@@ -8,8 +8,8 @@ use crate::traits::{
     fmm::SourceToTargetTranslation,
     tree::{FmmTree, Tree},
 };
-use green_kernels::traits::Kernel;
 use crate::tree::{constants::NTRANSFER_VECTORS_KIFMM, types::single_node::SingleNodeTree};
+use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;

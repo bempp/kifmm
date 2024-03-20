@@ -3,16 +3,16 @@ use crate::fmm::{
     helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
     types::{Charges, FmmEvalType, KiFmm, KiFmmDummy},
 };
-use green_kernels::traits::Kernel;
 use crate::traits::{
     field::SourceToTargetData,
     fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
     tree::{FmmTree, Tree},
 };
 use crate::tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use green_kernels::traits::Kernel;
+use green_kernels::types::EvalType;
 use num::Float;
 use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
-use green_kernels::types::EvalType;
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
@@ -368,9 +368,9 @@ mod test {
     use super::*;
     use crate::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
     use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
-    use green_kernels::laplace_3d::Laplace3dKernel;
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::implementations::helpers::points_fixture;
+    use green_kernels::laplace_3d::Laplace3dKernel;
     use num::Float;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
@@ -533,13 +533,7 @@ mod test {
         fmm.evaluate();
 
         let fmm = Box::new(fmm);
-        test_single_node_fmm_vector_helper(
-            fmm,
-            EvalType::Value,
-            &sources,
-            &charges,
-            threshold_pot,
-        );
+        test_single_node_fmm_vector_helper(fmm, EvalType::Value, &sources, &charges, threshold_pot);
     }
 
     #[test]

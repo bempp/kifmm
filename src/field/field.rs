@@ -7,7 +7,6 @@ use crate::field::{
     types::FftM2lOperatorData,
     types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
-use green_kernels::{traits::Kernel, types::EvalType};
 use crate::traits::field::SourceToTargetData;
 use crate::tree::{
     constants::{
@@ -17,6 +16,7 @@ use crate::tree::{
     types::domain::Domain,
     types::morton::MortonKey,
 };
+use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
 use rlst::{

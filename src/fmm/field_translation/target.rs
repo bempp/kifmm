@@ -10,11 +10,11 @@ use crate::traits::{
     fmm::TargetTranslation,
     tree::{FmmTree, Tree},
 };
-use green_kernels::traits::Kernel;
 use crate::tree::{
     constants::NSIBLINGS,
     types::{morton::MortonKey, single_node::SingleNodeTree},
 };
+use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;

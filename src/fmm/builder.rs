@@ -14,12 +14,11 @@ use crate::traits::{
     field::SourceToTargetData,
     tree::{FmmTree, Tree},
 };
-use green_kernels::{    types::EvalType,
-traits::Kernel};
 use crate::tree::{
     constants::{ALPHA_INNER, ALPHA_OUTER, N_CRIT, ROOT},
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree},
 };
+use green_kernels::{traits::Kernel, types::EvalType};
 use num::Float;
 use rlst::{
     empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,

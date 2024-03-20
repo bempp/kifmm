@@ -4,8 +4,8 @@ use crate::traits::{
     fmm::SourceTranslation,
     tree::{FmmTree, Tree},
 };
-use green_kernels::{traits::Kernel, types::EvalType};
 use crate::tree::{constants::NSIBLINGS, types::single_node::SingleNodeTree};
+use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::Float;
 use rayon::prelude::*;

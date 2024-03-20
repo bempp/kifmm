@@ -1,7 +1,7 @@
 //! FMM traits
-use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
-use green_kernels::traits::Kernel;
 use crate::traits::tree::FmmTree;
+use green_kernels::traits::Kernel;
+use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {

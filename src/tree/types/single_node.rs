@@ -1,10 +1,10 @@
 //! Data Structures to create octrees on a single node.
-use rlst::RlstScalar;
 use crate::tree::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},
 };
 use num::Float;
+use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 
 /// Local Trees (non-distributed).

@@ -2,10 +2,10 @@
 use crate::fmm::tree::SingleNodeFmmTree;
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
 use crate::tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
+use green_kernels::{traits::Kernel, types::EvalType};
 use num::Float;
 use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
-use green_kernels::{traits::Kernel, types::EvalType};
 
 /// Type alias to store charges corresponding to nvecs, in column major order such that the shape is `[ncharges, nvecs]`
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
