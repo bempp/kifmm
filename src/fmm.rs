@@ -1,6 +1,7 @@
 //! A a general framework for implementing Fast Multipole Methods.
 pub mod builder;
 pub mod constants;
+#[allow(clippy::module_inception)]
 pub mod fmm;
 pub mod helpers;
 pub mod pinv;
