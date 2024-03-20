@@ -17,7 +17,7 @@ jobs:
       matrix:
         rust-version: ["stable"]
         mpi: ['mpich', 'openmpi']
-        feature-flags: ['--features "mpi,strict"']
+        feature-flags: ['--features "strict"']
     steps:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -42,7 +42,7 @@ jobs:
       - name: Run tests
         run: cargo test --examples --release ${{ matrix.feature-flags }}
       - name: Test benchmarks build
-        run: cargo bench --no-run --features "mpi,strict"
+        run: cargo bench --no-run ${{ matrix.feature-flags }}
       - name: Run examples
         run: |
           python3 find_examples.py
