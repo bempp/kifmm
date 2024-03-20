@@ -6,11 +6,12 @@ use crate::fmm::{
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
 use crate::traits::tree::FmmTree;
-use crate::traits::{fmm::SourceToTargetTranslation, kernel::Kernel, tree::Tree};
+use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
     constants::{NHALO, NSIBLINGS},
     types::{morton::MortonKey, single_node::SingleNodeTree},
 };
+use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use num::{Complex, Float};
 use rayon::prelude::*;

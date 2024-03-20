@@ -1,5 +1,5 @@
 //! Field traits
-use crate::traits::kernel::Kernel;
+use green_kernels::traits::Kernel;
 
 /// Container for metadata associated with a field translation implementation.
 pub trait SourceToTargetData<T>

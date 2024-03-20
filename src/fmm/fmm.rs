@@ -3,16 +3,16 @@ use crate::fmm::{
     helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
     types::{Charges, FmmEvalType, KiFmm, KiFmmDummy},
 };
+use green_kernels::traits::Kernel;
 use crate::traits::{
     field::SourceToTargetData,
     fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
-    kernel::Kernel,
     tree::{FmmTree, Tree},
-    types::EvalType,
 };
 use crate::tree::types::{morton::MortonKey, single_node::SingleNodeTree};
 use num::Float;
 use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
+use green_kernels::types::EvalType;
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
@@ -368,7 +368,7 @@ mod test {
     use super::*;
     use crate::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
     use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
-    use crate::kernel::laplace_3d::Laplace3dKernel;
+    use green_kernels::laplace_3d::Laplace3dKernel;
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::implementations::helpers::points_fixture;
     use num::Float;
@@ -517,7 +517,7 @@ mod test {
                 &charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                crate::traits::types::EvalType::Value,
+                EvalType::Value,
                 FftFieldTranslationKiFmm::new(),
             )
             .unwrap()
@@ -535,7 +535,7 @@ mod test {
         let fmm = Box::new(fmm);
         test_single_node_fmm_vector_helper(
             fmm,
-            crate::traits::types::EvalType::Value,
+            EvalType::Value,
             &sources,
             &charges,
             threshold_pot,
@@ -578,7 +578,7 @@ mod test {
                     &charges,
                     expansion_order,
                     Laplace3dKernel::new(),
-                    crate::traits::types::EvalType::Value,
+                    EvalType::Value,
                     FftFieldTranslationKiFmm::new(),
                 )
                 .unwrap()
@@ -603,7 +603,7 @@ mod test {
                     &charges,
                     expansion_order,
                     Laplace3dKernel::new(),
-                    crate::traits::types::EvalType::ValueDeriv,
+                    EvalType::ValueDeriv,
                     FftFieldTranslationKiFmm::new(),
                 )
                 .unwrap()
@@ -776,7 +776,7 @@ mod test {
         let mut found = vec![T::zero()];
 
         fmm.kernel().evaluate_st(
-            crate::traits::types::EvalType::Value,
+            EvalType::Value,
             sources.data(),
             &test_point,
             charges.data(),
@@ -784,7 +784,7 @@ mod test {
         );
 
         fmm.kernel().evaluate_st(
-            crate::traits::types::EvalType::Value,
+            EvalType::Value,
             &upward_equivalent_surface,
             &test_point,
             multipole,
@@ -823,7 +823,7 @@ mod test {
                 &charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                crate::traits::types::EvalType::Value,
+                EvalType::Value,
                 FftFieldTranslationKiFmm::new(),
             )
             .unwrap()
@@ -839,7 +839,7 @@ mod test {
                 &charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                crate::traits::types::EvalType::Value,
+                EvalType::Value,
                 BlasFieldTranslationKiFmm::new(svd_threshold),
             )
             .unwrap()

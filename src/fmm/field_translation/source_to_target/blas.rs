@@ -6,9 +6,9 @@ use crate::fmm::{
 };
 use crate::traits::{
     fmm::SourceToTargetTranslation,
-    kernel::Kernel,
     tree::{FmmTree, Tree},
 };
+use green_kernels::traits::Kernel;
 use crate::tree::{constants::NTRANSFER_VECTORS_KIFMM, types::single_node::SingleNodeTree};
 use itertools::Itertools;
 use num::Float;

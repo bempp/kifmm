@@ -1,7 +1,6 @@
 //! FMM traits
 use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
-
-use crate::traits::kernel::Kernel;
+use green_kernels::traits::Kernel;
 use crate::traits::tree::FmmTree;
 
 /// Interface for source field translations.

@@ -1,10 +1,11 @@
 //! Data structures for kernel independent FMM
 use crate::fmm::tree::SingleNodeFmmTree;
-use crate::traits::{field::SourceToTargetData, kernel::Kernel, tree::FmmTree, types::EvalType};
+use crate::traits::{field::SourceToTargetData, tree::FmmTree};
 use crate::tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
 use num::Float;
 use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
+use green_kernels::{traits::Kernel, types::EvalType};
 
 /// Type alias to store charges corresponding to nvecs, in column major order such that the shape is `[ncharges, nvecs]`
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -195,11 +196,11 @@ pub enum FmmEvalType {
 /// # extern crate lapack_src;
 /// use kifmm::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 /// use kifmm::fmm::types::KiFmmBuilderSingleNode;
-/// use kifmm::kernel::laplace_3d::Laplace3dKernel;
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::implementations::helpers::points_fixture;
 /// use rlst::{rlst_dynamic_array2, RawAccessMut};
+/// use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 ///
 /// /// Particle data
 /// let nsources = 1000;
@@ -229,7 +230,7 @@ pub enum FmmEvalType {
 ///         &charges,
 ///         expansion_order,
 ///         Laplace3dKernel::new(),
-///         kifmm::traits::types::EvalType::Value,
+///         EvalType::Value,
 ///         FftFieldTranslationKiFmm::new(),
 ///     )
 ///     .unwrap()

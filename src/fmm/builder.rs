@@ -12,10 +12,10 @@ use crate::fmm::{
 };
 use crate::traits::{
     field::SourceToTargetData,
-    kernel::Kernel,
     tree::{FmmTree, Tree},
-    types::EvalType,
 };
+use green_kernels::{    types::EvalType,
+traits::Kernel};
 use crate::tree::{
     constants::{ALPHA_INNER, ALPHA_OUTER, N_CRIT, ROOT},
     types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree},

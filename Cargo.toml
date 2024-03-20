@@ -24,8 +24,6 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 itertools = "0.10"
 num = "0.4"
-rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-fftw = { git = "https://github.com/skailasa/fftw.git" }
 cauchy = "0.4.*"
 approx = "0.5"
 rayon = "1.9"
@@ -36,6 +34,9 @@ num_cpus = "1"
 superslice = "1"
 libc = "0.2"
 thiserror="1.*"
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+fftw = { git = "https://github.com/skailasa/fftw.git" }
+green-kernels = { git = "https://github.com/bempp/green-kernels" }
 
 [dev-dependencies]
 approx_eq = "0.1.8"

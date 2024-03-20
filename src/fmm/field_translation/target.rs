@@ -8,9 +8,9 @@ use crate::fmm::{
 use crate::traits::{
     field::SourceToTargetData,
     fmm::TargetTranslation,
-    kernel::Kernel,
     tree::{FmmTree, Tree},
 };
+use green_kernels::traits::Kernel;
 use crate::tree::{
     constants::NSIBLINGS,
     types::{morton::MortonKey, single_node::SingleNodeTree},

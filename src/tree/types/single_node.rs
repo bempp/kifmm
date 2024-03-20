@@ -1,5 +1,5 @@
 //! Data Structures to create octrees on a single node.
-use crate::traits::types::RlstScalar;
+use rlst::RlstScalar;
 use crate::tree::types::{
     domain::Domain,
     morton::{MortonKey, MortonKeys},

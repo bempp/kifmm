@@ -2,10 +2,9 @@
 use crate::traits::{
     field::SourceToTargetData,
     fmm::SourceTranslation,
-    kernel::Kernel,
     tree::{FmmTree, Tree},
-    types::EvalType,
 };
+use green_kernels::{traits::Kernel, types::EvalType};
 use crate::tree::{constants::NSIBLINGS, types::single_node::SingleNodeTree};
 use itertools::Itertools;
 use num::Float;

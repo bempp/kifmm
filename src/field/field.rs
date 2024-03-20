@@ -7,8 +7,8 @@ use crate::field::{
     types::FftM2lOperatorData,
     types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
-use crate::traits::kernel::Kernel;
-use crate::traits::{field::SourceToTargetData, types::EvalType};
+use green_kernels::{traits::Kernel, types::EvalType};
+use crate::traits::field::SourceToTargetData;
 use crate::tree::{
     constants::{
         ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
@@ -589,7 +589,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::kernel::laplace_3d::Laplace3dKernel;
+    use green_kernels::laplace_3d::Laplace3dKernel;
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
