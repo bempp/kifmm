@@ -1,15 +1,12 @@
 //! Implementation of the Laplace kernel
-use std::marker::PhantomData;
 use crate::kernel::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
-use crate::traits::{
-    kernel::Kernel,
-    types::EvalType,
-};
-use rlst::RlstScalar;
+use crate::traits::{kernel::Kernel, types::EvalType};
 use num::traits::FloatConst;
 use rayon::prelude::*;
+use rlst::RlstScalar;
+use std::marker::PhantomData;
 
 /// Kernel for Laplace in 3D
 #[derive(Clone)]

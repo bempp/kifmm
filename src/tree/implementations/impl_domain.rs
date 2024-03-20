@@ -90,9 +90,9 @@ impl<T: Float + Default + Debug> Domain<T> {
 
 #[cfg(test)]
 mod test {
-    use rlst::{RawAccess, Shape, RlstScalar};
-    use crate::tree::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
     use super::*;
+    use crate::tree::implementations::helpers::{points_fixture, points_fixture_col, PointsMat};
+    use rlst::{RawAccess, RlstScalar, Shape};
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where

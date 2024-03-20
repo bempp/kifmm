@@ -647,9 +647,9 @@ where
 
 #[cfg(test)]
 mod test {
-    use rlst::RawAccess;
-    use crate::tree::implementations::helpers::{points_fixture, points_fixture_col};
     use super::*;
+    use crate::tree::implementations::helpers::{points_fixture, points_fixture_col};
+    use rlst::RawAccess;
 
     #[test]
     pub fn test_uniform_tree() {

@@ -2,15 +2,12 @@
 use crate::kernel::helpers::{
     check_dimensions_assemble, check_dimensions_assemble_diagonal, check_dimensions_evaluate,
 };
-use crate::traits::{
-    kernel::Kernel,
-    types::EvalType,
-};
+use crate::traits::{kernel::Kernel, types::EvalType};
 use num::traits::FloatConst;
 use num::Zero;
 use rayon::prelude::*;
-use std::marker::PhantomData;
 use rlst::RlstScalar;
+use std::marker::PhantomData;
 
 /// Kernel for Helmholtz in 3D
 #[derive(Clone)]

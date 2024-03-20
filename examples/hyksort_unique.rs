@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use rand::Rng;
-use mpi::traits::{Communicator, Destination, Source};
 use kifmm::hyksort::hyksort;
+use mpi::traits::{Communicator, Destination, Source};
+use rand::Rng;
+use std::collections::HashSet;
 
 fn main() {
     // Setup MPI

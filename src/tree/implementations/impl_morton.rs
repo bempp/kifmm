@@ -1018,11 +1018,11 @@ impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+    use crate::tree::implementations::helpers::points_fixture;
     use itertools::Itertools;
     use rlst::{RawAccess, Shape};
     use std::vec;
-    use crate::tree::implementations::helpers::points_fixture;
-    use super::*;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].
     fn most_significant_bit(x: u64, y: u64) -> bool {

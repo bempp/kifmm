@@ -68,10 +68,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use rlst::RawAccess;
     use crate::tree::constants::DEEPEST_LEVEL;
     use crate::tree::implementations::helpers::points_fixture;
     use crate::tree::types::{domain::Domain, morton::MortonKey, point::Point};
+    use rlst::RawAccess;
 
     #[test]
     pub fn test_ordering() {

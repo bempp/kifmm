@@ -1,9 +1,6 @@
 //! Helpers
 
-use crate::traits::{
-    kernel::Kernel,
-    types::EvalType,
-};
+use crate::traits::{kernel::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
 pub(crate) fn check_dimensions_evaluate<K: Kernel, T: RlstScalar>(

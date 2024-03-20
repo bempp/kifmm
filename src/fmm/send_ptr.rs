@@ -1,7 +1,7 @@
 //! Send ptr
 
-use num::Complex;
 use crate::fmm::types::{SendPtr, SendPtrMut};
+use num::Complex;
 
 unsafe impl<T> Sync for SendPtrMut<T> {}
 unsafe impl<T> Send for SendPtrMut<Complex<T>> {}

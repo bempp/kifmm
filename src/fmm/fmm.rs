@@ -365,6 +365,9 @@ where
 #[cfg(test)]
 mod test {
 
+    use super::*;
+    use crate::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
+    use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
     use crate::kernel::laplace_3d::Laplace3dKernel;
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::implementations::helpers::points_fixture;
@@ -376,9 +379,6 @@ mod test {
     use rlst::BaseArray;
     use rlst::VectorContainer;
     use rlst::{RawAccess, RawAccessMut, Shape};
-    use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
-    use crate::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
-    use super::*;
 
     fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
