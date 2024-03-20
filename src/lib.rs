@@ -7,6 +7,5 @@
 pub mod field;
 pub mod fmm;
 pub mod hyksort;
-pub mod tools;
 pub mod traits;
 pub mod tree;
