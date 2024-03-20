@@ -1,6 +1,6 @@
 //! Constructor for a single node Domain.
-use num::Float;
 use crate::tree::types::domain::Domain;
+use num::Float;
 use std::fmt::Debug;
 
 impl<T: Float + Default + Debug> Domain<T> {

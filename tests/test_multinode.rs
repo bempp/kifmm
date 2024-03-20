@@ -1,14 +1,14 @@
 // ? mpirun -n {{NPROCESSES}} --features "mpi"
 #![allow(unused_imports)]
 
-#[cfg(feature = "mpi")]
-use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 use kifmm::traits::tree::Tree;
-use rand::distributions::uniform::SampleUniform;
+use kifmm::tree::implementations::helpers::points_fixture;
 #[cfg(feature = "mpi")]
 use kifmm::tree::types::{domain::Domain, morton::MortonKey, multi_node::MultiNodeTree};
-use kifmm::tree::implementations::helpers::points_fixture;
+#[cfg(feature = "mpi")]
+use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
 use num::traits::Float;
+use rand::distributions::uniform::SampleUniform;
 use rlst::{RawAccess, RlstScalar};
 
 /// Test that the leaves on separate nodes do not overlap.

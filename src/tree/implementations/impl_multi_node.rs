@@ -1,17 +1,8 @@
 //! Implementation of constructors for multi node trees from distributed point data.
-use rlst::RlstScalar;
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-use mpi::{
-    // collective::SystemOperation,
-    topology::UserCommunicator,
-    traits::{Communicator, Equivalence},
-};
-use num::traits::Float;
+use crate::hyksort::hyksort;
 use crate::traits::tree::Tree;
 use crate::tree::{
-    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, N_CRIT, ROOT, LEVEL_SIZE},
+    constants::{DEEPEST_LEVEL, DEFAULT_LEVEL, LEVEL_SIZE, N_CRIT, ROOT},
     implementations::impl_morton::{complete_region, encode_anchor},
     types::{
         domain::Domain,
@@ -21,12 +12,21 @@ use crate::tree::{
         single_node::SingleNodeTree,
     },
 };
-use crate::hyksort::hyksort;
+use itertools::Itertools;
 use mpi::{
     topology::UserCommunicator,
     traits::{Communicator, Destination, Equivalence, Source},
     Rank,
 };
+use mpi::{
+    // collective::SystemOperation,
+    topology::UserCommunicator,
+    traits::{Communicator, Equivalence},
+};
+use num::traits::Float;
+use rlst::RlstScalar;
+use std::collections::{HashMap, HashSet};
+use std::fmt::Debug;
 
 impl<T> MultiNodeTree<T>
 where
