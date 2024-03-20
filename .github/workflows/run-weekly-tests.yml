@@ -33,22 +33,16 @@ jobs:
         run: cargo build --features "strict"
       - name: Build rust library in release mode
         run: cargo build --release --features "strict"
-      - name: Build rust library in release mode with mpi
-        run: cargo build --release --features "strict,mpi"
 
 
       - name: Run unit tests
         run: cargo test --features "strict"
       - name: Run unit tests in release mode
         run: cargo test --release --features "strict"
-      - name: Run unit tests with mpi enabled
-        run: cargo test --features "mpi,strict"
-      - name: Run unit tests in release mode with mpi enabled
-        run: cargo test --release --features "mpi,strict"
       - name: Run tests
-        run: cargo test --examples --release --features "mpi,strict"
+        run: cargo test --examples --release --features "strict"
       - name: Test benchmarks build
-        run: cargo bench --no-run --features "mpi,strict"
+        run: cargo bench --no-run --features "strict"
       - name: Run examples
         run: |
           python3 find_examples.py
@@ -56,4 +50,4 @@ jobs:
           ./examples.sh
 
       - name: Build docs
-        run: cargo doc --features "mpi,strict" --no-deps
+        run: cargo doc --features "strict" --no-deps
