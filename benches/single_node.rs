@@ -1,11 +1,11 @@
 use std::time::Duration;
 
-use bempp_field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
-use bempp_fmm::types::KiFmmBuilderSingleNode;
-use bempp_kernel::laplace_3d::Laplace3dKernel;
-use bempp_traits::fmm::Fmm;
-use bempp_traits::types::EvalType;
-use bempp_tree::implementations::helpers::points_fixture;
+use kifmm::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
+use kifmm::fmm::types::KiFmmBuilderSingleNode;
+use kifmm::kernel::laplace_3d::Laplace3dKernel;
+use kifmm::traits::fmm::Fmm;
+use kifmm::traits::types::EvalType;
+use kifmm::tree::implementations::helpers::points_fixture;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rlst::{rlst_dynamic_array2, RawAccessMut};
 
