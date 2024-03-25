@@ -371,14 +371,13 @@ mod test {
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::implementations::helpers::points_fixture;
     use green_kernels::laplace_3d::Laplace3dKernel;
-    use num::Float;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rlst::rlst_array_from_slice2;
     use rlst::Array;
     use rlst::BaseArray;
+    use rlst::RawAccessMut;
     use rlst::VectorContainer;
-    use rlst::{RawAccess, RawAccessMut, Shape};
 
     fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
