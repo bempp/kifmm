@@ -376,8 +376,8 @@ mod test {
     use rlst::rlst_array_from_slice2;
     use rlst::Array;
     use rlst::BaseArray;
-    use rlst::VectorContainer;
     use rlst::RawAccessMut;
+    use rlst::VectorContainer;
 
     fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
