@@ -139,9 +139,6 @@ pub struct KiFmm<
 
     /// Scales of each source leaf box
     pub leaf_scales_sources: Vec<W>,
-
-    /// Global indices of each charge
-    pub global_indices: Vec<usize>,
 }
 
 /// Dummy for KiFMM, simply used for implementing the trait that evaluated interactions directly

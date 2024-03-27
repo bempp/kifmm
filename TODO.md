@@ -1,0 +1,5 @@
+- Readme
+- uniform docs that are useful
+- returning potential data in original ordering
+- fft sys crate with minimal bindings to remove dependency.
+- remove global index in fmm struct

@@ -247,7 +247,6 @@ where
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),
             leaf_scales_sources: Vec::default(),
-            global_indices: Vec::default(),
         }
     }
 }

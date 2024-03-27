@@ -1,4 +1,4 @@
-//! A a general framework for implementing Fast Multipole Methods.
+//! A general framework for implementing Fast Multipole Methods.
 pub mod builder;
 pub mod constants;
 #[allow(clippy::module_inception)]
