@@ -8,7 +8,7 @@ use crate::traits::{
     fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
     tree::{FmmTree, Tree},
 };
-use crate::tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use crate::tree::types::{MortonKey, SingleNodeTree};
 use green_kernels::traits::Kernel;
 use green_kernels::types::EvalType;
 use num::Float;
@@ -368,7 +368,7 @@ mod test {
     use crate::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
     use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
     use crate::tree::constants::{ALPHA_INNER, ROOT};
-    use crate::tree::implementations::helpers::points_fixture;
+    use crate::tree::helpers::points_fixture;
     use green_kernels::laplace_3d::Laplace3dKernel;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};

@@ -1,6 +1,6 @@
 //! Types for storing field translation metadata.
 
-use crate::tree::types::morton::MortonKey;
+use crate::tree::types::MortonKey;
 use green_kernels::traits::Kernel;
 use num::{Complex, Float};
 use rlst::RlstScalar;

@@ -1,7 +1,7 @@
 //! Helpers
 use crate::fmm::types::{Charges, SendPtrMut};
 use crate::traits::tree::Tree;
-use crate::tree::types::{morton::MortonKey, single_node::SingleNodeTree};
+use crate::tree::types::{MortonKey, SingleNodeTree};
 use num::Float;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
 use std::collections::HashMap;

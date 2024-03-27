@@ -18,5 +18,22 @@
 //! \[4\] Chan, T. "Closest-point problems simplified on the RAM", ACM-SIAM Symposium on Discrete
 //! Algorithms (2002)
 pub mod constants;
-pub mod implementations;
 pub mod types;
+
+
+pub mod helpers;
+pub mod domain;
+pub mod morton;
+pub mod point;
+pub mod single_node;
+
+#[cfg(feature = "mpi")]
+pub mod impl_domain_mpi;
+#[cfg(feature = "mpi")]
+pub mod impl_morton_mpi;
+#[cfg(feature = "mpi")]
+pub mod impl_multi_node;
+#[cfg(feature = "mpi")]
+pub mod impl_point_mpi;
+#[cfg(feature = "mpi")]
+pub mod mpi_helpers;

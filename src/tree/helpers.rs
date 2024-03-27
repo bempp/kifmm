@@ -159,7 +159,7 @@ pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
 mod test {
 
     use super::*;
-    use crate::tree::types::morton::MortonKey;
+    use crate::tree::types::MortonKey;
 
     #[test]
     fn test_find_corners() {

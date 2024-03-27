@@ -1,6 +1,6 @@
 //! Functions for handling transfer vectors
 use crate::field::types::TransferVector;
-use crate::tree::types::{domain::Domain, morton::MortonKey};
+use crate::tree::types::{Domain, MortonKey};
 use itertools::Itertools;
 use std::collections::HashSet;
 

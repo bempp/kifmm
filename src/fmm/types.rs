@@ -1,7 +1,7 @@
 //! Data structures for kernel independent FMM
 use crate::fmm::tree::SingleNodeFmmTree;
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
-use crate::tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
+use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Float;
 use rlst::{Array, BaseArray, RlstScalar, VectorContainer};

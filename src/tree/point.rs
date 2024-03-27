@@ -1,5 +1,5 @@
 //! Implementation of traits for handling, and sorting, containers of point data.
-use crate::tree::types::point::{Point, Points};
+use crate::tree::types::{Point, Points};
 use rlst::RlstScalar;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -66,11 +66,72 @@ where
     }
 }
 
+
+#[cfg(feature = "mpi")]
+use memoffset::offset_of;
+#[cfg(feature = "mpi")]
+use mpi::{
+    datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
+    Address,
+};
+
+#[cfg(feature = "mpi")]
+unsafe impl<T> Equivalence for Point<T>
+where
+    T: RlstScalar<Real = T> + Float + Equivalence,
+{
+    type Out = UserDatatype;
+    fn equivalent_datatype() -> Self::Out {
+        UserDatatype::structured(
+            &[1, 1, 1, 1],
+            &[
+                offset_of!(Point<T>, coordinate) as Address,
+                offset_of!(Point<T>, global_idx) as Address,
+                offset_of!(Point<T>, base_key) as Address,
+                offset_of!(Point<T>, encoded_key) as Address,
+            ],
+            &[
+                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::structured(
+                    &[1, 1],
+                    &[
+                        offset_of!(MortonKey, anchor) as Address,
+                        offset_of!(MortonKey, morton) as Address,
+                    ],
+                    &[
+                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
+                            .as_ref(),
+                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
+                            .as_ref(),
+                    ],
+                )
+                .as_ref(),
+                UncommittedUserDatatype::structured(
+                    &[1, 1],
+                    &[
+                        offset_of!(MortonKey, anchor) as Address,
+                        offset_of!(MortonKey, morton) as Address,
+                    ],
+                    &[
+                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
+                            .as_ref(),
+                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
+                            .as_ref(),
+                    ],
+                )
+                .as_ref(),
+            ],
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use crate::tree::constants::DEEPEST_LEVEL;
-    use crate::tree::implementations::helpers::points_fixture;
-    use crate::tree::types::{domain::Domain, morton::MortonKey, point::Point};
+    use crate::tree::helpers::points_fixture;
+    use crate::tree::types::{Domain, MortonKey, Point};
     use rlst::RawAccess;
 
     #[test]

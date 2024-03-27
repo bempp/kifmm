@@ -1,6 +1,6 @@
 //! Tree
 use crate::traits::tree::{FmmTree, Tree};
-use crate::tree::types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree};
+use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
 use num::Float;
 use rlst::RlstScalar;
 

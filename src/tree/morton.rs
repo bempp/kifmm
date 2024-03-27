@@ -6,11 +6,10 @@ use crate::tree::{
         LEVEL_SIZE, NINE_BIT_MASK, X_LOOKUP_DECODE, X_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
-    implementations::helpers::find_corners,
+    helpers::find_corners,
     types::{
-        domain::Domain,
-        morton::{KeyType, MortonKey, MortonKeys},
-        point::PointType,
+        Domain,
+        MortonKey, MortonKeys,
     },
 };
 use itertools::{izip, Itertools};
@@ -204,9 +203,9 @@ impl FromIterator<MortonKey> for MortonKeys {
 }
 
 /// Helper function for decoding keys.
-fn decode_key_helper(key: KeyType, lookup_table: &[KeyType; 512]) -> KeyType {
-    const N_LOOPS: KeyType = 7; // 8 bytes in 64 bit key
-    let mut coord: KeyType = 0;
+fn decode_key_helper(key: u64, lookup_table: &[u64; 512]) -> u64 {
+    const N_LOOPS: u64 = 7; // 8 bytes in 64 bit key
+    let mut coord: u64 = 0;
 
     for index in 0..N_LOOPS {
         coord |= lookup_table[((key >> (index * 9)) & NINE_BIT_MASK) as usize] << (3 * index);
@@ -218,7 +217,7 @@ fn decode_key_helper(key: KeyType, lookup_table: &[KeyType; 512]) -> KeyType {
 /// Decode a given key.
 ///
 /// Returns the anchor for the given Morton key
-fn decode_key(morton: KeyType) -> [KeyType; 3] {
+fn decode_key(morton: u64) -> [u64; 3] {
     let key = morton >> LEVEL_DISPLACEMENT;
 
     let x = decode_key_helper(key, &X_LOOKUP_DECODE);
@@ -237,10 +236,10 @@ fn decode_key(morton: KeyType) -> [KeyType; 3] {
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
 pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
-    point: &[PointType<T>; 3],
-    level: KeyType,
+    point: &[T; 3],
+    level: u64,
     domain: &Domain<T>,
-) -> Result<[KeyType; 3], Box<dyn Error>> {
+) -> Result<[u64; 3], Box<dyn Error>> {
     // Check if point is in the domain
 
     let mut tmp = Vec::new();
@@ -251,7 +250,7 @@ pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
 
     match contained {
         true => {
-            let mut anchor = [KeyType::default(); 3];
+            let mut anchor = [u64::default(); 3];
 
             let side_length: Vec<T> = domain
                 .diameter
@@ -278,12 +277,12 @@ pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
 /// # Arguments
 /// * `anchor` - A vector with 3 elements defining the integer coordinates.
 /// * `level` - The level of the tree the anchor is encoded to.
-pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
+pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
     let x = anchor[0];
     let y = anchor[1];
     let z = anchor[2];
 
-    let key: KeyType = X_LOOKUP_ENCODE[((x >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
+    let key: u64 = X_LOOKUP_ENCODE[((x >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
         | Y_LOOKUP_ENCODE[((y >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize]
         | Z_LOOKUP_ENCODE[((z >> BYTE_DISPLACEMENT) & BYTE_MASK) as usize];
 
@@ -298,14 +297,14 @@ pub fn encode_anchor(anchor: &[KeyType; 3], level: KeyType) -> KeyType {
 
 impl MortonKey {
     /// Construct a `MortonKey` type from a Morton index
-    pub fn from_morton(morton: KeyType) -> Self {
+    pub fn from_morton(morton: u64) -> Self {
         let anchor = decode_key(morton);
 
         MortonKey { anchor, morton }
     }
 
     /// Construct a `MortonKey` type from the anchor at a given level
-    pub fn from_anchor(anchor: &[KeyType; 3], level: u64) -> Self {
+    pub fn from_anchor(anchor: &[u64; 3], level: u64) -> Self {
         let morton = encode_anchor(anchor, level);
 
         MortonKey {
@@ -321,7 +320,7 @@ impl MortonKey {
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
     pub fn from_point<T: Float + Default + Debug>(
-        point: &[PointType<T>; 3],
+        point: &[T; 3],
         domain: &Domain<T>,
         level: u64,
     ) -> Self {
@@ -428,17 +427,17 @@ impl MortonKey {
     }
 
     /// The anchor corresponding to this key.
-    pub fn anchor(&self) -> &[KeyType; 3] {
+    pub fn anchor(&self) -> &[u64; 3] {
         &self.anchor
     }
 
     /// The Morton Key in index form.
-    pub fn morton(&self) -> KeyType {
+    pub fn morton(&self) -> u64 {
         self.morton
     }
 
     /// The level of this key.
-    pub fn level(&self) -> KeyType {
+    pub fn level(&self) -> u64 {
         self.morton & LEVEL_MASK
     }
 
@@ -497,12 +496,12 @@ impl MortonKey {
         let level = self.level();
         let morton = self.morton() >> LEVEL_DISPLACEMENT;
 
-        let mut children_morton: [KeyType; 8] = [0; 8];
+        let mut children_morton: [u64; 8] = [0; 8];
         let mut children: Vec<MortonKey> = Vec::with_capacity(8);
         let bit_shift = 3 * (DEEPEST_LEVEL - level - 1);
         for (index, item) in children_morton.iter_mut().enumerate() {
             *item =
-                ((morton | (index << bit_shift) as KeyType) << LEVEL_DISPLACEMENT) | (level + 1);
+                ((morton | (index << bit_shift) as u64) << LEVEL_DISPLACEMENT) | (level + 1);
         }
 
         for &child_morton in children_morton.iter() {
@@ -591,8 +590,8 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The domain with which we are calculating with respect to.
-    pub fn to_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> [PointType<T>; 3] {
-        let mut coord: [PointType<T>; 3] = [T::zero(); 3];
+    pub fn to_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
+        let mut coord: [T; 3] = [T::zero(); 3];
 
         for (anchor_value, coord_ref, origin_value, diameter_value) in
             izip!(self.anchor, &mut coord, &domain.origin, &domain.diameter)
@@ -692,7 +691,7 @@ impl MortonKey {
             & (y < max_number_of_boxes)
             & (z < max_number_of_boxes)
         {
-            let new_anchor: [KeyType; 3] = [x as KeyType, y as KeyType, z as KeyType];
+            let new_anchor: [u64; 3] = [x as u64, y as u64, z as u64];
             let new_morton = encode_anchor(&new_anchor, level);
             Some(MortonKey {
                 anchor: new_anchor,
@@ -1016,10 +1015,40 @@ impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
     }
 }
 
+
+
+#[cfg(feature = "mpi")]
+use memoffset::offset_of;
+
+#[cfg(feature = "mpi")]
+use mpi::{
+    datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
+    Address,
+};
+
+#[cfg(feature = "mpi")]
+unsafe impl Equivalence for MortonKey {
+    type Out = UserDatatype;
+    fn equivalent_datatype() -> Self::Out {
+        UserDatatype::structured(
+            &[1, 1],
+            &[
+                offset_of!(MortonKey, anchor) as Address,
+                offset_of!(MortonKey, morton) as Address,
+            ],
+            &[
+                UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
+            ],
+        )
+    }
+}
+
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::tree::implementations::helpers::points_fixture;
+    use crate::tree::helpers::points_fixture;
     use rlst::{RawAccess, Shape};
     use std::vec;
 
@@ -1090,10 +1119,10 @@ mod test {
     #[test]
     fn test_z_encode_table() {
         for (mut index, actual) in Z_LOOKUP_ENCODE.iter().enumerate() {
-            let mut sum: KeyType = 0;
+            let mut sum: u64 = 0;
 
             for shift in 0..8 {
-                sum |= ((index & 1) << (3 * shift)) as KeyType;
+                sum |= ((index & 1) << (3 * shift)) as u64;
                 index >>= 1;
             }
 
@@ -1104,10 +1133,10 @@ mod test {
     #[test]
     fn test_y_encode_table() {
         for (mut index, actual) in Y_LOOKUP_ENCODE.iter().enumerate() {
-            let mut sum: KeyType = 0;
+            let mut sum: u64 = 0;
 
             for shift in 0..8 {
-                sum |= ((index & 1) << (3 * shift + 1)) as KeyType;
+                sum |= ((index & 1) << (3 * shift + 1)) as u64;
                 index >>= 1;
             }
 
@@ -1118,10 +1147,10 @@ mod test {
     #[test]
     fn test_x_encode_table() {
         for (mut index, actual) in X_LOOKUP_ENCODE.iter().enumerate() {
-            let mut sum: KeyType = 0;
+            let mut sum: u64 = 0;
 
             for shift in 0..8 {
-                sum |= ((index & 1) << (3 * shift + 2)) as KeyType;
+                sum |= ((index & 1) << (3 * shift + 2)) as u64;
                 index >>= 1;
             }
 
@@ -1132,9 +1161,9 @@ mod test {
     #[test]
     fn test_z_decode_table() {
         for (index, &actual) in Z_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: KeyType = (index & 1) as KeyType;
-            expected |= (((index >> 3) & 1) << 1) as KeyType;
-            expected |= (((index >> 6) & 1) << 2) as KeyType;
+            let mut expected: u64 = (index & 1) as u64;
+            expected |= (((index >> 3) & 1) << 1) as u64;
+            expected |= (((index >> 6) & 1) << 2) as u64;
 
             assert_eq!(actual, expected);
         }
@@ -1143,9 +1172,9 @@ mod test {
     #[test]
     fn test_y_decode_table() {
         for (index, &actual) in Y_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: KeyType = ((index >> 1) & 1) as KeyType;
-            expected |= (((index >> 4) & 1) << 1) as KeyType;
-            expected |= (((index >> 7) & 1) << 2) as KeyType;
+            let mut expected: u64 = ((index >> 1) & 1) as u64;
+            expected |= (((index >> 4) & 1) << 1) as u64;
+            expected |= (((index >> 7) & 1) << 2) as u64;
 
             assert_eq!(actual, expected);
         }
@@ -1154,9 +1183,9 @@ mod test {
     #[test]
     fn test_x_decode_table() {
         for (index, &actual) in X_LOOKUP_DECODE.iter().enumerate() {
-            let mut expected: KeyType = ((index >> 2) & 1) as KeyType;
-            expected |= (((index >> 5) & 1) << 1) as KeyType;
-            expected |= (((index >> 8) & 1) << 2) as KeyType;
+            let mut expected: u64 = ((index >> 2) & 1) as u64;
+            expected |= (((index >> 5) & 1) << 1) as u64;
+            expected |= (((index >> 8) & 1) << 2) as u64;
 
             assert_eq!(actual, expected);
         }
@@ -1164,7 +1193,7 @@ mod test {
 
     #[test]
     fn test_encoding_decoding() {
-        let anchor: [KeyType; 3] = [65535, 65535, 65535];
+        let anchor: [u64; 3] = [65535, 65535, 65535];
 
         let actual = decode_key(encode_anchor(&anchor, DEEPEST_LEVEL));
 

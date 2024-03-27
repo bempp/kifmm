@@ -16,7 +16,7 @@ use crate::traits::{
 };
 use crate::tree::{
     constants::{ALPHA_INNER, ALPHA_OUTER, N_CRIT, ROOT},
-    types::{domain::Domain, morton::MortonKey, single_node::SingleNodeTree},
+    types::{Domain, MortonKey, SingleNodeTree},
 };
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Float;

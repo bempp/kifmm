@@ -2,12 +2,12 @@
 use crate::traits::tree::Tree;
 use crate::tree::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, ROOT},
-    implementations::impl_morton::encode_anchor,
+    morton::encode_anchor,
     types::{
-        domain::Domain,
-        morton::{MortonKey, MortonKeys},
-        point::{Point, PointType, Points},
-        single_node::SingleNodeTree,
+        Domain,
+        MortonKey, MortonKeys,
+        Point, Points,
+        SingleNodeTree,
     },
 };
 use itertools::Itertools;
@@ -15,7 +15,7 @@ use num::Float;
 use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 
-use super::impl_morton::complete_region;
+use super::morton::complete_region;
 
 impl<T> SingleNodeTree<T>
 where
@@ -186,7 +186,7 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     fn uniform_tree_sparse(
-        points: &[PointType<T>],
+        points: &[T],
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
@@ -648,7 +648,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::tree::implementations::helpers::{points_fixture, points_fixture_col};
+    use crate::tree::helpers::{points_fixture, points_fixture_col};
     use rlst::RawAccess;
 
     #[test]

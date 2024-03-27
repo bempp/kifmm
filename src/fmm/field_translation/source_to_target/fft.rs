@@ -9,7 +9,7 @@ use crate::traits::tree::FmmTree;
 use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
     constants::{NHALO, NSIBLINGS},
-    types::{morton::MortonKey, single_node::SingleNodeTree},
+    types::{MortonKey, SingleNodeTree},
 };
 use green_kernels::traits::Kernel;
 use itertools::Itertools;

@@ -12,9 +12,8 @@ use crate::tree::{
     constants::{
         ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
     },
-    implementations::helpers::find_corners,
-    types::domain::Domain,
-    types::morton::MortonKey,
+    helpers::find_corners,
+    types::{MortonKey, Domain},
 };
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;

@@ -12,7 +12,7 @@ use crate::traits::{
 };
 use crate::tree::{
     constants::NSIBLINGS,
-    types::{morton::MortonKey, single_node::SingleNodeTree},
+    types::{MortonKey, SingleNodeTree},
 };
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
