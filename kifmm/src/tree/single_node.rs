@@ -3,12 +3,7 @@ use crate::traits::tree::Tree;
 use crate::tree::{
     constants::{DEEPEST_LEVEL, LEVEL_SIZE, ROOT},
     morton::encode_anchor,
-    types::{
-        Domain,
-        MortonKey, MortonKeys,
-        Point, Points,
-        SingleNodeTree,
-    },
+    types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
 };
 use itertools::Itertools;
 use num::Float;

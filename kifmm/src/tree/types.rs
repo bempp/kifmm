@@ -7,9 +7,6 @@ use num::traits::Float;
 use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 
-
-
-
 /// A domain is a box defined aby an origin coordinate and its diameter along all three Cartesian axes.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -24,7 +21,6 @@ where
     /// by the maximum width of the point distribution along a given axis.
     pub diameter: [T; 3],
 }
-
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -47,7 +43,6 @@ pub struct MortonKeys {
     /// index for implementing the Iterator trait.
     pub index: usize,
 }
-
 
 /// Concrete distributed multi-node tree
 #[cfg(feature = "mpi")]
@@ -95,8 +90,6 @@ where
     pub range: [KeyType; 3],
 }
 
-
-
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
 /// the octree node in which it lies. Each Point as an associated 'base key', which is its matching
 /// Morton encoding at the lowest possible level of discretization (DEEPEST_LEVEL), and an 'encoded key'
@@ -133,7 +126,6 @@ where
     /// index for implementing the Iterator trait.
     pub index: usize,
 }
-
 
 /// Local Trees (non-distributed).
 #[derive(Default)]

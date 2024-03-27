@@ -5,7 +5,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 use kifmm::fmm::types::KiFmmBuilderSingleNode;
 use kifmm::traits::fmm::Fmm;
-use kifmm::tree::implementations::helpers::points_fixture;
+use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
 
 extern crate blas_src;

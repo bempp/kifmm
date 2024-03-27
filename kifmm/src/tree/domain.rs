@@ -88,7 +88,6 @@ impl<T: Float + Default + Debug> Domain<T> {
     }
 }
 
-
 #[cfg(feature = "mpi")]
 use memoffset::offset_of;
 
@@ -183,7 +182,6 @@ where
         }
     }
 }
-
 
 #[cfg(test)]
 mod test {

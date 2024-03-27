@@ -66,7 +66,6 @@ where
     }
 }
 
-
 #[cfg(feature = "mpi")]
 use memoffset::offset_of;
 #[cfg(feature = "mpi")]
@@ -125,7 +124,6 @@ where
         )
     }
 }
-
 
 #[cfg(test)]
 mod test {

@@ -1,5 +1,4 @@
 //! Builder objects to construct FMMs
-use crate::field::helpers::ncoeffs_kifmm;
 use crate::fmm::{
     helpers::{
         coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
@@ -10,6 +9,7 @@ use crate::fmm::{
     tree::SingleNodeFmmTree,
     types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode},
 };
+use crate::helpers::ncoeffs_kifmm;
 use crate::traits::{
     field::SourceToTargetData,
     tree::{FmmTree, Tree},

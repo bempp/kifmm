@@ -7,10 +7,7 @@ use crate::tree::{
         Y_LOOKUP_ENCODE, Z_LOOKUP_DECODE, Z_LOOKUP_ENCODE,
     },
     helpers::find_corners,
-    types::{
-        Domain,
-        MortonKey, MortonKeys,
-    },
+    types::{Domain, MortonKey, MortonKeys},
 };
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
@@ -500,8 +497,7 @@ impl MortonKey {
         let mut children: Vec<MortonKey> = Vec::with_capacity(8);
         let bit_shift = 3 * (DEEPEST_LEVEL - level - 1);
         for (index, item) in children_morton.iter_mut().enumerate() {
-            *item =
-                ((morton | (index << bit_shift) as u64) << LEVEL_DISPLACEMENT) | (level + 1);
+            *item = ((morton | (index << bit_shift) as u64) << LEVEL_DISPLACEMENT) | (level + 1);
         }
 
         for &child_morton in children_morton.iter() {
@@ -1015,8 +1011,6 @@ impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
     }
 }
 
-
-
 #[cfg(feature = "mpi")]
 use memoffset::offset_of;
 
@@ -1043,7 +1037,6 @@ unsafe impl Equivalence for MortonKey {
         )
     }
 }
-
 
 #[cfg(test)]
 mod test {

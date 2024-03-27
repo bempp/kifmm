@@ -1,0 +1,3 @@
+[submodule "fftw-src/fftw3"]
+	path = fftw-src/fftw3
+	url = https://github.com/FFTW/fftw3

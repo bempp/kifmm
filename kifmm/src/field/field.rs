@@ -2,18 +2,18 @@
 use crate::field::{
     array::flip3,
     fft::Fft,
-    helpers::ncoeffs_kifmm,
     transfer_vector::compute_transfer_vectors,
     types::FftM2lOperatorData,
     types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
+use crate::helpers::ncoeffs_kifmm;
 use crate::traits::field::SourceToTargetData;
 use crate::tree::{
     constants::{
         ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
     },
     helpers::find_corners,
-    types::{MortonKey, Domain},
+    types::{Domain, MortonKey},
 };
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
