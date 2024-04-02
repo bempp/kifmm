@@ -6,7 +6,7 @@ use crate::field::{
     types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
 
-use crate::fftw::R2CFft3d;
+use crate::fftw::traits::R2CFft3d;
 use crate::helpers::ncoeffs_kifmm;
 use crate::traits::field::SourceToTargetData;
 use crate::tree::{
