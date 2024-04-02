@@ -1,8 +1,12 @@
+#[cfg(feature = "mpi_support")]
 use kifmm::hyksort::hyksort;
+#[cfg(feature = "mpi_support")]
 use mpi::traits::{Communicator, Destination, Source};
 use rand::Rng;
 use std::collections::HashSet;
 
+
+#[cfg(feature = "mpi_support")]
 fn main() {
     // Setup MPI
     let universe = mpi::initialize().unwrap();
@@ -56,3 +60,5 @@ fn main() {
         assert!(a <= b);
     }
 }
+
+fn main () {}

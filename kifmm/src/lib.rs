@@ -7,6 +7,7 @@
 pub mod field;
 pub mod fmm;
 pub mod helpers;
+#[cfg(feature = "mpi_support")]
 pub mod hyksort;
 pub mod traits;
 pub mod tree;
