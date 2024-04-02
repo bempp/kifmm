@@ -1,8 +1,5 @@
 use std::{
-    env::var,
-    fs::{canonicalize, File},
-    path::{Path, PathBuf},
-    process::Command,
+    env::var, fs::{canonicalize, File}, io::Write, path::{Path, PathBuf}, process::Command
 };
 
 use zip::ZipArchive;
@@ -26,7 +23,7 @@ fn extract_unix_archive(archive_path: &PathBuf) -> Result<String, ()> {
     let file = File::open(&archive_path).unwrap();
     let mut zip = ZipArchive::new(file).unwrap();
     let out_path = PathBuf::from(var("CARGO_MANIFEST_DIR").unwrap());
-    zip.extract(&out_path);
+    zip.extract(&out_path).unwrap();
 
     Ok("success".to_string())
 }

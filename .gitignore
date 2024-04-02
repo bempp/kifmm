@@ -12,37 +12,8 @@ Cargo.lock
 # nano swp files
 .*.swp
 
-*.pyc
-
-examples.sh
-
-_*.msh
-*.btr
-
+# Local VSCode files
 .vscode/
 
-*.tar.gz
-*.exe
-*.dll
-*.do
-*.o
-*.lo
-*.a
-*.la
-*.dylib
-*.dSYM
-*.zip
-*.native
-*~
-_build
-*.lai
-
-*.Po
-*.Plo
-
-fftwf-wisdom.*
-fftw-wisdom.*
-fftw-wisdom
-fftwf-wisdom
-
-Makefile
+# Download source files upon build
+fftw-src/fftw-*
