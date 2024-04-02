@@ -22,7 +22,7 @@ unsafe impl Send for Plan64 {}
 unsafe impl Sync for Plan32 {}
 unsafe impl Sync for Plan64 {}
 
-// pub mod fftw;
+const FFTW_ESTIMATE: u32 = 1 << 6;
 
 lazy_static! {
     /// Mutex for FFTW call.
@@ -130,7 +130,7 @@ impl R2CFft3d for f32 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32,
+            FFTW_ESTIMATE,
         )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n);
@@ -159,7 +159,7 @@ impl R2CFft3d for f32 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32,
+            FFTW_ESTIMATE,
         )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n_sub);
@@ -197,7 +197,7 @@ impl R2CFft3d for f32 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n);
@@ -225,7 +225,7 @@ impl R2CFft3d for f32 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_sub);
@@ -253,7 +253,7 @@ impl R2CFft3d for f32 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         unsafe {
@@ -275,7 +275,7 @@ impl R2CFft3d for f32 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         unsafe { ffi::fftwf_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
@@ -303,7 +303,7 @@ impl R2CFft3d for f64 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32,
+            FFTW_ESTIMATE,
         )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n);
@@ -332,7 +332,7 @@ impl R2CFft3d for f64 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32,
+            FFTW_ESTIMATE,
         )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n_sub);
@@ -370,7 +370,7 @@ impl R2CFft3d for f64 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n);
@@ -398,7 +398,7 @@ impl R2CFft3d for f64 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_sub);
@@ -426,7 +426,7 @@ impl R2CFft3d for f64 {
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         unsafe {
@@ -442,13 +442,12 @@ impl R2CFft3d for f64 {
 
     fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize]) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-
         let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_c2r(
             shape.len() as i32,
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
             in_.as_mut_ptr(),
             out.as_mut_ptr(),
-            0u32
+            FFTW_ESTIMATE
         )))?);
 
         unsafe { ffi::fftw_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }

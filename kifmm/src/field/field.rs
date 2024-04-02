@@ -971,7 +971,6 @@ mod test {
                 }
             }
         }
-
         let mut potentials = rlst_dynamic_array3!(f64, [m, n, o]);
 
         let _ = f64::c2r(
@@ -996,6 +995,7 @@ mod test {
         );
 
         println!("r {:?} \n d {:?}", result, direct);
+
         let abs_error: f64 = result
             .iter()
             .zip(direct.iter())
