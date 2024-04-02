@@ -6,8 +6,8 @@ use itertools::Itertools;
 use num_complex::Complex;
 
 use lazy_static::lazy_static;
-use std::sync::Mutex;
 use rayon::prelude::*;
+use std::sync::Mutex;
 
 /// A threadsafe wrapper for a FFT plan operating on double precision data
 #[derive(Clone, Copy)]
@@ -41,11 +41,9 @@ macro_rules! excall {
     }};
 } // excall!
 
-
 /// TODO: Docs
 #[derive(Debug)]
 pub enum FftError {
-
     /// Failed to create a valid plan using FFTW library
     InvalidPlanError,
 
@@ -443,7 +441,6 @@ impl R2CFft3d for f64 {
     }
 
     fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize]) -> Result<(), FftError> {
-
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
 
         let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_c2r(
@@ -466,7 +463,6 @@ impl R2CFft3d for f64 {
         Ok(())
     }
 }
-
 
 /// Interface for taking 3D real-to-complex DFT with FFTW over buffers of a given type.
 pub trait R2CFft3d

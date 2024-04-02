@@ -4,6 +4,7 @@
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![warn(missing_docs)]
 
+pub mod fftw;
 pub mod field;
 pub mod fmm;
 pub mod helpers;
@@ -11,4 +12,3 @@ pub mod helpers;
 pub mod hyksort;
 pub mod traits;
 pub mod tree;
-pub mod fftw;

@@ -7,7 +7,6 @@ fn main() {
     println!("cargo:rustc-link-lib=static=fftw3");
     println!("cargo:rustc-link-lib=static=fftw3f");
 
-
     let root = PathBuf::from(std::env::var("DEP_FFTW3_ROOT").unwrap());
     println!("HERE {:?}", root.display());
 

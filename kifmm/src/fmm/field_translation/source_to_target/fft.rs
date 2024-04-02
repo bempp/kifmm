@@ -1,11 +1,11 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use crate::field::{types::FftFieldTranslationKiFmm};
+use crate::fftw::R2CFft3d;
+use crate::field::types::FftFieldTranslationKiFmm;
 use crate::fmm::field_translation::matmul::matmul8x8;
 use crate::fmm::{
     helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
-use crate::fftw::R2CFft3d;
 use crate::traits::tree::FmmTree;
 use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
@@ -352,7 +352,7 @@ where
                         });
 
                     // Compute inverse FFT
-                   let _ =  U::c2r_batch_par(
+                    let _ = U::c2r_batch_par(
                         check_potential_hat_c,
                         &mut check_potential,
                         &[nconv_pad, nconv_pad, nconv_pad],

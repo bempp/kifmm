@@ -5,7 +5,6 @@ use mpi::traits::{Communicator, Destination, Source};
 use rand::Rng;
 use std::collections::HashSet;
 
-
 #[cfg(feature = "mpi_support")]
 fn main() {
     // Setup MPI
@@ -61,4 +60,4 @@ fn main() {
     }
 }
 
-fn main () {}
+fn main() {}

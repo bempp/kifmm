@@ -1,10 +1,38 @@
 use std::{
     env::var,
-    fs::canonicalize,
+    fs::{canonicalize, File},
     path::{Path, PathBuf},
     process::Command,
 };
 
+use zip::ZipArchive;
+
+
+/// Download FFTW release archive from FTP server
+fn download_unix_archive(archive_path: &Path) -> Result<String, ()> {
+    let mut conn = ftp::FtpStream::connect("ftp.fftw.org:21").unwrap();
+    conn.login("anonymous", "anonymous").unwrap();
+    conn.cwd("pub/fftw").unwrap();
+    let buf = conn.simple_retr("fftw-3.3.9.zip").unwrap().into_inner();
+    let mut f = File::create(&archive_path).unwrap();
+    f.write(&buf).unwrap();
+
+    Ok("success".to_string())
+}
+
+
+/// Extract FFTW release archive
+fn extract_unix_archive(archive_path: &PathBuf) -> Result<String, ()> {
+    let file = File::open(&archive_path).unwrap();
+    let mut zip = ZipArchive::new(file).unwrap();
+    let out_path = PathBuf::from(var("CARGO_MANIFEST_DIR").unwrap());
+    zip.extract(&out_path);
+
+    Ok("success".to_string())
+}
+
+
+/// Run a shell command
 fn run(command: &mut Command) {
     println!("Running: {:?}", command);
     match command.status() {
@@ -19,6 +47,8 @@ fn run(command: &mut Command) {
     }
 }
 
+
+/// Build FFTW library
 fn build_fftw(src_dir: &Path, out_dir: &Path, flags: &[&str]) {
     run(
         Command::new(canonicalize(src_dir.join("configure")).unwrap())
@@ -37,25 +67,34 @@ fn build_fftw(src_dir: &Path, out_dir: &Path, flags: &[&str]) {
     run(Command::new("make").arg("install").current_dir(src_dir));
 }
 
+
 fn main() {
     let out_dir = PathBuf::from(var("OUT_DIR").unwrap());
-    let src_dir = PathBuf::from(var("CARGO_MANIFEST_DIR").unwrap()).join("fftw-3.3.10");
+    let src_dir = PathBuf::from(var("CARGO_MANIFEST_DIR").unwrap()).join("fftw-3.3.9");
     let out_src_dir = out_dir.join("src");
 
-    // Out of source build
-    fs_extra::dir::copy(
-        &src_dir,
-        &out_src_dir,
-        &fs_extra::dir::CopyOptions {
-            overwrite: true,
-            skip_exist: false,
-            buffer_size: 64000,
-            copy_inside: true,
-            depth: 0,
-            content_only: false,
-        },
-    )
-    .unwrap();
+    let archive_path = out_dir.join("fftw-3.3.9.zip");
+
+    if !archive_path.exists() {
+        // Download and extract archive
+        download_unix_archive(&archive_path);
+        extract_unix_archive(&archive_path);
+
+        // Copy source files, for out of source build
+        fs_extra::dir::copy(
+            &src_dir,
+            &out_src_dir,
+            &fs_extra::dir::CopyOptions {
+                overwrite: true,
+                skip_exist: false,
+                buffer_size: 64000,
+                copy_inside: true,
+                depth: 0,
+                content_only: false,
+            },
+        )
+        .unwrap();
+    }
 
     // Build FFTW
     if !out_dir.join("lib/libfftw3.a").exists() {
@@ -67,8 +106,11 @@ fn main() {
         build_fftw(&src_dir, &out_dir, &["--enable-single"]);
     }
 
+    // Link built libraries
     println!("cargo:rustc-link-search={}", out_dir.join("lib").display());
     println!("cargo:rustc-link-lib=static=fftw3");
     println!("cargo:rustc-link-lib=static=fftw3f");
+
+    // Set dependency root to source path
     println!("cargo:root={}", out_src_dir.display());
 }

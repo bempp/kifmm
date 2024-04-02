@@ -58,4 +58,4 @@ fn main() {
     }
 }
 
-fn main () {}
+fn main() {}

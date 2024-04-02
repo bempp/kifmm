@@ -37,3 +37,12 @@ _*.msh
 _build
 *.lai
 
+*.Po
+*.Plo
+
+fftwf-wisdom.*
+fftw-wisdom.*
+fftw-wisdom
+fftwf-wisdom
+
+Makefile
