@@ -1,10 +1,11 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use crate::field::{fft::Fft, types::FftFieldTranslationKiFmm};
+use crate::field::{types::FftFieldTranslationKiFmm};
 use crate::fmm::field_translation::matmul::matmul8x8;
 use crate::fmm::{
     helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
     types::{FmmEvalType, KiFmm, SendPtrMut},
 };
+use crate::fftw::R2CFft3d;
 use crate::traits::tree::FmmTree;
 use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
@@ -25,7 +26,7 @@ use std::{collections::HashSet, sync::RwLock};
 impl<T, U, V> KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalar<Real = U> + Float + Default + Fft,
+    U: RlstScalar<Real = U> + Float + Default + R2CFft3d,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
@@ -84,7 +85,7 @@ where
 impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
-    U: RlstScalar<Real = U> + Float + Default + Fft,
+    U: RlstScalar<Real = U> + Float + Default + R2CFft3d,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
@@ -234,7 +235,7 @@ where
                                 );
                             }
 
-                            U::rfft3_fftw_slice(
+                            let _ = U::r2c_batch(
                                 &mut signal_chunk,
                                 signal_hat_chunk_c,
                                 &[nconv_pad, nconv_pad, nconv_pad],
@@ -351,7 +352,7 @@ where
                         });
 
                     // Compute inverse FFT
-                    U::irfft3_fftw_par_slice(
+                   let _ =  U::c2r_batch_par(
                         check_potential_hat_c,
                         &mut check_potential,
                         &[nconv_pad, nconv_pad, nconv_pad],

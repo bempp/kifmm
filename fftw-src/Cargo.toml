@@ -1,0 +1,13 @@
+[package]
+name = "fftw-src"
+version = "0.1.0"
+edition = "2021"
+
+# build="build.rs"
+links="fftw3"
+
+[dependencies]
+
+[build-dependencies]
+cc = "1.0.90"
+fs_extra = "1.3.0"

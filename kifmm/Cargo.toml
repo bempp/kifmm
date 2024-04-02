@@ -35,8 +35,11 @@ superslice = "1"
 libc = "0.2"
 thiserror="1.*"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
-fftw = { git = "https://github.com/skailasa/fftw.git" }
+# fftw = { git = "https://github.com/skailasa/fftw.git" }
+fftw-sys = {path = "../fftw-sys"}
 green-kernels = { git = "https://github.com/bempp/green-kernels" }
+lazy_static = "1.4.0"
+num-complex = "0.4.5"
 
 [dev-dependencies]
 approx_eq = "0.1.8"

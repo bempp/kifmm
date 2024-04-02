@@ -1,11 +1,12 @@
 //! Implementation of traits for field translations via the FFT and SVD.
 use crate::field::{
     array::flip3,
-    fft::Fft,
     transfer_vector::compute_transfer_vectors,
     types::FftM2lOperatorData,
     types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
+
+use crate::fftw::R2CFft3d;
 use crate::helpers::ncoeffs_kifmm;
 use crate::traits::field::SourceToTargetData;
 use crate::tree::{
@@ -236,7 +237,7 @@ where
 
 impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: RlstScalar<Real = T> + Float + Default + Fft,
+    T: RlstScalar<Real = T> + Float + Default + R2CFft3d,
     Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
@@ -366,7 +367,7 @@ where
                     let mut kernel_hat = rlst_dynamic_array3!(Complex<T>, [p, p, p / 2 + 1]);
 
                     // TODO: is kernel_hat the transpose of what it used to be?
-                    T::rfft3_fftw(kernel.data_mut(), kernel_hat.data_mut(), &[p, p, p]);
+                    let _ = T::r2c(kernel.data_mut(), kernel_hat.data_mut(), &[p, p, p]);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
@@ -452,7 +453,7 @@ where
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Float + RlstScalar<Real = T> + Default + Fft,
+    T: Float + RlstScalar<Real = T> + Default + R2CFft3d,
     Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
@@ -802,7 +803,7 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut test_kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
-        f64::rfft3_fftw(
+        f64::r2c(
             test_kernel.data_mut(),
             test_kernel_hat.data_mut(),
             &[m, n, o],
@@ -915,7 +916,7 @@ mod test {
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
 
-        f64::rfft3_fftw(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
+        let _ = f64::r2c(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
 
         let source_equivalent_surface =
             transfer_vector
@@ -959,7 +960,7 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
-        f64::rfft3_fftw(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
+        let _ = f64::r2c(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
 
         let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
         for k in 0..o / 2 + 1 {
@@ -973,7 +974,7 @@ mod test {
 
         let mut potentials = rlst_dynamic_array3!(f64, [m, n, o]);
 
-        f64::irfft3_fftw(
+        let _ = f64::c2r(
             hadamard_product.data_mut(),
             potentials.data_mut(),
             &[m, n, o],
@@ -994,6 +995,7 @@ mod test {
             &mut direct[..],
         );
 
+        println!("r {:?} \n d {:?}", result, direct);
         let abs_error: f64 = result
             .iter()
             .zip(direct.iter())

@@ -1,0 +1,11 @@
+prefix=/Users/sri/Code/kifmm/target/release/build/fftw-src-63a61260ddf75dde/out
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: FFTW
+Description: fast Fourier transform library
+Version: 3.3.10
+Libs: -L${libdir} -lfftw3 
+Libs.private: -lm
+Cflags: -I${includedir}

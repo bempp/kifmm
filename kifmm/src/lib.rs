@@ -10,3 +10,4 @@ pub mod helpers;
 pub mod hyksort;
 pub mod traits;
 pub mod tree;
+pub mod fftw;

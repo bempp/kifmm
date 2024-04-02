@@ -1,6 +1,7 @@
 [workspace]
+resolver =  "2"
 members = [
     "kifmm",
-    "fftw-sys",
-    "fftw-src"
+    "fftw-src",
+    "fftw-sys"
 ]
