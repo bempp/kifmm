@@ -1,0 +1,15 @@
+[package]
+name = "fftw-sys"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+fftw-src = {path = "../fftw-src"}
+libc = "0.2.153"
+num-complex = "0.4.5"
+
+[build-dependencies]
+bindgen = "0.69.4"
+cc = "1.0.90"

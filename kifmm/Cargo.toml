@@ -1,0 +1,62 @@
+[features]
+# Treat warnings as a build error.
+strict = []
+avx = []
+neon = []
+mpi = ["dep:mpi"]
+
+[package]
+name = "kifmm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
+description = "Kernel-independent fast multipole method"
+license = "BSD-3-Clause"
+homepage = "https://github.com/bempp/kifmm"
+repository = "https://github.com/bempp/kifmm"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "kifmm"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+itertools = "0.10"
+num = "0.4"
+approx = "0.5"
+rayon = "1.9"
+mpi = { version = "0.6.*", optional = true}
+rand = "0.8.5"
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+fftw-sys = {path = "../fftw-sys"}
+green-kernels = { git = "https://github.com/bempp/green-kernels" }
+lazy_static = "1.4.0"
+num-complex = "0.4.5"
+
+[dev-dependencies]
+criterion = { version = "0.3", features = ["html_reports"]}
+
+[[bench]]
+name = "single_node"
+harness = false
+
+[[example]]
+name = "single_node_laplace"
+path = "examples/single_node_laplace.rs"
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
+
+[target.aarch64-apple-darwin.dev-dependencies]
+blas-src = { version = "0.9", features = ["accelerate"]}
+lapack-src = { version = "0.9", features = ["accelerate"]}
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.9", features = ["blis"]}
+lapack-src = { version = "0.9", features = ["netlib"]}
+
+[lints.clippy]
+wildcard_imports = "forbid"
