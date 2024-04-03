@@ -1,8 +1,7 @@
 //! Builder objects to construct FMMs
 use crate::fmm::{
     pinv::pinv,
-    tree::SingleNodeFmmTree,
-    types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode},
+    types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode, SingleNodeFmmTree},
 };
 use crate::helpers::{
     coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,

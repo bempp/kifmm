@@ -8,8 +8,8 @@ use lazy_static::lazy_static;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
-use super::types::{Plan32, Plan64, ShapeInfo, FftError};
 use super::traits::RealToComplexFft3D;
+use super::types::{FftError, Plan32, Plan64, ShapeInfo};
 
 unsafe impl Send for Plan32 {}
 unsafe impl Send for Plan64 {}
@@ -36,10 +36,6 @@ macro_rules! excall {
         unsafe { $call }
     }};
 }
-
-
-
-
 
 /// Validate the dimensions of the (batch) input and output sequences in real-to-complex DFTs
 ///

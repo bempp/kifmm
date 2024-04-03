@@ -1,4 +1,4 @@
-//! Implementation of FmmData and Fmm traits.
+//! Implementation of Fmm Trait.
 use crate::fmm::types::{Charges, FmmEvalType, KiFmm, KiFmmDummy};
 use crate::helpers::{
     leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
@@ -365,8 +365,10 @@ where
 mod test {
 
     use super::*;
-    use crate::fmm::field_translation::source_to_target::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
-    use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
+    use crate::fmm::field_translation::source_to_target::types::{
+        BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm,
+    };
+    use crate::fmm::types::{KiFmmBuilderSingleNode, SingleNodeFmmTree};
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::helpers::points_fixture;
     use green_kernels::laplace_3d::Laplace3dKernel;

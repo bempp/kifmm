@@ -1,4 +1,4 @@
-//! Multipole field translations
+//! Multipole Translations
 use crate::traits::{
     field::SourceToTargetData,
     fmm::SourceTranslation,

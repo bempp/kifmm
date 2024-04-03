@@ -1,6 +1,4 @@
-//! Functionality for handling 3D arrays
-//! # Warning
-//! This module awaits deprecation with the addition of N-Dimensional tensor handling in rlst.
+//! Functions for manipulating 3D arrays
 use num::traits::Num;
 
 use rlst::{

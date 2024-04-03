@@ -1,3 +1,4 @@
+//! # Local Translations
 use std::collections::HashSet;
 
 use crate::fmm::{

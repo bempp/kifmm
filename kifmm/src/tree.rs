@@ -5,11 +5,11 @@
 pub mod constants;
 pub mod types;
 
-pub mod domain;
+mod domain;
 pub mod helpers;
 pub mod morton;
-pub mod point;
-pub mod single_node;
+mod point;
+mod single_node;
 
 // #[cfg(feature = "mpi")]
 // pub mod impl_domain_mpi;

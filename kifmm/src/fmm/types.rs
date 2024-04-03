@@ -1,5 +1,4 @@
 //! Data structures for kernel independent FMM
-use crate::fmm::tree::SingleNodeFmmTree;
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
 use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
 use green_kernels::{traits::Kernel, types::EvalType};
@@ -259,4 +258,15 @@ where
     pub kernel_eval_type: Option<EvalType>,
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
+}
+
+/// A struct that holds the single node trees associated with both sources and targets as well as their shared domain.
+#[derive(Default)]
+pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
+    /// Source tree
+    pub source_tree: SingleNodeTree<T>,
+    /// Target tree
+    pub target_tree: SingleNodeTree<T>,
+    /// Domain
+    pub domain: Domain<T>,
 }
