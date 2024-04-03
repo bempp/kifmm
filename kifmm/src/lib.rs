@@ -19,10 +19,7 @@
 //! # extern crate lapack_src;
 //!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-//! use kifmm::fmm::types::{
-//!     BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
-//! };
-//! use kifmm::traits::fmm::Fmm;
+//! use kifmm::{Fmm, BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
 //! use rlst::{rlst_dynamic_array2, RawAccessMut};
 //!
@@ -45,7 +42,7 @@
 //!     charges.data_mut().copy_from_slice(&tmp);
 //!
 //!     // Build FMM object, with a given kernel and field translation
-//!     let mut fmm_fft = KiFmmBuilderSingleNode::new()
+//!     let mut fmm_fft = SingleNodeBuilder::new()
 //!         .tree(&sources, &targets, n_crit, sparse)
 //!         .unwrap()
 //!         .parameters(
@@ -53,7 +50,7 @@
 //!             expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
-//!             FftFieldTranslationKiFmm::new(), // Choose a field translation method, could replace with BLAS field translation
+//!             FftFieldTranslation::new(), // Choose a field translation method, could replace with BLAS field translation
 //!         )
 //!         .unwrap()
 //!         .build()
@@ -89,11 +86,11 @@ pub mod tree;
 
 // Public API
 #[doc(inline)]
-pub use fmm::types::BlasFieldTranslationKiFmm;
+pub use fmm::types::BlasFieldTranslation;
 #[doc(inline)]
-pub use fmm::types::FftFieldTranslationKiFmm;
+pub use fmm::types::FftFieldTranslation;
 #[doc(inline)]
-pub use fmm::types::KiFmmBuilderSingleNode;
+pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
 

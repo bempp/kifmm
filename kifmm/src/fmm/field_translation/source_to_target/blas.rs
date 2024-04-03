@@ -1,7 +1,7 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 // use crate::field::types::BlasFieldTranslationKiFmm;
 use crate::fmm::helpers::{homogenous_kernel_scale, m2l_scale};
-use crate::fmm::types::{BlasFieldTranslationKiFmm, FmmEvalType, KiFmm, SendPtrMut};
+use crate::fmm::types::{BlasFieldTranslation, FmmEvalType, KiFmm, SendPtrMut};
 
 use crate::traits::{
     fmm::SourceToTargetTranslation,
@@ -21,7 +21,7 @@ use std::{
     sync::Mutex,
 };
 
-impl<T, U, V> KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> KiFmm<V, BlasFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalar<Real = U> + Float + Default,
@@ -87,7 +87,7 @@ where
     }
 }
 
-impl<T, U, V> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalar<Real = U> + Float + Default,

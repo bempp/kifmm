@@ -1,7 +1,7 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use crate::fmm::field_translation::source_to_target::matmul::matmul8x8;
 use crate::fmm::helpers::{chunk_size, homogenous_kernel_scale, m2l_scale};
-use crate::fmm::types::{FftFieldTranslationKiFmm, FmmEvalType, KiFmm, SendPtrMut};
+use crate::fmm::types::{FftFieldTranslation, FmmEvalType, KiFmm, SendPtrMut};
 use crate::traits::tree::FmmTree;
 use crate::traits::{fftw::RealToComplexFft3D, fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
@@ -21,7 +21,7 @@ use rlst::{Array, RlstScalar};
 use rlst::{MatrixSvd, RandomAccessMut};
 use std::{collections::HashSet, sync::RwLock};
 
-impl<T, U, V> KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
@@ -81,7 +81,7 @@ where
     }
 }
 
-impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
+impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
     U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,

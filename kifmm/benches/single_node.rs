@@ -2,9 +2,7 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::fmm::types::{
-    BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
-};
+use kifmm::fmm::types::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
@@ -31,7 +29,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let fmm_fft = KiFmmBuilderSingleNode::new()
+    let fmm_fft = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -39,7 +37,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            FftFieldTranslationKiFmm::new(),
+            FftFieldTranslation::new(),
         )
         .unwrap()
         .build()
@@ -54,7 +52,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         b.iter(|| fmm_fft.evaluate())
     });
 
-    let fmm_blas = KiFmmBuilderSingleNode::new()
+    let fmm_blas = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -62,7 +60,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslationKiFmm::new(svd_threshold),
+            BlasFieldTranslation::new(svd_threshold),
         )
         .unwrap()
         .build()
@@ -92,7 +90,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let fmm_fft = KiFmmBuilderSingleNode::new()
+    let fmm_fft = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -100,7 +98,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            FftFieldTranslationKiFmm::new(),
+            FftFieldTranslation::new(),
         )
         .unwrap()
         .build()
@@ -115,7 +113,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         b.iter(|| fmm_fft.evaluate())
     });
 
-    let fmm_blas = KiFmmBuilderSingleNode::new()
+    let fmm_blas = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -123,7 +121,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslationKiFmm::new(svd_threshold),
+            BlasFieldTranslation::new(svd_threshold),
         )
         .unwrap()
         .build()

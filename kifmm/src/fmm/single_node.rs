@@ -257,10 +257,7 @@ mod test {
     use super::*;
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::helpers::points_fixture;
-    use crate::{
-        BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
-        SingleNodeFmmTree,
-    };
+    use crate::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder, SingleNodeFmmTree};
     use green_kernels::laplace_3d::Laplace3dKernel;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
@@ -400,7 +397,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let mut fmm = KiFmmBuilderSingleNode::new()
+        let mut fmm = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -408,7 +405,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslationKiFmm::new(),
+                FftFieldTranslation::new(),
             )
             .unwrap()
             .build()
@@ -455,7 +452,7 @@ mod test {
         // fmm with fft based field translation
         {
             // Evaluate potentials
-            let fmm_fft = KiFmmBuilderSingleNode::new()
+            let fmm_fft = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
@@ -463,7 +460,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
-                    FftFieldTranslationKiFmm::new(),
+                    FftFieldTranslation::new(),
                 )
                 .unwrap()
                 .build()
@@ -480,7 +477,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm_fft = KiFmmBuilderSingleNode::new()
+            let fmm_fft = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
@@ -488,7 +485,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::ValueDeriv,
-                    FftFieldTranslationKiFmm::new(),
+                    FftFieldTranslation::new(),
                 )
                 .unwrap()
                 .build()
@@ -509,7 +506,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = KiFmmBuilderSingleNode::new()
+            let fmm_blas = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
@@ -517,7 +514,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                    BlasFieldTranslation::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -534,7 +531,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = KiFmmBuilderSingleNode::new()
+            let fmm_blas = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
@@ -542,7 +539,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                    BlasFieldTranslation::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -590,7 +587,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = KiFmmBuilderSingleNode::new()
+            let fmm_blas = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
@@ -598,7 +595,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                    BlasFieldTranslation::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -610,7 +607,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = KiFmmBuilderSingleNode::new()
+            let fmm_blas = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
@@ -618,7 +615,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                    BlasFieldTranslation::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -700,7 +697,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm_fft = KiFmmBuilderSingleNode::new()
+        let fmm_fft = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -708,7 +705,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslationKiFmm::new(),
+                FftFieldTranslation::new(),
             )
             .unwrap()
             .build()
@@ -716,7 +713,7 @@ mod test {
         fmm_fft.evaluate();
 
         let svd_threshold = Some(1e-5);
-        let fmm_svd = KiFmmBuilderSingleNode::new()
+        let fmm_svd = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -724,7 +721,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationKiFmm::new(svd_threshold),
+                BlasFieldTranslation::new(svd_threshold),
             )
             .unwrap()
             .build()

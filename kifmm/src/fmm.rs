@@ -1,11 +1,10 @@
 //! A 3D Kernel Independent Fast Multipole Method
 mod builder;
 pub mod constants;
-#[allow(clippy::module_inception)]
-mod fmm;
 pub mod helpers;
 pub mod pinv;
 mod send_ptr;
+mod single_node;
 pub mod tree;
 pub mod types;
 

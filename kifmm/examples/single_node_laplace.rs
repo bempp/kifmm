@@ -1,5 +1,5 @@
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, Fmm, KiFmmBuilderSingleNode};
+use kifmm::{BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
@@ -26,7 +26,7 @@ fn main() {
         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let fmm_fft = KiFmmBuilderSingleNode::new()
+        let fmm_fft = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -34,7 +34,7 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslationKiFmm::new(),
+                FftFieldTranslation::new(),
             )
             .unwrap()
             .build()
@@ -55,7 +55,7 @@ fn main() {
 
         let singular_value_threshold = Some(1e-5);
 
-        let fmm_vec = KiFmmBuilderSingleNode::new()
+        let fmm_vec = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -63,7 +63,7 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                BlasFieldTranslation::new(singular_value_threshold),
             )
             .unwrap()
             .build()
@@ -80,7 +80,7 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
-        let fmm_mat = KiFmmBuilderSingleNode::new()
+        let fmm_mat = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -88,7 +88,7 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationKiFmm::new(singular_value_threshold),
+                BlasFieldTranslation::new(singular_value_threshold),
             )
             .unwrap()
             .build()

@@ -6,7 +6,7 @@ use crate::fmm::helpers::{
 };
 use crate::fmm::{
     pinv::pinv,
-    types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode, SingleNodeFmmTree},
+    types::{Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
 };
 
 use crate::traits::{
@@ -24,7 +24,7 @@ use rlst::{
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
-impl<T, U, V> KiFmmBuilderSingleNode<T, U, V>
+impl<T, U, V> SingleNodeBuilder<T, U, V>
 where
     T: SourceToTargetData<V, Domain = Domain<U>> + Default,
     U: RlstScalar<Real = U> + Float + Default,
@@ -33,7 +33,7 @@ where
 {
     /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
-        KiFmmBuilderSingleNode {
+        SingleNodeBuilder {
             tree: None,
             domain: None,
             source_to_target: None,

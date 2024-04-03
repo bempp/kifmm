@@ -2,9 +2,7 @@
 use super::{array::flip3, transfer_vector::compute_transfer_vectors};
 
 use crate::fmm::helpers::ncoeffs_kifmm;
-use crate::fmm::types::{
-    BlasFieldTranslationKiFmm, BlasMetadata, FftFieldTranslationKiFmm, FftMetadata,
-};
+use crate::fmm::types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata};
 use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData};
 use crate::tree::{
     constants::{
@@ -37,7 +35,7 @@ fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
     singular_values.len() - 1
 }
 
-impl<T, U> SourceToTargetData<U> for BlasFieldTranslationKiFmm<T, U>
+impl<T, U> SourceToTargetData<U> for BlasFieldTranslation<T, U>
 where
     T: Float + Default,
     T: RlstScalar<Real = T> + Gemm,
@@ -215,7 +213,7 @@ where
     }
 }
 
-impl<T, U> BlasFieldTranslationKiFmm<T, U>
+impl<T, U> BlasFieldTranslation<T, U>
 where
     T: Float + Default,
     T: RlstScalar<Real = T>,
@@ -225,7 +223,7 @@ where
     /// Create new
     pub fn new(threshold: Option<T>) -> Self {
         let tmp = T::from(4).unwrap() * T::epsilon();
-        BlasFieldTranslationKiFmm {
+        BlasFieldTranslation {
             threshold: threshold.unwrap_or(tmp),
             transfer_vectors: compute_transfer_vectors(),
             ..Default::default()
@@ -233,7 +231,7 @@ where
     }
 }
 
-impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
+impl<T, U> SourceToTargetData<U> for FftFieldTranslation<T, U>
 where
     T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
     Complex<T>: RlstScalar + ComplexFloat,
@@ -437,7 +435,7 @@ where
 
         // Set required maps, TODO: Should be a part of operator data
         (self.surf_to_conv_map, self.conv_to_surf_map) =
-            FftFieldTranslationKiFmm::<T, U>::compute_surf_to_conv_map(self.expansion_order);
+            FftFieldTranslation::<T, U>::compute_surf_to_conv_map(self.expansion_order);
     }
 
     fn expansion_order(&mut self, expansion_order: usize) {
@@ -449,7 +447,7 @@ where
     }
 }
 
-impl<T, U> FftFieldTranslationKiFmm<T, U>
+impl<T, U> FftFieldTranslation<T, U>
 where
     T: Float + RlstScalar<Real = T> + Default + RealToComplexFft3D,
     Complex<T>: RlstScalar + ComplexFloat,
@@ -457,7 +455,7 @@ where
 {
     /// Create new
     pub fn new() -> Self {
-        FftFieldTranslationKiFmm {
+        FftFieldTranslation {
             transfer_vectors: compute_transfer_vectors(),
             ..Default::default()
         }
@@ -616,7 +614,7 @@ mod test {
         let transfer_vectors = compute_transfer_vectors();
 
         // Create field translation object
-        let mut blas = BlasFieldTranslationKiFmm {
+        let mut blas = BlasFieldTranslation {
             kernel,
             threshold,
             transfer_vectors,
@@ -715,7 +713,7 @@ mod test {
         let transfer_vectors = compute_transfer_vectors();
 
         // Create field translation object
-        let mut fft = FftFieldTranslationKiFmm {
+        let mut fft = FftFieldTranslation {
             kernel,
             expansion_order,
             transfer_vectors,
@@ -892,7 +890,7 @@ mod test {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
-        let mut fft = FftFieldTranslationKiFmm {
+        let mut fft = FftFieldTranslation {
             kernel,
             expansion_order,
             transfer_vectors,

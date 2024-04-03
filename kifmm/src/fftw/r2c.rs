@@ -28,7 +28,6 @@ lazy_static! {
     pub static ref FFTW_MUTEX: Mutex<()> = Mutex::new(());
 }
 
-#[macro_export]
 /// Exclusive call of FFTW interface.
 macro_rules! excall {
     ($call:expr) => {{

@@ -317,7 +317,7 @@ pub enum FmmEvalType {
 /// ```
 /// # extern crate blas_src;
 /// # extern crate lapack_src;
-/// use kifmm::{KiFmmBuilderSingleNode, BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
+/// use kifmm::{SingleNodeBuilder, BlasFieldTranslation, FftFieldTranslation};
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::helpers::points_fixture;
@@ -342,7 +342,7 @@ pub enum FmmEvalType {
 /// charges.data_mut().copy_from_slice(&tmp);
 ///
 /// /// Create a new builder, and attach a tree
-/// let fmm = KiFmmBuilderSingleNode::new()
+/// let fmm = SingleNodeBuilder::new()
 ///     .tree(&sources, &targets, n_crit, sparse)
 ///     .unwrap();
 ///
@@ -353,7 +353,7 @@ pub enum FmmEvalType {
 ///         expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
-///         FftFieldTranslationKiFmm::new(),
+///         FftFieldTranslation::new(),
 ///     )
 ///     .unwrap()
 ///     .build()
@@ -363,7 +363,7 @@ pub enum FmmEvalType {
 /// with source and target points, charge data, and specifying FMM parameters like the kernel
 /// and expansion order, before finally building the KiFMM object.
 #[derive(Default)]
-pub struct KiFmmBuilderSingleNode<T, U, V>
+pub struct SingleNodeBuilder<T, U, V>
 where
     T: SourceToTargetData<V>,
     U: RlstScalar<Real = U> + Float + Default,
@@ -446,7 +446,7 @@ pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
 /// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
 ///   used to control the accuracy and computational complexity of the FMM.
 #[derive(Default)]
-pub struct FftFieldTranslationKiFmm<T, U>
+pub struct FftFieldTranslation<T, U>
 where
     T: Default + RlstScalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
@@ -494,7 +494,7 @@ where
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
 ///    matrices corresponding to unique transfer vectors.
 #[derive(Default)]
-pub struct BlasFieldTranslationKiFmm<T, U>
+pub struct BlasFieldTranslation<T, U>
 where
     T: RlstScalar<Real = T>,
     U: Kernel<T = T> + Default,
