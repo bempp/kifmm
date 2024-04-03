@@ -20,3 +20,15 @@ pub mod helpers;
 pub mod hyksort;
 pub mod traits;
 pub mod tree;
+
+// Public API
+#[doc(inline)]
+pub use fmm::types::KiFmmBuilderSingleNode as KiFmmBuilderSingleNode;
+#[doc(inline)]
+pub use fmm::types::BlasFieldTranslationKiFmm as BlasFieldTranslationKiFmm;
+#[doc(inline)]
+pub use fmm::types::FftFieldTranslationKiFmm as FftFieldTranslationKiFmm;
+#[doc(inline)]
+pub use fmm::types::SingleNodeFmmTree as SingleNodeFmmTree;
+
+

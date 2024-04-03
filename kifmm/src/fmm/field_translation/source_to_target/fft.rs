@@ -1,8 +1,7 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use super::types::FftFieldTranslationKiFmm;
 use crate::fftw::traits::RealToComplexFft3D;
 use crate::fmm::field_translation::source_to_target::matmul::matmul8x8;
-use crate::fmm::types::{FmmEvalType, KiFmm, SendPtrMut};
+use crate::fmm::types::{FftFieldTranslationKiFmm, FmmEvalType, KiFmm, SendPtrMut};
 use crate::helpers::{chunk_size, homogenous_kernel_scale, m2l_scale};
 use crate::traits::tree::FmmTree;
 use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
@@ -14,6 +13,7 @@ use crate::tree::{
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use num::{Complex, Float};
+use num_complex::ComplexFloat;
 use rayon::prelude::*;
 use rlst::BaseArray;
 use rlst::VectorContainer;
@@ -29,6 +29,7 @@ where
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
+    Complex<U>: ComplexFloat
 {
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
         let targets = self.tree.target_tree().keys(level).unwrap();
@@ -88,6 +89,7 @@ where
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
+    Complex<U>: ComplexFloat
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {
@@ -180,7 +182,7 @@ where
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft = &self
                     .source_to_target_translation_data
-                    .operator_data
+                    .metadata
                     .kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order

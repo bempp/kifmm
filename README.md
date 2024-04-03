@@ -11,6 +11,12 @@ kifmm = { git = "https://github.com/bempp/kifmm" }
 ## Documentation
 The latest documentation of the main branch of this repo is available at [bempp.github.io/kifmm/](https://bempp.github.io/kifmm/).
 
+Build docs with Latex enabled
+
+```bash
+RUSTDOCFLAGS="--html-in-header kifmm/src/docs-header.html" cargo doc --no-deps
+```
+
 ## Testing
 The functionality of the library can be tested by running:
 ```bash

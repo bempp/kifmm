@@ -2,7 +2,6 @@
 pub mod array;
 mod blas;
 mod fft;
-mod field;
+mod metadata;
 mod matmul;
 pub mod transfer_vector;
-pub mod types;

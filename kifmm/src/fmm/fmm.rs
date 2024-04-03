@@ -1,5 +1,5 @@
 //! Implementation of Fmm Trait.
-use crate::fmm::types::{Charges, FmmEvalType, KiFmm, KiFmmDummy};
+use crate::fmm::types::{Charges, FmmEvalType, KiFmm};
 use crate::helpers::{
     leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
 };
@@ -251,124 +251,15 @@ where
     }
 }
 
-impl<T, U, V> Fmm for KiFmmDummy<T, U, V>
-where
-    T: FmmTree<Tree = SingleNodeTree<U>, Node = MortonKey>,
-    U: RlstScalar<Real = U> + Float + Default,
-    V: Kernel<T = U> + Send + Sync,
-{
-    type NodeIndex = T::Node;
-    type Scalar = U;
-    type Tree = T;
-    type Kernel = V;
-
-    fn dim(&self) -> usize {
-        3
-    }
-
-    fn multipole(&self, _key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
-        None
-    }
-
-    fn local(&self, _key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
-        None
-    }
-
-    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Scalar]>> {
-        let ntarget_coordinates =
-            self.tree.target_tree().all_coordinates().unwrap().len() / self.dim();
-
-        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
-            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
-
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => Some(vec![
-                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
-                ]),
-                FmmEvalType::Matrix(nmatvecs) => {
-                    let mut slices = Vec::new();
-                    for eval_idx in 0..nmatvecs {
-                        let vec_displacement = eval_idx * ntarget_coordinates;
-                        let slice = &self.potentials[vec_displacement + l..vec_displacement + r];
-                        slices.push(slice);
-                    }
-                    Some(slices)
-                }
-            }
-        } else {
-            None
-        }
-    }
-
-    fn evaluate(&self) {
-        let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
-        let ntarget_coordinates = all_target_coordinates.len() / self.dim();
-        let all_source_coordinates = self.tree.source_tree().all_coordinates().unwrap();
-        let nsource_coordinates = all_target_coordinates.len() / self.dim();
-
-        match self.fmm_eval_type {
-            FmmEvalType::Vector => {
-                let charges = &self.charges;
-                let res = unsafe {
-                    std::slice::from_raw_parts_mut(
-                        self.potentials.as_ptr() as *mut U,
-                        ntarget_coordinates,
-                    )
-                };
-                self.kernel.evaluate_st(
-                    self.kernel_eval_type,
-                    all_source_coordinates,
-                    all_target_coordinates,
-                    charges,
-                    res,
-                )
-            }
-
-            FmmEvalType::Matrix(nmatvecs) => {
-                for i in 0..nmatvecs {
-                    let charges_i =
-                        &self.charges[i * nsource_coordinates..(i + 1) * nsource_coordinates];
-                    let res_i = unsafe {
-                        std::slice::from_raw_parts_mut(
-                            self.potentials.as_ptr().add(ntarget_coordinates) as *mut U,
-                            ntarget_coordinates,
-                        )
-                    };
-                    self.kernel.evaluate_st(
-                        self.kernel_eval_type,
-                        all_source_coordinates,
-                        all_target_coordinates,
-                        charges_i,
-                        res_i,
-                    )
-                }
-            }
-        }
-    }
-
-    fn expansion_order(&self) -> usize {
-        self.expansion_order
-    }
-
-    fn kernel(&self) -> &Self::Kernel {
-        &self.kernel
-    }
-
-    fn tree(&self) -> &Self::Tree {
-        &self.tree
-    }
-
-    fn clear(&mut self, _charges: &Charges<U>) {}
-}
 
 #[cfg(test)]
 mod test {
 
     use super::*;
-    use crate::fmm::field_translation::source_to_target::types::{
-        BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm,
+    use crate::{
+        BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
+        SingleNodeFmmTree,
     };
-    use crate::fmm::types::{KiFmmBuilderSingleNode, SingleNodeFmmTree};
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::helpers::points_fixture;
     use green_kernels::laplace_3d::Laplace3dKernel;

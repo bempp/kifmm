@@ -1,14 +1,11 @@
 //! Implementation of traits for field translations via the FFT and BLAS.
-use super::{
-    array::flip3,
-    transfer_vector::compute_transfer_vectors,
-    types::{
-        BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm,
-        FftM2lOperatorData,
-    },
-};
+use super::{array::flip3, transfer_vector::compute_transfer_vectors};
 
 use crate::fftw::traits::RealToComplexFft3D;
+use crate::fmm::types::{
+    BlasFieldTranslationKiFmm, BlasMetadata, FftFieldTranslationKiFmm,
+    FftMetadata,
+};
 use crate::helpers::ncoeffs_kifmm;
 use crate::traits::field::SourceToTargetData;
 use crate::tree::{
@@ -21,6 +18,7 @@ use crate::tree::{
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
+use num_complex::ComplexFloat;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
@@ -48,7 +46,7 @@ where
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    type OperatorData = BlasSourceToTargetOperatorData<T>;
+    type OperatorData = BlasMetadata<T>;
     type Domain = Domain<T>;
 
     fn set_operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
@@ -144,10 +142,10 @@ where
             )
             .unwrap();
 
-        let mut s_block = rlst_dynamic_array2!(T, [nst, cutoff_rank]);
+        let mut s_trunc = rlst_dynamic_array2!(T, [nst, cutoff_rank]);
         for j in 0..cutoff_rank {
             for i in 0..nst {
-                unsafe { *s_block.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
+                unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
             }
         }
 
@@ -159,7 +157,7 @@ where
 
             let tmp = empty_array::<T, 2>().simple_mult_into_resize(
                 sigma_mat.view(),
-                empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_block.view()),
+                empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
             );
 
             let mut u_i = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
@@ -197,16 +195,16 @@ where
             c_vt.push(vt_i_compressed);
         }
 
-        let mut st_block = rlst_dynamic_array2!(T, [cutoff_rank, nst]);
-        st_block.fill_from(s_block.transpose());
+        let mut st_trunc = rlst_dynamic_array2!(T, [cutoff_rank, nst]);
+        st_trunc.fill_from(s_trunc.transpose());
 
-        let result = BlasSourceToTargetOperatorData {
+        let result = BlasMetadata {
             u,
-            st_block,
+            st: st_trunc,
             c_u,
             c_vt,
         };
-        self.operator_data = result;
+        self.metadata = result;
         self.cutoff_rank = cutoff_rank;
     }
 
@@ -240,12 +238,12 @@ where
 impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
     T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
-    Complex<T>: RlstScalar,
+    Complex<T>: RlstScalar + ComplexFloat,
     U: Kernel<T = T> + Default,
 {
     type Domain = Domain<T>;
 
-    type OperatorData = FftM2lOperatorData<Complex<T>>;
+    type OperatorData = FftMetadata<Complex<T>>;
 
     fn set_operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
@@ -431,13 +429,13 @@ where
             }
         }
 
-        let result = FftM2lOperatorData {
+        let result = FftMetadata {
             kernel_data,
             kernel_data_f: kernel_data_ft,
         };
 
         // Set operator data
-        self.operator_data = result;
+        self.metadata = result;
 
         // Set required maps, TODO: Should be a part of operator data
         (self.surf_to_conv_map, self.conv_to_surf_map) =
@@ -456,7 +454,7 @@ where
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
     T: Float + RlstScalar<Real = T> + Default + RealToComplexFft3D,
-    Complex<T>: RlstScalar,
+    Complex<T>: RlstScalar + ComplexFloat,
     U: Kernel<T = T> + Default,
 {
     /// Create new
@@ -643,11 +641,11 @@ mod test {
             .position(|x| x.hash == transfer_vector.hash)
             .unwrap();
 
-        let c_u = &blas.operator_data.c_u[c_idx];
-        let c_vt = &blas.operator_data.c_vt[c_idx];
+        let c_u = &blas.metadata.c_u[c_idx];
+        let c_vt = &blas.metadata.c_vt[c_idx];
 
         let compressed_multipole = empty_array::<f64, 2>()
-            .simple_mult_into_resize(blas.operator_data.st_block.view(), multipole.view());
+            .simple_mult_into_resize(blas.metadata.st.view(), multipole.view());
 
         let compressed_check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
             c_u.view(),
@@ -657,7 +655,7 @@ mod test {
 
         // Post process to find check potential
         let check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
-            blas.operator_data.u.view(),
+            blas.metadata.u.view(),
             compressed_check_potential.view(),
         );
 
@@ -730,7 +728,7 @@ mod test {
 
         fft.set_operator_data(expansion_order, domain);
 
-        let kernels = &fft.operator_data.kernel_data;
+        let kernels = &fft.metadata.kernel_data;
 
         let key = MortonKey::from_point(&[0.5, 0.5, 0.5], &domain, level);
 

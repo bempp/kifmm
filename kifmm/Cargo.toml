@@ -48,6 +48,7 @@ path = "examples/single_node_laplace.rs"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
 
 [target.aarch64-apple-darwin.dev-dependencies]
 blas-src = { version = "0.9", features = ["accelerate"]}

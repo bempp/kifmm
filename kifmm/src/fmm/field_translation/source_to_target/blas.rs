@@ -1,7 +1,6 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 // use crate::field::types::BlasFieldTranslationKiFmm;
-use crate::fmm::field_translation::source_to_target::types::BlasFieldTranslationKiFmm;
-use crate::fmm::types::{FmmEvalType, KiFmm, SendPtrMut};
+use crate::fmm::types::{BlasFieldTranslationKiFmm, FmmEvalType, KiFmm, SendPtrMut};
 use crate::helpers::{homogenous_kernel_scale, m2l_scale};
 
 use crate::traits::{
@@ -189,8 +188,8 @@ where
                     //rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
                         self.source_to_target_translation_data
-                            .operator_data
-                            .st_block
+                            .metadata
+                            .st
                             .view(),
                         multipoles,
                     );
@@ -210,9 +209,9 @@ where
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
                             let c_u_sub =
-                                &self.source_to_target_translation_data.operator_data.c_u[c_idx];
+                                &self.source_to_target_translation_data.metadata.c_u[c_idx];
                             let c_vt_sub =
-                                &self.source_to_target_translation_data.operator_data.c_vt[c_idx];
+                                &self.source_to_target_translation_data.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
@@ -278,7 +277,7 @@ where
                             self.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
                                 self.source_to_target_translation_data
-                                    .operator_data
+                                    .metadata
                                     .u
                                     .view(),
                                 compressed_check_potentials,
@@ -352,8 +351,8 @@ where
                     //rlst_blis::interface::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
                         self.source_to_target_translation_data
-                            .operator_data
-                            .st_block
+                            .metadata
+                            .st
                             .view(),
                         multipoles,
                     );
@@ -373,9 +372,9 @@ where
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
                             let c_u_sub =
-                                &self.source_to_target_translation_data.operator_data.c_u[c_idx];
+                                &self.source_to_target_translation_data.metadata.c_u[c_idx];
                             let c_vt_sub =
-                                &self.source_to_target_translation_data.operator_data.c_vt[c_idx];
+                                &self.source_to_target_translation_data.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
@@ -474,7 +473,7 @@ where
                             self.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
                                 self.source_to_target_translation_data
-                                    .operator_data
+                                    .metadata
                                     .u
                                     .view(),
                                 compressed_check_potentials,
