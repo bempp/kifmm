@@ -15,6 +15,9 @@
 //! Basic usage for evaluating an FMM between a set of source and target points
 //!
 //! ```rust
+//! # extern crate blas_src;
+//! # extern crate lapack_src;
+//!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 //! use kifmm::fmm::types::{
 //!     BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
@@ -42,7 +45,7 @@
 //!     charges.data_mut().copy_from_slice(&tmp);
 //!
 //!     // Build FMM object, with a given kernel and field translation
-//!     let fmm_fft = KiFmmBuilderSingleNode::new()
+//!     let mut fmm_fft = KiFmmBuilderSingleNode::new()
 //!         .tree(&sources, &targets, n_crit, sparse)
 //!         .unwrap()
 //!         .parameters(
@@ -59,8 +62,12 @@
 //!     // Run the FMM
 //!     fmm_fft.evaluate();
 //!
-//!     // Optionally clear, to re-evaluate
-//!     fmm_fft.clear();
+//!     // Optionally clear, to re-evaluate with new charges
+//!     let nvecs = 1;
+//!     let tmp = vec![1.0; nsources * nvecs];
+//!     let mut new_charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+//!     new_charges.data_mut().copy_from_slice(&tmp);
+//!     fmm_fft.clear(&new_charges);
 //! }
 //!
 //! ````

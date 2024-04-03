@@ -7,7 +7,7 @@ use num_complex::Complex;
 /// # Example usage
 ///
 /// ```rust
-/// use kifmm::fftw::traits::RealToComplexFft3D;
+/// use kifmm::traits::fftw::RealToComplexFft3D;
 /// use num_complex::Complex;
 /// use num::Zero;
 /// use rlst::{rlst_dynamic_array3, RawAccessMut, c64};
