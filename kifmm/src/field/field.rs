@@ -6,7 +6,7 @@ use crate::field::{
     types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
 
-use crate::fftw::traits::R2CFft3d;
+use crate::fftw::traits::RealToComplexFft3D;
 use crate::helpers::ncoeffs_kifmm;
 use crate::traits::field::SourceToTargetData;
 use crate::tree::{
@@ -237,7 +237,7 @@ where
 
 impl<T, U> SourceToTargetData<U> for FftFieldTranslationKiFmm<T, U>
 where
-    T: RlstScalar<Real = T> + Float + Default + R2CFft3d,
+    T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
     Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
@@ -453,7 +453,7 @@ where
 
 impl<T, U> FftFieldTranslationKiFmm<T, U>
 where
-    T: Float + RlstScalar<Real = T> + Default + R2CFft3d,
+    T: Float + RlstScalar<Real = T> + Default + RealToComplexFft3D,
     Complex<T>: RlstScalar,
     U: Kernel<T = T> + Default,
 {
@@ -807,7 +807,8 @@ mod test {
             test_kernel.data_mut(),
             test_kernel_hat.data_mut(),
             &[m, n, o],
-        );
+        )
+        .unwrap();
 
         for (p, t) in test_kernel_hat.data().iter().zip(kernel_hat.iter()) {
             assert!((p - t).norm() < 1e-6)

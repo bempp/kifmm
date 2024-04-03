@@ -9,7 +9,7 @@ use lazy_static::lazy_static;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
-use super::traits::R2CFft3d;
+use super::traits::RealToComplexFft3D;
 
 /// A threadsafe wrapper for a FFT plan operating on double precision data
 #[derive(Clone, Copy)]
@@ -120,7 +120,7 @@ fn validate_plan<T: Sized>(plan: *mut T) -> Result<*mut T, FftError> {
     }
 }
 
-impl R2CFft3d for f32 {
+impl RealToComplexFft3D for f32 {
     fn r2c_batch_par(
         in_: &mut [Self],
         out: &mut [Complex<Self>],
@@ -293,7 +293,7 @@ impl R2CFft3d for f32 {
     }
 }
 
-impl R2CFft3d for f64 {
+impl RealToComplexFft3D for f64 {
     fn r2c_batch_par(
         in_: &mut [Self],
         out: &mut [Complex<Self>],

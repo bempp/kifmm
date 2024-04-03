@@ -1,5 +1,5 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use crate::fftw::traits::R2CFft3d;
+use crate::fftw::traits::RealToComplexFft3D;
 use crate::field::types::FftFieldTranslationKiFmm;
 use crate::fmm::field_translation::matmul::matmul8x8;
 use crate::fmm::{
@@ -26,7 +26,7 @@ use std::{collections::HashSet, sync::RwLock};
 impl<T, U, V> KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalar<Real = U> + Float + Default + R2CFft3d,
+    U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
@@ -85,7 +85,7 @@ where
 impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
-    U: RlstScalar<Real = U> + Float + Default + R2CFft3d,
+    U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
