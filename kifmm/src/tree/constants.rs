@@ -1,4 +1,4 @@
-//! Crate wide constants.
+//! Module wide constants.
 
 use crate::tree::types::MortonKey;
 

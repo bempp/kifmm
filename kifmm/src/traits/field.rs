@@ -1,4 +1,4 @@
-//! Field traits
+//! Field Traits
 use green_kernels::traits::Kernel;
 
 /// Interface for handling field translation data and metadata
