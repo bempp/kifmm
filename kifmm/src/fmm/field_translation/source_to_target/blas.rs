@@ -1,9 +1,9 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use crate::field::types::BlasFieldTranslationKiFmm;
-use crate::fmm::{
-    helpers::{homogenous_kernel_scale, m2l_scale},
-    types::{FmmEvalType, KiFmm, SendPtrMut},
-};
+// use crate::field::types::BlasFieldTranslationKiFmm;
+use crate::fmm::types::{FmmEvalType, KiFmm, SendPtrMut};
+use crate::fmm::field_translation::source_to_target::types::{BlasFieldTranslationKiFmm};
+use crate::helpers::{homogenous_kernel_scale, m2l_scale};
+
 use crate::traits::{
     fmm::SourceToTargetTranslation,
     tree::{FmmTree, Tree},

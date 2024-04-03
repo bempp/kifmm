@@ -1,6 +1,5 @@
-//! Wrappers for FFTW functions, including multithreaded implementations.
-// use crate::{excall, ffi};
-pub use fftw_sys as ffi;
+//! # FFTW Implementations
+use fftw_sys as ffi;
 
 use itertools::Itertools;
 use num_complex::Complex;
@@ -9,21 +8,16 @@ use lazy_static::lazy_static;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
+use super::types::{Plan32, Plan64, ShapeInfo, FftError};
 use super::traits::RealToComplexFft3D;
-
-/// A threadsafe wrapper for a FFT plan operating on double precision data
-#[derive(Clone, Copy)]
-struct Plan64(pub *mut ffi::fftw_plan_s);
-
-/// A threadsafe wrapper for a FFT plan operating on single precision data
-#[derive(Clone, Copy)]
-struct Plan32(pub *mut ffi::fftwf_plan_s);
 
 unsafe impl Send for Plan32 {}
 unsafe impl Send for Plan64 {}
 unsafe impl Sync for Plan32 {}
 unsafe impl Sync for Plan64 {}
 
+/// FFTW in 'estimate' mode. A sub-optimal heuristic is used to create FFT plan.
+/// input/output arrays are not overwritten during planning, see [original doc](https://www.fftw.org/fftw3_doc/Planner-Flags.html) for detail
 const FFTW_ESTIMATE: u32 = 1 << 6;
 
 lazy_static! {
@@ -41,26 +35,11 @@ macro_rules! excall {
         let _lock = FFTW_MUTEX.lock().expect("Cannot get lock");
         unsafe { $call }
     }};
-} // excall!
-
-/// TODO: Docs
-#[derive(Debug)]
-pub enum FftError {
-    /// Failed to create a valid plan using FFTW library
-    InvalidPlanError,
-
-    /// The input and output buffers are of incompatible sizes
-    InvalidDimensionError,
 }
 
-/// Helper type storing length of input and output sequences in real-to-complex DFTs
-pub struct ShapeInfo {
-    /// Length of the real input sequence
-    n: usize,
 
-    /// Length of the complex output sequence
-    n_sub: usize,
-}
+
+
 
 /// Validate the dimensions of the (batch) input and output sequences in real-to-complex DFTs
 ///

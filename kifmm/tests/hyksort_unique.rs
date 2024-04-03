@@ -1,11 +1,13 @@
-#[cfg(feature = "mpi_support")]
+#[cfg(feature = "mpi")]
 use kifmm::hyksort::hyksort;
-#[cfg(feature = "mpi_support")]
+#[cfg(feature = "mpi")]
 use mpi::traits::{Communicator, Destination, Source};
+#[cfg(feature = "mpi")]
 use rand::Rng;
+#[cfg(feature = "mpi")]
 use std::collections::HashSet;
 
-#[cfg(feature = "mpi_support")]
+#[cfg(feature = "mpi")]
 fn main() {
     // Setup MPI
     let universe = mpi::initialize().unwrap();
@@ -60,4 +62,5 @@ fn main() {
     }
 }
 
+#[cfg(not(feature = "mpi"))]
 fn main() {}

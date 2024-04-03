@@ -19,7 +19,7 @@ impl<T> FmmTree for SingleNodeFmmTree<T>
 where
     T: RlstScalar<Real = T> + Float + Default,
 {
-    type Precision = T;
+    type Scalar = T;
     type Node = MortonKey;
     type Tree = SingleNodeTree<T>;
 

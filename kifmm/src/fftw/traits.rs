@@ -1,5 +1,5 @@
-//! FFTW traits
-use crate::fftw::fftw::FftError;
+//! FFTW Traits
+use super::types::FftError;
 use num_complex::Complex;
 
 /// Interface for Real-to_Complex DFT computed with FFT library for 3D real data.
@@ -10,7 +10,7 @@ use num_complex::Complex;
 /// use kifmm::fftw::traits::RealToComplexFft3D;
 /// use num_complex::Complex;
 /// use num::Zero;
-/// use rlst::{rlst_dynamic_array3, RawAccessMut};
+/// use rlst::{rlst_dynamic_array3, RawAccessMut, c64};
 ///
 ///
 /// // Single R2C FFT
@@ -20,9 +20,9 @@ use num_complex::Complex;
 ///     let mut in_ = rlst_dynamic_array3!(f64, shape_in);
 ///     let mut rng = rand::thread_rng();
 ///     in_.fill_from_standard_normal(&mut rng); // fill with random data
-///     let mut out = rlst_dynamic_array3!(f64, shape_out)
+///     let mut out = rlst_dynamic_array3!(c64, shape_out);
 ///
-///     let _success = f64::r2c(in_.data_mut(), out.data_mut(), &shape_in).unwrap();
+///     let _ = f64::r2c(in_.data_mut(), out.data_mut(), &shape_in).unwrap();
 /// }
 ///
 /// // (parallel) Batch operation
@@ -37,12 +37,12 @@ use num_complex::Complex;
 ///     let mut in_ = rlst_dynamic_array3!(f64, shape_in_batch);
 ///     let mut rng = rand::thread_rng();
 ///     in_.fill_from_standard_normal(&mut rng); // fill with random data
-///     let mut out = rlst_dynamic_array3!(f64, shape_out_batch)
+///     let mut out = rlst_dynamic_array3!(c64, shape_out_batch);
 ///
-///     let _success_batch = f64::r2c_batch(&mut in_, &mut out, &shape_in).unwrap();
+///     let _ = f64::r2c_batch(in_.data_mut(), out.data_mut(), &shape_in).unwrap();
 ///
 ///     // Optionally parallel
-///     let _success_batch_par = f64::r2c_batch_par(&mut in_, &mut out, &shape_in).unwrap();
+///     let _ = f64::r2c_batch_par(in_.data_mut(), out.data_mut(), &shape_in).unwrap();
 /// }
 ///
 /// ```

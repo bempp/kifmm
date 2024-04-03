@@ -1,7 +1,7 @@
 //! Implementation of FmmData and Fmm traits.
-use crate::fmm::{
-    helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
-    types::{Charges, FmmEvalType, KiFmm, KiFmmDummy},
+use crate::fmm::types::{Charges, FmmEvalType, KiFmm, KiFmmDummy};
+use crate::helpers::{
+    leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
 };
 use crate::traits::{
     field::SourceToTargetData,
@@ -23,7 +23,7 @@ where
     Self: SourceToTargetTranslation,
 {
     type NodeIndex = T::Node;
-    type Precision = W;
+    type Scalar = W;
     type Kernel = V;
     type Tree = T;
 
@@ -31,7 +31,7 @@ where
         self.dim
     }
 
-    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree.source_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -47,7 +47,7 @@ where
         }
     }
 
-    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree.target_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -63,7 +63,7 @@ where
         }
     }
 
-    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Scalar]>> {
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
             let ntargets = r - l;
@@ -258,7 +258,7 @@ where
     V: Kernel<T = U> + Send + Sync,
 {
     type NodeIndex = T::Node;
-    type Precision = U;
+    type Scalar = U;
     type Tree = T;
     type Kernel = V;
 
@@ -266,15 +266,15 @@ where
         3
     }
 
-    fn multipole(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn multipole(&self, _key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
         None
     }
 
-    fn local(&self, _key: &Self::NodeIndex) -> Option<&[Self::Precision]> {
+    fn local(&self, _key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
         None
     }
 
-    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>> {
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Scalar]>> {
         let ntarget_coordinates =
             self.tree.target_tree().all_coordinates().unwrap().len() / self.dim();
 
@@ -365,7 +365,7 @@ where
 mod test {
 
     use super::*;
-    use crate::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
+    use crate::fmm::field_translation::source_to_target::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
     use crate::fmm::{tree::SingleNodeFmmTree, types::KiFmmBuilderSingleNode};
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::helpers::points_fixture;
@@ -381,7 +381,7 @@ mod test {
     fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
             dyn Fmm<
-                Precision = T,
+                Scalar = T,
                 NodeIndex = MortonKey,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
@@ -430,7 +430,7 @@ mod test {
     fn test_single_node_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
             dyn Fmm<
-                Precision = T,
+                Scalar = T,
                 NodeIndex = MortonKey,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
@@ -746,7 +746,7 @@ mod test {
     fn test_root_multipole_laplace_single_node<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
             dyn Fmm<
-                Precision = T,
+                Scalar = T,
                 NodeIndex = MortonKey,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,

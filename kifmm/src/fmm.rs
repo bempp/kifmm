@@ -1,20 +1,23 @@
-//! A general framework for implementing Fast Multipole Methods.
+//! A 3D Kernel Independent Fast Multipole Method
 pub mod builder;
 pub mod constants;
 #[allow(clippy::module_inception)]
 pub mod fmm;
-pub mod helpers;
 pub mod pinv;
 pub mod send_ptr;
 pub mod tree;
 pub mod types;
 
-mod field_translation {
-    pub mod matmul;
+pub mod field_translation {
     pub mod source;
     pub mod source_to_target {
         pub mod blas;
         pub mod fft;
+        pub mod matmul;
+        pub mod array;
+        pub mod field;
+        pub mod types;
+        pub mod transfer_vector;
     }
     pub mod target;
 }

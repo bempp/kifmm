@@ -60,7 +60,7 @@ type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// Interface for FMM
 pub trait Fmm {
     /// Precision of data associated with FMM
-    type Precision: RlstScalar;
+    type Scalar: RlstScalar;
 
     /// Type of node index
     type NodeIndex;
@@ -74,17 +74,17 @@ pub trait Fmm {
     /// Get the multipole expansion data associated with a node index as a slice
     /// # Arguments
     /// * `key` - The source node index.
-    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Scalar]>;
 
     /// Get the local expansion data associated with a node index as a slice
     /// # Arguments
     /// * `key` - The target node index.
-    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Precision]>;
+    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Scalar]>;
 
     /// Get the potential data associated with the particles contained at a given node
     /// # Arguments
     /// * `key` - The target leaf node index.
-    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Precision]>>;
+    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get the expansion order associated with this FMM
     fn expansion_order(&self) -> usize;
@@ -105,5 +105,5 @@ pub trait Fmm {
     ///
     /// # Arguments
     /// * `charges` - 2D RLST array, of dimensions `[ncharges, nvecs]` where each of `nvecs` is associated with `ncharges`
-    fn clear(&mut self, charges: &Charges<Self::Precision>);
+    fn clear(&mut self, charges: &Charges<Self::Scalar>);
 }

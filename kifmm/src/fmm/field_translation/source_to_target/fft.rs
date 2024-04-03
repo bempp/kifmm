@@ -1,17 +1,16 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 use crate::fftw::traits::RealToComplexFft3D;
-use crate::field::types::FftFieldTranslationKiFmm;
-use crate::fmm::field_translation::matmul::matmul8x8;
-use crate::fmm::{
-    helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
-    types::{FmmEvalType, KiFmm, SendPtrMut},
-};
+use super::types::FftFieldTranslationKiFmm;
+use crate::fmm::field_translation::source_to_target::matmul::matmul8x8;
+use crate::fmm::types::{FmmEvalType, KiFmm, SendPtrMut};
+use crate::helpers::{chunk_size, homogenous_kernel_scale, m2l_scale};
 use crate::traits::tree::FmmTree;
 use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
     constants::{NHALO, NSIBLINGS},
     types::{MortonKey, SingleNodeTree},
 };
+
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use num::{Complex, Float};

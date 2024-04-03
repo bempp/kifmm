@@ -1,9 +1,8 @@
 //! Implementation of traits for field translations via the FFT and SVD.
-use crate::field::{
+use super::{
     array::flip3,
     transfer_vector::compute_transfer_vectors,
-    types::FftM2lOperatorData,
-    types::{BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
+    types::{FftM2lOperatorData, BlasFieldTranslationKiFmm, BlasSourceToTargetOperatorData, FftFieldTranslationKiFmm},
 };
 
 use crate::fftw::traits::RealToComplexFft3D;

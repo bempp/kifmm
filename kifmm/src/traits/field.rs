@@ -10,7 +10,7 @@ where
     /// and translation method
     type OperatorData;
 
-    /// The computational domain for these operators, defined by the input points distribution.
+    /// The computational domain defining the tree.
     type Domain;
 
     /// Compute the field translation operators corresponding to each unique transfer vector.

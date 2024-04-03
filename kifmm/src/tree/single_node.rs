@@ -540,7 +540,7 @@ impl<T> Tree for SingleNodeTree<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
-    type Precision = T;
+    type Scalar = T;
     type Domain = Domain<T>;
     type Node = MortonKey;
     type NodeSlice<'a> = &'a [MortonKey]
@@ -607,7 +607,7 @@ where
         Some(&self.leaves)
     }
 
-    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Precision]> {
+    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
@@ -615,7 +615,7 @@ where
         }
     }
 
-    fn all_coordinates(&self) -> Option<&[Self::Precision]> {
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
         Some(&self.coordinates)
     }
 

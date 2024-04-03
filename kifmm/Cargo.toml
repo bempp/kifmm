@@ -3,7 +3,7 @@
 strict = []
 avx = []
 neon = []
-mpi_support = ["mpi"]
+mpi = ["dep:mpi"]
 
 [package]
 name = "kifmm"
@@ -25,16 +25,10 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 itertools = "0.10"
 num = "0.4"
-cauchy = "0.4.*"
 approx = "0.5"
 rayon = "1.9"
 mpi = { version = "0.6.*", optional = true}
 rand = "0.8.5"
-float-cmp = "0.9.0"
-num_cpus = "1"
-superslice = "1"
-libc = "0.2"
-thiserror="1.*"
 rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 fftw-sys = {path = "../fftw-sys"}
 green-kernels = { git = "https://github.com/bempp/green-kernels" }
@@ -42,7 +36,6 @@ lazy_static = "1.4.0"
 num-complex = "0.4.5"
 
 [dev-dependencies]
-approx_eq = "0.1.8"
 criterion = { version = "0.3", features = ["html_reports"]}
 
 [[bench]]
@@ -66,4 +59,3 @@ lapack-src = { version = "0.9", features = ["netlib"]}
 
 [lints.clippy]
 wildcard_imports = "forbid"
-

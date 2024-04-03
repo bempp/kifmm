@@ -1,22 +1,25 @@
-//! Traits
+//! # Interfaces for Octrees.
+//!
+//! # Example
+//!
+//!
 use std::{collections::HashSet, hash::Hash};
 
 use num::Float;
 use rlst::RlstScalar;
 
-/// Tree is the trait interface for distributed octrees implemented by Rusty Fast Solvers.
-/// This trait makes no assumptions about the downstream usage of a struct implementing Tree,
-/// it simply provides methods for accessing tree nodes, and associated data, and is generically
-/// defined for both single and multi-node settings.
+/// A trait for interacting with single and multinode trees.
+///
+/// # Examples
 pub trait Tree {
-    /// The computational domain defined by the tree.
+    /// The computational domain defining the tree.
     type Domain;
 
-    /// Precision
-    type Precision: RlstScalar<Real = Self::Precision> + Float + Default;
+    ///
+    type Scalar: RlstScalar<Real = Self::Scalar> + Float + Default;
 
     /// A tree node.
-    type Node: TreeNode<Self::Precision, Domain = Self::Domain> + Clone + Copy;
+    type Node: TreeNode<Self::Scalar, Domain = Self::Domain> + Clone + Copy;
 
     /// Slice of nodes.
     type NodeSlice<'a>: IntoIterator<Item = &'a Self::Node>
@@ -54,13 +57,13 @@ pub trait Tree {
     fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
-    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Precision]>;
+    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Scalar]>;
 
     /// Number of coordinates
     fn ncoordinates(&self, key: &Self::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
-    fn all_coordinates(&self) -> Option<&[Self::Precision]>;
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]>;
 
     /// Total number of coordinates
     fn ncoordinates_tot(&self) -> Option<usize>;
@@ -84,14 +87,14 @@ pub trait Tree {
     fn leaf_index(&self, key: &Self::Node) -> Option<&usize>;
 }
 
-/// An FMM tree
+/// A trait
 pub trait FmmTree {
     /// Precision
-    type Precision;
+    type Scalar;
     /// Node type
     type Node;
     /// Tree type
-    type Tree: Tree<Precision = Self::Precision, Node = Self::Node>;
+    type Tree: Tree<Scalar = Self::Scalar, Node = Self::Node>;
 
     /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
@@ -106,13 +109,13 @@ pub trait FmmTree {
     fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
 }
 
-/// A tree node
+/// A trait representing the nodes of a tree, for example a Morton index.
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
     T: RlstScalar,
 {
-    /// Domain
+    /// The computational domain defining the tree.
     type Domain;
 
     /// Copy of nodes

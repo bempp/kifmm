@@ -1,14 +1,14 @@
 //! Builder objects to construct FMMs
 use crate::fmm::{
-    helpers::{
-        coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
-        leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges,
-        potential_pointers,
-    },
     pinv::pinv,
     tree::SingleNodeFmmTree,
     types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode},
 };
+use crate::helpers::{
+    coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
+    leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, potential_pointers,
+};
+
 use crate::helpers::ncoeffs_kifmm;
 use crate::traits::{
     field::SourceToTargetData,
@@ -195,7 +195,7 @@ where
 impl<T, U, V, W> KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTree<W>>,
-    T::Tree: Tree<Domain = Domain<W>, Precision = W, Node = MortonKey>,
+    T::Tree: Tree<Domain = Domain<W>, Scalar = W, Node = MortonKey>,
     U: SourceToTargetData<V>,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,
