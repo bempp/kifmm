@@ -11,11 +11,11 @@ use num::Float;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
+use crate::fmm::helpers::chunk_size;
 use crate::fmm::{
     constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
     types::{FmmEvalType, KiFmm},
 };
-use crate::helpers::chunk_size;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar,

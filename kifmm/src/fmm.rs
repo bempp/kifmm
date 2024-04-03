@@ -3,6 +3,7 @@ mod builder;
 pub mod constants;
 #[allow(clippy::module_inception)]
 mod fmm;
+pub mod helpers;
 pub mod pinv;
 mod send_ptr;
 pub mod tree;

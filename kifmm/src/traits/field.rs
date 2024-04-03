@@ -1,7 +1,7 @@
 //! Field traits
 use green_kernels::traits::Kernel;
 
-/// Container for metadata associated with a field translation implementation.
+/// Interface for handling field translation data and metadata
 pub trait SourceToTargetData<T>
 where
     T: Kernel,
@@ -13,22 +13,22 @@ where
     /// The computational domain defining the tree.
     type Domain;
 
-    /// Compute the field translation operators corresponding to each unique transfer vector.
+    /// Set the field translation operators corresponding to each unique transfer vector.
     ///
     /// # Arguments
     /// * `expansion_order` - The expansion order of the FMM
     /// * `domain` - Domain associated with the global point set.
-    fn set_operator_data(&mut self, expansion_order: usize, domain: Self::Domain);
+    fn operator_data(&mut self, expansion_order: usize, domain: Self::Domain);
 
     /// Set expansion order
     ///
     /// # Arguments
     /// * `expansion_order` - The expansion order of the FMM
-    fn set_expansion_order(&mut self, expansion_order: usize);
+    fn expansion_order(&mut self, expansion_order: usize);
 
     /// Set the associated kernel
     ///
     /// # Arguments
     /// * `kernel` - The kernel being used
-    fn set_kernel(&mut self, kernel: T);
+    fn kernel(&mut self, kernel: T);
 }

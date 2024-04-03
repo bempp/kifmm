@@ -1,4 +1,2 @@
 - Readme
-- uniform docs that are useful
 - returning potential data in original ordering
-- Re export key traits and data structures to top level.

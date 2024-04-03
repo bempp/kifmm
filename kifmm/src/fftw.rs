@@ -10,5 +10,4 @@
 //!
 #[allow(clippy::module_inception)]
 pub mod fftw;
-pub mod traits;
 pub mod types;

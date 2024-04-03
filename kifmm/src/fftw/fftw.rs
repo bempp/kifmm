@@ -8,8 +8,8 @@ use lazy_static::lazy_static;
 use rayon::prelude::*;
 use std::sync::Mutex;
 
-use super::traits::RealToComplexFft3D;
 use super::types::{FftError, Plan32, Plan64, ShapeInfo};
+use crate::traits::fftw::RealToComplexFft3D;
 
 unsafe impl Send for Plan32 {}
 unsafe impl Send for Plan64 {}

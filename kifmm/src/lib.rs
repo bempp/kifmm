@@ -75,7 +75,6 @@
 
 pub mod fftw;
 pub mod fmm;
-pub mod helpers;
 #[cfg(feature = "mpi_support")]
 pub mod hyksort;
 pub mod traits;
@@ -83,12 +82,13 @@ pub mod tree;
 
 // Public API
 #[doc(inline)]
-pub use fmm::types::KiFmmBuilderSingleNode as KiFmmBuilderSingleNode;
+pub use fmm::types::BlasFieldTranslationKiFmm;
 #[doc(inline)]
-pub use fmm::types::BlasFieldTranslationKiFmm as BlasFieldTranslationKiFmm;
+pub use fmm::types::FftFieldTranslationKiFmm;
 #[doc(inline)]
-pub use fmm::types::FftFieldTranslationKiFmm as FftFieldTranslationKiFmm;
+pub use fmm::types::KiFmmBuilderSingleNode;
 #[doc(inline)]
-pub use fmm::types::SingleNodeFmmTree as SingleNodeFmmTree;
+pub use fmm::types::SingleNodeFmmTree;
 
-
+#[doc(inline)]
+pub use traits::fmm::Fmm;

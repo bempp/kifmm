@@ -1,11 +1,11 @@
 //! # Local Translations
 use std::collections::HashSet;
 
+use crate::fmm::helpers::chunk_size;
 use crate::fmm::{
     constants::L2L_MAX_CHUNK_SIZE,
     types::{FmmEvalType, KiFmm},
 };
-use crate::helpers::chunk_size;
 use crate::traits::{
     field::SourceToTargetData,
     fmm::TargetTranslation,

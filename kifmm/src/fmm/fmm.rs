@@ -1,8 +1,8 @@
 //! Implementation of Fmm Trait.
-use crate::fmm::types::{Charges, FmmEvalType, KiFmm};
-use crate::helpers::{
+use crate::fmm::helpers::{
     leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
 };
+use crate::fmm::types::{Charges, FmmEvalType, KiFmm};
 use crate::traits::{
     field::SourceToTargetData,
     fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
@@ -22,7 +22,7 @@ where
     W: RlstScalar<Real = W> + Float + Default,
     Self: SourceToTargetTranslation,
 {
-    type NodeIndex = T::Node;
+    type Node = T::Node;
     type Scalar = W;
     type Kernel = V;
     type Tree = T;
@@ -31,7 +31,7 @@ where
         self.dim
     }
 
-    fn multipole(&self, key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
+    fn multipole(&self, key: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree.source_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -47,7 +47,7 @@ where
         }
     }
 
-    fn local(&self, key: &Self::NodeIndex) -> Option<&[Self::Scalar]> {
+    fn local(&self, key: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree.target_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -63,7 +63,7 @@ where
         }
     }
 
-    fn potential(&self, leaf: &Self::NodeIndex) -> Option<Vec<&[Self::Scalar]>> {
+    fn potential(&self, leaf: &Self::Node) -> Option<Vec<&[Self::Scalar]>> {
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
             let ntargets = r - l;
@@ -251,17 +251,16 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
     use super::*;
+    use crate::tree::constants::{ALPHA_INNER, ROOT};
+    use crate::tree::helpers::points_fixture;
     use crate::{
         BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
         SingleNodeFmmTree,
     };
-    use crate::tree::constants::{ALPHA_INNER, ROOT};
-    use crate::tree::helpers::points_fixture;
     use green_kernels::laplace_3d::Laplace3dKernel;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
@@ -275,7 +274,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                NodeIndex = MortonKey,
+                Node = MortonKey,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -324,7 +323,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                NodeIndex = MortonKey,
+                Node = MortonKey,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -640,7 +639,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                NodeIndex = MortonKey,
+                Node = MortonKey,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,

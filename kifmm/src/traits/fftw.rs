@@ -1,5 +1,5 @@
 //! FFTW Traits
-use super::types::FftError;
+use crate::fftw::types::FftError;
 use num_complex::Complex;
 
 /// Interface for Real-to_Complex DFT computed with FFT library for 3D real data.

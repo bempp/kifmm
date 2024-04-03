@@ -1,13 +1,11 @@
 //! Implementation of traits for field translations via the FFT and BLAS.
 use super::{array::flip3, transfer_vector::compute_transfer_vectors};
 
-use crate::fftw::traits::RealToComplexFft3D;
+use crate::fmm::helpers::ncoeffs_kifmm;
 use crate::fmm::types::{
-    BlasFieldTranslationKiFmm, BlasMetadata, FftFieldTranslationKiFmm,
-    FftMetadata,
+    BlasFieldTranslationKiFmm, BlasMetadata, FftFieldTranslationKiFmm, FftMetadata,
 };
-use crate::helpers::ncoeffs_kifmm;
-use crate::traits::field::SourceToTargetData;
+use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData};
 use crate::tree::{
     constants::{
         ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
@@ -49,7 +47,7 @@ where
     type OperatorData = BlasMetadata<T>;
     type Domain = Domain<T>;
 
-    fn set_operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
+    fn operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
 
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -208,11 +206,11 @@ where
         self.cutoff_rank = cutoff_rank;
     }
 
-    fn set_expansion_order(&mut self, expansion_order: usize) {
+    fn expansion_order(&mut self, expansion_order: usize) {
         self.expansion_order = expansion_order;
     }
 
-    fn set_kernel(&mut self, kernel: U) {
+    fn kernel(&mut self, kernel: U) {
         self.kernel = kernel;
     }
 }
@@ -245,7 +243,7 @@ where
 
     type OperatorData = FftMetadata<Complex<T>>;
 
-    fn set_operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
+    fn operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
         let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
@@ -442,11 +440,11 @@ where
             FftFieldTranslationKiFmm::<T, U>::compute_surf_to_conv_map(self.expansion_order);
     }
 
-    fn set_expansion_order(&mut self, expansion_order: usize) {
+    fn expansion_order(&mut self, expansion_order: usize) {
         self.expansion_order = expansion_order;
     }
 
-    fn set_kernel(&mut self, kernel: U) {
+    fn kernel(&mut self, kernel: U) {
         self.kernel = kernel;
     }
 }
@@ -627,7 +625,7 @@ mod test {
             ..Default::default()
         };
 
-        blas.set_operator_data(expansion_order, domain);
+        blas.operator_data(expansion_order, domain);
 
         let idx = 123;
 
@@ -654,10 +652,8 @@ mod test {
         );
 
         // Post process to find check potential
-        let check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
-            blas.metadata.u.view(),
-            compressed_check_potential.view(),
-        );
+        let check_potential = empty_array::<f64, 2>()
+            .simple_mult_into_resize(blas.metadata.u.view(), compressed_check_potential.view());
 
         let sources = transfer_vector
             .source
@@ -726,7 +722,7 @@ mod test {
             ..Default::default()
         };
 
-        fft.set_operator_data(expansion_order, domain);
+        fft.operator_data(expansion_order, domain);
 
         let kernels = &fft.metadata.kernel_data;
 
@@ -903,7 +899,7 @@ mod test {
             ..Default::default()
         };
 
-        fft.set_operator_data(expansion_order, domain);
+        fft.operator_data(expansion_order, domain);
 
         // Compute all M2L operators
         // Pick a random source/target pair

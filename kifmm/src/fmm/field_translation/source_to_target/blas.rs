@@ -1,7 +1,7 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
 // use crate::field::types::BlasFieldTranslationKiFmm;
+use crate::fmm::helpers::{homogenous_kernel_scale, m2l_scale};
 use crate::fmm::types::{BlasFieldTranslationKiFmm, FmmEvalType, KiFmm, SendPtrMut};
-use crate::helpers::{homogenous_kernel_scale, m2l_scale};
 
 use crate::traits::{
     fmm::SourceToTargetTranslation,
@@ -70,12 +70,7 @@ where
                 let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
 
                 // Mark items in interaction list for scattering
-                for (tv_idx, tv) in self
-                    .source_to_target
-                    .transfer_vectors
-                    .iter()
-                    .enumerate()
-                {
+                for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
                     let mut all_displacements_lock = all_displacements[tv_idx].lock().unwrap();
                     if transfer_vectors_set.contains(&tv.hash) {
                         // Look up scatter location in target tree
@@ -92,7 +87,6 @@ where
     }
 }
 
-/// Implement the multipole to local translation operator for an SVD accelerated KiFMM on a single node.
 impl<T, U, V> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslationKiFmm<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
@@ -158,10 +152,8 @@ where
                 );
 
                 // Allocate buffer to store compressed check potentials
-                let compressed_check_potentials = rlst_dynamic_array2!(
-                    U,
-                    [self.source_to_target.cutoff_rank, ntargets]
-                );
+                let compressed_check_potentials =
+                    rlst_dynamic_array2!(U, [self.source_to_target.cutoff_rank, ntargets]);
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
@@ -187,10 +179,7 @@ where
                     //TODO: Rework threading
                     //rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.source_to_target
-                            .metadata
-                            .st
-                            .view(),
+                        self.source_to_target.metadata.st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
@@ -208,17 +197,12 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let c_u_sub =
-                                &self.source_to_target.metadata.c_u[c_idx];
-                            let c_vt_sub =
-                                &self.source_to_target.metadata.c_vt[c_idx];
+                            let c_u_sub = &self.source_to_target.metadata.c_u[c_idx];
+                            let c_vt_sub = &self.source_to_target.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
-                                [
-                                    self.source_to_target.cutoff_rank,
-                                    multipole_idxs.len()
-                                ]
+                                [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
@@ -230,9 +214,7 @@ where
                                         &compressed_multipoles.data()[multipole_idx
                                             * self.source_to_target.cutoff_rank
                                             ..(multipole_idx + 1)
-                                                * self
-                                                    .source_to_target
-                                                    .cutoff_rank],
+                                                * self.source_to_target.cutoff_rank],
                                     );
                             }
 
@@ -257,8 +239,7 @@ where
                                 };
                                 let tmp = &compressed_check_potential.data()[multipole_idx
                                     * self.source_to_target.cutoff_rank
-                                    ..(multipole_idx + 1)
-                                        * self.source_to_target.cutoff_rank];
+                                    ..(multipole_idx + 1) * self.source_to_target.cutoff_rank];
                                 check_potential
                                     .iter_mut()
                                     .zip(tmp)
@@ -276,10 +257,7 @@ where
                         empty_array::<U, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                self.source_to_target
-                                    .metadata
-                                    .u
-                                    .view(),
+                                self.source_to_target.metadata.u.view(),
                                 compressed_check_potentials,
                             ),
                         ),
@@ -311,16 +289,12 @@ where
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     U,
-                    [
-                        self.source_to_target.cutoff_rank,
-                        nsources * nmatvecs
-                    ]
+                    [self.source_to_target.cutoff_rank, nsources * nmatvecs]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
-                    let key_displacement =
-                        i * self.source_to_target.cutoff_rank * nmatvecs;
+                    let key_displacement = i * self.source_to_target.cutoff_rank * nmatvecs;
                     let mut tmp = Vec::new();
                     for charge_vec_idx in 0..nmatvecs {
                         let charge_vec_displacement =
@@ -350,10 +324,7 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.source_to_target
-                            .metadata
-                            .st
-                            .view(),
+                        self.source_to_target.metadata.st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
@@ -371,10 +342,8 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let c_u_sub =
-                                &self.source_to_target.metadata.c_u[c_idx];
-                            let c_vt_sub =
-                                &self.source_to_target.metadata.c_vt[c_idx];
+                            let c_u_sub = &self.source_to_target.metadata.c_u[c_idx];
+                            let c_vt_sub = &self.source_to_target.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
@@ -396,8 +365,8 @@ where
                                     * nmatvecs;
 
                                 for charge_vec_idx in 0..nmatvecs {
-                                    let charge_vec_displacement = charge_vec_idx
-                                        * self.source_to_target.cutoff_rank;
+                                    let charge_vec_displacement =
+                                        charge_vec_idx * self.source_to_target.cutoff_rank;
 
                                     compressed_multipoles_subset.data_mut()[key_displacement_local
                                         + charge_vec_displacement
@@ -409,9 +378,7 @@ where
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
-                                                    + self
-                                                        .source_to_target
-                                                        .cutoff_rank],
+                                                    + self.source_to_target.cutoff_rank],
                                         );
                                 }
                             }
@@ -446,8 +413,8 @@ where
                                     let key_displacement = local_multipole_idx
                                         * self.source_to_target.cutoff_rank
                                         * nmatvecs;
-                                    let charge_vec_displacement = charge_vec_idx
-                                        * self.source_to_target.cutoff_rank;
+                                    let charge_vec_displacement =
+                                        charge_vec_idx * self.source_to_target.cutoff_rank;
 
                                     let tmp = &compressed_check_potential.data()[key_displacement
                                         + charge_vec_displacement
@@ -472,10 +439,7 @@ where
                         empty_array::<U, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                self.source_to_target
-                                    .metadata
-                                    .u
-                                    .view(),
+                                self.source_to_target.metadata.u.view(),
                                 compressed_check_potentials,
                             ),
                         ),

@@ -1,8 +1,6 @@
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::fmm::types::{
-    BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, KiFmmBuilderSingleNode,
-};
-use kifmm::traits::fmm::Fmm;
+use kifmm::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm, Fmm, KiFmmBuilderSingleNode};
+
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
 

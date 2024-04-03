@@ -1,14 +1,14 @@
 //! Builder objects to construct FMMs
+use crate::fmm::helpers::{
+    coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
+    leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, ncoeffs_kifmm,
+    potential_pointers,
+};
 use crate::fmm::{
     pinv::pinv,
     types::{Charges, Coordinates, FmmEvalType, KiFmm, KiFmmBuilderSingleNode, SingleNodeFmmTree},
 };
-use crate::helpers::{
-    coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
-    leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, potential_pointers,
-};
 
-use crate::helpers::ncoeffs_kifmm;
 use crate::traits::{
     field::SourceToTargetData,
     tree::{FmmTree, Tree},
@@ -143,14 +143,14 @@ where
 
             // Calculate source to target translation metadata
             // Set the expansion order
-            source_to_target.set_expansion_order(self.expansion_order.unwrap());
+            source_to_target.expansion_order(self.expansion_order.unwrap());
 
             // Set the associated kernel
             let kernel = self.kernel.as_ref().unwrap().clone();
-            source_to_target.set_kernel(kernel);
+            source_to_target.kernel(kernel);
 
             // Compute the field translation operators
-            source_to_target.set_operator_data(self.expansion_order.unwrap(), self.domain.unwrap());
+            source_to_target.operator_data(self.expansion_order.unwrap(), self.domain.unwrap());
 
             self.source_to_target = Some(source_to_target);
 

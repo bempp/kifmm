@@ -1,10 +1,9 @@
 //! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use crate::fftw::traits::RealToComplexFft3D;
 use crate::fmm::field_translation::source_to_target::matmul::matmul8x8;
+use crate::fmm::helpers::{chunk_size, homogenous_kernel_scale, m2l_scale};
 use crate::fmm::types::{FftFieldTranslationKiFmm, FmmEvalType, KiFmm, SendPtrMut};
-use crate::helpers::{chunk_size, homogenous_kernel_scale, m2l_scale};
 use crate::traits::tree::FmmTree;
-use crate::traits::{fmm::SourceToTargetTranslation, tree::Tree};
+use crate::traits::{fftw::RealToComplexFft3D, fmm::SourceToTargetTranslation, tree::Tree};
 use crate::tree::{
     constants::{NHALO, NSIBLINGS},
     types::{MortonKey, SingleNodeTree},
@@ -29,7 +28,7 @@ where
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: ComplexFloat
+    Complex<U>: ComplexFloat,
 {
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
         let targets = self.tree.target_tree().keys(level).unwrap();
@@ -89,7 +88,7 @@ where
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: ComplexFloat
+    Complex<U>: ComplexFloat,
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {
@@ -180,10 +179,7 @@ where
                 let scale = Complex::from(m2l_scale::<U>(level) * homogenous_kernel_scale(level));
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
-                let kernel_data_ft = &self
-                    .source_to_target
-                    .metadata
-                    .kernel_data_f;
+                let kernel_data_ft = &self.source_to_target.metadata.kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
                 let mut check_potential_hat = vec![U::zero(); fft_size_real * ntargets * 2];
@@ -211,11 +207,8 @@ where
                                 let multipole =
                                     &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
                                 let signal = &mut signal_chunk[i * fft_size..(i + 1) * fft_size];
-                                for (surf_idx, &conv_idx) in self
-                                    .source_to_target
-                                    .surf_to_conv_map
-                                    .iter()
-                                    .enumerate()
+                                for (surf_idx, &conv_idx) in
+                                    self.source_to_target.surf_to_conv_map.iter().enumerate()
                                 {
                                     signal[conv_idx] = multipole[surf_idx]
                                 }
@@ -368,11 +361,8 @@ where
                                 rlst_dynamic_array2!(U, [self.ncoeffs, NSIBLINGS]);
 
                             for i in 0..NSIBLINGS {
-                                for (surf_idx, &conv_idx) in self
-                                    .source_to_target
-                                    .conv_to_surf_map
-                                    .iter()
-                                    .enumerate()
+                                for (surf_idx, &conv_idx) in
+                                    self.source_to_target.conv_to_surf_map.iter().enumerate()
                                 {
                                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
                                         check_potential_chunk[i * fft_size + conv_idx];

@@ -155,7 +155,6 @@ pub struct KiFmm<
     V: Kernel,
     W: RlstScalar<Real = W> + Float + Default,
 > {
-
     /// Dimension of the FMM
     pub dim: usize,
 
@@ -451,7 +450,7 @@ pub struct FftFieldTranslationKiFmm<T, U>
 where
     T: Default + RlstScalar<Real = T> + Float,
     U: Kernel<T = T> + Default,
-    Complex<T>: ComplexFloat
+    Complex<T>: ComplexFloat,
 {
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
@@ -570,7 +569,7 @@ pub struct TransferVector {
 #[derive(Default)]
 pub struct FftMetadata<T>
 where
-    T: ComplexFloat
+    T: ComplexFloat,
 {
     /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster
     pub kernel_data: Vec<Vec<T>>,
@@ -636,10 +635,10 @@ where
     pub u: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
 
     /// Right singular vectors from SVD of thin M2L matrix, truncated to a maximum cutoff rank.
-    pub st:  Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+    pub st: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
 
     /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_u: Vec< Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+    pub c_u: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 
     /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,

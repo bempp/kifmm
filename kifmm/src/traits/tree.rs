@@ -1,14 +1,10 @@
-//! # Interfaces for Octrees.
-//!
-//! # Example
-//!
-//!
+//! Tree Traits
 use std::{collections::HashSet, hash::Hash};
 
 use num::Float;
 use rlst::RlstScalar;
 
-/// A trait for interacting with single and multinode trees.
+/// Interface for single and multi-node trees
 ///
 /// # Examples
 pub trait Tree {
@@ -87,12 +83,15 @@ pub trait Tree {
     fn leaf_index(&self, key: &Self::Node) -> Option<&usize>;
 }
 
-/// A trait
+/// Interface for trees required by the fast multipole method (FMM), which requires
+/// separate trees for the source and target particle data.
 pub trait FmmTree {
     /// Precision
     type Scalar;
+
     /// Node type
     type Node;
+
     /// Tree type
     type Tree: Tree<Scalar = Self::Scalar, Node = Self::Node>;
 
@@ -109,7 +108,7 @@ pub trait FmmTree {
     fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
 }
 
-/// A trait representing the nodes of a tree, for example a Morton index.
+/// Interface for tree nodes
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
