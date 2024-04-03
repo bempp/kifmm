@@ -190,8 +190,8 @@ pub enum FmmEvalType {
 /// ```
 /// # extern crate blas_src;
 /// # extern crate lapack_src;
-/// use kifmm::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
-/// use kifmm::fmm::types::KiFmmBuilderSingleNode;
+/// use kifmm::fmm::types::{KiFmmBuilderSingleNode};
+/// use kifmm::fmm::field_translation::source_to_target::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::helpers::points_fixture;
