@@ -3,6 +3,7 @@ use super::{array::flip3, transfer_vector::compute_transfer_vectors};
 
 use crate::fmm::helpers::ncoeffs_kifmm;
 use crate::fmm::types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata};
+use crate::traits::field::ConfigureSourceToTargetData;
 use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData};
 use crate::tree::{
     constants::{
@@ -35,15 +36,25 @@ fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
     singular_values.len() - 1
 }
 
-impl<T, U> SourceToTargetData<U> for BlasFieldTranslation<T, U>
+// T: SourceToTargetData + ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
+impl<T, U> SourceToTargetData for BlasFieldTranslation<T, U>
 where
     T: Float + Default,
     T: RlstScalar<Real = T> + Gemm,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    type OperatorData = BlasMetadata<T>;
+    type Metadata = BlasMetadata<T>;
+}
+
+impl<T, U> ConfigureSourceToTargetData for BlasFieldTranslation<T, U>
+where
+    T: Float + Default + RlstScalar<Real = T> + Gemm,
+    U: Kernel<T = T> + Default,
+    Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
+{
     type Domain = Domain<T>;
+    type Kernel = U;
 
     fn operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
@@ -231,7 +242,16 @@ where
     }
 }
 
-impl<T, U> SourceToTargetData<U> for FftFieldTranslation<T, U>
+impl<T, U> SourceToTargetData for FftFieldTranslation<T, U>
+where
+    T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
+    Complex<T>: RlstScalar + ComplexFloat,
+    U: Kernel<T = T> + Default,
+{
+    type Metadata = FftMetadata<Complex<T>>;
+}
+
+impl<T, U> ConfigureSourceToTargetData for FftFieldTranslation<T, U>
 where
     T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
     Complex<T>: RlstScalar + ComplexFloat,
@@ -239,7 +259,7 @@ where
 {
     type Domain = Domain<T>;
 
-    type OperatorData = FftMetadata<Complex<T>>;
+    type Kernel = U;
 
     fn operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree

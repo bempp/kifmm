@@ -5,13 +5,11 @@ use num::Float;
 use rlst::RlstScalar;
 
 /// Interface for single and multi-node trees
-///
-/// # Examples
 pub trait Tree {
     /// The computational domain defining the tree.
-    type Domain;
+    type Domain: Domain;
 
-    ///
+    /// Scalar type
     type Scalar: RlstScalar<Real = Self::Scalar> + Float + Default;
 
     /// A tree node.
@@ -86,7 +84,7 @@ pub trait Tree {
 /// Interface for trees required by the fast multipole method (FMM), which requires
 /// separate trees for the source and target particle data.
 pub trait FmmTree {
-    /// Precision
+    /// Scalar type
     type Scalar;
 
     /// Node type
@@ -115,7 +113,7 @@ where
     T: RlstScalar,
 {
     /// The computational domain defining the tree.
-    type Domain;
+    type Domain: Domain;
 
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
@@ -134,4 +132,16 @@ where
 
     /// Checks adjacency, defined by sharing a vertex, edge, or face, between this node and another
     fn is_adjacent(&self, other: &Self) -> bool;
+}
+
+/// Interface for computational domain
+pub trait Domain {
+    /// Scalar type
+    type Scalar: RlstScalar;
+
+    /// Origin of computational domain.
+    fn origin(&self) -> &[Self::Scalar; 3];
+
+    /// Side length along each axis
+    fn diameter(&self) -> &[Self::Scalar; 3];
 }

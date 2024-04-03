@@ -9,6 +9,7 @@ use crate::fmm::{
     types::{Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
 };
 
+use crate::traits::field::ConfigureSourceToTargetData;
 use crate::traits::{
     field::SourceToTargetData,
     tree::{FmmTree, Tree},
@@ -26,7 +27,7 @@ use rlst::{
 
 impl<T, U, V> SingleNodeBuilder<T, U, V>
 where
-    T: SourceToTargetData<V, Domain = Domain<U>> + Default,
+    T: ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
     U: RlstScalar<Real = U> + Float + Default,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,
@@ -195,7 +196,7 @@ impl<T, U, V, W> KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTree<W>>,
     T::Tree: Tree<Domain = Domain<W>, Scalar = W, Node = MortonKey>,
-    U: SourceToTargetData<V>,
+    U: SourceToTargetData,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
