@@ -53,20 +53,120 @@ pub struct SendPtr<T> {
 }
 
 /// Holds all required data and metadata for evaluating a kernel independent FMM on a single node.
+///
+/// # Fields
+///
+/// - `dim` - Dimension of FMM, defaults to 3.
+///
+/// - `tree`- Holds an octree structure (`SingleNodeFmmTree`) representing
+/// the sources and targets within the computational domain.
+///
+/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
+///
+/// - `charges`- Holds the charge data associated with the source points, stored as a buffer
+/// where each item is associated with a leaf in Morton order and looked up using `charge_index_pointer_targets`.
+/// The displacement must be correctly calculated if using without the provided trait interface and multiple input charges
+/// are used in the FMM.
+///
+/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
+/// used to control the accuracy and computational complexity of the FMM.
+///
+/// - `ncoeffs`- the number of quadrature points associated with the `exansion_order`.
+///
+/// - `kernel_eval_type`- Specifies the evaluation type of the kernel, either evaluating potentials
+/// or potentials as well as gradients.
+///
+/// - `fmm_eval_type`- Defines the evaluation type for the FMM algorithm, either for a single charge
+/// vector or multiple charge vectors.
+///
+/// - `kernel_eval_size` - Set by the kernel eval type.
+///
+/// - `charge_index_pointer_sources` - Index pointer providing left and right indices of source points
+/// contained within a source leaf. This vector is `n_sources` long.
+///
+/// - `charge_index_pointer_targets` - Index pointer providing left and right indices of target points
+/// contained within a target leaf. This vector is `n_targets` long.
+///
+/// - `leaf_upward_surfaces_sources` - Upward surface associated with each source leaf, in Morton order, precomputed
+/// for performance during loops.
+///
+/// - `leaf_upward_surfaces_targets` - Upward surface associated with each target leaf, in Morton order, precomputed
+/// for performance during loops.
+///
+/// - `leaf_scales_sources` - Scale factor for operators when applying to a each source leaf box, precomputed for
+/// performance during loops.
+///
+/// - `uc2e_inv_1` - First component of pseudo-inverse of interaction matrix between upward check and equivalent surfaces, stored
+/// in two parts for stability purposes.
+///
+/// - `uc2e_inv_2` - Second component of pseudo-inverse of interaction matrix between upward check and equivalent surfaces, stored
+/// in two parts for stability purposes.
+///
+/// - `dc2e_inv_1` - First component of pseudo-inverse of interaction matrix between downward check and equivalent surfaces, stored
+/// in two parts for stability purposes.
+///
+/// - `dc2e_inv_2` - Second component of pseudo-inverse of interaction matrix between downward check and equivalent surfaces, stored
+/// in two parts for stability purposes.
+///
+/// - `source` -  The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order as a single matrix
+/// for ease of application.
+///
+/// - `source_vec` -  The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order where each
+/// index corresponds to a child box.
+///
+/// - `target_vec` - The local translation matrices, for a cluster of eight children and their parent. Stored in Morton order where each
+/// index corresponds to a child box.
+///
+/// - `multipoles` - Buffer containing multipole data of all source boxes stored in Morton order. If `n` charge vectors are used in
+/// the FMM, their associated multipole data is displaced by `nsources * ncoeffs` in `multipole` where `ncoeffs` is the length of each
+/// sequence corresponding to a multipole expansion and there are `nsources` boxes in the source tree.
+///
+/// - `locals` - Buffer containing local data of all target boxes stored in Morton order. If `n` charge vectors are used in
+/// the FMM, their associated local data is displaced by `ntargets * ncoeffs` in `locals` where `ncoeffs` is the length of each
+/// sequence corresponding to a local expansion and there are `ntargets` boxes in the target tree.
+///
+/// `potentials` - Buffer containing evaluated potentials of all target boxes stored in Morton order. If `n` charge vectors are used in
+/// the FMM, their associated potential data is displaced by `ntargets * nparticles` in `potentials` where `nparticles` is the number of
+/// target particles and there are `ntargets` boxes in the target tree.
+///
+/// - `leaf_multipoles` - Thread safe pointers to beginning of buffer containing leaf multipole data, where the outer index is set by the number
+/// of evaluations being computed by the FMM.
+///
+/// - `level_multipoles` - Thread safe pointers to beginning of buffer containing multipole data at each level, where the outer index is set by the
+/// the level of the source tree, and the inner index is set by the number of evaluations being computed by the FMM.
+///
+/// - `leaf_locals` - Thread safe pointers to beginning of buffer containing leaf local data, where the outer index is set by the number
+/// of evaluations being computed by the FMM.
+///
+/// - `level_locals` - Thread safe pointers to beginning of buffer containing local data at each level, where the outer index is set by the
+/// the level of the target tree, and the inner index is set by the number of evaluations being computed by the FMM.
+///
+/// - `level_index_pointer_locals - Index of each key in target tree at a given level within the Morton sorted keys at that level.
+///
+/// - `level_index_pointer_multipoles- Index of each key in source tree at a given level within the Morton sorted keys at that level.
+///
+/// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
+/// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
+///
+///
 pub struct KiFmm<
     T: FmmTree<Tree = SingleNodeTree<W>>,
     U: SourceToTargetData<V>,
     V: Kernel,
     W: RlstScalar<Real = W> + Float + Default,
 > {
+
+    /// Dimension of the FMM
+    pub dim: usize,
+
     /// A single node tree
     pub tree: T,
 
-    /// The metadata required for source to target translation
-    pub source_to_target_translation_data: U,
-
     /// The associated kernel function
     pub kernel: V,
+
+    /// The charge data at each target leaf box.
+    pub charges: Vec<W>,
 
     /// The expansion order of the FMM
     pub expansion_order: usize,
@@ -74,14 +174,11 @@ pub struct KiFmm<
     /// The number of coefficients, corresponding to points discretising the equivalent surface
     pub ncoeffs: usize,
 
-    /// The FMM evaluation type, either for a vector or matrix of input charges.
-    pub fmm_eval_type: FmmEvalType,
-
-    /// The kernel evaluation type, either for potentials or potentials and derivatives
+    /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
 
-    /// The metadata required for source to source translation
-    pub source_translation_data_vec: Vec<Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>>,
+    /// The FMM evaluation type, either for a vector or matrix of input charges.
+    pub fmm_eval_type: FmmEvalType,
 
     /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub kernel_eval_size: usize,
@@ -92,14 +189,14 @@ pub struct KiFmm<
     /// Index pointer for target coordinates
     pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
-    /// Dimension of the FMM
-    pub dim: usize,
-
     /// Upward surfaces associated with source leaves
     pub leaf_upward_surfaces_sources: Vec<W>,
 
     /// Upward surfaces associated with target leaves
     pub leaf_upward_surfaces_targets: Vec<W>,
+
+    /// Scales of each source leaf box
+    pub leaf_scales_sources: Vec<W>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
@@ -117,14 +214,26 @@ pub struct KiFmm<
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_2: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
 
-    /// The multipole to multipole operator matrices, each index is associated with a child box (in sequential Morton order),
-    pub source_data: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+    /// Data and metadata for field translations
+    pub source_to_target: U,
+
+    /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
+    pub source: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+
+    /// The metadata required for source to source translation
+    pub source_vec: Vec<Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_data: Vec<Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>>,
+    pub target_vec: Vec<Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>>,
 
     /// The multipole expansion data at each box.
     pub multipoles: Vec<W>,
+
+    /// The local expansion at each box
+    pub locals: Vec<W>,
+
+    /// The evaluated potentials at each target leaf box.
+    pub potentials: Vec<W>,
 
     /// Multipole expansions at leaf level
     pub leaf_multipoles: Vec<Vec<SendPtrMut<W>>>,
@@ -132,35 +241,20 @@ pub struct KiFmm<
     /// Multipole expansions at each level
     pub level_multipoles: Vec<Vec<Vec<SendPtrMut<W>>>>,
 
-    /// The local expansion at each box
-    pub locals: Vec<W>,
-
     /// Local expansions at the leaf level
     pub leaf_locals: Vec<Vec<SendPtrMut<W>>>,
 
     /// The local expansion data at each level.
     pub level_locals: Vec<Vec<Vec<SendPtrMut<W>>>>,
 
-    /// index pointers to each key at a given level, indexed by level.
+    /// Index pointers to each key at a given level, indexed by level.
     pub level_index_pointer_locals: Vec<HashMap<MortonKey, usize>>,
 
-    /// index pointers to each key at a given level, indexed by level.
+    /// Index pointers to each key at a given level, indexed by level.
     pub level_index_pointer_multipoles: Vec<HashMap<MortonKey, usize>>,
 
     /// The evaluated potentials at each target leaf box.
-    pub potentials: Vec<W>,
-
-    /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<W>>,
-
-    /// Leaf downward surfaces
-    pub leaf_downward_surfaces: Vec<W>,
-
-    /// The charge data at each target leaf box.
-    pub charges: Vec<W>,
-
-    /// Scales of each source leaf box
-    pub leaf_scales_sources: Vec<W>,
 }
 
 /// Specifies the format of the input data for Fast Multipole Method (FMM) calculations.
@@ -177,9 +271,9 @@ pub struct KiFmm<
 ///
 /// # Variants
 ///
-/// - `Vector`: Indicates that the input is a single vector of charges.
+/// - `Vector`- Indicates that the input is a single vector of charges.
 ///
-/// - `Matrix`: Indicates that the input is a matrix of charges, where each column in the
+/// - `Matrix`- Indicates that the input is a matrix of charges, where each column in the
 ///   matrix represents a distinct vector of charges.
 #[derive(Clone, Copy)]
 pub enum FmmEvalType {
@@ -196,36 +290,29 @@ pub enum FmmEvalType {
 /// This builder facilitates the configuration and initialisation of the KiFMM in a step-by-step
 /// manner
 ///
-///
-/// # Type Parameters
-///
-/// - `T`: Metadata associated with multipole to local field translation method.
-/// - `U`: Scalar type must satisfy `RlstScalar`, `Float`, and `Default`.
-/// - `V`: The kernel type, representing the mathematical kernel used in FMM calculations.
-///
 /// # Fields
 ///
-/// - `tree`: Holds an octree structure (`SingleNodeFmmTree`) representing
-///   the sources and targets within the computational domain.
+/// - `tree`- Holds an octree structure (`SingleNodeFmmTree`) representing
+/// the sources and targets within the computational domain.
 ///
-/// - `charges`: Holds the charge data associated with the source points.
+/// - `charges`- Holds the charge data associated with the source points.
 ///
-/// - `source_to_target`: Metadata for multipole to local field translation, of type `T`.
+/// - `source_to_target`- Metadata for multipole to local field translation, of type `T`.
 ///
-/// - `domain`: Defines the computational domain for the FMM calculations.
+/// - `domain`- Defines the computational domain for the FMM calculations.
 ///
-/// - `kernel`: Specifies the kernel to be used for the FMM calculations.
+/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
 ///
-/// - `expansion_order`: Specifies the expansion order for the multipole/local expansions,
-///   used to control the accuracy and computational complexity of the FMM.
+/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
+/// used to control the accuracy and computational complexity of the FMM.
 ///
-/// - `ncoeffs`: The number of quadrature points associated with the `exansion_order`.
+/// - `ncoeffs`- the number of quadrature points associated with the `exansion_order`.
 ///
-/// - `kernel_eval_type`: Specifies the evaluation type of the kernel, either evaluating potentials
-///    or potentials as well as gradients.
+/// - `kernel_eval_type`- Specifies the evaluation type of the kernel, either evaluating potentials
+/// or potentials as well as gradients.
 ///
-/// - `fmm_eval_type`: Defines the evaluation type for the FMM algorithm, either for a single charge
-///    vector or multiple charge vectors.
+/// - `fmm_eval_type`- Defines the evaluation type for the FMM algorithm, either for a single charge
+/// vector or multiple charge vectors.
 ///
 /// # Example
 /// ```
@@ -285,20 +372,28 @@ where
 {
     /// Tree
     pub tree: Option<SingleNodeFmmTree<U>>,
-    /// Charges
-    pub charges: Option<Charges<U>>,
-    /// Source to target
-    pub source_to_target: Option<T>,
-    /// Domain
-    pub domain: Option<Domain<U>>,
+
     /// Kernel
     pub kernel: Option<V>,
+
+    /// Charges
+    pub charges: Option<Charges<U>>,
+
+    /// Data and metadata for field translations
+    pub source_to_target: Option<T>,
+
+    /// Domain
+    pub domain: Option<Domain<U>>,
+
     /// Expansion order
     pub expansion_order: Option<usize>,
+
     /// Number of coefficients
     pub ncoeffs: Option<usize>,
+
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,
+
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
 }
@@ -310,13 +405,13 @@ where
 ///
 /// # Fields
 ///
-/// - `source_tree`: An octree structure containing the source points. The source points
+/// - `source_tree`- An octree structure containing the source points. The source points
 ///   are those from which the potential will be computed.
 ///
-/// - `target_tree`: An octree structure containing the target points. The target points
+/// - `target_tree`- An octree structure containing the target points. The target points
 ///   are those at which the potential will be evaluated.
 ///
-/// - `domain`: The computational domain associated with this FMM calculation. This domain
+/// - `domain`- The computational domain associated with this FMM calculation. This domain
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 ///
@@ -333,7 +428,24 @@ pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
     pub domain: Domain<T>,
 }
 
-/// FFT field translation for KiFMM
+/// Stores data and metadata for FFT based acceleration scheme for field translation.
+///
+///  # Fields
+///
+/// - `surf_to_conv_map`- A mapping from indices of surface grid points to their
+///   corresponding points in the convolution grid.
+///
+/// - `conv_to_surf_map`- A mapping from indices in the convolution grid back to
+///   the surface grid points.
+///
+/// - `metadata`- Stores precomputed metadata required to apply this method.
+///
+/// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
+///
+/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
+///
+/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
+///   used to control the accuracy and computational complexity of the FMM.
 #[derive(Default)]
 pub struct FftFieldTranslationKiFmm<T, U>
 where
@@ -360,27 +472,27 @@ where
     pub expansion_order: usize,
 }
 
-/// Stores field translation meta-data and data for an SVD based sparsification in the kernel independent FMM.
+/// Stores data and metadata for BLAS based acceleration scheme for field translation.
 ///
-/// Our compressions scheme is based on [Messner et. al, 2012](https://arxiv.org/abs/1210.7292). We take the a SVD over
+/// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
 /// interaction matrices corresponding to all unique transfer vectors, and re-compress in a directional manner.
 /// This recompression is controlled via the `threshold` parameter, which filters singular vectors with corresponding
 /// singular values smaller than this.
 ///
 /// # Fields
 ///
-/// - `threshold`: A value used to filter singular vectors during recompression.
+/// - `threshold`- A value used to filter singular vectors during recompression.
 ///
-/// - `operator_data`: Stores precomputed metadata required to apply this method.
+/// - `metadata`- Stores precomputed metadata required to apply this method.
 ///
-/// - `transfer_vectors`: Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
+/// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
 ///
-/// - `kernel`: Specifies the kernel to be used for the FMM calculations.
+/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
 ///
-/// - `expansion_order`: Specifies the expansion order for the multipole/local expansions,
+/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
 ///   used to control the accuracy and computational complexity of the FMM.
 ///
-/// - `cutoff_rank`: Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
+/// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
 ///    matrices corresponding to unique transfer vectors.
 #[derive(Default)]
 pub struct BlasFieldTranslationKiFmm<T, U>
@@ -407,7 +519,22 @@ where
     pub cutoff_rank: usize,
 }
 
-/// A type to store a transfer vector between a `source` and `target` Morton key.
+/// Represents the vector between a source and target boxes encoded by Morton keys.
+///
+/// Encapsulates the directional vector from a source to a target, identified by their Morton keys,
+/// providing both the vector components and a unique identifier (hash) for efficient lookup and
+/// comparison operations.
+///
+/// # Fields
+///
+/// - `components`- The discrete vector components (x, y, z) represented as `[i64; 3]` indicating the
+///   directional offset from `source` to `target`.
+///
+/// - `hash`- A unique identifier for this transfer vector, used to facilitate quick lookups.
+///
+/// - `source`- The Morton key of the source box.
+///
+/// - `target`- The Morton key of the target box.
 #[derive(Debug)]
 pub struct TransferVector {
     /// Three vector of components.
@@ -423,20 +550,36 @@ pub struct TransferVector {
     pub target: MortonKey,
 }
 
-/// Container for the precomputed data required for FFT field translation.
+/// Stores metadata for FFT based acceleration scheme for field translation.
+///
+/// A set of eight siblings is called a __cluster__, the M2L translations for a given target cluster then consists
+/// only of translations between source clusters which correspond to neighbours of the target cluster's parent.
+/// In 3D there are (up to) 26 source clusters for each target cluster, which we call its __halo__.
+///
+/// Each source/target cluster pair will have 64 unique interaction matrices, for each of which we compute the DFT using FFTW.
+/// We store this data as `kernel_data`, a vector of length 26 - corresponding to the size of the halo. Each element contains a vector
+/// of all 64 DFT sequences of the interaction matrices between source and target clusters. The outer and inner vectors are in Morton order.
+///
+/// Each DFT sequence, $K_i$, is of length $P$, such that each element of `kernel_data` is of the form,
+///
+/// $$ [K_1, K_2, ..., K_{64}] = [[K_1^1, K_1^2, ..., K_1^{P}], [K_2^1, K_2^2, ..., K_2^{P}], ..., [K_{64}^1, K_{64}^2, ..., K_{64}^{P}]] $$
+///
+/// We also store these in a permuted 'frequency' order for fast application in `kernel_data_f`, based on the techniques presented in [[Malhotra et. al, 2015](https://www.cambridge.org/core/journals/communications-in-computational-physics/article/pvfmm-a-parallel-kernel-independent-fmm-for-particle-and-volume-potentials/365109A4C15B126CD2A184F767D4C957)]
+///
+/// $$ [[K_1^1, K_2^1, ..., K_{64}^1],  [K_1^2, K_2^2, ..., K_{64}^2], ..., [K_1^{P}, K_2^P, ..., K_{64}^P ] $$
 #[derive(Default)]
 pub struct FftMetadata<T>
 where
     T: ComplexFloat
 {
-    /// FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set
+    /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster
     pub kernel_data: Vec<Vec<T>>,
 
-    /// FFT of unique kernel evaluations for each transfer vector in a halo of a sibling set, re-arranged in frequency order
+    /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster, re-arranged in frequency order
     pub kernel_data_f: Vec<Vec<T>>,
 }
 
-/// Stores metadata required for BLAS field translations based on the SVD recompression scheme of [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]
+/// Stores metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Each interaction, identified by a unique transfer vector, $t \in T$, corresponds to a matrix $K_t$, where $T$ is the set of unique transfer vectors.
 ///
@@ -478,13 +621,13 @@ where
 /// The latter terms correspond to the fields `c_u` and `c_vt` respectively.
 ///
 /// # Fields
-/// - `u`: Left singular vectors from SVD of $K_{\text{fat}}$, truncated to correspond to a maximum cutoff rank of $k$.
+/// - `u`- Left singular vectors from SVD of $K_{\text{fat}}$, truncated to correspond to a maximum cutoff rank of $k$.
 ///
-/// - `st`: Right singular vectors from the SVD of the $K_{\text{thin}}$, truncated to correspond to a maximum cutoff rank of $k$.
+/// - `st`- Right singular vectors from the SVD of the $K_{\text{thin}}$, truncated to correspond to a maximum cutoff rank of $k$.
 ///
-/// - `c_u`:  Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+/// - `c_u`-  Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 ///
-/// - `c_vt`: Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+/// - `c_vt`- Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 pub struct BlasMetadata<T>
 where
     T: RlstScalar,

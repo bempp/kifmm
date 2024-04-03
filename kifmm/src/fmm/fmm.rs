@@ -213,9 +213,10 @@ where
         let dc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
         let dc2e_inv_2 = rlst_dynamic_array2!(W, [1, 1]);
         let source = rlst_dynamic_array2!(W, [1, 1]);
+
         KiFmm {
             tree: T::default(),
-            source_to_target_translation_data: U::default(),
+            source_to_target: U::default(),
             kernel: V::default(),
             expansion_order: 0,
             fmm_eval_type: FmmEvalType::Vector,
@@ -227,9 +228,9 @@ where
             uc2e_inv_2,
             dc2e_inv_1,
             dc2e_inv_2,
-            source_data: source,
-            source_translation_data_vec: Vec::default(),
-            target_data: Vec::default(),
+            source,
+            source_vec: Vec::default(),
+            target_vec: Vec::default(),
             multipoles: Vec::default(),
             locals: Vec::default(),
             leaf_multipoles: Vec::default(),
@@ -242,7 +243,6 @@ where
             potentials_send_pointers: Vec::default(),
             leaf_upward_surfaces_sources: Vec::default(),
             leaf_upward_surfaces_targets: Vec::default(),
-            leaf_downward_surfaces: Vec::default(),
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),

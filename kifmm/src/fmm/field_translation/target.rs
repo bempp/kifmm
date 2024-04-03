@@ -85,7 +85,7 @@ where
 
                         for i in 0..NSIBLINGS {
                             let tmp = empty_array::<W, 2>().simple_mult_into_resize(
-                                self.target_data[i].view(),
+                                self.target_vec[i].view(),
                                 parent_locals.view(),
                             );
 
@@ -143,7 +143,7 @@ where
                             child_locals_pointers.iter().enumerate().take(NSIBLINGS)
                         {
                             let result_i = empty_array::<W, 2>().simple_mult_into_resize(
-                                self.target_data[i].view(),
+                                self.target_vec[i].view(),
                                 parent_locals.view(),
                             );
 

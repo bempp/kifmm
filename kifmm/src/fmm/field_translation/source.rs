@@ -262,7 +262,7 @@ where
 
                             let parent_multipoles_chunk = empty_array::<W, 2>()
                                 .simple_mult_into_resize(
-                                    self.source_data.view(),
+                                    self.source.view(),
                                     child_multipoles_chunk_mat,
                                 );
 
@@ -326,7 +326,7 @@ where
                             );
 
                             let result_i = empty_array::<W, 2>().simple_mult_into_resize(
-                                self.source_translation_data_vec[i].view(),
+                                self.source_vec[i].view(),
                                 child_multipoles_i,
                             );
 

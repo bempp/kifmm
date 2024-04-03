@@ -71,7 +71,7 @@ where
 
                 // Mark items in interaction list for scattering
                 for (tv_idx, tv) in self
-                    .source_to_target_translation_data
+                    .source_to_target
                     .transfer_vectors
                     .iter()
                     .enumerate()
@@ -160,7 +160,7 @@ where
                 // Allocate buffer to store compressed check potentials
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     U,
-                    [self.source_to_target_translation_data.cutoff_rank, ntargets]
+                    [self.source_to_target.cutoff_rank, ntargets]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
@@ -169,7 +169,7 @@ where
                         compressed_check_potentials
                             .data()
                             .as_ptr()
-                            .add(i * self.source_to_target_translation_data.cutoff_rank)
+                            .add(i * self.source_to_target.cutoff_rank)
                             as *mut U
                     };
                     let send_ptr = SendPtrMut { raw };
@@ -187,7 +187,7 @@ where
                     //TODO: Rework threading
                     //rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.source_to_target_translation_data
+                        self.source_to_target
                             .metadata
                             .st
                             .view(),
@@ -209,29 +209,29 @@ where
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
                             let c_u_sub =
-                                &self.source_to_target_translation_data.metadata.c_u[c_idx];
+                                &self.source_to_target.metadata.c_u[c_idx];
                             let c_vt_sub =
-                                &self.source_to_target_translation_data.metadata.c_vt[c_idx];
+                                &self.source_to_target.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
                                 [
-                                    self.source_to_target_translation_data.cutoff_rank,
+                                    self.source_to_target.cutoff_rank,
                                     multipole_idxs.len()
                                 ]
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
-                                    .source_to_target_translation_data
+                                    .source_to_target
                                     .cutoff_rank
-                                    ..(i + 1) * self.source_to_target_translation_data.cutoff_rank]
+                                    ..(i + 1) * self.source_to_target.cutoff_rank]
                                     .copy_from_slice(
                                         &compressed_multipoles.data()[multipole_idx
-                                            * self.source_to_target_translation_data.cutoff_rank
+                                            * self.source_to_target.cutoff_rank
                                             ..(multipole_idx + 1)
                                                 * self
-                                                    .source_to_target_translation_data
+                                                    .source_to_target
                                                     .cutoff_rank],
                                     );
                             }
@@ -252,13 +252,13 @@ where
                                 let check_potential = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         check_potential_ptr,
-                                        self.source_to_target_translation_data.cutoff_rank,
+                                        self.source_to_target.cutoff_rank,
                                     )
                                 };
                                 let tmp = &compressed_check_potential.data()[multipole_idx
-                                    * self.source_to_target_translation_data.cutoff_rank
+                                    * self.source_to_target.cutoff_rank
                                     ..(multipole_idx + 1)
-                                        * self.source_to_target_translation_data.cutoff_rank];
+                                        * self.source_to_target.cutoff_rank];
                                 check_potential
                                     .iter_mut()
                                     .zip(tmp)
@@ -276,7 +276,7 @@ where
                         empty_array::<U, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                self.source_to_target_translation_data
+                                self.source_to_target
                                     .metadata
                                     .u
                                     .view(),
@@ -312,7 +312,7 @@ where
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     U,
                     [
-                        self.source_to_target_translation_data.cutoff_rank,
+                        self.source_to_target.cutoff_rank,
                         nsources * nmatvecs
                     ]
                 );
@@ -320,11 +320,11 @@ where
 
                 for i in 0..ntargets {
                     let key_displacement =
-                        i * self.source_to_target_translation_data.cutoff_rank * nmatvecs;
+                        i * self.source_to_target.cutoff_rank * nmatvecs;
                     let mut tmp = Vec::new();
                     for charge_vec_idx in 0..nmatvecs {
                         let charge_vec_displacement =
-                            charge_vec_idx * self.source_to_target_translation_data.cutoff_rank;
+                            charge_vec_idx * self.source_to_target.cutoff_rank;
 
                         let raw = unsafe {
                             compressed_check_potentials
@@ -350,7 +350,7 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
                     compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
-                        self.source_to_target_translation_data
+                        self.source_to_target
                             .metadata
                             .st
                             .view(),
@@ -372,14 +372,14 @@ where
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
                             let c_u_sub =
-                                &self.source_to_target_translation_data.metadata.c_u[c_idx];
+                                &self.source_to_target.metadata.c_u[c_idx];
                             let c_vt_sub =
-                                &self.source_to_target_translation_data.metadata.c_vt[c_idx];
+                                &self.source_to_target.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 U,
                                 [
-                                    self.source_to_target_translation_data.cutoff_rank,
+                                    self.source_to_target.cutoff_rank,
                                     multipole_idxs.len() * nmatvecs
                                 ]
                             );
@@ -388,29 +388,29 @@ where
                                 multipole_idxs.iter().enumerate()
                             {
                                 let key_displacement_global = global_multipole_idx
-                                    * self.source_to_target_translation_data.cutoff_rank
+                                    * self.source_to_target.cutoff_rank
                                     * nmatvecs;
 
                                 let key_displacement_local = local_multipole_idx
-                                    * self.source_to_target_translation_data.cutoff_rank
+                                    * self.source_to_target.cutoff_rank
                                     * nmatvecs;
 
                                 for charge_vec_idx in 0..nmatvecs {
                                     let charge_vec_displacement = charge_vec_idx
-                                        * self.source_to_target_translation_data.cutoff_rank;
+                                        * self.source_to_target.cutoff_rank;
 
                                     compressed_multipoles_subset.data_mut()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
-                                            + self.source_to_target_translation_data.cutoff_rank]
+                                            + self.source_to_target.cutoff_rank]
                                         .copy_from_slice(
                                             &compressed_multipoles.data()[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
                                                     + self
-                                                        .source_to_target_translation_data
+                                                        .source_to_target
                                                         .cutoff_rank],
                                         );
                                 }
@@ -439,21 +439,21 @@ where
                                     let check_potential = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             check_potential_ptr,
-                                            self.source_to_target_translation_data.cutoff_rank,
+                                            self.source_to_target.cutoff_rank,
                                         )
                                     };
 
                                     let key_displacement = local_multipole_idx
-                                        * self.source_to_target_translation_data.cutoff_rank
+                                        * self.source_to_target.cutoff_rank
                                         * nmatvecs;
                                     let charge_vec_displacement = charge_vec_idx
-                                        * self.source_to_target_translation_data.cutoff_rank;
+                                        * self.source_to_target.cutoff_rank;
 
                                     let tmp = &compressed_check_potential.data()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement
-                                            + self.source_to_target_translation_data.cutoff_rank];
+                                            + self.source_to_target.cutoff_rank];
                                     check_potential
                                         .iter_mut()
                                         .zip(tmp)
@@ -472,7 +472,7 @@ where
                         empty_array::<U, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2.view(),
                             empty_array::<U, 2>().simple_mult_into_resize(
-                                self.source_to_target_translation_data
+                                self.source_to_target
                                     .metadata
                                     .u
                                     .view(),

@@ -181,7 +181,7 @@ where
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft = &self
-                    .source_to_target_translation_data
+                    .source_to_target
                     .metadata
                     .kernel_data_f;
 
@@ -212,7 +212,7 @@ where
                                     &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
                                 let signal = &mut signal_chunk[i * fft_size..(i + 1) * fft_size];
                                 for (surf_idx, &conv_idx) in self
-                                    .source_to_target_translation_data
+                                    .source_to_target
                                     .surf_to_conv_map
                                     .iter()
                                     .enumerate()
@@ -369,7 +369,7 @@ where
 
                             for i in 0..NSIBLINGS {
                                 for (surf_idx, &conv_idx) in self
-                                    .source_to_target_translation_data
+                                    .source_to_target
                                     .conv_to_surf_map
                                     .iter()
                                     .enumerate()

@@ -172,7 +172,7 @@ where
                 tree: self.tree.unwrap(),
                 expansion_order: self.expansion_order.unwrap(),
                 ncoeffs: self.ncoeffs.unwrap(),
-                source_to_target_translation_data: self.source_to_target.unwrap(),
+                source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
                 kernel,
@@ -324,9 +324,9 @@ where
             l2l.push(tmp);
         }
 
-        self.source_data = m2m;
-        self.source_translation_data_vec = m2m_vec;
-        self.target_data = l2l;
+        self.source = m2m;
+        self.source_vec = m2m_vec;
+        self.target_vec = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
         self.uc2e_inv_1 = uc2e_inv_1;
@@ -336,7 +336,6 @@ where
     /// Calculate metadata required by the FMM
     fn set_metadata(&mut self, eval_type: EvalType, charges: &Charges<W>) {
         let alpha_outer = W::from(ALPHA_OUTER).unwrap();
-        let alpha_inner = W::from(ALPHA_INNER).unwrap();
 
         // Check if computing potentials, or potentials and derivatives
         let eval_size = match eval_type {
@@ -377,12 +376,6 @@ where
             self.tree.target_tree(),
             self.ncoeffs,
             alpha_outer,
-            self.expansion_order,
-        );
-        let leaf_downward_surfaces_targets = leaf_surfaces(
-            self.tree.target_tree(),
-            self.ncoeffs,
-            alpha_inner,
             self.expansion_order,
         );
 
@@ -437,7 +430,6 @@ where
         self.potentials_send_pointers = potentials_send_pointers;
         self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
         self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
-        self.leaf_downward_surfaces = leaf_downward_surfaces_targets;
         self.charges = charges.data().to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
