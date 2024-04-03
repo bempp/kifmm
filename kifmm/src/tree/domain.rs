@@ -1,6 +1,7 @@
 //! Constructor for a single node Domain.
-use crate::tree::types::Domain;
+use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain};
 use num::Float;
+use rlst::RlstScalar;
 use std::fmt::Debug;
 
 impl<T: Float + Default + Debug> Domain<T> {
@@ -85,6 +86,18 @@ impl<T: Float + Default + Debug> Domain<T> {
             origin: *origin,
             diameter: *diameter,
         }
+    }
+}
+
+impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
+    type Scalar = T;
+
+    fn diameter(&self) -> &[Self::Scalar; 3] {
+        &self.diameter
+    }
+
+    fn origin(&self) -> &[Self::Scalar; 3] {
+        &self.origin
     }
 }
 

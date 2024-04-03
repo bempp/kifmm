@@ -1,17 +1,25 @@
 //! Field Traits
 use green_kernels::traits::Kernel;
 
-/// Interface for handling field translation data and metadata
-pub trait SourceToTargetData<T>
-where
-    T: Kernel,
-{
+use super::tree::Domain;
+
+/// Marker trait for field translations
+pub trait SourceToTargetData {
     /// Metadata for applying each to source to target translation, depends on both the kernel
     /// and translation method
-    type OperatorData;
+    type Metadata;
+}
+
+/// Interface for configuration of field translation data used during FMM construction
+pub trait ConfigureSourceToTargetData
+where
+    Self: SourceToTargetData,
+{
+    /// Kernel function associated with field translation
+    type Kernel: Kernel;
 
     /// The computational domain defining the tree.
-    type Domain;
+    type Domain: Domain;
 
     /// Set the field translation operators corresponding to each unique transfer vector.
     ///
@@ -30,5 +38,5 @@ where
     ///
     /// # Arguments
     /// * `kernel` - The kernel being used
-    fn kernel(&mut self, kernel: T);
+    fn kernel(&mut self, kernel: Self::Kernel);
 }

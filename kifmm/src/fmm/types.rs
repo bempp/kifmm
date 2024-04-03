@@ -151,7 +151,7 @@ pub struct SendPtr<T> {
 ///
 pub struct KiFmm<
     T: FmmTree<Tree = SingleNodeTree<W>>,
-    U: SourceToTargetData<V>,
+    U: SourceToTargetData,
     V: Kernel,
     W: RlstScalar<Real = W> + Float + Default,
 > {
@@ -365,7 +365,7 @@ pub enum FmmEvalType {
 #[derive(Default)]
 pub struct SingleNodeBuilder<T, U, V>
 where
-    T: SourceToTargetData<V>,
+    T: SourceToTargetData,
     U: RlstScalar<Real = U> + Float + Default,
     V: Kernel,
 {
