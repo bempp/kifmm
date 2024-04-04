@@ -9,7 +9,6 @@ use itertools::Itertools;
 use num::Float;
 use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 
 use super::morton::complete_region;
 
@@ -342,11 +341,11 @@ where
         depth: u64,
         sparse: bool,
         domain: Option<Domain<T>>,
-    ) -> Result<SingleNodeTree<T>, Box<dyn Error>> {
+    ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let points_len = points.len();
 
-        if points.len() > 0 && points_len % dim == 0 {
+        if !points.is_empty() && points_len % dim == 0 {
             let npoints = points_len / dim;
             let domain = domain.unwrap_or(Domain::from_local_points(points));
             let global_idxs = (0..npoints).collect_vec();
@@ -368,10 +367,10 @@ where
             }
         }
 
-        Err(Box::new(std::io::Error::new(
+        Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "Invalid points format",
-        )))
+        ))
     }
     /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
     /// Return any keys that are unmapped.

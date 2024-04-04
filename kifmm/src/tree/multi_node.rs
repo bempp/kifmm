@@ -426,33 +426,42 @@ where
         domain: Option<Domain<T>>,
         world: &UserCommunicator,
         hyksort_subcomm_size: i32,
-    ) -> MultiNodeTree<T> {
+    ) -> Result<MultiNodeTree<T>, std::io::Error> {
         let dim = 3;
-        let domain = domain.unwrap_or(Domain::from_global_points(points, world));
-        let npoints = points.len() / dim;
+        let points_len = points.len();
 
-        // Assign global indices
-        let global_idxs = global_indices(npoints, world);
+        if !points.is_empty() && points_len & dim == 0 {
+            let domain = domain.unwrap_or(Domain::from_global_points(points, world));
+            let npoints = points_len / dim;
 
-        if sparse {
-            MultiNodeTree::uniform_tree_sparse(
-                world,
-                hyksort_subcomm_size,
-                points,
-                &domain,
-                depth,
-                &global_idxs,
-            )
-        } else {
-            MultiNodeTree::uniform_tree(
-                world,
-                hyksort_subcomm_size,
-                points,
-                &domain,
-                depth,
-                &global_idxs,
-            )
+            // Assign global indices
+            let global_idxs = global_indices(npoints, world);
+
+            if sparse {
+                return Ok(MultiNodeTree::uniform_tree_sparse(
+                    world,
+                    hyksort_subcomm_size,
+                    points,
+                    &domain,
+                    depth,
+                    &global_idxs,
+                ));
+            } else {
+                return Ok(MultiNodeTree::uniform_tree(
+                    world,
+                    hyksort_subcomm_size,
+                    points,
+                    &domain,
+                    depth,
+                    &global_idxs,
+                ));
+            }
         }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Invalid points format",
+        ))
     }
 }
 

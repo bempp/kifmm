@@ -120,7 +120,8 @@ fn main() {
         None,
         &comm,
         hyksort_subcomm_size,
-    );
+    )
+    .unwrap();
 
     test_no_overlaps(&comm, &tree);
     if world.rank() == 0 {
