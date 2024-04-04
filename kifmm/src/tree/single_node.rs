@@ -54,18 +54,17 @@ where
         // Generate complete tree at specified depth
         let diameter = 1 << (DEEPEST_LEVEL - depth);
 
-        let leaves = MortonKeys {
-            keys: (0..LEVEL_SIZE)
+        let leaves = MortonKeys::from_iter(
+            (0..LEVEL_SIZE)
                 .step_by(diameter)
                 .flat_map(|i| (0..LEVEL_SIZE).step_by(diameter).map(move |j| (i, j)))
                 .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
                     MortonKey { anchor, morton }
-                })
-                .collect(),
-            index: 0,
-        };
+                }),
+        );
+
         // Assign keys to points
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
@@ -86,14 +85,13 @@ where
         leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
         // Add unmapped leaves
-        let mut leaves = MortonKeys {
-            keys: leaves_to_coordinates
+        let mut leaves = MortonKeys::from(
+            leaves_to_coordinates
                 .keys()
                 .cloned()
                 .chain(unmapped.iter().copied())
                 .collect_vec(),
-            index: 0,
-        };
+        );
 
         // Sort leaves before returning
         leaves.sort();
@@ -104,10 +102,7 @@ where
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
-        let mut keys = MortonKeys {
-            keys: tmp.into_iter().collect_vec(),
-            index: 0,
-        };
+        let mut keys = MortonKeys::from_iter(tmp.into_iter());
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
@@ -226,10 +221,7 @@ where
             .collect();
 
         // Store in a sorted vector
-        let mut leaves = MortonKeys {
-            keys: leaves.into_iter().collect_vec(),
-            index: 0,
-        };
+        let mut leaves = MortonKeys::from_iter(leaves.into_iter());
         leaves.sort();
 
         // Find all keys in tree
@@ -249,10 +241,7 @@ where
             })
             .collect();
 
-        let mut keys = MortonKeys {
-            keys: tmp.into_iter().collect_vec(),
-            index: 0,
-        };
+        let mut keys = MortonKeys::from_iter(tmp.into_iter());
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
@@ -368,7 +357,7 @@ where
         }
 
         Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
+            std::io::ErrorKind::InvalidInput,
             "Invalid points format",
         ))
     }
@@ -465,14 +454,13 @@ where
     pub fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
         let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
 
-        let mut seeds: MortonKeys = MortonKeys {
-            keys: leaves
+        let mut seeds = MortonKeys::from(
+            leaves
                 .iter()
                 .filter(|k| k.level() == coarsest_level)
                 .cloned()
                 .collect_vec(),
-            index: 0,
-        };
+        );
 
         seeds.sort();
         seeds
@@ -749,11 +737,7 @@ mod test {
             })
         }
         let mut points = tmp;
-
-        let keys = MortonKeys {
-            keys: ROOT.children(),
-            index: 0,
-        };
+        let keys = MortonKeys::from(ROOT.children());
 
         SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
 
@@ -809,16 +793,11 @@ mod test {
         let n_crit = 15;
 
         // Test case where blocks span the entire domain
-        let blocktree = MortonKeys {
-            keys: vec![ROOT],
-            index: 0,
-        };
+        let blocktree = MortonKeys::from(vec![ROOT]);
 
         SingleNodeTree::split_blocks(&mut points, blocktree, n_crit);
-        let split_blocktree = MortonKeys {
-            keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
-            index: 0,
-        };
+        let split_blocktree =
+            MortonKeys::from(points.points.iter().map(|p| p.encoded_key).collect_vec());
 
         test_no_overlaps_helper(&split_blocktree);
 
@@ -829,18 +808,13 @@ mod test {
         let a = children[0];
         let b = children[6];
 
-        let mut seeds = MortonKeys {
-            keys: vec![a, b],
-            index: 0,
-        };
+        let mut seeds = MortonKeys::from(vec![a, b]);
 
         let blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
 
         SingleNodeTree::split_blocks(&mut points, blocktree, 25);
-        let split_blocktree = MortonKeys {
-            keys: points.points.iter().map(|p| p.encoded_key).collect_vec(),
-            index: 0,
-        };
+        let split_blocktree =
+            MortonKeys::from(points.points.iter().map(|p| p.encoded_key).collect_vec());
         test_no_overlaps_helper(&split_blocktree);
     }
 
@@ -849,10 +823,7 @@ mod test {
         let a = ROOT.first_child();
         let b = *ROOT.children().last().unwrap();
 
-        let mut seeds = MortonKeys {
-            keys: vec![a, b],
-            index: 0,
-        };
+        let mut seeds = MortonKeys::from(vec![a, b]);
 
         let mut blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
 

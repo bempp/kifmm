@@ -20,6 +20,8 @@ use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 
+use super::constants::ROOT;
+
 impl<T> MultiNodeTree<T>
 where
     T: Float + Default + Equivalence + Debug + RlstScalar<Real = T>,
@@ -69,21 +71,25 @@ where
         // Define range owned by each processor
 
         // 2.ii Find leaf keys on each processor
-        let mut min = points.points.iter().min().unwrap().encoded_key;
+        let min;
         if rank == 0 {
-            min = min.siblings().into_iter().min().unwrap();
+            min = MortonKey::from_anchor(&[0, 0, 0], depth)
+        } else {
+            min = points.points.iter().min().unwrap().encoded_key;
         }
 
-        let mut max = points.points.iter().max().unwrap().encoded_key;
+        let max;
         if rank == world.size() - 1 {
-            max = max.siblings().into_iter().max().unwrap();
+            max = ROOT.last_child(depth);
+        } else {
+            max = points.points.iter().max().unwrap().encoded_key;
         }
 
         let diameter = 1 << (DEEPEST_LEVEL - depth);
 
         // Find all leaves within this processor's range
-        let leaves = MortonKeys {
-            keys: (min.anchor[0]..max.anchor[0])
+        let leaves = MortonKeys::from_iter(
+            (min.anchor[0]..max.anchor[0])
                 .step_by(diameter)
                 .flat_map(|i| {
                     (min.anchor[1]..max.anchor[1])
@@ -98,10 +104,8 @@ where
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
                     MortonKey { anchor, morton }
-                })
-                .collect(),
-            index: 0,
-        };
+                }),
+        );
 
         // 3. Assign leaves to points
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
@@ -120,45 +124,41 @@ where
                 curr = *point;
             }
         }
+
         leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
-        // // For sparse trees need to ensure that final leaf set contains all siblings of encoded trees if they
-        // // are in range.
-        // {
-        //     let leaves: HashSet<MortonKey> = leaves_to_coordinates
-        //         .keys()
-        //         .flat_map(|k| k.siblings())
-        //         .filter(|&sib| min <= sib && sib <= max)
-        //         .collect();
-        // }
-
         // Add unmapped leaves
-        let leaves = MortonKeys {
-            keys: leaves_to_coordinates
+        let leaves = MortonKeys::from(
+            leaves_to_coordinates
                 .keys()
                 .cloned()
                 .chain(unmapped.iter().copied())
                 .collect_vec(),
-            index: 0,
-        };
+        );
 
         // Find all keys in tree
+        let range = [world.rank() as u64, min.morton, max.morton];
+
         let tmp: HashSet<MortonKey> = leaves
             .iter()
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
-        let mut keys = MortonKeys {
-            keys: tmp.into_iter().collect_vec(),
-            index: 0,
-        };
+        let tmp: HashSet<MortonKey> = tmp
+            .iter()
+            .flat_map(|key| {
+                if key.level() != 0 {
+                    key.siblings()
+                } else {
+                    vec![*key]
+                }
+            })
+            .collect();
+
+        let mut keys = MortonKeys::from_iter(tmp.into_iter());
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
-
-        let min = leaves.iter().min().unwrap();
-        let max = leaves.iter().max().unwrap();
-        let range = [world.rank() as u64, min.morton, max.morton];
 
         // Group by level to perform efficient lookup of nodes
         keys.sort_by_key(|a| a.level());
@@ -254,24 +254,26 @@ where
         let comm = world.duplicate();
         hyksort(&mut points.points, k, comm);
 
-        // Define range owned by each processor
-
         // 2.ii Find leaf keys on each processor
-        let mut min = points.points.iter().min().unwrap().encoded_key;
+        let min;
         if rank == 0 {
-            min = min.siblings().into_iter().min().unwrap();
+            min = MortonKey::from_anchor(&[0, 0, 0], depth)
+        } else {
+            min = points.points.iter().min().unwrap().encoded_key;
         }
 
-        let mut max = points.points.iter().max().unwrap().encoded_key;
+        let max;
         if rank == world.size() - 1 {
-            max = max.siblings().into_iter().max().unwrap();
+            max = ROOT.last_child(depth);
+        } else {
+            max = points.points.iter().max().unwrap().encoded_key;
         }
 
         let diameter = 1 << (DEEPEST_LEVEL - depth);
 
         // Find all leaves within this processor's range
-        let leaves = MortonKeys {
-            keys: (min.anchor[0]..max.anchor[0])
+        let leaves = MortonKeys::from_iter(
+            (min.anchor[0]..max.anchor[0])
                 .step_by(diameter)
                 .flat_map(|i| {
                     (min.anchor[1]..max.anchor[1])
@@ -286,13 +288,11 @@ where
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
                     MortonKey { anchor, morton }
-                })
-                .collect(),
-            index: 0,
-        };
+                }),
+        );
 
         // 3. Assign leaves to points
-        let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
+        let _unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
         // Group points by leaves
         points.sort();
@@ -310,25 +310,16 @@ where
         }
         leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.points.len()));
 
-        // // For sparse trees need to ensure that final leaf set contains all siblings of encoded trees if they
-        // // are in range.
-        // {
-        //     let leaves: HashSet<MortonKey> = leaves_to_coordinates
-        //         .keys()
-        //         .flat_map(|k| k.siblings())
-        //         .filter(|&sib| min <= sib && sib <= max)
-        //         .collect();
-        // }
+        // For sparse trees need to ensure that final leaf set contains all siblings of encoded trees if they
+        // are in range, some sibling data may be ghost
+        let leaves: HashSet<MortonKey> = leaves_to_coordinates
+            .keys()
+            .flat_map(|k| k.siblings())
+            .filter(|&sib| min <= sib && sib <= max)
+            .collect();
 
-        // Add unmapped leaves
-        let leaves = MortonKeys {
-            keys: leaves_to_coordinates
-                .keys()
-                .cloned()
-                .chain(unmapped.iter().copied())
-                .collect_vec(),
-            index: 0,
-        };
+        let mut leaves = MortonKeys::from(leaves.into_iter().collect_vec());
+        leaves.sort();
 
         // Find all keys in tree
         let tmp: HashSet<MortonKey> = leaves
@@ -336,14 +327,24 @@ where
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
-        let mut keys = MortonKeys {
-            keys: tmp.into_iter().collect_vec(),
-            index: 0,
-        };
+        let tmp: HashSet<MortonKey> = tmp
+            .iter()
+            .flat_map(|key| {
+                if key.level() != 0 {
+                    key.siblings()
+                } else {
+                    vec![*key]
+                }
+            })
+            .filter(|&sib| min <= sib && sib <= max)
+            .collect();
+
+        let mut keys = MortonKeys::from(tmp.into_iter().collect_vec());
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
+        // Calculate range
         let min = leaves.iter().min().unwrap();
         let max = leaves.iter().max().unwrap();
         let range = [world.rank() as u64, min.morton, max.morton];
@@ -376,6 +377,7 @@ where
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
+
         let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
 
         let mut key_to_index = HashMap::new();
@@ -459,7 +461,7 @@ where
         }
 
         Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
+            std::io::ErrorKind::InvalidInput,
             "Invalid points format",
         ))
     }

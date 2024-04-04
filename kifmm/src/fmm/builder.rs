@@ -123,7 +123,10 @@ where
         mut source_to_target: T,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
-            Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Must build tree before specifying FMM parameters"))
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must build tree before specifying FMM parameters",
+            ))
         } else {
             // Set FMM parameters
             let global_idxs = self
@@ -169,7 +172,10 @@ where
     pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, std::io::Error> {
         if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
         {
-            Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Must create a tree, and FMM metadata before building"))
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must create a tree, and FMM metadata before building",
+            ))
         } else {
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();

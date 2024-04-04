@@ -199,6 +199,12 @@ impl FromIterator<MortonKey> for MortonKeys {
     }
 }
 
+impl From<Vec<MortonKey>> for MortonKeys {
+    fn from(keys: Vec<MortonKey>) -> Self {
+        MortonKeys { keys, index: 0 }
+    }
+}
+
 /// Helper function for decoding keys.
 fn decode_key_helper(key: u64, lookup_table: &[u64; 512]) -> u64 {
     const N_LOOPS: u64 = 7; // 8 bytes in 64 bit key
@@ -472,10 +478,14 @@ impl MortonKey {
 
     /// Return the last child of a Morton Key on the deepest level.
     pub fn finest_last_child(&self) -> Self {
-        if self.level() < DEEPEST_LEVEL {
-            let mut level_diff = DEEPEST_LEVEL - self.level();
-            let mut flc = *self.children().iter().max().unwrap();
+        self.last_child(DEEPEST_LEVEL)
+    }
 
+    /// Return last child at `level`
+    pub fn last_child(&self, level: u64) -> Self {
+        if self.level() < level {
+            let mut level_diff = level - self.level();
+            let mut flc = *self.children().iter().max().unwrap();
             while level_diff > 1 {
                 let tmp = flc;
                 flc = *tmp.children().iter().max().unwrap();
