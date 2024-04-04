@@ -9,7 +9,7 @@ use rand::Rng;
 use mpi::{collective::SystemOperation, environment::Universe, traits::*, Rank};
 
 #[cfg(feature = "mpi")]
-use kifmm::tree::mpi_helpers::all_to_allv_sparse;
+use kifmm::tree::helpers::all_to_allv_sparse;
 
 #[cfg(feature = "mpi")]
 fn main() {

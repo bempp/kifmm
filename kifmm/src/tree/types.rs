@@ -34,7 +34,7 @@ pub struct MortonKey {
     pub morton: u64,
 }
 
-/// Container of **MortonKeys**.
+/// Iterable container of `MortonKey` data
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys {
     /// A vector of MortonKeys
@@ -44,7 +44,7 @@ pub struct MortonKeys {
     pub index: usize,
 }
 
-/// Concrete distributed multi-node tree
+/// Distributed trees created with MPI.
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
@@ -116,8 +116,7 @@ where
     pub encoded_key: MortonKey,
 }
 
-/// Vector of **Points**.
-/// Container of **Points**.
+/// Iterable container of `Point` data
 #[derive(Clone, Debug, Default)]
 pub struct Points<T>
 where
@@ -130,7 +129,7 @@ where
     pub index: usize,
 }
 
-/// Local Trees (non-distributed).
+/// Single Node Trees
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where

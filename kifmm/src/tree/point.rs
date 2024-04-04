@@ -67,66 +67,71 @@ where
 }
 
 #[cfg(feature = "mpi")]
-use memoffset::offset_of;
-#[cfg(feature = "mpi")]
-use mpi::{
-    datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
-    Address,
-};
+mod mpi_point {
+    use super::{Point, RlstScalar};
 
-use crate::tree::types::MortonKey;
-use num::Float;
+    use crate::tree::types::MortonKey;
+    use memoffset::offset_of;
+    use mpi::{
+        datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
+        Address,
+    };
+    use num::Float;
 
-#[cfg(feature = "mpi")]
-unsafe impl<T> Equivalence for Point<T>
-where
-    T: RlstScalar<Real = T> + Float + Equivalence,
-{
-    type Out = UserDatatype;
-    fn equivalent_datatype() -> Self::Out {
-        UserDatatype::structured(
-            &[1, 1, 1, 1],
-            &[
-                offset_of!(Point<T>, coordinate) as Address,
-                offset_of!(Point<T>, global_idx) as Address,
-                offset_of!(Point<T>, base_key) as Address,
-                offset_of!(Point<T>, encoded_key) as Address,
-            ],
-            &[
-                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::structured(
-                    &[1, 1],
-                    &[
-                        offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address,
-                    ],
-                    &[
-                        UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
-                            .as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
-                            .as_ref(),
-                    ],
-                )
-                .as_ref(),
-                UncommittedUserDatatype::structured(
-                    &[1, 1],
-                    &[
-                        offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address,
-                    ],
-                    &[
-                        UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
-                            .as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
-                            .as_ref(),
-                    ],
-                )
-                .as_ref(),
-            ],
-        )
+    unsafe impl<T> Equivalence for Point<T>
+    where
+        T: RlstScalar<Real = T> + Float + Equivalence,
+    {
+        type Out = UserDatatype;
+        fn equivalent_datatype() -> Self::Out {
+            UserDatatype::structured(
+                &[1, 1, 1, 1],
+                &[
+                    offset_of!(Point<T>, coordinate) as Address,
+                    offset_of!(Point<T>, global_idx) as Address,
+                    offset_of!(Point<T>, base_key) as Address,
+                    offset_of!(Point<T>, encoded_key) as Address,
+                ],
+                &[
+                    UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
+                    UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
+                    UncommittedUserDatatype::structured(
+                        &[1, 1],
+                        &[
+                            offset_of!(MortonKey, anchor) as Address,
+                            offset_of!(MortonKey, morton) as Address,
+                        ],
+                        &[
+                            UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
+                                .as_ref(),
+                            UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
+                                .as_ref(),
+                        ],
+                    )
+                    .as_ref(),
+                    UncommittedUserDatatype::structured(
+                        &[1, 1],
+                        &[
+                            offset_of!(MortonKey, anchor) as Address,
+                            offset_of!(MortonKey, morton) as Address,
+                        ],
+                        &[
+                            UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
+                                .as_ref(),
+                            UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
+                                .as_ref(),
+                        ],
+                    )
+                    .as_ref(),
+                ],
+            )
+        }
     }
 }
+
+#[allow(unused_imports)]
+#[cfg(feature = "mpi")]
+pub use mpi_point::*;
 
 #[cfg(test)]
 mod test {
