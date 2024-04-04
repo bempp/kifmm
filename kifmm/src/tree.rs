@@ -6,12 +6,12 @@
 //! Create a single node tree. Multi Node examples can be found in the `examples` folder.
 //!
 //! ```rust
-//! use kifmm::tree::helpers::points_fixture;
-//! use kifmm::{SingleNodeTree, MultiNodeTree};
+//! use rlst::RawAccess;
+//! use kifmm::tree::{SingleNodeTree, helpers::points_fixture};
 //!
 //! // Create some test points
 //! let npoints = 1000;
-//! let points = points_fixture(npoints, None, None, None);
+//! let points = points_fixture::<f32>(npoints, None, None, None);
 //!
 //! // Set tree parameters
 //! let sparse = true; // Setting to sparse mode drops empty leaves and ancestors from final tree
@@ -24,7 +24,7 @@
 //!     depth,
 //!     sparse,
 //!     domain
-//! );
+//! ).unwrap();
 //!  ```
 
 pub mod constants;

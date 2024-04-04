@@ -9,6 +9,7 @@ use itertools::Itertools;
 use num::Float;
 use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
+use std::error::Error;
 
 use super::morton::complete_region;
 
@@ -341,17 +342,36 @@ where
         depth: u64,
         sparse: bool,
         domain: Option<Domain<T>>,
-    ) -> SingleNodeTree<T> {
+    ) -> Result<SingleNodeTree<T>, Box<dyn Error>> {
         let dim = 3;
-        let domain = domain.unwrap_or(Domain::from_local_points(points));
-        let npoints = points.len() / dim;
-        let global_idxs = (0..npoints).collect_vec();
+        let points_len = points.len();
 
-        if sparse {
-            SingleNodeTree::uniform_tree_sparse(points, &domain, depth, &global_idxs)
-        } else {
-            SingleNodeTree::uniform_tree(points, &domain, depth, &global_idxs)
+        if points.len() > 0 && points_len % dim == 0 {
+            let npoints = points_len / dim;
+            let domain = domain.unwrap_or(Domain::from_local_points(points));
+            let global_idxs = (0..npoints).collect_vec();
+
+            if sparse {
+                return Ok(SingleNodeTree::uniform_tree_sparse(
+                    points,
+                    &domain,
+                    depth,
+                    &global_idxs,
+                ));
+            } else {
+                return Ok(SingleNodeTree::uniform_tree(
+                    points,
+                    &domain,
+                    depth,
+                    &global_idxs,
+                ));
+            }
         }
+
+        Err(Box::new(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Invalid points format",
+        )))
     }
     /// Create a mapping between octree nodes and the points they contain, assumed to overlap.
     /// Return any keys that are unmapped.
@@ -655,6 +675,7 @@ mod test {
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
+            .unwrap()
             .all_leaves()
             .unwrap()
             .iter()
@@ -668,7 +689,7 @@ mod test {
 
         // Test a column distribution of data
         let points = points_fixture_col::<f64>(npoints);
-        let tree = SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -854,7 +875,7 @@ mod test {
         let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None, None);
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
 
         let keys = tree.all_keys().unwrap();
 
@@ -890,7 +911,7 @@ mod test {
         let npoints = 10000;
         let points = points_fixture::<f64>(npoints, None, None, None);
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
 
         let keys = tree.keys(3).unwrap();
 

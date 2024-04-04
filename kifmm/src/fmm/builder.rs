@@ -1,4 +1,6 @@
 //! Builder objects to construct FMMs
+use std::error::Error;
+
 use crate::fmm::helpers::{
     coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
     leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, ncoeffs_kifmm,
@@ -60,14 +62,21 @@ where
         targets: &Coordinates<U>,
         n_crit: Option<u64>,
         sparse: bool,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, Box<dyn Error>> {
         let [nsources, dims] = sources.shape();
         let [ntargets, dimt] = targets.shape();
 
         if dims < 3 || dimt < 3 {
-            Err("Only 3D KiFMM supported with this builder".to_string())
+            // Err("Only 3D KiFMM supported with this builder".to_string())
+            Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Only 3D FMM supported",
+            )))
         } else if nsources == 0 || ntargets == 0 {
-            Err("Must have a positive number of source or target particles".to_string())
+            Err(Box::new(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Must have a positive number of source or target particles",
+            )))
         } else {
             // Source and target trees calcualted over the same domain
             let source_domain = Domain::from_local_points(sources.data());
@@ -87,8 +96,8 @@ where
             let target_depth = SingleNodeTree::<U>::minimum_depth(ntargets as u64, n_crit);
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain);
-            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain);
+            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain)?;
+            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain)?;
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,
