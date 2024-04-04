@@ -65,7 +65,6 @@ where
         let [ntargets, dimt] = targets.shape();
 
         if dims < 3 || dimt < 3 {
-            // Err("Only 3D KiFMM supported with this builder".to_string())
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Only 3D FMM supported",
