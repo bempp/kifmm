@@ -1031,8 +1031,8 @@ unsafe impl Equivalence for MortonKey {
                 offset_of!(MortonKey, morton) as Address,
             ],
             &[
-                UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype()).as_ref(),
             ],
         )
     }

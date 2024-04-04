@@ -79,7 +79,7 @@
 
 pub mod fftw;
 pub mod fmm;
-#[cfg(feature = "mpi_support")]
+#[cfg(feature = "mpi")]
 pub mod hyksort;
 pub mod traits;
 pub mod tree;

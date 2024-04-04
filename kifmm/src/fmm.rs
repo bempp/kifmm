@@ -2,6 +2,7 @@
 mod builder;
 pub mod constants;
 pub mod helpers;
+mod multi_node;
 pub mod pinv;
 mod send_ptr;
 mod single_node;

@@ -157,7 +157,6 @@ where
 
         SingleNodeTree {
             depth,
-            adaptive: false,
             coordinates,
             global_indices,
             domain: *domain,
@@ -302,7 +301,6 @@ where
         }
         SingleNodeTree {
             depth,
-            adaptive: false,
             coordinates,
             global_indices,
             domain: *domain,

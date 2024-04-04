@@ -59,9 +59,6 @@ where
     /// Domain spanned by the points.
     pub domain: Domain<T>,
 
-    ///  A vector of Cartesian points.
-    pub points: Points<T>,
-
     /// All coordinates
     pub coordinates: Vec<T>,
 
@@ -75,10 +72,16 @@ where
     pub keys: MortonKeys,
 
     /// Associate leaves with point indices.
-    pub leaves_to_points: HashMap<MortonKey, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
+
+    /// Map between a key and its index
+    pub key_to_index: HashMap<MortonKey, usize>,
+
+    /// Map between a leaf and its index
+    pub leaf_to_index: HashMap<MortonKey, usize>,
 
     /// All leaves, returned as a set.
     pub leaves_set: HashSet<MortonKey>,
@@ -87,7 +90,7 @@ where
     pub keys_set: HashSet<MortonKey>,
 
     /// Range of Morton keys at this processor, and their current rank [rank, min, max]
-    pub range: [KeyType; 3],
+    pub range: [u64; 3],
 }
 
 /// A 3D cartesian point, described by coordinate, a unique global index, and the Morton Key for
@@ -135,9 +138,6 @@ where
 {
     /// Depth of a tree.
     pub depth: u64,
-
-    /// Whether the tree is adaptive.
-    pub adaptive: bool,
 
     /// Domain spanned by the points.
     pub domain: Domain<T>,

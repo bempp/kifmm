@@ -74,6 +74,9 @@ use mpi::{
     Address,
 };
 
+use crate::tree::types::MortonKey;
+use num::Float;
+
 #[cfg(feature = "mpi")]
 unsafe impl<T> Equivalence for Point<T>
 where
@@ -99,9 +102,9 @@ where
                         offset_of!(MortonKey, morton) as Address,
                     ],
                     &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
+                        UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
                             .as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
+                        UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
                             .as_ref(),
                     ],
                 )
@@ -113,9 +116,9 @@ where
                         offset_of!(MortonKey, morton) as Address,
                     ],
                     &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
+                        UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
                             .as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
+                        UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
                             .as_ref(),
                     ],
                 )
