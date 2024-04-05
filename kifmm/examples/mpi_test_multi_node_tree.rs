@@ -102,7 +102,7 @@ fn test_n_points<T: RlstScalar<Real = T> + Float + Default + Equivalence + Sampl
     tree: &MultiNodeTree<T>,
     points_per_proc: usize,
 ) {
-    let n_points = tree.ncoordinates_tot().unwrap();
+    let n_points = tree.n_coordinates_tot().unwrap();
 
     let size = world.size() as usize;
     let mut counts = vec![0usize; size];

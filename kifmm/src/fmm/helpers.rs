@@ -105,7 +105,7 @@ where
     for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
         let l = i * ncoeffs * dim;
         let r = l + ncoeffs * dim;
-        let surface = key.compute_surface(tree.domain(), expansion_order, alpha);
+        let surface = key.surface_grid(expansion_order, tree.domain(), alpha);
 
         result[l..r].copy_from_slice(&surface);
     }
@@ -124,7 +124,7 @@ where
     let mut result = vec![(0usize, 0usize); tree.n_leaves().unwrap()];
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let n_points = if let Some(n) = tree.ncoordinates(leaf) {
+        let n_points = if let Some(n) = tree.n_coordinates(leaf) {
             n
         } else {
             0

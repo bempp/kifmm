@@ -133,7 +133,7 @@ where
 
     fn clear(&mut self, charges: &Charges<W>) {
         let [_ncharges, nmatvecs] = charges.shape();
-        let ntarget_points = self.tree().target_tree().ncoordinates_tot().unwrap();
+        let ntarget_points = self.tree().target_tree().n_coordinates_tot().unwrap();
         let nsource_leaves = self.tree().source_tree().n_leaves().unwrap();
         let ntarget_leaves = self.tree().target_tree().n_leaves().unwrap();
 
@@ -647,9 +647,9 @@ mod test {
         threshold: T,
     ) {
         let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.compute_surface(
-            fmm.tree().domain(),
+        let upward_equivalent_surface = ROOT.surface_grid(
             fmm.expansion_order(),
+            fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap(),
         );
 

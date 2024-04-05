@@ -862,6 +862,55 @@ impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
     }
 }
 
+/// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
+/// returns a tuple, the first element is an owned vector of the physical coordinates of the
+/// surface grid in column major order [x_1, x_2, ... x_n, y_1, y_2, ..., y_n, z_1, z_2, ..., z_n].
+/// the second element is a vector of indices corresponding to each of these coordinates.
+///
+/// # Arguments
+/// * `expansion_order` - the expansion order of the fmm
+pub fn surface_grid<T: RlstScalar + Float + Default>(expansion_order: usize) -> Vec<T> {
+    let dim = 3;
+    let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
+
+    // Implicitly in column major order
+    let mut surface: Vec<T> = vec![T::zero(); dim * n_coeffs];
+
+    // Bounds of the surface grid
+    let lower = 0;
+    let upper = expansion_order - 1;
+
+    // Orders the surface grid, implicitly column major
+    let mut idx = 0;
+
+    for k in 0..expansion_order {
+        for j in 0..expansion_order {
+            for i in 0..expansion_order {
+                if (i >= lower && j >= lower && (k == lower || k == upper))
+                    || (j >= lower && k >= lower && (i == lower || i == upper))
+                    || (k >= lower && i >= lower && (j == lower || j == upper))
+                {
+                    surface[idx] = T::from(i).unwrap();
+                    surface[(dim - 2) * n_coeffs + idx] = T::from(j).unwrap();
+                    surface[(dim - 1) * n_coeffs + idx] = T::from(k).unwrap();
+                    idx += 1;
+                }
+            }
+        }
+    }
+
+    // Shift and scale surface so that it's centered at the origin and has side length of 1
+    let two = T::from(2.0).unwrap();
+
+    surface.iter_mut().for_each(|point| {
+        *point *= two / (T::from(expansion_order).unwrap() - T::one());
+    });
+
+    surface.iter_mut().for_each(|point| *point -= T::one());
+
+    surface
+}
+
 impl<T: RlstScalar<Real = T> + Float + Default> FmmTreeNode<T> for MortonKey {
     fn convolution_grid(
         &self,
@@ -934,48 +983,6 @@ impl<T: RlstScalar<Real = T> + Float + Default> FmmTreeNode<T> for MortonKey {
         (grid, conv_idxs)
     }
 
-    fn surface_grid(expansion_order: usize) -> Vec<T> {
-        let dim = 3;
-        let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
-
-        // Implicitly in column major order
-        let mut surface: Vec<T> = vec![T::zero(); dim * n_coeffs];
-
-        // Bounds of the surface grid
-        let lower = 0;
-        let upper = expansion_order - 1;
-
-        // Orders the surface grid, implicitly column major
-        let mut idx = 0;
-
-        for k in 0..expansion_order {
-            for j in 0..expansion_order {
-                for i in 0..expansion_order {
-                    if (i >= lower && j >= lower && (k == lower || k == upper))
-                        || (j >= lower && k >= lower && (i == lower || i == upper))
-                        || (k >= lower && i >= lower && (j == lower || j == upper))
-                    {
-                        surface[idx] = T::from(i).unwrap();
-                        surface[(dim - 2) * n_coeffs + idx] = T::from(j).unwrap();
-                        surface[(dim - 1) * n_coeffs + idx] = T::from(k).unwrap();
-                        idx += 1;
-                    }
-                }
-            }
-        }
-
-        // Shift and scale surface so that it's centered at the origin and has side length of 1
-        let two = T::from(2.0).unwrap();
-
-        surface.iter_mut().for_each(|point| {
-            *point *= two / (T::from(expansion_order).unwrap() - T::one());
-        });
-
-        surface.iter_mut().for_each(|point| *point -= T::one());
-
-        surface
-    }
-
     fn scale_surface(&self, surface: Vec<T::Real>, domain: &Domain<T>, alpha: T) -> Vec<T::Real> {
         let dim = 3;
         // Translate box to specified centre, and scale
@@ -1002,13 +1009,8 @@ impl<T: RlstScalar<Real = T> + Float + Default> FmmTreeNode<T> for MortonKey {
         scaled_surface
     }
 
-    fn compute_surface(
-        &self,
-        domain: &Domain<T>,
-        expansion_order: usize,
-        alpha: T,
-    ) -> Vec<T::Real> {
-        let surface: Vec<T> = MortonKey::surface_grid(expansion_order);
+    fn surface_grid(&self, expansion_order: usize, domain: &Domain<T>, alpha: T) -> Vec<T::Real> {
+        let surface: Vec<T> = surface_grid(expansion_order);
 
         self.scale_surface(surface, domain, alpha)
     }
@@ -1845,10 +1847,10 @@ mod test {
         let ncoeffs = 6 * (expansion_order - 1_usize).pow(2) + 2;
 
         // Test lengths
-        let surface = key.compute_surface(&domain, expansion_order, alpha);
+        let surface = key.surface_grid(expansion_order, &domain, alpha);
         assert_eq!(surface.len(), ncoeffs * dim);
 
-        let surface: Vec<f64> = MortonKey::surface_grid(expansion_order);
+        let surface: Vec<f64> = surface_grid(expansion_order);
         assert_eq!(surface.len(), ncoeffs * dim);
 
         let mut expected = vec![[0usize; 3]; ncoeffs];
@@ -1872,7 +1874,7 @@ mod test {
         // Test scaling
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);
-        let surface = key.compute_surface(&domain, expansion_order, alpha);
+        let surface = key.surface_grid(expansion_order, &domain, alpha);
 
         let min_x = surface
             .iter()
@@ -1890,7 +1892,7 @@ mod test {
         let point = [0.1, 0.2, 0.3];
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);
-        let surface = key.compute_surface(&domain, expansion_order, alpha);
+        let surface = key.surface_grid(expansion_order, &domain, alpha);
         let expected = key.centre(&domain);
 
         let c_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
@@ -1925,7 +1927,7 @@ mod test {
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
-        let surface_grid = key.compute_surface(&domain, expansion_order, alpha);
+        let surface_grid = key.surface_grid(expansion_order, &domain, alpha);
 
         // Place convolution grid on max corner
         let corners = find_corners(&surface_grid);
