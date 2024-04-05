@@ -19,8 +19,8 @@ where
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
     /// # Arguments
-    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order
-    /// [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order.
+    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
@@ -29,7 +29,7 @@ where
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
-    ) -> SingleNodeTree<T> {
+    ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let n_coords = coordinates_col_major.len() / dim;
 
@@ -50,6 +50,8 @@ where
                 global_index: global_indices[i],
             })
         }
+
+        // Perform Morton sort over points
         points.sort();
 
         // Generate complete tree at specified depth
@@ -69,7 +71,7 @@ where
         // Assign keys to points
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
-        // Group points by leaves
+        // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
         let mut curr = points[0];
         let mut curr_idx = 0;
@@ -152,7 +154,7 @@ where
             leaf_to_index.insert(*key, i);
         }
 
-        SingleNodeTree {
+        Ok(SingleNodeTree {
             depth,
             coordinates: coordinates_row_major,
             global_indices,
@@ -165,7 +167,7 @@ where
             leaves_set,
             keys_set,
             levels_to_keys,
-        }
+        })
     }
 
     /// Constructor for uniform trees on a single node refined to a user defined depth, however excludes
@@ -173,7 +175,7 @@ where
     ///
     /// # Arguments
     /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order
-    /// [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
@@ -182,7 +184,7 @@ where
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
-    ) -> SingleNodeTree<T> {
+    ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let n_coords = coordinates_col_major.len() / dim;
 
@@ -203,9 +205,11 @@ where
                 global_index: global_indices[i],
             })
         }
+
+        // Morton sort over points
         points.sort();
 
-        // Group points by leaves
+        // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
         let mut curr = points[0];
         let mut curr_idx = 0;
@@ -298,7 +302,7 @@ where
             leaf_to_index.insert(*key, i);
         }
 
-        SingleNodeTree {
+        Ok(SingleNodeTree {
             depth,
             coordinates: coordinates_row_major,
             global_indices,
@@ -311,7 +315,7 @@ where
             leaves_set,
             keys_set,
             levels_to_keys,
-        }
+        })
     }
 
     /// Calculates the minimum depth of a tree required to ensure that each leaf box contains at most `n_crit` points,
@@ -372,32 +376,49 @@ where
         let dim = 3;
         let coords_len = coordinates_col_major.len();
 
-        if !coordinates_col_major.is_empty() && coords_len % dim == 0 {
-            let n_coords = coords_len / dim;
-            let domain = domain.unwrap_or(Domain::from_local_points(coordinates_col_major));
-            let global_indices = (0..n_coords).collect_vec();
+        let valid_len = !coordinates_col_major.is_empty();
+        let valid_dim = coords_len % dim == 0;
+        let valid_depth = depth <= DEEPEST_LEVEL;
 
-            if prune_empty {
-                return Ok(SingleNodeTree::uniform_tree_pruned(
+        match (valid_depth, valid_dim, valid_len, prune_empty) {
+            (true, true, true, true) => {
+                let n_coords = coords_len / dim;
+                let domain = domain.unwrap_or(Domain::from_local_points(coordinates_col_major));
+                let global_indices = (0..n_coords).collect_vec();
+
+                SingleNodeTree::uniform_tree_pruned(
                     coordinates_col_major,
                     &domain,
                     depth,
                     &global_indices,
-                ));
-            } else {
-                return Ok(SingleNodeTree::uniform_tree(
-                    coordinates_col_major,
-                    &domain,
-                    depth,
-                    &global_indices,
-                ));
+                )
+            }
+            (true, true, true, false) => {
+                let n_coords = coords_len / dim;
+                let domain = domain.unwrap_or(Domain::from_local_points(coordinates_col_major));
+                let global_indices = (0..n_coords).collect_vec();
+
+                SingleNodeTree::uniform_tree(coordinates_col_major, &domain, depth, &global_indices)
+            }
+
+            (false, _, _, _) => {
+                let msg = format!(
+                    "Invalid depth, depth={} > max allowed depth={}",
+                    depth, DEEPEST_LEVEL
+                );
+                Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg))
+            }
+
+            (_, false, _, _) => {
+                let msg = format!("Coordinates must be three dimensional Cartesian, found `coords.len() % 3 = {:?} != 0`", coords_len % 3);
+                Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg))
+            }
+
+            (_, _, false, _) => {
+                let msg = format!("Empty coordinate vector");
+                Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg))
             }
         }
-
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "Invalid points format",
-        ))
     }
 
     /// Assigns points to their corresponding octree nodes based on Morton encoding, identifying nodes
@@ -461,7 +482,7 @@ where
     /// # Arguments
     ///
     /// - `seeds` - Mutable reference to a collection of seed octants.
-    pub fn complete_blocktree(seeds: &mut MortonKeys) -> MortonKeys {
+    pub fn complete_block_tree(seeds: &mut MortonKeys) -> MortonKeys {
         let ffc_root = ROOT.finest_first_child();
         let min = seeds.iter().min().unwrap();
         let fa = ffc_root.finest_ancestor(min);
@@ -486,21 +507,21 @@ where
 
         seeds.sort();
 
-        let mut blocktree = MortonKeys::new();
+        let mut block_tree = MortonKeys::new();
 
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
             let b = seeds[i + 1];
             let mut tmp = complete_region(&a, &b);
-            blocktree.keys.push(a);
-            blocktree.keys.append(&mut tmp);
+            block_tree.keys.push(a);
+            block_tree.keys.append(&mut tmp);
         }
 
-        blocktree.keys.push(seeds.last().unwrap());
+        block_tree.keys.push(seeds.last().unwrap());
 
-        blocktree.sort();
+        block_tree.sort();
 
-        blocktree
+        block_tree
     }
 
     /// Identifies and returns the coarsest level nodes, called 'seeds', from a set of leaf boxes.
@@ -530,27 +551,27 @@ where
 
     /// Splits tree blocks to meet a specified maximum occupancy constraint per leaf node.
     ///
-    /// Processes the `blocktree` in-place, subdividing blocks as necessary to ensure that no block
+    /// Processes the `block_tree` in-place, subdividing blocks as necessary to ensure that no block
     /// exceeds the `n_crit` maximum number of points allowed per leaf node.
     ///
     /// # Arguments
     ///
     /// - `points` - Mutable reference to points, used to count occupancy within blocks, contain
     /// Morton encoding.
-    /// - `blocktree` - Initially constructed blocktree, subject to refinement through splitting.
+    /// - `block_tree` - Initially constructed block_tree, subject to refinement through splitting.
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
     pub fn split_blocks(
         points: &mut Points<T>,
-        mut blocktree: MortonKeys,
+        mut block_tree: MortonKeys,
         n_crit: usize,
     ) -> MortonKeys {
-        let split_blocktree;
+        let split_block_tree;
         let mut blocks_to_points;
         loop {
-            let mut new_blocktree = MortonKeys::new();
+            let mut new_block_tree = MortonKeys::new();
 
             // Map between blocks and the leaves they contain
-            let unmapped = SingleNodeTree::assign_nodes_to_points(&blocktree, points);
+            let unmapped = SingleNodeTree::assign_nodes_to_points(&block_tree, points);
             blocks_to_points = points
                 .iter()
                 .enumerate()
@@ -575,34 +596,34 @@ where
                 blocks.push(*key)
             }
 
-            // Generate a new blocktree with a block's children if they violate the n_crit parameter
+            // Generate a new block_tree with a block's children if they violate the n_crit parameter
             let mut check = 0;
 
             for block in blocks.iter() {
                 if let Some((l, r)) = blocks_to_points.get(block) {
                     if (r - l) > n_crit {
                         let mut children = block.children();
-                        new_blocktree.append(&mut children);
+                        new_block_tree.append(&mut children);
                     } else {
-                        new_blocktree.push(*block);
+                        new_block_tree.push(*block);
                         check += 1;
                     }
                 } else {
                     // Retain unmapped blocks
-                    new_blocktree.push(*block);
+                    new_block_tree.push(*block);
                     check += 1;
                 }
             }
 
             // Return if we cycle through all blocks without splitting
             if check == blocks.len() {
-                split_blocktree = new_blocktree;
+                split_block_tree = new_block_tree;
                 break;
             } else {
-                blocktree = new_blocktree;
+                block_tree = new_block_tree;
             }
         }
-        split_blocktree
+        split_block_tree
     }
 }
 
@@ -857,14 +878,14 @@ mod test {
         let n_crit = 15;
 
         // Test case where blocks span the entire domain
-        let blocktree = MortonKeys::from(vec![ROOT]);
+        let block_tree = MortonKeys::from(vec![ROOT]);
 
-        SingleNodeTree::split_blocks(&mut points, blocktree, n_crit);
-        let split_blocktree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
+        SingleNodeTree::split_blocks(&mut points, block_tree, n_crit);
+        let split_block_tree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
 
-        test_no_overlaps_helper(&split_blocktree);
+        test_no_overlaps_helper(&split_block_tree);
 
-        // Test case where the blocktree only partially covers the area
+        // Test case where the block_tree only partially covers the area
         let mut children = ROOT.children();
         children.sort();
 
@@ -873,11 +894,11 @@ mod test {
 
         let mut seeds = MortonKeys::from(vec![a, b]);
 
-        let blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
+        let block_tree = SingleNodeTree::<f64>::complete_block_tree(&mut seeds);
 
-        SingleNodeTree::split_blocks(&mut points, blocktree, 25);
-        let split_blocktree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
-        test_no_overlaps_helper(&split_blocktree);
+        SingleNodeTree::split_blocks(&mut points, block_tree, 25);
+        let split_block_tree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
+        test_no_overlaps_helper(&split_block_tree);
     }
 
     #[test]
@@ -887,16 +908,16 @@ mod test {
 
         let mut seeds = MortonKeys::from(vec![a, b]);
 
-        let mut blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
+        let mut block_tree = SingleNodeTree::<f64>::complete_block_tree(&mut seeds);
 
-        blocktree.sort();
+        block_tree.sort();
 
         let mut children = ROOT.children();
         children.sort();
-        // Test that the blocktree is completed
-        assert_eq!(blocktree.len(), 8);
+        // Test that the block_tree is completed
+        assert_eq!(block_tree.len(), 8);
 
-        for (a, b) in children.iter().zip(blocktree.iter()) {
+        for (a, b) in children.iter().zip(block_tree.iter()) {
             assert_eq!(a, b)
         }
     }

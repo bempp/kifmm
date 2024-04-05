@@ -15,7 +15,7 @@ use crate::traits::{
     tree::{FmmTree, Tree},
 };
 use crate::tree::{
-    constants::{ALPHA_INNER, ALPHA_OUTER, N_CRIT, ROOT},
+    constants::{ALPHA_INNER, ALPHA_OUTER, ROOT},
     types::{Domain, MortonKey, SingleNodeTree},
 };
 use green_kernels::{traits::Kernel, types::EvalType};
@@ -24,6 +24,8 @@ use rlst::{
     empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
+
+use super::constants::DEFAULT_NCRIT;
 
 impl<T, U, V> SingleNodeBuilder<T, U, V>
 where
@@ -84,7 +86,7 @@ where
             self.domain = Some(domain);
 
             // If not specified estimate from point data estimate critical value
-            let n_crit = n_crit.unwrap_or(N_CRIT);
+            let n_crit = n_crit.unwrap_or(DEFAULT_NCRIT);
             let [nsources, _dim] = sources.shape();
             let [ntargets, _dim] = targets.shape();
 
