@@ -1,11 +1,14 @@
 //! Data structures for kernel independent FMM
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
-use crate::tree::types::{Domain, MortonKey, MultiNodeTree, SingleNodeTree};
+use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::{Complex, Float};
 use num_complex::ComplexFloat;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
+
+#[cfg(feature = "mpi")]
+use crate::tree::types::MultiNodeTree;
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in column-major order.
