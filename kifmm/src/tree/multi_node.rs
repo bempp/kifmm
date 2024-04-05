@@ -34,14 +34,14 @@ where
     /// * `points` - Cartesian point data in column major order.
     /// * `domain` - Domain associated with the global point set.
     /// * `depth` - The maximum depth of recursion for the tree.
-    /// * `global_idxs` - Globally unique indices for point data.
+    /// * `global_indices` - Globally unique indices for point data.
     pub fn uniform_tree(
         world: &UserCommunicator,
         hyksort_subcomm_size: i32,
         coordinates: &[T],
         domain: &Domain<T>,
         depth: u64,
-        global_idxs: &[usize],
+        global_indices: &[usize],
     ) -> Result<MultiNodeTree<T>, std::io::Error> {
         let size = world.size();
         let rank = world.rank();
@@ -63,7 +63,7 @@ where
                 coordinate: point,
                 base_key,
                 encoded_key,
-                global_idx: global_idxs[i],
+                global_index: global_indices[i],
             })
         }
 
@@ -163,7 +163,7 @@ where
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
-        let global_indices = points.iter().map(|p| p.global_idx).collect_vec();
+        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
 
         let mut key_to_index = HashMap::new();
 
@@ -202,7 +202,7 @@ where
         coordinates: &[T],
         domain: &Domain<T>,
         depth: u64,
-        global_idxs: &[usize],
+        global_indices: &[usize],
     ) -> Result<MultiNodeTree<T>, std::io::Error> {
         let size = world.size();
         let rank = world.rank();
@@ -224,7 +224,7 @@ where
                 coordinate: point,
                 base_key,
                 encoded_key,
-                global_idx: global_idxs[i],
+                global_index: global_indices[i],
             })
         }
 
@@ -336,7 +336,7 @@ where
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
-        let global_indices = points.iter().map(|p| p.global_idx).collect_vec();
+        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
 
         let mut key_to_index = HashMap::new();
 
@@ -378,7 +378,7 @@ where
     /// * `points` - Cartesian point data in column major order.
     /// * `domain` - Domain associated with the global point set.
     /// * `n_crit` - Maximum number of particles in a leaf node.
-    /// * `global_idxs` - Globally unique indices for point data.
+    /// * `global_indices` - Globally unique indices for point data.
     pub fn new(
         points: &[T],
         depth: u64,
@@ -397,7 +397,7 @@ where
             let hyksort_subcomm_size = 2;
 
             // Assign global indices
-            let global_idxs = global_indices(n_points, world);
+            let global_indices = global_indices(n_points, world);
 
             if sparse {
                 return MultiNodeTree::uniform_tree_sparse(
@@ -406,7 +406,7 @@ where
                     points,
                     &domain,
                     depth,
-                    &global_idxs,
+                    &global_indices,
                 );
             } else {
                 return MultiNodeTree::uniform_tree(
@@ -415,7 +415,7 @@ where
                     points,
                     &domain,
                     depth,
-                    &global_idxs,
+                    &global_indices,
                 );
             }
         }

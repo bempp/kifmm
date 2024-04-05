@@ -94,5 +94,9 @@ pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
 
+#[cfg(feature = "mpi")]
+#[doc(inline)]
+pub use fmm::types::MultiNodeFmmTree;
+
 #[doc(inline)]
 pub use traits::fmm::Fmm;

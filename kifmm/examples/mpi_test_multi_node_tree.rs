@@ -68,9 +68,9 @@ fn test_global_bounds<T: RlstScalar + Float + Default + Equivalence + SampleUnif
         let y = points.data()[i + n_points];
         let z = points.data()[i + 2 * n_points];
 
-        assert!(domain.origin[0] <= x && x <= domain.origin[0] + domain.diameter[0]);
-        assert!(domain.origin[1] <= y && y <= domain.origin[1] + domain.diameter[1]);
-        assert!(domain.origin[2] <= z && z <= domain.origin[2] + domain.diameter[2]);
+        assert!(domain.origin[0] <= x && x <= domain.origin[0] + domain.side_length[0]);
+        assert!(domain.origin[1] <= y && y <= domain.origin[1] + domain.side_length[1]);
+        assert!(domain.origin[2] <= z && z <= domain.origin[2] + domain.side_length[2]);
     }
 }
 

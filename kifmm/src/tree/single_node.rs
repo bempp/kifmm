@@ -23,12 +23,12 @@ where
     /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
-    /// * `global_idxs` - A slice of indices to uniquely identify the points.
+    /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree(
         coordinates_col_major: &[T],
         domain: &Domain<T>,
         depth: u64,
-        global_idxs: &[usize],
+        global_indices: &[usize],
     ) -> SingleNodeTree<T> {
         let dim = 3;
         let n_coords = coordinates_col_major.len() / dim;
@@ -47,7 +47,7 @@ where
                 coordinate: coord,
                 base_key,
                 encoded_key,
-                global_idx: global_idxs[i],
+                global_index: global_indices[i],
             })
         }
         points.sort();
@@ -134,7 +134,7 @@ where
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
 
-        let global_indices = points.iter().map(|p| p.global_idx).collect_vec();
+        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
 
         let mut key_to_index = HashMap::new();
 
@@ -171,12 +171,12 @@ where
     /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
-    /// * `global_idxs` - A slice of indices to uniquely identify the points.
+    /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree_sparse(
         coordinates_col_major: &[T],
         domain: &Domain<T>,
         depth: u64,
-        global_idxs: &[usize],
+        global_indices: &[usize],
     ) -> SingleNodeTree<T> {
         let dim = 3;
         let n_points = coordinates_col_major.len() / dim;
@@ -195,7 +195,7 @@ where
                 coordinate: point,
                 base_key,
                 encoded_key,
-                global_idx: global_idxs[i],
+                global_index: global_indices[i],
             })
         }
         points.sort();
@@ -274,7 +274,7 @@ where
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
 
-        let global_indices = points.iter().map(|p| p.global_idx).collect_vec();
+        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
 
         let mut key_to_index = HashMap::new();
 
@@ -337,21 +337,21 @@ where
         if !points.is_empty() && points_len % dim == 0 {
             let n_points = points_len / dim;
             let domain = domain.unwrap_or(Domain::from_local_points(points));
-            let global_idxs = (0..n_points).collect_vec();
+            let global_indices = (0..n_points).collect_vec();
 
             if sparse {
                 return Ok(SingleNodeTree::uniform_tree_sparse(
                     points,
                     &domain,
                     depth,
-                    &global_idxs,
+                    &global_indices,
                 ));
             } else {
                 return Ok(SingleNodeTree::uniform_tree(
                     points,
                     &domain,
                     depth,
-                    &global_idxs,
+                    &global_indices,
                 ));
             }
         }
@@ -721,7 +721,7 @@ mod test {
 
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
-            diameter: [1.0, 1.0, 1.0],
+            side_length: [1.0, 1.0, 1.0],
         };
 
         let mut tmp = Points::default();
@@ -732,7 +732,7 @@ mod test {
                 coordinate: point,
                 base_key: key,
                 encoded_key: key,
-                global_idx: i,
+                global_index: i,
             })
         }
         let mut points = tmp;
@@ -769,7 +769,7 @@ mod test {
     pub fn test_split_blocks() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1.0, 1.0, 1.0],
+            side_length: [1.0, 1.0, 1.0],
         };
         let n_points = 10000;
         let points = points_fixture(n_points, None, None, None);
@@ -783,7 +783,7 @@ mod test {
                 coordinate: point,
                 base_key: key,
                 encoded_key: key,
-                global_idx: i,
+                global_index: i,
             })
         }
         let mut points = tmp;

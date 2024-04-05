@@ -270,7 +270,7 @@ where
 
         // Pick a point in the middle of the domain
         let two = T::from(2.0).unwrap();
-        let midway = domain.diameter.iter().map(|d| *d / two).collect_vec();
+        let midway = domain.side_length.iter().map(|d| *d / two).collect_vec();
         let point = midway
             .iter()
             .zip(domain.origin)
@@ -620,7 +620,7 @@ mod test {
 
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
         let alpha = 1.05;
         let threshold = 1e-5;
@@ -708,7 +708,7 @@ mod test {
 
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         // Some expansion data998
@@ -888,7 +888,7 @@ mod test {
 
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [5., 5., 5.],
+            side_length: [5., 5., 5.],
         };
 
         let transfer_vectors = compute_transfer_vectors();

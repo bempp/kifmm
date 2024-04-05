@@ -48,7 +48,10 @@ impl<T: Float + Default + Debug> Domain<T> {
         // The origin is defined by the minimum point
         let origin = [*min_x - err, *min_y - err, *min_z - err];
 
-        Domain { origin, diameter }
+        Domain {
+            origin,
+            side_length: diameter,
+        }
     }
 
     /// Find the union of two domains such that the returned domain is a superset and contains both sets of corresponding points
@@ -64,15 +67,15 @@ impl<T: Float + Default + Debug> Domain<T> {
         let min_origin = [min_x, min_y, min_z];
 
         // Find maximum diameter (+max origin)
-        let max_x = self.diameter[0].max(other.diameter[0]);
-        let max_y = self.diameter[0].max(other.diameter[0]);
-        let max_z = self.diameter[0].max(other.diameter[0]);
+        let max_x = self.side_length[0].max(other.side_length[0]);
+        let max_y = self.side_length[0].max(other.side_length[0]);
+        let max_z = self.side_length[0].max(other.side_length[0]);
 
         let max_diameter = [max_x, max_y, max_z];
 
         Domain {
             origin: min_origin,
-            diameter: max_diameter,
+            side_length: max_diameter,
         }
     }
 
@@ -84,7 +87,7 @@ impl<T: Float + Default + Debug> Domain<T> {
     pub fn new(origin: &[T; 3], diameter: &[T; 3]) -> Self {
         Domain {
             origin: *origin,
-            diameter: *diameter,
+            side_length: *diameter,
         }
     }
 }
@@ -93,7 +96,7 @@ impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
     type Scalar = T;
 
     fn diameter(&self) -> &[Self::Scalar; 3] {
-        &self.diameter
+        &self.side_length
     }
 
     fn origin(&self) -> &[Self::Scalar; 3] {
@@ -120,7 +123,7 @@ mod mpi_domain {
                 &[1, 1],
                 &[
                     offset_of!(Domain<T>, origin) as Address,
-                    offset_of!(Domain<T>, diameter) as Address,
+                    offset_of!(Domain<T>, side_length) as Address,
                 ],
                 &[
                     UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
@@ -172,25 +175,25 @@ mod mpi_domain {
             // Find maximum diameter (+max origin)
             let max_x = buffer
                 .iter()
-                .max_by(|a, b| a.diameter[0].partial_cmp(&b.diameter[0]).unwrap())
+                .max_by(|a, b| a.side_length[0].partial_cmp(&b.side_length[0]).unwrap())
                 .unwrap()
-                .diameter[0];
+                .side_length[0];
             let max_y = buffer
                 .iter()
-                .max_by(|a, b| a.diameter[1].partial_cmp(&b.diameter[1]).unwrap())
+                .max_by(|a, b| a.side_length[1].partial_cmp(&b.side_length[1]).unwrap())
                 .unwrap()
-                .diameter[1];
+                .side_length[1];
             let max_z = buffer
                 .iter()
-                .max_by(|a, b| a.diameter[2].partial_cmp(&b.diameter[2]).unwrap())
+                .max_by(|a, b| a.side_length[2].partial_cmp(&b.side_length[2]).unwrap())
                 .unwrap()
-                .diameter[2];
+                .side_length[2];
 
             let max_diameter = [max_x, max_y, max_z];
 
             Domain {
                 origin: min_origin,
-                diameter: max_diameter,
+                side_length: max_diameter,
             }
         }
     }
@@ -213,7 +216,10 @@ mod test {
         let domain = Domain::from_local_points(points.data());
 
         // Test that the domain remains cubic
-        assert!(domain.diameter.iter().all(|&x| x == domain.diameter[0]));
+        assert!(domain
+            .side_length
+            .iter()
+            .all(|&x| x == domain.side_length[0]));
 
         // Test that all local points are contained within the local domain
         let n_points = points.shape()[0];
@@ -221,13 +227,16 @@ mod test {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
 
             assert!(
-                domain.origin[0] <= point[0] && point[0] <= domain.origin[0] + domain.diameter[0]
+                domain.origin[0] <= point[0]
+                    && point[0] <= domain.origin[0] + domain.side_length[0]
             );
             assert!(
-                domain.origin[1] <= point[1] && point[1] <= domain.origin[1] + domain.diameter[1]
+                domain.origin[1] <= point[1]
+                    && point[1] <= domain.origin[1] + domain.side_length[1]
             );
             assert!(
-                domain.origin[2] <= point[2] && point[2] <= domain.origin[2] + domain.diameter[2]
+                domain.origin[2] <= point[2]
+                    && point[2] <= domain.origin[2] + domain.side_length[2]
             );
         }
     }

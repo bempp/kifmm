@@ -129,7 +129,7 @@ where
             ))
         } else {
             // Set FMM parameters
-            let global_idxs = self
+            let global_indices = self
                 .tree
                 .as_ref()
                 .unwrap()
@@ -139,7 +139,7 @@ where
 
             let [_ncharges, nmatvecs] = charges.shape();
 
-            self.charges = Some(map_charges(global_idxs, charges));
+            self.charges = Some(map_charges(global_indices, charges));
 
             if nmatvecs > 1 {
                 self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))

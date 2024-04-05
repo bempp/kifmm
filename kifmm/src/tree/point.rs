@@ -65,7 +65,7 @@ mod mpi_point {
                 &[1, 1, 1, 1],
                 &[
                     offset_of!(Point<T>, coordinate) as Address,
-                    offset_of!(Point<T>, global_idx) as Address,
+                    offset_of!(Point<T>, global_index) as Address,
                     offset_of!(Point<T>, base_key) as Address,
                     offset_of!(Point<T>, encoded_key) as Address,
                 ],
@@ -121,7 +121,7 @@ mod test {
     pub fn test_ordering() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         let n_points = 1000;
@@ -138,7 +138,7 @@ mod test {
                 coordinate: p,
                 base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
                 encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
-                global_idx: i,
+                global_index: i,
             })
         }
 

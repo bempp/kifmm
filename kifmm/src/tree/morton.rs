@@ -254,7 +254,7 @@ fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
     // Check if point is in the domain
 
     let mut tmp = Vec::new();
-    for (&p, d, o) in izip!(point, domain.diameter, domain.origin) {
+    for (&p, d, o) in izip!(point, domain.side_length, domain.origin) {
         tmp.push((o <= p) && (p <= o + d));
     }
     let contained = tmp.iter().all(|&x| x);
@@ -264,7 +264,7 @@ fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
             let mut anchor = [u64::default(); 3];
 
             let side_length: Vec<T> = domain
-                .diameter
+                .side_length
                 .iter()
                 .map(|d| *d / T::from(1 << level).unwrap())
                 .collect();
@@ -421,7 +421,7 @@ impl MortonKey {
     /// `domain` - The physical domain with which we calculate the diameter with respect to.
     pub fn diameter<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
         domain
-            .diameter
+            .side_length
             .map(|x| T::from(0.5).unwrap().powf(T::from(self.level()).unwrap()) * x)
     }
 
@@ -616,7 +616,7 @@ impl MortonKey {
         let mut coord: [T; 3] = [T::zero(); 3];
 
         for (anchor_value, coord_ref, origin_value, diameter_value) in
-            izip!(self.anchor, &mut coord, &domain.origin, &domain.diameter)
+            izip!(self.anchor, &mut coord, &domain.origin, &domain.side_length)
         {
             *coord_ref = *origin_value
                 + *diameter_value * T::from(anchor_value).unwrap() / T::from(LEVEL_SIZE).unwrap();
@@ -665,7 +665,7 @@ impl MortonKey {
         for anchor in anchors.iter() {
             let mut coord = [T::zero(); 3];
             for (&anchor_value, coord_ref, origin_value, diameter_value) in
-                izip!(anchor, &mut coord, &domain.origin, &domain.diameter)
+                izip!(anchor, &mut coord, &domain.origin, &domain.side_length)
             {
                 *coord_ref = *origin_value
                     + *diameter_value * T::from(anchor_value).unwrap()
@@ -1323,7 +1323,7 @@ mod test {
     fn test_ancestors() {
         let domain: Domain<f64> = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
         let point = [0.5, 0.5, 0.5];
 
@@ -1377,7 +1377,7 @@ mod test {
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
         let domain: Domain<f64> = Domain {
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
             origin: [0., 0., 0.],
         };
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
@@ -1521,7 +1521,7 @@ mod test {
         let n_points = 1000;
         let domain = Domain {
             origin: [-1.01, -1.01, -1.01],
-            diameter: [2.0, 2.0, 2.0],
+            side_length: [2.0, 2.0, 2.0],
         };
         let min = Some(-1.01);
         let max = Some(0.99);
@@ -1562,7 +1562,7 @@ mod test {
     fn test_point_to_anchor() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         // Test points in the domain
@@ -1577,7 +1577,7 @@ mod test {
 
         let domain = Domain {
             origin: [-0.7, -0.6, -0.5],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         let point = [-0.499, -0.499, -0.499];
@@ -1594,7 +1594,7 @@ mod test {
     fn test_point_to_anchor_fails() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         // Test a point not in the domain
@@ -1607,7 +1607,7 @@ mod test {
     fn test_point_to_anchor_fails_negative_domain() {
         let domain = Domain {
             origin: [-0.5, -0.5, -0.5],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         // Test a point not in the domain
@@ -1760,7 +1760,7 @@ mod test {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [-0.1, -0.1, 0.1],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
@@ -1800,7 +1800,7 @@ mod test {
         let point = [-0.099999, -0.099999, -0.099999];
         let domain: Domain<f64> = Domain {
             origin: [-0.1, -0.1, -0.1],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         let a = MortonKey::from_point(&point, &domain, 1);
@@ -1814,7 +1814,7 @@ mod test {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         // Test scale independence of transfer vectors
@@ -1846,7 +1846,7 @@ mod test {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
@@ -1858,7 +1858,7 @@ mod test {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
         let key = MortonKey::from_point(&point, &domain, 0);
 
@@ -1940,7 +1940,7 @@ mod test {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
         let expansion_order = 5;
