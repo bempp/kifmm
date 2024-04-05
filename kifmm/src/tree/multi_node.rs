@@ -377,18 +377,18 @@ where
     ///
     /// # Arguments
 
-    /// - `coordinates_col_major` -, A slice of coordinates in column major order, structured as
+    /// - `coordinates_col_major` - A slice of coordinates in column major order, structured as
     ///   [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]. This ordering facilitates
     ///   efficient spatial indexing and operations within the tree.
     ///
-    /// - `depth` -, Defines the maximum recursion level of the tree, determining the granularity of
+    /// - `depth` - Defines the maximum recursion level of the tree, determining the granularity of
     ///   spatial division. A greater depth results in a finer partitioning of the spatial domain.
     ///
-    /// - `prune_empty` -, Specifies whether to prune empty leaf nodes and their unoccupied ancestors from the tree.
+    /// - `prune_empty` - Specifies whether to prune empty leaf nodes and their unoccupied ancestors from the tree.
     ///   Enabling this option streamlines the tree by removing nodes that do not contain any point data, potentially
     ///   enhancing query efficiency and reducing memory usage by focusing the tree structure on regions with actual data.
     ///
-    /// - `domain` -, Optionally specifies the spatial domain of the tree. If provided, this domain is
+    /// - `domain` - Optionally specifies the spatial domain of the tree. If provided, this domain is
     ///   used directly; otherwise, it is computed from the point data, ensuring the tree encompasses
     ///   all points.
     ///
