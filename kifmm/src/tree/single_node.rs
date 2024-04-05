@@ -51,7 +51,7 @@ where
             })
         }
 
-        // Perform Morton sort over points
+        // Morton sort over points
         points.sort();
 
         // Generate complete tree at specified depth
@@ -415,7 +415,7 @@ where
             }
 
             (_, _, false, _) => {
-                let msg = format!("Empty coordinate vector");
+                let msg = "Empty coordinate vector".to_string();
                 Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg))
             }
         }

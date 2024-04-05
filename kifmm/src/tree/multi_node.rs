@@ -35,18 +35,19 @@ where
     /// * `domain` - The (global) physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
-    /// * `world` - A global communicator for the tree.
-    /// * `hyksort_subcomm_size` - Size of sub-communicator used by
-    /// [Hyksort](https://dl.acm.org/doi/abs/10.1145/2464996.2465442?casa_token=vFAXToyb_xsAAAAA:DqQ1hfnP_gOKAatn_d0sVex37V_XOOiqevDRONg-4lYn_pmSuPhmR3CP-0QVBisxTBWVUUCAuA).
-    /// Must be a power of 2.
+    /// * `world` - a global communicator for the tree.
+    /// * `hyksort_subcomm_size` - size of sub-communicator used by
+    /// [hyksort](https://dl.acm.org/doi/abs/10.1145/2464996.2465442?casa_token=vfaxtoyb_xsaaaaa:dqq1hfnp_gokaatn_d0svex37v_xooiqevdrong-4lyn_pmsuphmr3cp-0qvbisxtbwvuucaua).
+    /// must be a power of 2.
     pub fn uniform_tree(
         coordinates_col_major: &[T],
-        domain: &Domain<T>,
+        &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
         world: &UserCommunicator,
         hyksort_subcomm_size: i32,
     ) -> Result<MultiNodeTree<T>, std::io::Error> {
+        // Size of global communicator, and processor rank
         let size = world.size();
         let rank = world.rank();
 
@@ -61,8 +62,8 @@ where
                 coordinates_col_major[i + n_coords],
                 coordinates_col_major[i + 2 * n_coords],
             ];
-            let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, domain, depth);
+            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(&point, &domain, depth);
             points.push(Point {
                 coordinate: point,
                 base_key,
@@ -92,7 +93,7 @@ where
         // Morton sort over local points after transfer
         points.sort();
 
-        // Split blocks to required depth
+        // Split blocks to required depth, defines leaves
         let mut leaves = MortonKeys::new();
         for block in block_tree.iter() {
             let level_diff = depth - block.level();
@@ -196,7 +197,7 @@ where
         Ok(MultiNodeTree {
             world: world.duplicate(),
             depth,
-            domain: *domain,
+            domain,
             coordinates: coordinates_row_major,
             global_indices,
             leaves,
@@ -211,32 +212,47 @@ where
         })
     }
 
-    /// TODO: Docs
+    /// Constructor for uniform trees, distributed with MPI, refined to a user defined depth, however excludes
+    /// empty nodes which don't contain particles and their ancestors.
+    ///
+    /// The input point data is also assumed to be distributed across each node.
+    ///
+    /// # Arguments
+    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order
+    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `depth` - The maximum depth of the tree, defines the level of recursion.
+    /// * `global_indices` - A slice of indices to uniquely identify the points.
+    /// * `world` - a global communicator for the tree.
+    /// * `hyksort_subcomm_size` - size of sub-communicator used by
+    /// [hyksort](https://dl.acm.org/doi/abs/10.1145/2464996.2465442?casa_token=vfaxtoyb_xsaaaaa:dqq1hfnp_gokaatn_d0svex37v_xooiqevdrong-4lyn_pmsuphmr3cp-0qvbisxtbwvuucaua).
+    /// must be a power of 2.
     pub fn uniform_tree_pruned(
-        world: &UserCommunicator,
-        hyksort_subcomm_size: i32,
-        coordinates: &[T],
-        domain: &Domain<T>,
+        coordinates_col_major: &[T],
+        &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
+        world: &UserCommunicator,
+        hyksort_subcomm_size: i32,
     ) -> Result<MultiNodeTree<T>, std::io::Error> {
+        // Size of global communicator, and processor rank
         let size = world.size();
         let rank = world.rank();
 
-        // Encode points at deepest level, and map to specified depth.
+        // Convert column major coordinate into `Point`, containing Morton encoding
         let dim = 3;
-        let n_points = coordinates.len() / dim;
+        let n_coords = coordinates_col_major.len() / dim;
 
-        let mut tmp = Points::default();
-        for i in 0..n_points {
+        let mut points = Points::default();
+        for i in 0..n_coords {
             let point = [
-                coordinates[i],
-                coordinates[i + n_points],
-                coordinates[i + 2 * n_points],
+                coordinates_col_major[i],
+                coordinates_col_major[i + n_coords],
+                coordinates_col_major[i + 2 * n_coords],
             ];
-            let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, domain, depth);
-            tmp.push(Point {
+            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(&point, &domain, depth);
+            points.push(Point {
                 coordinate: point,
                 base_key,
                 encoded_key,
@@ -244,22 +260,26 @@ where
             })
         }
 
-        let mut points = tmp;
-
-        // 2.i Perform parallel Morton sort over encoded points
+        // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
         hyksort(&mut points, hyksort_subcomm_size, comm)?;
 
+        // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey> = points.iter().map(|p| p.encoded_key).collect();
         let mut leaves = MortonKeys::from(leaves);
         leaves.complete();
 
-        // 2.ii Find leaf keys on each processor
+        // Find the seeds (coarsest leaves) on each processor
         let mut seeds = SingleNodeTree::<T>::find_seeds(&leaves);
 
+        // Compute the minimum spanning block tree
         let block_tree = Self::complete_block_tree(&mut seeds, rank, size, world);
 
+        // Transfer points below minimum seed to previous processor
         Self::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
+
+        // Morton sort over local points after transfer
+        points.sort();
 
         // Split blocks to required depth
         let mut leaves = MortonKeys::new();
@@ -268,10 +288,11 @@ where
             leaves.append(&mut block.descendants(level_diff).unwrap())
         }
 
+        // Find the minimum and maximum owned leaves
         let min = leaves.iter().min().unwrap();
         let max = leaves.iter().max().unwrap();
 
-        // 3. Assign leaves to points
+        // Assign leaves to points, disregard unmapped
         let _unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
         // Leaves are those that are mapped and their siblings if they exist in the processors range
@@ -284,9 +305,7 @@ where
         let mut leaves = MortonKeys::from(leaves);
         leaves.sort();
 
-        // Group points by leaves
-        points.sort();
-
+        // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
         let mut curr = points[0];
         let mut curr_idx = 0;
@@ -309,6 +328,8 @@ where
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
+        // This additional step is needed in distributed trees to ensure that siblings of ancestors
+        // are contained on each processor
         let tmp: HashSet<MortonKey> = tmp
             .iter()
             .flat_map(|key| {
@@ -322,6 +343,7 @@ where
 
         let mut keys = MortonKeys::from(tmp);
 
+        // Create sets for inclusion testing
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
 
@@ -340,20 +362,24 @@ where
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
-        // Return tree in sorted order
+        // Return tree in sorted order, by level and then by Morton key
         for l in 0..=depth {
             let &(l, r) = levels_to_keys.get(&l).unwrap();
             let subset = &mut keys[l..r];
             subset.sort();
         }
 
-        let coordinates = points
+        // Collect coordinates in row-major order, for ease of lookup
+        let coordinates_row_major = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
+
+        // Collect global indices, in Morton sorted order
         let global_indices = points.iter().map(|p| p.global_index).collect_vec();
 
+        // Map between keys/leaves and their respective indices
         let mut key_to_index = HashMap::new();
 
         for (i, key) in keys.iter().enumerate() {
@@ -369,8 +395,8 @@ where
         Ok(MultiNodeTree {
             world: world.duplicate(),
             depth,
-            domain: *domain,
-            coordinates,
+            domain,
+            coordinates: coordinates_row_major,
             global_indices,
             leaves,
             keys,
@@ -433,12 +459,12 @@ where
 
             if prune_empty {
                 return MultiNodeTree::uniform_tree_pruned(
-                    world,
-                    hyksort_subcomm_size,
                     coordinates_col_major,
                     &domain,
                     depth,
                     &global_indices,
+                    world,
+                    hyksort_subcomm_size,
                 );
             } else {
                 return MultiNodeTree::uniform_tree(
