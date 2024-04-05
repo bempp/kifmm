@@ -225,12 +225,11 @@ where
 
         // Compute required surfaces
         let upward_equivalent_surface =
-            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
-        let upward_check_surface = ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
+            ROOT.surface_grid(self.expansion_order, domain, alpha_inner);
+        let upward_check_surface = ROOT.surface_grid(self.expansion_order, domain, alpha_outer);
         let downward_equivalent_surface =
-            ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
-        let downward_check_surface =
-            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
+            ROOT.surface_grid(self.expansion_order, domain, alpha_outer);
+        let downward_check_surface = ROOT.surface_grid(self.expansion_order, domain, alpha_inner);
 
         let nequiv_surface = upward_equivalent_surface.len() / self.dim;
         let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -289,9 +288,9 @@ where
 
         for (i, child) in children.iter().enumerate() {
             let child_upward_equivalent_surface =
-                child.compute_surface(domain, self.expansion_order, alpha_inner);
+                child.surface_grid(self.expansion_order, domain, alpha_inner);
             let child_downward_check_surface =
-                child.compute_surface(domain, self.expansion_order, alpha_inner);
+                child.surface_grid(self.expansion_order, domain, alpha_inner);
 
             let mut pc2ce_t = rlst_dynamic_array2!(W, [ncheck_surface, nequiv_surface]);
 

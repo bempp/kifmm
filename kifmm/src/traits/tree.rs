@@ -51,34 +51,52 @@ pub trait Tree {
     fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>>;
 
     /// Gets a reference to the coordinates contained with a leaf node.
-    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Scalar]>;
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]>;
 
-    /// Number of coordinates
-    fn ncoordinates(&self, key: &Self::Node) -> Option<usize>;
+    /// Query number of coordinates contained at a given leaf node
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize>;
 
-    /// Gets a reference to the coordinates contained in across tree (local in multinode setting)
+    /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
     fn all_coordinates(&self) -> Option<&[Self::Scalar]>;
 
-    /// Total number of coordinates
-    fn ncoordinates_tot(&self) -> Option<usize>;
+    /// Total number of coordinates (local in a multi node setting)
+    fn n_coordinates_tot(&self) -> Option<usize>;
 
-    /// Gets global indices at a leaf (local in multinode setting)
-    fn global_indices<'a>(&'a self, key: &Self::Node) -> Option<&'a [usize]>;
+    /// Gets global indices at a leaf node (local in multi node setting)
+    ///
+    /// # Arguments
+    /// - `leaf` - Node being query.
+    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]>;
 
-    /// Gets all global indices (local in multinode setting)
+    /// Gets all global indices (local in mult inode setting)
     fn all_global_indices(&self) -> Option<&[usize]>;
 
-    /// Get domain defined by the points, gets global domain in multi-node setting.
-    fn domain(&self) -> &'_ Self::Domain;
+    /// Get domain defined by the points, gets global domain in multi node setting.
+    fn domain(&self) -> &Self::Domain;
 
-    /// Get a map from the key to index position in sorted keys
+    /// Map from the key to index position in sorted keys
+    ///
+    /// # Arguments
+    /// - `key` - Node being query.
     fn index(&self, key: &Self::Node) -> Option<&usize>;
 
-    /// Get a node
-    fn node(&self, idx: usize) -> Option<&Self::Node>;
+    /// Map from the leaf to its index position in sorted leaves
+    ///
+    /// # Arguments
+    /// - `leaf` - Node being query.
+    fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize>;
 
-    /// Get a map from the key to leaf index position in sorted leaves
-    fn leaf_index(&self, key: &Self::Node) -> Option<&usize>;
+    /// Map from an index position to a node
+    ///
+    /// # Arguments
+    /// - `idx` - Index being query.
+    fn node(&self, idx: usize) -> Option<&Self::Node>;
 }
 
 /// Interface for trees required by the fast multipole method (FMM), which requires
@@ -131,6 +149,9 @@ where
     fn children(&self) -> Self::Nodes;
 
     /// Checks adjacency, defined by sharing a vertex, edge, or face, between this node and another
+    ///
+    /// # Arguments
+    /// - `other` - Node being query.
     fn is_adjacent(&self, other: &Self) -> bool;
 }
 
@@ -140,10 +161,22 @@ where
     Self: TreeNode<T>,
     T: RlstScalar,
 {
-    /// Compute the convolution grid centered at a given node and its respective surface grid. This method is used
-    /// in the FFT acceleration of the field translation operator for kernel independent fast multipole method.
+    /// Scale a surface centered at this node, used in the discretisation of the kernel independent fast nultipole
+    /// method
+    ///
+    /// # Arguments
+    /// * `surface` - A general surface grid, computed for a given expansion order computed with the
+    /// associated function `surface_grid`.
+    /// * `domain` - The physical domain with which nodes are being constructed with respect to.
+    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
+    fn scale_surface(&self, surface: Vec<T::Real>, domain: &Self::Domain, alpha: T)
+        -> Vec<T::Real>;
+
+    /// Compute the convolution grid, centered at this node. This method is used in the FFT acceleration of
+    /// the field translation operator for kernel independent fast multipole method.
+    ///
     /// Returns an owned vector corresponding to the coordinates of the
-    /// convolution grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N], as well as a
+    /// convolution grid in column major order \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn], as well as a
     /// vector of grid indices.
     ///
     /// # Arguments
@@ -161,26 +194,6 @@ where
         conv_point_corner_index: usize,
     ) -> (Vec<T>, Vec<usize>);
 
-    /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
-    /// returns a tuple, the first element is an owned vector of the physical coordinates of the
-    /// surface grid in column major order [x_1, x_2, ... x_n, y_1, y_2, ..., y_n, z_1, z_2, ..., z_n].
-    /// the second element is a vector of indices corresponding to each of these coordinates.
-    ///
-    /// # Arguments
-    /// * `expansion_order` - the expansion order of the fmm
-    fn surface_grid(expansion_order: usize) -> Vec<T>;
-
-    /// Scale a surface grid centered at this node, used in the discretisation of the kernel independent fast nultipole
-    /// method
-    ///
-    /// # Arguments
-    /// * `surface` - A general surface grid, computed for a given expansion order computed with the
-    /// associated function `surface_grid`.
-    /// * `domain` - The physical domain with which nodes are being constructed with respect to.
-    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn scale_surface(&self, surface: Vec<T::Real>, domain: &Self::Domain, alpha: T)
-        -> Vec<T::Real>;
-
     /// Compute the surface grid, centered at this node, for a given expansion order and alpha parameter. This is used
     /// in the discretisation of the kernel independent fast multipole method
     ///
@@ -188,12 +201,8 @@ where
     /// * `domain` - The physical domain with which node are being constructed with respect to.
     /// * `expansion_order` - The expansion order of the FMM
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn compute_surface(
-        &self,
-        domain: &Self::Domain,
-        expansion_order: usize,
-        alpha: T,
-    ) -> Vec<T::Real>;
+    fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: T)
+        -> Vec<T::Real>;
 }
 
 /// Interface for computational domain

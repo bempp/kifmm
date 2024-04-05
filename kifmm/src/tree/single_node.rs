@@ -638,11 +638,11 @@ where
         where T: 'a;
     type Nodes = MortonKeys;
 
-    fn ncoordinates(&self, key: &Self::Node) -> Option<usize> {
-        self.coordinates(key).map(|coords| coords.len() / 3)
+    fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
+        self.coordinates(leaf).map(|coords| coords.len() / 3)
     }
 
-    fn ncoordinates_tot(&self) -> Option<usize> {
+    fn n_coordinates_tot(&self) -> Option<usize> {
         self.all_coordinates().map(|coords| coords.len() / 3)
     }
 
@@ -698,8 +698,8 @@ where
         Some(&self.leaves)
     }
 
-    fn coordinates(&self, key: &Self::Node) -> Option<&[Self::Scalar]> {
-        if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
             None
@@ -710,8 +710,8 @@ where
         Some(&self.coordinates)
     }
 
-    fn global_indices(&self, key: &Self::Node) -> Option<&[usize]> {
-        if let Some(&(l, r)) = self.leaves_to_coordinates.get(key) {
+    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             Some(&self.global_indices[l..r])
         } else {
             None
@@ -726,8 +726,8 @@ where
         self.key_to_index.get(key)
     }
 
-    fn leaf_index(&self, key: &Self::Node) -> Option<&usize> {
-        self.leaf_to_index.get(key)
+    fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize> {
+        self.leaf_to_index.get(leaf)
     }
 }
 

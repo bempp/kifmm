@@ -266,15 +266,15 @@ pub use mpi_helpers::*;
 mod test {
 
     use super::*;
-    use crate::{traits::tree::FmmTreeNode, tree::types::MortonKey};
+    use crate::tree::morton::surface_grid;
 
     #[test]
     fn test_find_corners() {
         let expansion_order = 5;
-        let grid_1: Vec<f64> = MortonKey::surface_grid(expansion_order);
+        let grid_1: Vec<f64> = surface_grid(expansion_order);
 
         let expansion_order = 2;
-        let grid_2: Vec<f64> = MortonKey::surface_grid(expansion_order);
+        let grid_2: Vec<f64> = surface_grid(expansion_order);
 
         let corners_1 = find_corners(&grid_1);
         let corners_2 = find_corners(&grid_2);
