@@ -64,7 +64,6 @@ fn main() {
     if rank == 0 {
         println!("...test_hyksort_unique passed")
     }
-
 }
 
 #[cfg(not(feature = "mpi"))]
