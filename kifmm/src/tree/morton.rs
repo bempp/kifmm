@@ -15,7 +15,6 @@ use rlst::RlstScalar;
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    error::Error,
     fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
@@ -205,6 +204,15 @@ impl From<Vec<MortonKey>> for MortonKeys {
     }
 }
 
+impl From<HashSet<MortonKey>> for MortonKeys {
+    fn from(keys: HashSet<MortonKey>) -> Self {
+        MortonKeys {
+            keys: keys.into_iter().collect_vec(),
+            index: 0,
+        }
+    }
+}
+
 /// Helper function for decoding keys.
 fn decode_key_helper(key: u64, lookup_table: &[u64; 512]) -> u64 {
     const N_LOOPS: u64 = 7; // 8 bytes in 64 bit key
@@ -242,7 +250,7 @@ pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
     point: &[T; 3],
     level: u64,
     domain: &Domain<T>,
-) -> Result<[u64; 3], Box<dyn Error>> {
+) -> Result<[u64; 3], std::io::Error> {
     // Check if point is in the domain
 
     let mut tmp = Vec::new();
@@ -268,9 +276,10 @@ pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
             }
             Ok(anchor)
         }
-        false => {
-            panic!("Point not in Domain")
-        }
+        false => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Point not in Domain",
+        )),
     }
 }
 
@@ -335,10 +344,16 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `other` - A Morton Key with which to calculate a transfer vector to.
-    pub fn find_transfer_vector_components(&self, &other: &MortonKey) -> [i64; 3] {
+    pub fn find_transfer_vector_components(
+        &self,
+        &other: &MortonKey,
+    ) -> Result<[i64; 3], std::io::Error> {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
-            panic!("Transfer vectors only computed for keys at levels deeper than 2")
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Transfer vectors only computed for keys at levels deeper than 2",
+            ));
         }
 
         let level_diff = DEEPEST_LEVEL - self.level();
@@ -356,7 +371,7 @@ impl MortonKey {
         y /= 2_i64.pow(level_diff as u32);
         z /= 2_i64.pow(level_diff as u32);
 
-        [x, y, z]
+        Ok([x, y, z])
     }
 
     /// Subroutine for converting components of a transfer vector into a unique, positive, checksum.
@@ -393,9 +408,9 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `other` - A Morton Key with which to calculate a transfer vector to.
-    pub fn find_transfer_vector(&self, &other: &MortonKey) -> usize {
-        let tmp = self.find_transfer_vector_components(&other);
-        MortonKey::find_transfer_vector_from_components(&tmp)
+    pub fn find_transfer_vector(&self, &other: &MortonKey) -> Result<usize, std::io::Error> {
+        let tmp = self.find_transfer_vector_components(&other)?;
+        Ok(MortonKey::find_transfer_vector_from_components(&tmp))
     }
 
     /// The physical diameter of a box specified by this Morton Key, calculated with respect to
@@ -554,13 +569,14 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `n` - The level below the key's level to return descendants from.
-    pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey>, Box<dyn Error>> {
+    pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey>, std::io::Error> {
         let valid: bool = self.level() + n <= DEEPEST_LEVEL;
 
         match valid {
-            false => {
-                panic!("Cannot find descendants below level {:?}", DEEPEST_LEVEL)
-            }
+            false => Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("Cannot find descendants below level {:?}", DEEPEST_LEVEL),
+            )),
             true => {
                 let mut descendants = vec![*self];
                 for _ in 0..n {
@@ -584,7 +600,7 @@ impl MortonKey {
             *other
         } else {
             let my_ancestors = self.ancestors();
-            let mut current = other.parent();
+            let mut current = *other;
             while !my_ancestors.contains(&current) {
                 current = current.parent()
             }
@@ -1575,7 +1591,6 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "Point not in Domain")]
     fn test_point_to_anchor_fails() {
         let domain = Domain {
             origin: [0., 0., 0.],
@@ -1585,11 +1600,10 @@ mod test {
         // Test a point not in the domain
         let point = [1.9, 0.9, 0.9];
         let level = 2;
-        let _anchor = point_to_anchor(&point, level, &domain);
+        assert!(point_to_anchor(&point, level, &domain).is_err());
     }
 
     #[test]
-    #[should_panic(expected = "Point not in Domain")]
     fn test_point_to_anchor_fails_negative_domain() {
         let domain = Domain {
             origin: [-0.5, -0.5, -0.5],
@@ -1599,7 +1613,7 @@ mod test {
         // Test a point not in the domain
         let point = [-0.51, -0.5, -0.5];
         let level = 2;
-        let _anchor = point_to_anchor(&point, level, &domain);
+        assert!(point_to_anchor(&point, level, &domain).is_err());
     }
 
     #[test]
@@ -1634,13 +1648,12 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "Cannot find descendants below level 16")]
-    fn test_find_descendants_panics() {
+    fn test_find_descendants_errors() {
         let key = MortonKey {
             morton: 0,
             anchor: [0, 0, 0],
         };
-        let _descendants = key.descendants(17);
+        assert!(key.descendants(17).is_err());
     }
 
     #[test]
@@ -1807,30 +1820,29 @@ mod test {
         // Test scale independence of transfer vectors
         let a = MortonKey::from_point(&point, &domain, 2);
         let other = a.siblings()[2];
-        let res_a = a.find_transfer_vector(&other);
+        let res_a = a.find_transfer_vector(&other).unwrap();
 
         let b = MortonKey::from_point(&point, &domain, 16);
         let other = b.siblings()[2];
-        let res_b = b.find_transfer_vector(&other);
+        let res_b = b.find_transfer_vector(&other).unwrap();
 
         assert_eq!(res_a, res_b);
 
         // Test translational invariance of transfer vector
         let a = MortonKey::from_point(&point, &domain, 2);
         let other = a.siblings()[2];
-        let res_a = a.find_transfer_vector(&other);
+        let res_a = a.find_transfer_vector(&other).unwrap();
 
         let shifted_point = [0.1, 0.1, 0.1];
         let b = MortonKey::from_point(&shifted_point, &domain, 2);
         let other = b.siblings()[2];
-        let res_b = b.find_transfer_vector(&other);
+        let res_b = b.find_transfer_vector(&other).unwrap();
 
         assert_eq!(res_a, res_b);
     }
 
     #[test]
-    #[should_panic(expected = "Transfer vectors only computed for keys at levels deeper than 2")]
-    fn test_transfer_vector_panic() {
+    fn test_transfer_vector_errors() {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain {
             origin: [0., 0., 0.],
@@ -1838,7 +1850,7 @@ mod test {
         };
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
-        key.find_transfer_vector(&sibling);
+        assert!(key.find_transfer_vector(&sibling).is_err());
     }
 
     #[test]

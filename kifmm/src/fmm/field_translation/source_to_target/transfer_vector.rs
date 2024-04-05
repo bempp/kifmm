@@ -48,7 +48,7 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
         // Find transfer vectors for everything in dense v list of each key
         let tmp: Vec<usize> = v_list
             .iter()
-            .map(|v| key.find_transfer_vector(v))
+            .map(|v| key.find_transfer_vector(v).unwrap())
             .collect_vec();
 
         transfer_vectors.extend(&mut tmp.iter().cloned());
@@ -91,7 +91,7 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
         .zip(unique_sources)
         .zip(unique_transfer_vectors)
     {
-        let components = t.find_transfer_vector_components(&s);
+        let components = t.find_transfer_vector_components(&s).unwrap();
 
         result.push(TransferVector {
             components,

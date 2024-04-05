@@ -95,6 +95,28 @@ fn test_nleaves<T: RlstScalar<Real = T> + Float + Default + Equivalence + Sample
     }
 }
 
+/// Test that all leaves are mapped
+#[cfg(feature = "mpi")]
+fn test_npoints<T: RlstScalar<Real = T> + Float + Default + Equivalence + SampleUniform>(
+    world: &UserCommunicator,
+    tree: &MultiNodeTree<T>,
+    points_per_proc: usize,
+) {
+    let npoints = tree.ncoordinates_tot().unwrap();
+
+    let size = world.size() as usize;
+    let mut counts = vec![0usize; size];
+
+    world.all_gather_into(&npoints, &mut counts[..]);
+
+    let npoints_tot = counts.iter().sum::<usize>() as usize;
+    let expected = points_per_proc * size;
+
+    if world.rank() == 0 {
+        assert_eq!(npoints_tot, expected)
+    }
+}
+
 #[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
@@ -105,25 +127,16 @@ fn main() {
 
     // Setup tree parameters
     let sparse = false;
-    let hyksort_subcomm_size = 2;
-    let depth = 3;
-    let n_points = 10000;
+    let depth = 5;
+    let npoints = 10000;
 
     // Generate some random test data local to each process
-    let points = points_fixture::<f32>(n_points, None, None, None);
+    let points = points_fixture::<f32>(npoints, None, None, None);
 
     // Create a uniform tree
-    let tree = MultiNodeTree::new(
-        points.data(),
-        depth,
-        sparse,
-        None,
-        &comm,
-        hyksort_subcomm_size,
-    )
-    .unwrap();
+    let uniform = MultiNodeTree::new(points.data(), depth, sparse, None, &comm).unwrap();
 
-    test_no_overlaps(&comm, &tree);
+    test_no_overlaps(&comm, &uniform);
     if world.rank() == 0 {
         println!("\t ... test_no_overlaps passed on uniform tree");
     }
@@ -133,9 +146,31 @@ fn main() {
         println!("\t ... test_global_bounds passed on uniform tree");
     }
 
-    test_nleaves(&comm, &tree);
+    test_nleaves(&comm, &uniform);
     if world.rank() == 0 {
         println!("\t ... test_nleaves passed on uniform tree");
+    }
+
+    test_npoints(&comm, &uniform, npoints);
+    if world.rank() == 0 {
+        println!("\t ... test_npoints passed on uniform tree");
+    }
+
+    let sparse = MultiNodeTree::new(points.data(), depth, sparse, None, &comm).unwrap();
+
+    test_no_overlaps(&comm, &sparse);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on sparse tree");
+    }
+
+    test_global_bounds::<f32>(&comm);
+    if world.rank() == 0 {
+        println!("\t ... test_global_bounds passed on sparse tree");
+    }
+
+    test_npoints(&comm, &sparse, npoints);
+    if world.rank() == 0 {
+        println!("\t ... test_npoints passed on sparse tree");
     }
 }
 

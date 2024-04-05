@@ -20,35 +20,36 @@ where
     /// Returns a SingleNodeTree, with the leaves in sorted order.
     ///
     /// # Arguments
-    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     fn uniform_tree(
-        points: &[T],
+        coordinates_col_major: &[T],
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
     ) -> SingleNodeTree<T> {
-        // Encode points at deepest level, and map to specified depth
-
-        // TODO: Automatically infer dimension
         let dim = 3;
-        let npoints = points.len() / dim;
+        let ncoords = coordinates_col_major.len() / dim;
 
-        let mut tmp = Points::default();
-        for i in 0..npoints {
-            let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
-            let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, domain, depth);
-            tmp.points.push(Point {
-                coordinate: point,
+        // Convert column major coordinate into `Point`, containing Morton encoding
+        let mut points = Points::default();
+        for i in 0..ncoords {
+            let coord = [
+                coordinates_col_major[i],
+                coordinates_col_major[i + ncoords],
+                coordinates_col_major[i + 2 * ncoords],
+            ];
+            let base_key = MortonKey::from_point(&coord, domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(&coord, domain, depth);
+            points.push(Point {
+                coordinate: coord,
                 base_key,
                 encoded_key,
                 global_idx: global_idxs[i],
             })
         }
-        let mut points = tmp;
         points.sort();
 
         // Generate complete tree at specified depth
@@ -69,20 +70,18 @@ where
         let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
 
         // Group points by leaves
-        points.sort();
-
         let mut leaves_to_coordinates = HashMap::new();
-        let mut curr = points.points[0];
+        let mut curr = points[0];
         let mut curr_idx = 0;
 
-        for (i, point) in points.points.iter().enumerate() {
+        for (i, point) in points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
                 curr = *point;
             }
         }
-        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.points.len()));
+        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
         // Add unmapped leaves
         let mut leaves = MortonKeys::from(
@@ -102,7 +101,7 @@ where
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
-        let mut keys = MortonKeys::from_iter(tmp.into_iter());
+        let mut keys = MortonKeys::from(tmp);
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
@@ -129,14 +128,13 @@ where
             subset.sort();
         }
 
-        let coordinates = points
-            .points
+        let coordinates_row_major = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
 
-        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+        let global_indices = points.iter().map(|p| p.global_idx).collect_vec();
 
         let mut key_to_index = HashMap::new();
 
@@ -152,7 +150,7 @@ where
 
         SingleNodeTree {
             depth,
-            coordinates,
+            coordinates: coordinates_row_major,
             global_indices,
             domain: *domain,
             leaves,
@@ -170,49 +168,51 @@ where
     /// Returns a SingleNodeTree, with the leaves in sorted order.
     ///
     /// # Arguments
-    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_idxs` - A slice of indices to uniquely identify the points.
     fn uniform_tree_sparse(
-        points: &[T],
+        coordinates_col_major: &[T],
         domain: &Domain<T>,
         depth: u64,
         global_idxs: &[usize],
     ) -> SingleNodeTree<T> {
         let dim = 3;
-        let npoints = points.len() / dim;
+        let npoints = coordinates_col_major.len() / dim;
 
         // Encode points at specified depth
-        let mut tmp = Points::default();
+        let mut points = Points::default();
         for i in 0..npoints {
-            let point = [points[i], points[i + npoints], points[i + 2 * npoints]];
+            let point = [
+                coordinates_col_major[i],
+                coordinates_col_major[i + npoints],
+                coordinates_col_major[i + 2 * npoints],
+            ];
             let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(&point, domain, depth);
-            tmp.points.push(Point {
+            points.push(Point {
                 coordinate: point,
                 base_key,
                 encoded_key,
                 global_idx: global_idxs[i],
             })
         }
-        let mut points = tmp;
-
-        // Group points by leaves
         points.sort();
 
+        // Group points by leaves
         let mut leaves_to_coordinates = HashMap::new();
-        let mut curr = points.points[0];
+        let mut curr = points[0];
         let mut curr_idx = 0;
 
-        for (i, point) in points.points.iter().enumerate() {
+        for (i, point) in points.iter().enumerate() {
             if point.encoded_key != curr.encoded_key {
                 leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
                 curr_idx = i;
                 curr = *point;
             }
         }
-        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.points.len()));
+        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
         // Ensure that final leaf set contains siblings of all encoded keys
         let leaves: HashSet<MortonKey> = leaves_to_coordinates
@@ -221,7 +221,7 @@ where
             .collect();
 
         // Store in a sorted vector
-        let mut leaves = MortonKeys::from_iter(leaves.into_iter());
+        let mut leaves = MortonKeys::from(leaves);
         leaves.sort();
 
         // Find all keys in tree
@@ -241,7 +241,7 @@ where
             })
             .collect();
 
-        let mut keys = MortonKeys::from_iter(tmp.into_iter());
+        let mut keys = MortonKeys::from(tmp);
 
         let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
         let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
@@ -268,14 +268,13 @@ where
             subset.sort();
         }
 
-        let coordinates = points
-            .points
+        let coordinates_row_major = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
 
-        let global_indices = points.points.iter().map(|p| p.global_idx).collect_vec();
+        let global_indices = points.iter().map(|p| p.global_idx).collect_vec();
 
         let mut key_to_index = HashMap::new();
 
@@ -290,7 +289,7 @@ where
         }
         SingleNodeTree {
             depth,
-            coordinates,
+            coordinates: coordinates_row_major,
             global_indices,
             domain: *domain,
             leaves,
@@ -373,7 +372,7 @@ where
             map.insert(*node, false);
         }
 
-        for point in points.points.iter_mut() {
+        for point in points.iter_mut() {
             // Ancestor could be the key itself
             if let Some(ancestor) = point
                 .base_key
@@ -486,11 +485,10 @@ where
             // Map between blocks and the leaves they contain
             let unmapped = SingleNodeTree::assign_nodes_to_points(&blocktree, points);
             blocks_to_points = points
-                .points
                 .iter()
                 .enumerate()
                 .fold(
-                    (HashMap::new(), 0, points.points[0]),
+                    (HashMap::new(), 0, points[0]),
                     |(mut blocks_to_points, curr_idx, curr), (i, point)| {
                         if point.encoded_key != curr.encoded_key {
                             blocks_to_points.insert(curr.encoded_key, (curr_idx, i));
@@ -729,7 +727,7 @@ mod test {
         for i in 0..npoints {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            tmp.points.push(Point {
+            tmp.push(Point {
                 coordinate: point,
                 base_key: key,
                 encoded_key: key,
@@ -742,11 +740,10 @@ mod test {
         SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
 
         let leaves_to_points = points
-            .points
             .iter()
             .enumerate()
             .fold(
-                (HashMap::new(), 0, points.points[0]),
+                (HashMap::new(), 0, points[0]),
                 |(mut leaves_to_points, curr_idx, curr), (i, point)| {
                     if point.encoded_key != curr.encoded_key {
                         leaves_to_points.insert(curr.encoded_key, (curr_idx, i + 1));
@@ -781,7 +778,7 @@ mod test {
         for i in 0..npoints {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            tmp.points.push(Point {
+            tmp.push(Point {
                 coordinate: point,
                 base_key: key,
                 encoded_key: key,
@@ -796,8 +793,7 @@ mod test {
         let blocktree = MortonKeys::from(vec![ROOT]);
 
         SingleNodeTree::split_blocks(&mut points, blocktree, n_crit);
-        let split_blocktree =
-            MortonKeys::from(points.points.iter().map(|p| p.encoded_key).collect_vec());
+        let split_blocktree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
 
         test_no_overlaps_helper(&split_blocktree);
 
@@ -813,8 +809,7 @@ mod test {
         let blocktree = SingleNodeTree::<f64>::complete_blocktree(&mut seeds);
 
         SingleNodeTree::split_blocks(&mut points, blocktree, 25);
-        let split_blocktree =
-            MortonKeys::from(points.points.iter().map(|p| p.encoded_key).collect_vec());
+        let split_blocktree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
         test_no_overlaps_helper(&split_blocktree);
     }
 

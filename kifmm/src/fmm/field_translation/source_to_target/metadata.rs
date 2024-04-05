@@ -609,6 +609,8 @@ mod test {
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
+    use crate::fmm::helpers::m2l_scale;
+
     use super::*;
 
     #[test]
@@ -699,17 +701,6 @@ mod test {
         assert!(rel_error < 1e-5);
     }
 
-    fn m2l_scale(level: u64) -> f64 {
-        if level < 2 {
-            panic!("M2L only performed on level 2 and below")
-        }
-        if level == 2 {
-            1. / 2.
-        } else {
-            2_f64.powf((level - 3) as f64)
-        }
-    }
-
     #[test]
     fn test_fft_operator_data_kernels() {
         let kernel = Laplace3dKernel::new();
@@ -774,7 +765,7 @@ mod test {
             &kernels[halo_idx][halo_child_idx * size_real..(halo_child_idx + 1) * size_real];
 
         // Apply scaling
-        let scale = m2l_scale(level);
+        let scale: f64 = m2l_scale(level).unwrap();
         let kernel_hat = kernel_hat.iter().map(|k| *k * scale).collect_vec();
 
         let target = key;

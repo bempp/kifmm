@@ -176,7 +176,8 @@ where
                 }
 
                 // Amount to scale the application of the kernel by
-                let scale = Complex::from(m2l_scale::<U>(level) * homogenous_kernel_scale(level));
+                let scale =
+                    Complex::from(m2l_scale::<U>(level).unwrap() * homogenous_kernel_scale(level));
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft = &self.source_to_target.metadata.kernel_data_f;

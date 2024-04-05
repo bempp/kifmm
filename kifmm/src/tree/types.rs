@@ -59,7 +59,7 @@ where
     /// Domain spanned by the points.
     pub domain: Domain<T>,
 
-    /// All coordinates
+    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
     pub coordinates: Vec<T>,
 
     /// All global indices
@@ -117,17 +117,7 @@ where
 }
 
 /// Iterable container of `Point` data
-#[derive(Clone, Debug, Default)]
-pub struct Points<T>
-where
-    T: RlstScalar<Real = T>,
-{
-    /// A vector of Points
-    pub points: Vec<Point<T>>,
-
-    /// index for implementing the Iterator trait.
-    pub index: usize,
-}
+pub type Points<T> = Vec<Point<T>>;
 
 /// Single Node Trees
 #[derive(Default)]
@@ -141,7 +131,7 @@ where
     /// Domain spanned by the points.
     pub domain: Domain<T>,
 
-    /// All coordinates
+    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
     pub coordinates: Vec<T>,
 
     /// All global indices
