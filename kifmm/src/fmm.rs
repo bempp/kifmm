@@ -6,7 +6,7 @@ mod multi_node;
 pub mod pinv;
 mod send_ptr;
 mod single_node;
-pub mod tree;
+mod tree;
 pub mod types;
 
 pub mod field_translation;
