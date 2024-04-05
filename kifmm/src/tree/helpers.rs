@@ -266,10 +266,7 @@ pub use mpi_helpers::*;
 mod test {
 
     use super::*;
-    use crate::{
-        traits::tree::FmmTreeNode,
-        tree::{morton::surface_grid, types::MortonKey},
-    };
+    use crate::tree::morton::surface_grid;
 
     #[test]
     fn test_find_corners() {
