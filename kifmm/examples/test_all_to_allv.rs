@@ -64,6 +64,10 @@ fn main() {
     // Test that the correct number of packets were received.
     let unique: Vec<i32> = received.iter().unique().cloned().collect();
     assert_eq!(unique.len() as i32, recv_count);
+
+    if rank == 0 {
+        println!("...test_all_to_allv passed")
+    }
 }
 #[cfg(not(feature = "mpi"))]
 fn main() {}

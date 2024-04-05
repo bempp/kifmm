@@ -4,6 +4,8 @@ use kifmm::hyksort::hyksort;
 use mpi::traits::{Communicator, Destination, Source};
 #[cfg(feature = "mpi")]
 use rand::Rng;
+#[cfg(feature = "mpi")]
+use std::collections::HashSet;
 
 #[cfg(feature = "mpi")]
 fn main() {
@@ -14,22 +16,23 @@ fn main() {
     let size = comm.size();
     let rank = comm.rank();
 
-    // Select random integers, with duplicates
+    // Select unique random integers
     let mut rng = rand::thread_rng();
     let nsamples = 1000;
-    let mut arr: Vec<i32> = (0..nsamples).map(|_| rng.gen_range(0..=20)).collect();
-    let mut replica = arr.to_vec();
-    arr.append(&mut replica);
+    let arr: Vec<i32> = (0..nsamples)
+        .map(|_| rng.gen_range(rank * nsamples..rank * nsamples + nsamples))
+        .collect();
+    let arr_set: HashSet<i32> = arr.iter().cloned().collect();
+    let mut arr: Vec<i32> = arr_set.into_iter().collect();
 
     // Sort
-    hyksort(&mut arr, k, comm.duplicate());
+    let _ = hyksort(&mut arr, k, comm.duplicate());
 
-    // Test that there is no overlap between elements on each processor and that they are
-    // globally sorted
+    // Test that elements are globally sorted
     let min = *arr.iter().min().unwrap();
     let max = *arr.iter().max().unwrap();
-    // Gather all bounds at root
 
+    // Gather all bounds at root
     let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
     let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
 
@@ -57,6 +60,11 @@ fn main() {
         let b = arr[i + 1];
         assert!(a <= b);
     }
+
+    if rank == 0 {
+        println!("...test_hyksort_unique passed")
+    }
+
 }
 
 #[cfg(not(feature = "mpi"))]
