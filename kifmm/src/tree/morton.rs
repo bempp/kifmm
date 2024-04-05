@@ -1,5 +1,5 @@
 //! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
-use crate::traits::tree::TreeNode;
+use crate::traits::tree::{FmmTreeNode, TreeNode};
 use crate::tree::{
     constants::{
         BYTE_DISPLACEMENT, BYTE_MASK, DEEPEST_LEVEL, DIRECTIONS, LEVEL_DISPLACEMENT, LEVEL_MASK,
@@ -21,11 +21,15 @@ use std::{
     vec,
 };
 
-/// Remove overlaps in an iterable of keys, prefer smallest keys if overlaps.
-/// Returns an owned vector of Morton Keys, hence requires a copy.
+/// Linearizes a collection of Morton Keys by removing overlaps, prioritizing smaller keys in case of overlaps.
+///
+/// This function processes a slice of Morton Keys to produce a new, owned vector of keys where any overlapping
+/// keys have been resolved. In scenarios where keys overlap, the smaller (by Morton order) keys are preferred
+/// and retained in the output vector. Requires a copy of the input keys.
 ///
 /// # Arguments
-/// * `keys` - A slice of Morton Keys to be linearised.
+///
+/// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
 fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     let depth = keys.iter().map(|k| k.level()).max().unwrap();
     let mut key_set: HashSet<MortonKey> = keys.iter().cloned().collect();
@@ -48,12 +52,18 @@ fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
     result
 }
 
-/// Enforce a 2:1 balance on a slice of Morton Keys. This method relies on `complete'
-/// Trees, i.e. there are no gaps between keys provided to the method in the iterator.
-/// Returns a set of Morton Keys.
+/// Ensures a 2:1 balance among a set of Morton Keys.
+///
+/// This function applies a 2:1 balance constraint to a slice of Morton Keys, where neighbouring
+/// nodes are at most twice as large as each other in terms of side length.  It assumes the input
+/// keys form a 'complete' set, meaning there are no gaps in the spatial coverage they represent.
+/// The balancing process may add new keys to meet this criterion, with the resulting, balanced
+/// set of keys returned as a `HashSet`.
 ///
 /// # Arguments
-/// * `keys` - A slice of Morton Keys to be balanced.
+///
+/// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
+/// contiguous space without gaps.
 fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
     let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
@@ -84,27 +94,34 @@ fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
     balanced
 }
 
-/// Complete the region between two keys with the minimum spanning boxes that cover the region.
-/// Returns an owned vector of Morton Keys.
+/// Fills the spatial region between two Morton Keys with the minimal set of covering boxes.
+///
+/// This function computes and returns the smallest set of Morton Keys necessary to fully cover
+/// the space between two given keys, `start` and `end`. These keys define the bounds of the region
+/// to be completed.
 ///
 /// # Arguments
-/// * `a` - Morton Key specifying the start of a region to be completed.
-/// * `b` - Morton Key specifying the end of a region to be completed.
-pub fn complete_region(a: &MortonKey, b: &MortonKey) -> Vec<MortonKey> {
-    let mut a_ancestors: HashSet<MortonKey> = a.ancestors();
-    let mut b_ancestors: HashSet<MortonKey> = b.ancestors();
+///
+/// - `start` - The Morton Key defining the beginning of the region to complete.
+/// - `end` - The Morton Key marking the end of the region.
+pub fn complete_region(start: &MortonKey, end: &MortonKey) -> Vec<MortonKey> {
+    let mut start_ancestors: HashSet<MortonKey> = start.ancestors();
+    let mut end_ancestors: HashSet<MortonKey> = end.ancestors();
 
     // Remove endpoints from ancestors
-    a_ancestors.remove(a);
-    b_ancestors.remove(b);
+    start_ancestors.remove(start);
+    end_ancestors.remove(end);
 
     let mut minimal_tree: Vec<MortonKey> = Vec::new();
-    let mut work_list: Vec<MortonKey> = a.finest_ancestor(b).children().into_iter().collect();
+    let mut work_list: Vec<MortonKey> = start.finest_ancestor(end).children().into_iter().collect();
 
     while let Some(current_item) = work_list.pop() {
-        if (current_item > *a) & (current_item < *b) & !b_ancestors.contains(&current_item) {
+        if (current_item > *start) & (current_item < *end) & !end_ancestors.contains(&current_item)
+        {
             minimal_tree.push(current_item);
-        } else if (a_ancestors.contains(&current_item)) | (b_ancestors.contains(&current_item)) {
+        } else if (start_ancestors.contains(&current_item))
+            | (end_ancestors.contains(&current_item))
+        {
             let mut children = current_item.children();
             work_list.append(&mut children);
         }
@@ -225,9 +242,15 @@ fn decode_key_helper(key: u64, lookup_table: &[u64; 512]) -> u64 {
     coord
 }
 
-/// Decode a given key.
+/// Decodes a Morton key to retrieve its spatial anchor point.
 ///
-/// Returns the anchor for the given Morton key
+/// # Arguments
+///
+/// - `morton` - The Morton key to be decoded.
+///
+/// # Returns
+///
+/// An array of three u64 values representing the x, y, and z coordinates of the anchor.
 fn decode_key(morton: u64) -> [u64; 3] {
     let key = morton >> LEVEL_DISPLACEMENT;
 
@@ -780,30 +803,74 @@ impl MortonKey {
             self.is_adjacent_same_level(other)
         }
     }
+}
 
-    /// Compute the convolution grid centered at a given MortonKey and its respective surface grid. This method is used
-    /// in the FFT sparsification of the Multipole to Local translation operator for kernel independent fast multipole method.
-    /// Returns an owned vector corresponding to the coordinates of the
-    /// convolution grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N], as well as a
-    /// vector of grid indices.
-    ///
-    /// # Arguments
-    /// * `expansion_order` - The expansion order of the FMM
-    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
-    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    /// * `conv_point` - The corner point on the surface grid against which the surface and  convolution grids are aligned.
-    /// * `conv_point_corner_index` - The index of the corner of the surface grid that the conv point lies on.
-    pub fn kifmm_convolution_grid<T>(
+impl PartialEq for MortonKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.morton == other.morton
+    }
+}
+impl Eq for MortonKey {}
+
+impl Ord for MortonKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.morton.cmp(&other.morton)
+    }
+}
+
+impl PartialOrd for MortonKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.morton.cmp(&other.morton))
+    }
+}
+
+impl Hash for MortonKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.morton.hash(state);
+    }
+}
+
+impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
+    type Nodes = MortonKeys;
+
+    type Domain = Domain<T>;
+
+    fn children(&self) -> Self::Nodes {
+        MortonKeys {
+            keys: self.children(),
+            index: 0,
+        }
+    }
+
+    fn parent(&self) -> Self {
+        self.parent()
+    }
+
+    fn level(&self) -> u64 {
+        self.level()
+    }
+
+    fn neighbors(&self) -> Self::Nodes {
+        MortonKeys {
+            keys: self.neighbors(),
+            index: 0,
+        }
+    }
+
+    fn is_adjacent(&self, other: &Self) -> bool {
+        self.is_adjacent(other)
+    }
+}
+
+impl<T: RlstScalar<Real = T> + Float + Default> FmmTreeNode<T> for MortonKey {
+    fn convolution_grid(
         &self,
         expansion_order: usize,
-        domain: &Domain<T>,
+        domain: &Self::Domain,
         alpha: T,
         conv_point_corner: &[T],
         conv_point_corner_index: usize,
-    ) -> (Vec<T>, Vec<usize>)
-    where
-        T: Float + std::ops::MulAssign + std::ops::AddAssign + ToPrimitive + Default,
-    {
+    ) -> (Vec<T>, Vec<usize>) {
         // Number of convolution points along each axis
         let n = 2 * expansion_order - 1;
 
@@ -867,17 +934,7 @@ impl MortonKey {
         (grid, conv_idxs)
     }
 
-    /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
-    /// Returns a tuple, the first element is an owned vector of the physical coordinates of the
-    /// surface grid in column major order [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
-    /// The second element is a vector of indices corresponding to each of these coordinates.
-    ///
-    /// # Arguments
-    /// * `expansion_order` - The expansion order of the FMM
-    pub fn kifmm_surface_grid<T>(expansion_order: usize) -> Vec<T>
-    where
-        T: Float + std::ops::MulAssign + std::ops::SubAssign + ToPrimitive,
-    {
+    fn surface_grid(expansion_order: usize) -> Vec<T> {
         let dim = 3;
         let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
 
@@ -919,20 +976,7 @@ impl MortonKey {
         surface
     }
 
-    /// Scale a surface grid centered at this Morton Key, used in the discretisation of the kernel independent fast nultipole
-    /// method
-    ///
-    /// # Arguments
-    /// * `surface` - A general surface grid, computed for a given expansion order computed with the
-    /// associated function `surface_grid`.
-    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
-    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn scale_kifmm_surface<T: Float + Default + RlstScalar>(
-        &self,
-        surface: Vec<T::Real>,
-        domain: &Domain<T>,
-        alpha: T,
-    ) -> Vec<T::Real> {
+    fn scale_surface(&self, surface: Vec<T::Real>, domain: &Domain<T>, alpha: T) -> Vec<T::Real> {
         let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
@@ -958,82 +1002,15 @@ impl MortonKey {
         scaled_surface
     }
 
-    /// Compute the surface grid, centered at this Morton Key, for a given expansion order and alpha parameter. This is used
-    /// in the discretisation of the kernel independent fast multipole method
-    ///
-    /// # Arguments
-    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
-    /// * `expansion_order` - The expansion order of the FMM
-    /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    pub fn compute_kifmm_surface<T>(
+    fn compute_surface(
         &self,
         domain: &Domain<T>,
         expansion_order: usize,
         alpha: T,
-    ) -> Vec<T::Real>
-    where
-        T: Float + std::ops::MulAssign + std::ops::SubAssign + Default + RlstScalar,
-    {
-        let surface = MortonKey::kifmm_surface_grid(expansion_order);
+    ) -> Vec<T::Real> {
+        let surface: Vec<T> = MortonKey::surface_grid(expansion_order);
 
-        self.scale_kifmm_surface::<T>(surface, domain, alpha)
-    }
-}
-
-impl PartialEq for MortonKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.morton == other.morton
-    }
-}
-impl Eq for MortonKey {}
-
-impl Ord for MortonKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.morton.cmp(&other.morton)
-    }
-}
-
-impl PartialOrd for MortonKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.morton.cmp(&other.morton))
-    }
-}
-
-impl Hash for MortonKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.morton.hash(state);
-    }
-}
-
-impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
-    type Nodes = MortonKeys;
-
-    type Domain = Domain<T>;
-
-    fn children(&self) -> Self::Nodes {
-        MortonKeys {
-            keys: self.children(),
-            index: 0,
-        }
-    }
-
-    fn parent(&self) -> Self {
-        self.parent()
-    }
-
-    fn level(&self) -> u64 {
-        self.level()
-    }
-
-    fn neighbors(&self) -> Self::Nodes {
-        MortonKeys {
-            keys: self.neighbors(),
-            index: 0,
-        }
-    }
-
-    fn is_adjacent(&self, other: &Self) -> bool {
-        self.is_adjacent(other)
+        self.scale_surface(surface, domain, alpha)
     }
 }
 
@@ -1868,10 +1845,10 @@ mod test {
         let ncoeffs = 6 * (expansion_order - 1_usize).pow(2) + 2;
 
         // Test lengths
-        let surface = key.compute_kifmm_surface(&domain, expansion_order, alpha);
+        let surface = key.compute_surface(&domain, expansion_order, alpha);
         assert_eq!(surface.len(), ncoeffs * dim);
 
-        let surface = MortonKey::kifmm_surface_grid::<f64>(expansion_order);
+        let surface: Vec<f64> = MortonKey::surface_grid(expansion_order);
         assert_eq!(surface.len(), ncoeffs * dim);
 
         let mut expected = vec![[0usize; 3]; ncoeffs];
@@ -1895,7 +1872,7 @@ mod test {
         // Test scaling
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);
-        let surface = key.compute_kifmm_surface(&domain, expansion_order, alpha);
+        let surface = key.compute_surface(&domain, expansion_order, alpha);
 
         let min_x = surface
             .iter()
@@ -1913,7 +1890,7 @@ mod test {
         let point = [0.1, 0.2, 0.3];
         let level = 2;
         let key = MortonKey::from_point(&point, &domain, level);
-        let surface = key.compute_kifmm_surface(&domain, expansion_order, alpha);
+        let surface = key.compute_surface(&domain, expansion_order, alpha);
         let expected = key.centre(&domain);
 
         let c_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
@@ -1948,7 +1925,7 @@ mod test {
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
-        let surface_grid = key.compute_kifmm_surface(&domain, expansion_order, alpha);
+        let surface_grid = key.compute_surface(&domain, expansion_order, alpha);
 
         // Place convolution grid on max corner
         let corners = find_corners(&surface_grid);
@@ -1961,7 +1938,7 @@ mod test {
             corners[2 * ncorners + conv_point_corner_index],
         ];
 
-        let (conv_grid, _) = key.kifmm_convolution_grid(
+        let (conv_grid, _) = key.convolution_grid(
             expansion_order,
             &domain,
             alpha,

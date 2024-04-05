@@ -4,7 +4,7 @@ use super::{array::flip3, transfer_vector::compute_transfer_vectors};
 use crate::fmm::helpers::ncoeffs_kifmm;
 use crate::fmm::types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata};
 use crate::traits::field::ConfigureSourceToTargetData;
-use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData};
+use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData, tree::FmmTreeNode};
 use crate::tree::{
     constants::{
         ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
@@ -70,13 +70,10 @@ where
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface =
-                t.source
-                    .compute_kifmm_surface(&domain, expansion_order, alpha);
+                t.source.compute_surface(&domain, expansion_order, alpha);
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
-            let target_check_surface =
-                t.target
-                    .compute_kifmm_surface(&domain, expansion_order, alpha);
+            let target_check_surface = t.target.compute_surface(&domain, expansion_order, alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
             let mut tmp_gram_t = rlst_dynamic_array2!(T, [ntargets, nsources]);
@@ -336,9 +333,8 @@ where
                 let source = sources[i][j];
 
                 let source_equivalent_surface =
-                    source.compute_kifmm_surface(&domain, expansion_order, alpha);
-                let target_check_surface =
-                    target.compute_kifmm_surface(&domain, expansion_order, alpha);
+                    source.compute_surface(&domain, expansion_order, alpha);
+                let target_check_surface = target.compute_surface(&domain, expansion_order, alpha);
 
                 let v_list: HashSet<MortonKey> = target
                     .parent()
@@ -358,7 +354,7 @@ where
                         corners[2 * NCORNERS + conv_point_corner_index],
                     ];
 
-                    let (conv_grid, _) = source.kifmm_convolution_grid(
+                    let (conv_grid, _) = source.convolution_grid(
                         expansion_order,
                         &domain,
                         alpha,
@@ -677,10 +673,10 @@ mod test {
 
         let sources = transfer_vector
             .source
-            .compute_kifmm_surface(&domain, expansion_order, alpha);
+            .compute_surface(&domain, expansion_order, alpha);
         let targets = transfer_vector
             .target
-            .compute_kifmm_surface(&domain, expansion_order, alpha);
+            .compute_surface(&domain, expansion_order, alpha);
         let mut direct = vec![0f64; ncoeffs];
         blas.kernel.evaluate_st(
             EvalType::Value,
@@ -771,9 +767,8 @@ mod test {
         let target = key;
         let source = v_list_structured[halo_idx][halo_child_idx].unwrap();
         let source_equivalent_surface =
-            source.compute_kifmm_surface(&domain, expansion_order, ALPHA_INNER);
-        let target_check_surface =
-            target.compute_kifmm_surface(&domain, expansion_order, ALPHA_INNER);
+            source.compute_surface(&domain, expansion_order, ALPHA_INNER);
+        let target_check_surface = target.compute_surface(&domain, expansion_order, ALPHA_INNER);
         let ntargets = target_check_surface.len() / 3;
 
         // Compute conv grid
@@ -785,7 +780,7 @@ mod test {
             corners[16 + conv_point_corner_index],
         ];
 
-        let (conv_grid, _) = source.kifmm_convolution_grid(
+        let (conv_grid, _) = source.convolution_grid(
             expansion_order,
             &domain,
             ALPHA_INNER,
@@ -927,11 +922,11 @@ mod test {
         let source_equivalent_surface =
             transfer_vector
                 .source
-                .compute_kifmm_surface(&domain, expansion_order, ALPHA_INNER);
+                .compute_surface(&domain, expansion_order, ALPHA_INNER);
         let target_check_surface =
             transfer_vector
                 .target
-                .compute_kifmm_surface(&domain, expansion_order, ALPHA_INNER);
+                .compute_surface(&domain, expansion_order, ALPHA_INNER);
         let ntargets = target_check_surface.len() / 3;
 
         // Compute conv grid
@@ -943,7 +938,7 @@ mod test {
             corners[16 + conv_point_corner_index],
         ];
 
-        let (conv_grid, _) = transfer_vector.source.kifmm_convolution_grid(
+        let (conv_grid, _) = transfer_vector.source.convolution_grid(
             expansion_order,
             &domain,
             ALPHA_INNER,

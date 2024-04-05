@@ -255,6 +255,7 @@ where
 mod test {
 
     use super::*;
+    use crate::traits::tree::FmmTreeNode;
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::helpers::points_fixture;
     use crate::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder, SingleNodeFmmTree};
@@ -646,7 +647,7 @@ mod test {
         threshold: T,
     ) {
         let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.compute_kifmm_surface(
+        let upward_equivalent_surface = ROOT.compute_surface(
             fmm.tree().domain(),
             fmm.expansion_order(),
             T::from(ALPHA_INNER).unwrap(),

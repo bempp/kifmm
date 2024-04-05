@@ -1,6 +1,6 @@
 //! Helper Functions
 use crate::fmm::types::{Charges, SendPtrMut};
-use crate::traits::tree::Tree;
+use crate::traits::tree::{FmmTreeNode, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
 use num::Float;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
@@ -105,7 +105,7 @@ where
     for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
         let l = i * ncoeffs * dim;
         let r = l + ncoeffs * dim;
-        let surface = key.compute_kifmm_surface(tree.domain(), expansion_order, alpha);
+        let surface = key.compute_surface(tree.domain(), expansion_order, alpha);
 
         result[l..r].copy_from_slice(&surface);
     }
