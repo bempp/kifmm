@@ -1,4 +1,4 @@
-//! Implementation of Fmm Trait.
+//! Implementation of Fmm Trait for Single Node.
 use crate::fmm::helpers::{
     leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
 };
@@ -73,11 +73,11 @@ where
                     &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
                 ]),
                 FmmEvalType::Matrix(nmatvecs) => {
-                    let nleaves = self.tree.target_tree().nleaves().unwrap();
+                    let n_leaves = self.tree.target_tree().n_leaves().unwrap();
                     let mut slices = Vec::new();
                     for eval_idx in 0..nmatvecs {
                         let potentials_pointer =
-                            self.potentials_send_pointers[eval_idx * nleaves + leaf_idx].raw;
+                            self.potentials_send_pointers[eval_idx * n_leaves + leaf_idx].raw;
                         slices.push(unsafe {
                             std::slice::from_raw_parts(
                                 potentials_pointer,
@@ -134,8 +134,8 @@ where
     fn clear(&mut self, charges: &Charges<W>) {
         let [_ncharges, nmatvecs] = charges.shape();
         let ntarget_points = self.tree().target_tree().ncoordinates_tot().unwrap();
-        let nsource_leaves = self.tree().source_tree().nleaves().unwrap();
-        let ntarget_leaves = self.tree().target_tree().nleaves().unwrap();
+        let nsource_leaves = self.tree().source_tree().n_leaves().unwrap();
+        let ntarget_leaves = self.tree().target_tree().n_leaves().unwrap();
 
         // Clear buffers and set new buffers
         self.multipoles = vec![W::default(); self.multipoles.len()];
@@ -255,6 +255,7 @@ where
 mod test {
 
     use super::*;
+    use crate::traits::tree::FmmTreeNode;
     use crate::tree::constants::{ALPHA_INNER, ROOT};
     use crate::tree::helpers::points_fixture;
     use crate::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder, SingleNodeFmmTree};
@@ -646,7 +647,7 @@ mod test {
         threshold: T,
     ) {
         let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.compute_kifmm_surface(
+        let upward_equivalent_surface = ROOT.compute_surface(
             fmm.tree().domain(),
             fmm.expansion_order(),
             T::from(ALPHA_INNER).unwrap(),

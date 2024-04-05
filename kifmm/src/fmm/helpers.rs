@@ -1,6 +1,6 @@
 //! Helper Functions
 use crate::fmm::types::{Charges, SendPtrMut};
-use crate::traits::tree::Tree;
+use crate::traits::tree::{FmmTreeNode, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
 use num::Float;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
@@ -45,16 +45,19 @@ pub fn homogenous_kernel_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
+pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Error> {
     if level < 2 {
-        panic!("M2L only perfomed on level 2 and below")
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "M2L only perfomed on level 2 and below",
+        ));
     }
 
     if level == 2 {
-        T::from(1. / 2.).unwrap()
+        Ok(T::from(1. / 2.).unwrap())
     } else {
         let two = T::from(2.0).unwrap();
-        <T as RlstScalar>::powf(two, T::from(level - 3).unwrap())
+        Ok(<T as RlstScalar>::powf(two, T::from(level - 3).unwrap()))
     }
 }
 
@@ -67,7 +70,7 @@ pub fn leaf_scales<T>(tree: &SingleNodeTree<T>, ncoeffs: usize) -> Vec<T>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
-    let mut result = vec![T::default(); tree.nleaves().unwrap() * ncoeffs];
+    let mut result = vec![T::default(); tree.n_leaves().unwrap() * ncoeffs];
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         // Assign scales
@@ -96,13 +99,13 @@ where
     T: Float + Default + RlstScalar<Real = T>,
 {
     let dim = 3;
-    let nkeys = tree.nleaves().unwrap();
-    let mut result = vec![T::default(); ncoeffs * dim * nkeys];
+    let n_keys = tree.n_leaves().unwrap();
+    let mut result = vec![T::default(); ncoeffs * dim * n_keys];
 
     for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
         let l = i * ncoeffs * dim;
         let r = l + ncoeffs * dim;
-        let surface = key.compute_kifmm_surface(tree.domain(), expansion_order, alpha);
+        let surface = key.compute_surface(tree.domain(), expansion_order, alpha);
 
         result[l..r].copy_from_slice(&surface);
     }
@@ -118,18 +121,18 @@ where
 {
     let mut index_pointer = 0;
 
-    let mut result = vec![(0usize, 0usize); tree.nleaves().unwrap()];
+    let mut result = vec![(0usize, 0usize); tree.n_leaves().unwrap()];
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let npoints = if let Some(n) = tree.ncoordinates(leaf) {
+        let n_points = if let Some(n) = tree.ncoordinates(leaf) {
             n
         } else {
             0
         };
 
         // Update charge index pointer
-        result[i] = (index_pointer, index_pointer + npoints);
-        index_pointer += npoints;
+        result[i] = (index_pointer, index_pointer + n_points);
+        index_pointer += n_points;
     }
 
     result
@@ -193,13 +196,13 @@ pub fn leaf_expansion_pointers<T>(
     tree: &SingleNodeTree<T>,
     ncoeffs: usize,
     nmatvecs: usize,
-    nleaves: usize,
+    n_leaves: usize,
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
-    let mut result = vec![Vec::new(); nleaves];
+    let mut result = vec![Vec::new(); n_leaves];
 
     for (leaf_idx, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         let key_idx = tree.index(leaf).unwrap();
@@ -223,15 +226,15 @@ where
 pub fn potential_pointers<T>(
     tree: &SingleNodeTree<T>,
     nmatvecs: usize,
-    nleaves: usize,
-    npoints: usize,
+    n_leaves: usize,
+    n_points: usize,
     kernel_eval_size: usize,
     potentials: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {
-    let mut result = vec![SendPtrMut::default(); nleaves * nmatvecs];
+    let mut result = vec![SendPtrMut::default(); n_leaves * nmatvecs];
     let dim = 3;
 
     let mut raw_pointers = Vec::new();
@@ -239,24 +242,24 @@ where
         let ptr = unsafe {
             potentials
                 .as_ptr()
-                .add(eval_idx * npoints * kernel_eval_size) as *mut T
+                .add(eval_idx * n_points * kernel_eval_size) as *mut T
         };
         raw_pointers.push(ptr)
     }
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let npoints;
+        let n_points;
         let nevals;
 
         if let Some(coordinates) = tree.coordinates(leaf) {
-            npoints = coordinates.len() / dim;
-            nevals = npoints * kernel_eval_size;
+            n_points = coordinates.len() / dim;
+            nevals = n_points * kernel_eval_size;
         } else {
             nevals = 0;
         }
 
         for j in 0..nmatvecs {
-            result[nleaves * j + i] = SendPtrMut {
+            result[n_leaves * j + i] = SendPtrMut {
                 raw: raw_pointers[j],
             }
         }

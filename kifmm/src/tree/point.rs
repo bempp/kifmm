@@ -1,5 +1,5 @@
 //! Implementation of traits for handling, and sorting, containers of point data.
-use crate::tree::types::{Point, Points};
+use crate::tree::types::Point;
 use rlst::RlstScalar;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
@@ -43,87 +43,72 @@ where
     }
 }
 
-impl<T> Points<T>
-where
-    T: RlstScalar<Real = T>,
-{
-    /// Create new
-    pub fn new() -> Points<T> {
-        Points {
-            points: Vec::new(),
-            index: 0,
+#[cfg(feature = "mpi")]
+mod mpi_point {
+    use super::{Point, RlstScalar};
+
+    use crate::tree::types::MortonKey;
+    use memoffset::offset_of;
+    use mpi::{
+        datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
+        Address,
+    };
+    use num::Float;
+
+    unsafe impl<T> Equivalence for Point<T>
+    where
+        T: RlstScalar<Real = T> + Float + Equivalence,
+    {
+        type Out = UserDatatype;
+        fn equivalent_datatype() -> Self::Out {
+            UserDatatype::structured(
+                &[1, 1, 1, 1],
+                &[
+                    offset_of!(Point<T>, coordinate) as Address,
+                    offset_of!(Point<T>, global_index) as Address,
+                    offset_of!(Point<T>, base_key) as Address,
+                    offset_of!(Point<T>, encoded_key) as Address,
+                ],
+                &[
+                    UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
+                    UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
+                    UncommittedUserDatatype::structured(
+                        &[1, 1],
+                        &[
+                            offset_of!(MortonKey, anchor) as Address,
+                            offset_of!(MortonKey, morton) as Address,
+                        ],
+                        &[
+                            UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
+                                .as_ref(),
+                            UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
+                                .as_ref(),
+                        ],
+                    )
+                    .as_ref(),
+                    UncommittedUserDatatype::structured(
+                        &[1, 1],
+                        &[
+                            offset_of!(MortonKey, anchor) as Address,
+                            offset_of!(MortonKey, morton) as Address,
+                        ],
+                        &[
+                            UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
+                                .as_ref(),
+                            UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
+                                .as_ref(),
+                        ],
+                    )
+                    .as_ref(),
+                ],
+            )
         }
     }
-
-    /// Add a point
-    pub fn add(&mut self, item: Point<T>) {
-        self.points.push(item);
-    }
-
-    /// Sort points
-    pub fn sort(&mut self) {
-        self.points.sort();
-    }
 }
 
+#[allow(unused_imports)]
 #[cfg(feature = "mpi")]
-use memoffset::offset_of;
-#[cfg(feature = "mpi")]
-use mpi::{
-    datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
-    Address,
-};
-
-#[cfg(feature = "mpi")]
-unsafe impl<T> Equivalence for Point<T>
-where
-    T: RlstScalar<Real = T> + Float + Equivalence,
-{
-    type Out = UserDatatype;
-    fn equivalent_datatype() -> Self::Out {
-        UserDatatype::structured(
-            &[1, 1, 1, 1],
-            &[
-                offset_of!(Point<T>, coordinate) as Address,
-                offset_of!(Point<T>, global_idx) as Address,
-                offset_of!(Point<T>, base_key) as Address,
-                offset_of!(Point<T>, encoded_key) as Address,
-            ],
-            &[
-                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::structured(
-                    &[1, 1],
-                    &[
-                        offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address,
-                    ],
-                    &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
-                            .as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
-                            .as_ref(),
-                    ],
-                )
-                .as_ref(),
-                UncommittedUserDatatype::structured(
-                    &[1, 1],
-                    &[
-                        offset_of!(MortonKey, anchor) as Address,
-                        offset_of!(MortonKey, morton) as Address,
-                    ],
-                    &[
-                        UncommittedUserDatatype::contiguous(3, &KeyType::equivalent_datatype())
-                            .as_ref(),
-                        UncommittedUserDatatype::contiguous(1, &KeyType::equivalent_datatype())
-                            .as_ref(),
-                    ],
-                )
-                .as_ref(),
-            ],
-        )
-    }
-}
+pub use mpi_point::*;
 
 #[cfg(test)]
 mod test {
@@ -136,24 +121,24 @@ mod test {
     pub fn test_ordering() {
         let domain = Domain {
             origin: [0., 0., 0.],
-            diameter: [1., 1., 1.],
+            side_length: [1., 1., 1.],
         };
 
-        let npoints = 1000;
-        let coords = points_fixture(npoints, None, None, None);
+        let n_points = 1000;
+        let coords = points_fixture(n_points, None, None, None);
         let mut points = Vec::new();
 
-        for i in 0..npoints {
+        for i in 0..n_points {
             let p = [
                 coords.data()[i],
-                coords.data()[i + npoints],
-                coords.data()[i + 2 * npoints],
+                coords.data()[i + n_points],
+                coords.data()[i + 2 * n_points],
             ];
             points.push(Point {
                 coordinate: p,
                 base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
                 encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
-                global_idx: i,
+                global_index: i,
             })
         }
 

@@ -2,17 +2,8 @@
 
 use crate::tree::types::MortonKey;
 
-/// Default value chosen for subcommunicator size in Hyksort, must be a power of 2.
-pub const K: i32 = 2;
-
-/// Default value chosen for maximum number of particles per leaf in adaptive trees.
-pub const N_CRIT: u64 = 150;
-
 /// Maximum possible level of octree recursion, by definition.
 pub const DEEPEST_LEVEL: u64 = 16;
-
-/// The default level of recursion chosen in adaptive octrees.
-pub const DEFAULT_LEVEL: u64 = 3;
 
 /// The 'size' of each level in terms of octants along each axis, at the maximum depth of recursion.
 pub const LEVEL_SIZE: u64 = 65536;

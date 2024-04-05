@@ -143,11 +143,27 @@ where
     split_keys
 }
 
+/// Check if `n` is a power of two
+fn power_of_two(n: Rank) -> bool {
+    n != 0 && (n & (n - 1)) == 0
+}
+
 /// HykSort of Sundar et. al. without the parallel merge logic.
-pub fn hyksort<T>(arr: &mut Vec<T>, mut k: Rank, mut comm: UserCommunicator)
+pub fn hyksort<T>(
+    arr: &mut Vec<T>,
+    mut k: Rank,
+    mut comm: UserCommunicator,
+) -> Result<(), std::io::Error>
 where
     T: Default + Clone + Copy + Equivalence + Ord + std::fmt::Debug,
 {
+    if !power_of_two(k) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "k must be a power of two greater than 0",
+        ));
+    }
+
     let mut p: Rank = comm.size();
     let mut rank: Rank = comm.rank();
 
@@ -293,4 +309,6 @@ where
             rank = comm.rank();
         }
     }
+
+    Ok(())
 }

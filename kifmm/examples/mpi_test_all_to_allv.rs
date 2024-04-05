@@ -9,7 +9,7 @@ use rand::Rng;
 use mpi::{collective::SystemOperation, environment::Universe, traits::*, Rank};
 
 #[cfg(feature = "mpi")]
-use bempp_tree::implementations::mpi_helpers::all_to_allv_sparse;
+use kifmm::tree::helpers::all_to_allv_sparse;
 
 #[cfg(feature = "mpi")]
 fn main() {
@@ -64,6 +64,11 @@ fn main() {
     // Test that the correct number of packets were received.
     let unique: Vec<i32> = received.iter().unique().cloned().collect();
     assert_eq!(unique.len() as i32, recv_count);
+
+    if rank == 0 {
+        println!("...test_all_to_allv passed")
+    }
 }
+
 #[cfg(not(feature = "mpi"))]
 fn main() {}

@@ -10,12 +10,13 @@ use crate::fmm::{
 };
 
 use crate::traits::field::ConfigureSourceToTargetData;
+use crate::traits::tree::FmmTreeNode;
 use crate::traits::{
     field::SourceToTargetData,
     tree::{FmmTree, Tree},
 };
 use crate::tree::{
-    constants::{ALPHA_INNER, ALPHA_OUTER, N_CRIT, ROOT},
+    constants::{ALPHA_INNER, ALPHA_OUTER, ROOT},
     types::{Domain, MortonKey, SingleNodeTree},
 };
 use green_kernels::{traits::Kernel, types::EvalType};
@@ -24,6 +25,8 @@ use rlst::{
     empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
+
+use super::constants::DEFAULT_NCRIT;
 
 impl<T, U, V> SingleNodeBuilder<T, U, V>
 where
@@ -50,8 +53,8 @@ where
     /// Associate FMM builder with an FMM Tree
     ///
     /// # Arguments
-    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [ncoords, dim]
-    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [ncoords, dim]
+    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
+    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
     /// * `sparse` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
@@ -60,14 +63,20 @@ where
         targets: &Coordinates<U>,
         n_crit: Option<u64>,
         sparse: bool,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, std::io::Error> {
         let [nsources, dims] = sources.shape();
         let [ntargets, dimt] = targets.shape();
 
         if dims < 3 || dimt < 3 {
-            Err("Only 3D KiFMM supported with this builder".to_string())
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Only 3D FMM supported",
+            ))
         } else if nsources == 0 || ntargets == 0 {
-            Err("Must have a positive number of source or target particles".to_string())
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Must have a positive number of source or target particles",
+            ))
         } else {
             // Source and target trees calcualted over the same domain
             let source_domain = Domain::from_local_points(sources.data());
@@ -78,7 +87,7 @@ where
             self.domain = Some(domain);
 
             // If not specified estimate from point data estimate critical value
-            let n_crit = n_crit.unwrap_or(N_CRIT);
+            let n_crit = n_crit.unwrap_or(DEFAULT_NCRIT);
             let [nsources, _dim] = sources.shape();
             let [ntargets, _dim] = targets.shape();
 
@@ -87,8 +96,8 @@ where
             let target_depth = SingleNodeTree::<U>::minimum_depth(ntargets as u64, n_crit);
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain);
-            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain);
+            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain)?;
+            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain)?;
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,
@@ -115,12 +124,15 @@ where
         kernel: V,
         eval_type: EvalType,
         mut source_to_target: T,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
-            Err("Must build tree before specifying FMM parameters".to_string())
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must build tree before specifying FMM parameters",
+            ))
         } else {
             // Set FMM parameters
-            let global_idxs = self
+            let global_indices = self
                 .tree
                 .as_ref()
                 .unwrap()
@@ -130,7 +142,7 @@ where
 
             let [_ncharges, nmatvecs] = charges.shape();
 
-            self.charges = Some(map_charges(global_idxs, charges));
+            self.charges = Some(map_charges(global_indices, charges));
 
             if nmatvecs > 1 {
                 self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))
@@ -160,10 +172,13 @@ where
     }
 
     /// Finalize and build the single node FMM
-    pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, String> {
+    pub fn build(self) -> Result<KiFmm<SingleNodeFmmTree<U>, T, V, U>, std::io::Error> {
         if self.tree.is_none() || self.source_to_target.is_none() || self.expansion_order.is_none()
         {
-            Err("Must create a tree, and FMM parameters before building".to_string())
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must create a tree, and FMM metadata before building",
+            ))
         } else {
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();
@@ -210,13 +225,12 @@ where
 
         // Compute required surfaces
         let upward_equivalent_surface =
-            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
-        let upward_check_surface =
-            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_outer);
+            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
+        let upward_check_surface = ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
         let downward_equivalent_surface =
-            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_outer);
+            ROOT.compute_surface(domain, self.expansion_order, alpha_outer);
         let downward_check_surface =
-            ROOT.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
+            ROOT.compute_surface(domain, self.expansion_order, alpha_inner);
 
         let nequiv_surface = upward_equivalent_surface.len() / self.dim;
         let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -275,9 +289,9 @@ where
 
         for (i, child) in children.iter().enumerate() {
             let child_upward_equivalent_surface =
-                child.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
+                child.compute_surface(domain, self.expansion_order, alpha_inner);
             let child_downward_check_surface =
-                child.compute_kifmm_surface(domain, self.expansion_order, alpha_inner);
+                child.compute_surface(domain, self.expansion_order, alpha_inner);
 
             let mut pc2ce_t = rlst_dynamic_array2!(W, [ncheck_surface, nequiv_surface]);
 
@@ -347,10 +361,10 @@ where
         // Check if we are computing matvec or matmul
         let [_ncharges, nmatvecs] = charges.shape();
         let ntarget_points = self.tree.target_tree().all_coordinates().unwrap().len() / self.dim;
-        let nsource_keys = self.tree.source_tree().nkeys_tot().unwrap();
-        let ntarget_keys = self.tree.target_tree().nkeys_tot().unwrap();
-        let ntarget_leaves = self.tree.target_tree().nleaves().unwrap();
-        let nsource_leaves = self.tree.source_tree().nleaves().unwrap();
+        let nsource_keys = self.tree.source_tree().n_keys_tot().unwrap();
+        let ntarget_keys = self.tree.target_tree().n_keys_tot().unwrap();
+        let ntarget_leaves = self.tree.target_tree().n_leaves().unwrap();
+        let nsource_leaves = self.tree.source_tree().n_leaves().unwrap();
 
         // Buffers to store all multipole and local data
         let multipoles = vec![W::default(); self.ncoeffs * nsource_keys * nmatvecs];

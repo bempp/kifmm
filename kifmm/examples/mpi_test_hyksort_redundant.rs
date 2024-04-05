@@ -1,3 +1,4 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
 #[cfg(feature = "mpi")]
 use kifmm::hyksort::hyksort;
 #[cfg(feature = "mpi")]
@@ -22,7 +23,7 @@ fn main() {
     arr.append(&mut replica);
 
     // Sort
-    hyksort(&mut arr, k, comm.duplicate());
+    let _ = hyksort(&mut arr, k, comm.duplicate());
 
     // Test that there is no overlap between elements on each processor and that they are
     // globally sorted
@@ -56,6 +57,10 @@ fn main() {
         let a = arr[i];
         let b = arr[i + 1];
         assert!(a <= b);
+    }
+
+    if rank == 0 {
+        println!("...test_hyksort_redundant passed")
     }
 }
 

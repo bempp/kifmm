@@ -7,11 +7,14 @@ use num_complex::ComplexFloat;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
 
+#[cfg(feature = "mpi")]
+use crate::tree::types::MultiNodeTree;
+
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in column-major order.
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Represents coordinate data in a two-dimensional array with shape `[ncoords, dim]`,
+/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
 /// stored in column-major order.
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
@@ -413,16 +416,38 @@ where
 /// - `domain`- The computational domain associated with this FMM calculation. This domain
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
-///
-/// Note: This example assumes that `SingleNodeTree` and `Domain` have been implemented
-/// and provide `Default` implementations. Replace `f64` with the appropriate type
-/// that meets the trait bounds of `T`.
 #[derive(Default)]
 pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
     pub target_tree: SingleNodeTree<T>,
+    /// The computational domain associated with this FMM calculation.
+    pub domain: Domain<T>,
+}
+
+/// Represents an octree structure for Fast Multipole Method (FMM) calculations on distributed nodes.
+///
+/// This struct encapsulates octrees for two distributions of points, sources, and targets,
+/// along with an associated computational domain.
+///
+/// # Fields
+///
+/// - `source_tree`- An octree structure containing the source points. The source points
+///   are those from which the potential will be computed.
+///
+/// - `target_tree`- An octree structure containing the target points. The target points
+///   are those at which the potential will be evaluated.
+///
+/// - `domain`- The computational domain associated with this FMM calculation. This domain
+///   defines the spatial extent within which the sources and targets are located and
+///   interacts.
+#[cfg(feature = "mpi")]
+pub struct MultiNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
+    /// An octree structure containing the source points for the FMM calculation.
+    pub source_tree: MultiNodeTree<T>,
+    /// An octree structure containing the target points for the FMM calculation.
+    pub target_tree: MultiNodeTree<T>,
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T>,
 }

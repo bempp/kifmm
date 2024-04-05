@@ -79,7 +79,7 @@
 
 pub mod fftw;
 pub mod fmm;
-#[cfg(feature = "mpi_support")]
+#[cfg(feature = "mpi")]
 pub mod hyksort;
 pub mod traits;
 pub mod tree;
@@ -93,6 +93,10 @@ pub use fmm::types::FftFieldTranslation;
 pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
+
+#[cfg(feature = "mpi")]
+#[doc(inline)]
+pub use fmm::types::MultiNodeFmmTree;
 
 #[doc(inline)]
 pub use traits::fmm::Fmm;

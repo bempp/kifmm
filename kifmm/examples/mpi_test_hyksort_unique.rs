@@ -1,3 +1,4 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
 #[cfg(feature = "mpi")]
 use kifmm::hyksort::hyksort;
 #[cfg(feature = "mpi")]
@@ -26,7 +27,7 @@ fn main() {
     let mut arr: Vec<i32> = arr_set.into_iter().collect();
 
     // Sort
-    hyksort(&mut arr, k, comm.duplicate());
+    let _ = hyksort(&mut arr, k, comm.duplicate());
 
     // Test that elements are globally sorted
     let min = *arr.iter().min().unwrap();
@@ -59,6 +60,10 @@ fn main() {
         let a = arr[i];
         let b = arr[i + 1];
         assert!(a <= b);
+    }
+
+    if rank == 0 {
+        println!("...test_hyksort_unique passed")
     }
 }
 

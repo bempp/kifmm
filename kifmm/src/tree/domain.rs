@@ -13,10 +13,10 @@ impl<T: Float + Default + Debug> Domain<T> {
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     pub fn from_local_points(points: &[T]) -> Domain<T> {
         let dim = 3;
-        let npoints = points.len() / dim;
-        let x = points[0..npoints].to_vec();
-        let y = points[npoints..2 * npoints].to_vec();
-        let z = points[2 * npoints..].to_vec();
+        let n_points = points.len() / dim;
+        let x = points[0..n_points].to_vec();
+        let y = points[n_points..2 * n_points].to_vec();
+        let z = points[2 * n_points..].to_vec();
 
         let max_x = x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
         let max_y = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
@@ -48,7 +48,10 @@ impl<T: Float + Default + Debug> Domain<T> {
         // The origin is defined by the minimum point
         let origin = [*min_x - err, *min_y - err, *min_z - err];
 
-        Domain { origin, diameter }
+        Domain {
+            origin,
+            side_length: diameter,
+        }
     }
 
     /// Find the union of two domains such that the returned domain is a superset and contains both sets of corresponding points
@@ -64,15 +67,15 @@ impl<T: Float + Default + Debug> Domain<T> {
         let min_origin = [min_x, min_y, min_z];
 
         // Find maximum diameter (+max origin)
-        let max_x = self.diameter[0].max(other.diameter[0]);
-        let max_y = self.diameter[0].max(other.diameter[0]);
-        let max_z = self.diameter[0].max(other.diameter[0]);
+        let max_x = self.side_length[0].max(other.side_length[0]);
+        let max_y = self.side_length[0].max(other.side_length[0]);
+        let max_z = self.side_length[0].max(other.side_length[0]);
 
         let max_diameter = [max_x, max_y, max_z];
 
         Domain {
             origin: min_origin,
-            diameter: max_diameter,
+            side_length: max_diameter,
         }
     }
 
@@ -84,7 +87,7 @@ impl<T: Float + Default + Debug> Domain<T> {
     pub fn new(origin: &[T; 3], diameter: &[T; 3]) -> Self {
         Domain {
             origin: *origin,
-            diameter: *diameter,
+            side_length: *diameter,
         }
     }
 }
@@ -93,7 +96,7 @@ impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
     type Scalar = T;
 
     fn diameter(&self) -> &[Self::Scalar; 3] {
-        &self.diameter
+        &self.side_length
     }
 
     fn origin(&self) -> &[Self::Scalar; 3] {
@@ -102,99 +105,103 @@ impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
 }
 
 #[cfg(feature = "mpi")]
-use memoffset::offset_of;
+mod mpi_domain {
 
-#[cfg(feature = "mpi")]
-use mpi::{
-    datatype::{UncommittedUserDatatype, UserDatatype},
-    topology::UserCommunicator,
-    traits::{Buffer, BufferMut, Communicator, CommunicatorCollectives, Equivalence},
-    Address,
-};
+    use super::{Debug, Domain, Float};
+    use memoffset::offset_of;
+    use mpi::{
+        datatype::{UncommittedUserDatatype, UserDatatype},
+        topology::UserCommunicator,
+        traits::{Buffer, BufferMut, Communicator, CommunicatorCollectives, Equivalence},
+        Address,
+    };
 
-#[cfg(feature = "mpi")]
-unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
-    type Out = UserDatatype;
-    fn equivalent_datatype() -> Self::Out {
-        UserDatatype::structured(
-            &[1, 1],
-            &[
-                offset_of!(Domain<T>, origin) as Address,
-                offset_of!(Domain<T>, diameter) as Address,
-            ],
-            &[
-                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
-            ],
-        )
+    unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
+        type Out = UserDatatype;
+        fn equivalent_datatype() -> Self::Out {
+            UserDatatype::structured(
+                &[1, 1],
+                &[
+                    offset_of!(Domain<T>, origin) as Address,
+                    offset_of!(Domain<T>, side_length) as Address,
+                ],
+                &[
+                    UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
+                    UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
+                ],
+            )
+        }
     }
-}
 
-#[cfg(feature = "mpi")]
-impl<T: Float + Default + Debug> Domain<T>
-where
-    [Domain<T>]: BufferMut,
-    Vec<Domain<T>>: Buffer,
-{
-    /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
-    /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
-    ///
-    /// # Arguments
-    /// * `local_points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
-    /// * `comm` - An MPI (User) communicator over which the domain is defined.
-    pub fn from_global_points(local_points: &[PointType<T>], comm: &UserCommunicator) -> Domain<T> {
-        let size = comm.size();
+    impl<T: Float + Default + Debug> Domain<T>
+    where
+        [Domain<T>]: BufferMut,
+        Vec<Domain<T>>: Buffer,
+    {
+        /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
+        /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
+        ///
+        /// # Arguments
+        /// * `local_points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+        /// * `comm` - An MPI (User) communicator over which the domain is defined.
+        pub fn from_global_points(local_points: &[T], comm: &UserCommunicator) -> Domain<T> {
+            let size = comm.size();
 
-        let local_domain = Domain::<T>::from_local_points(local_points);
-        let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];
-        let mut buffer = vec![Domain::<T>::default(); size as usize];
+            let local_domain = Domain::<T>::from_local_points(local_points);
+            let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];
+            let mut buffer = vec![Domain::<T>::default(); size as usize];
 
-        comm.all_to_all_into(&local_bounds, &mut buffer[..]);
+            comm.all_to_all_into(&local_bounds, &mut buffer[..]);
 
-        // Find minimum origin
-        let min_x = buffer
-            .iter()
-            .min_by(|a, b| a.origin[0].partial_cmp(&b.origin[0]).unwrap())
-            .unwrap()
-            .origin[0];
-        let min_y = buffer
-            .iter()
-            .min_by(|a, b| a.origin[1].partial_cmp(&b.origin[1]).unwrap())
-            .unwrap()
-            .origin[1];
-        let min_z = buffer
-            .iter()
-            .min_by(|a, b| a.origin[2].partial_cmp(&b.origin[2]).unwrap())
-            .unwrap()
-            .origin[2];
+            // Find minimum origin
+            let min_x = buffer
+                .iter()
+                .min_by(|a, b| a.origin[0].partial_cmp(&b.origin[0]).unwrap())
+                .unwrap()
+                .origin[0];
+            let min_y = buffer
+                .iter()
+                .min_by(|a, b| a.origin[1].partial_cmp(&b.origin[1]).unwrap())
+                .unwrap()
+                .origin[1];
+            let min_z = buffer
+                .iter()
+                .min_by(|a, b| a.origin[2].partial_cmp(&b.origin[2]).unwrap())
+                .unwrap()
+                .origin[2];
 
-        let min_origin = [min_x, min_y, min_z];
+            let min_origin = [min_x, min_y, min_z];
 
-        // Find maximum diameter (+max origin)
-        let max_x = buffer
-            .iter()
-            .max_by(|a, b| a.diameter[0].partial_cmp(&b.diameter[0]).unwrap())
-            .unwrap()
-            .diameter[0];
-        let max_y = buffer
-            .iter()
-            .max_by(|a, b| a.diameter[1].partial_cmp(&b.diameter[1]).unwrap())
-            .unwrap()
-            .diameter[1];
-        let max_z = buffer
-            .iter()
-            .max_by(|a, b| a.diameter[2].partial_cmp(&b.diameter[2]).unwrap())
-            .unwrap()
-            .diameter[2];
+            // Find maximum diameter (+max origin)
+            let max_x = buffer
+                .iter()
+                .max_by(|a, b| a.side_length[0].partial_cmp(&b.side_length[0]).unwrap())
+                .unwrap()
+                .side_length[0];
+            let max_y = buffer
+                .iter()
+                .max_by(|a, b| a.side_length[1].partial_cmp(&b.side_length[1]).unwrap())
+                .unwrap()
+                .side_length[1];
+            let max_z = buffer
+                .iter()
+                .max_by(|a, b| a.side_length[2].partial_cmp(&b.side_length[2]).unwrap())
+                .unwrap()
+                .side_length[2];
 
-        let max_diameter = [max_x, max_y, max_z];
+            let max_diameter = [max_x, max_y, max_z];
 
-        Domain {
-            origin: min_origin,
-            diameter: max_diameter,
+            Domain {
+                origin: min_origin,
+                side_length: max_diameter,
+            }
         }
     }
 }
+
+#[allow(unused_imports)]
+#[cfg(feature = "mpi")]
+pub use mpi_domain::*;
 
 #[cfg(test)]
 mod test {
@@ -209,39 +216,45 @@ mod test {
         let domain = Domain::from_local_points(points.data());
 
         // Test that the domain remains cubic
-        assert!(domain.diameter.iter().all(|&x| x == domain.diameter[0]));
+        assert!(domain
+            .side_length
+            .iter()
+            .all(|&x| x == domain.side_length[0]));
 
         // Test that all local points are contained within the local domain
-        let npoints = points.shape()[0];
-        for i in 0..npoints {
+        let n_points = points.shape()[0];
+        for i in 0..n_points {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
 
             assert!(
-                domain.origin[0] <= point[0] && point[0] <= domain.origin[0] + domain.diameter[0]
+                domain.origin[0] <= point[0]
+                    && point[0] <= domain.origin[0] + domain.side_length[0]
             );
             assert!(
-                domain.origin[1] <= point[1] && point[1] <= domain.origin[1] + domain.diameter[1]
+                domain.origin[1] <= point[1]
+                    && point[1] <= domain.origin[1] + domain.side_length[1]
             );
             assert!(
-                domain.origin[2] <= point[2] && point[2] <= domain.origin[2] + domain.diameter[2]
+                domain.origin[2] <= point[2]
+                    && point[2] <= domain.origin[2] + domain.side_length[2]
             );
         }
     }
 
     #[test]
     fn test_bounds() {
-        let npoints = 10000;
+        let n_points = 10000;
 
         // Test points in positive octant only
-        let points = points_fixture::<f64>(npoints, None, None, None);
+        let points = points_fixture::<f64>(n_points, None, None, None);
         test_compute_bounds(points);
 
         // Test points in positive and negative octants
-        let points = points_fixture::<f64>(npoints, Some(-1.), Some(1.), None);
+        let points = points_fixture::<f64>(n_points, Some(-1.), Some(1.), None);
         test_compute_bounds(points);
 
         // Test rectangular distributions of points
-        let points = points_fixture_col::<f64>(npoints);
+        let points = points_fixture_col::<f64>(n_points);
         test_compute_bounds(points);
     }
 }

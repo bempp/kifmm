@@ -232,13 +232,13 @@ where
             }
 
             FmmEvalType::Matrix(nmatvec) => {
-                let nleaves = self.tree.target_tree().nleaves().unwrap();
+                let n_leaves = self.tree.target_tree().n_leaves().unwrap();
                 for i in 0..nmatvec {
                     self.leaf_upward_surfaces_targets
                         .par_chunks_exact(surface_size)
                         .zip(&self.leaf_locals)
                         .zip(&self.charge_index_pointer_targets)
-                        .zip(&self.potentials_send_pointers[i * nleaves..(i + 1) * nleaves])
+                        .zip(&self.potentials_send_pointers[i * n_leaves..(i + 1) * n_leaves])
                         .for_each(
                             |(
                                 (
@@ -389,13 +389,13 @@ where
                 ),
 
             FmmEvalType::Matrix(nmatvec) => {
-                let nleaves = self.tree.target_tree().nleaves().unwrap();
+                let n_leaves = self.tree.target_tree().n_leaves().unwrap();
 
                 for i in 0..nmatvec {
                     leaves
                         .par_iter()
                         .zip(&self.charge_index_pointer_targets)
-                        .zip(&self.potentials_send_pointers[i * nleaves..(i + 1) * nleaves])
+                        .zip(&self.potentials_send_pointers[i * n_leaves..(i + 1) * n_leaves])
                         .for_each(|((leaf, charge_index_pointer), potential_send_ptr)| {
                             let target_coordinates_row_major = &all_target_coordinates
                                 [charge_index_pointer.0 * self.dim

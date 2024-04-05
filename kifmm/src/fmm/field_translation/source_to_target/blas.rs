@@ -59,7 +59,7 @@ where
 
                 let transfer_vectors = interaction_list
                     .iter()
-                    .map(|target| target.find_transfer_vector(source))
+                    .map(|target| target.find_transfer_vector(source).unwrap())
                     .collect_vec();
 
                 let mut transfer_vectors_map = HashMap::new();
@@ -186,7 +186,7 @@ where
                     //rlst::threading::disable_threading();
 
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level)
+                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level).unwrap()
                     });
                 }
 
@@ -331,7 +331,7 @@ where
                     //rlst_blis::interface::threading::disable_threading();
 
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level)
+                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level).unwrap()
                     });
                 }
 

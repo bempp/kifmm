@@ -33,14 +33,14 @@ where
             return;
         };
 
-        let nleaves = self.tree.source_tree().nleaves().unwrap();
+        let n_leaves = self.tree.source_tree().n_leaves().unwrap();
         let surface_size = self.ncoeffs * self.dim;
         let coordinates = self.tree.source_tree().all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                let mut check_potentials = rlst_dynamic_array2!(W, [nleaves * self.ncoeffs, 1]);
+                let mut check_potentials = rlst_dynamic_array2!(W, [n_leaves * self.ncoeffs, 1]);
 
                 // Compute check potential for each box
                 check_potentials
@@ -83,7 +83,7 @@ where
                     );
 
                 // Use check potentials to compute the multipole expansion
-                let chunk_size = chunk_size(nleaves, P2M_MAX_CHUNK_SIZE);
+                let chunk_size = chunk_size(n_leaves, P2M_MAX_CHUNK_SIZE);
                 check_potentials
                     .data()
                     .par_chunks_exact(self.ncoeffs * chunk_size)
@@ -121,7 +121,7 @@ where
 
             FmmEvalType::Matrix(nmatvecs) => {
                 let mut check_potentials =
-                    rlst_dynamic_array2!(W, [nleaves * self.ncoeffs * nmatvecs, 1]);
+                    rlst_dynamic_array2!(W, [n_leaves * self.ncoeffs * nmatvecs, 1]);
 
                 // Compute the check potential for each box for each charge vector
                 check_potentials
@@ -213,7 +213,7 @@ where
             return;
         };
 
-        let nchild_sources = self.tree.source_tree().nkeys(level).unwrap();
+        let nchild_sources = self.tree.source_tree().n_keys(level).unwrap();
         let min = &child_sources[0];
         let max = &child_sources[nchild_sources - 1];
         let min_idx = self.tree.source_tree().index(min).unwrap();
