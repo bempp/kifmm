@@ -1,4 +1,4 @@
-// // ? mpirun -n {{NPROCESSES}} --features "mpi"
+//? mpirun -n {{NPROCESSES}} --features "mpi"
 #![allow(unused_imports)]
 use num::traits::Float;
 use rand::distributions::uniform::SampleUniform;

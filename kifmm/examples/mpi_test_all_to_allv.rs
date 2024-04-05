@@ -69,5 +69,6 @@ fn main() {
         println!("...test_all_to_allv passed")
     }
 }
+
 #[cfg(not(feature = "mpi"))]
 fn main() {}
