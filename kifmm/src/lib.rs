@@ -9,7 +9,7 @@
 //!
 //! # Example Usage
 //!
-//! `Fmm` objects are built using the `KiFmmBuilder` objects, for which we give a single node example below. These objects implement
+//! `Fmm` objects are built using the `SingleNodeBuilder` objects, for which we give a single node example below. These objects implement
 //! the `Fmm` trait, which allows for the evaluation of the algorithm and interaction with the results.
 //!
 //! Basic usage for evaluating an FMM between a set of source and target points

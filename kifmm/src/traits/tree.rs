@@ -99,8 +99,7 @@ pub trait Tree {
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 }
 
-/// Interface for trees required by the fast multipole method (FMM), which requires
-/// separate trees for the source and target particle data.
+/// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
 pub trait FmmTree {
     /// Scalar type
     type Scalar;
