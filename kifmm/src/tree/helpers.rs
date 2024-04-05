@@ -6,7 +6,7 @@ use rand::prelude::*;
 use rlst::RlstScalar;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
 
-/// Alias for an rlst container for point data.
+/// Alias for an rlst container for point data, expected with shape [n_points, 3];
 pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Points fixture for testing, uniformly samples in each axis from min to max.
