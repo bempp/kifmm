@@ -11,7 +11,7 @@ use std::collections::HashMap;
 /// organized in column-major order.
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Represents coordinate data in a two-dimensional array with shape `[ncoords, dim]`,
+/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
 /// stored in column-major order.
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 

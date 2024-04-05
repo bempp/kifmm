@@ -124,15 +124,15 @@ mod test {
             diameter: [1., 1., 1.],
         };
 
-        let npoints = 1000;
-        let coords = points_fixture(npoints, None, None, None);
+        let n_points = 1000;
+        let coords = points_fixture(n_points, None, None, None);
         let mut points = Vec::new();
 
-        for i in 0..npoints {
+        for i in 0..n_points {
             let p = [
                 coords.data()[i],
-                coords.data()[i + npoints],
-                coords.data()[i + 2 * npoints],
+                coords.data()[i + n_points],
+                coords.data()[i + 2 * n_points],
             ];
             points.push(Point {
                 coordinate: p,

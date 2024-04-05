@@ -24,13 +24,13 @@ pub trait Tree {
     type Nodes: IntoIterator<Item = Self::Node>;
 
     /// Number of leaves
-    fn nleaves(&self) -> Option<usize>;
+    fn n_leaves(&self) -> Option<usize>;
 
     /// Total number of keys
-    fn nkeys_tot(&self) -> Option<usize>;
+    fn n_keys_tot(&self) -> Option<usize>;
 
     /// Number of keys at a given tree level
-    fn nkeys(&self, level: u64) -> Option<usize>;
+    fn n_keys(&self, level: u64) -> Option<usize>;
 
     /// Get depth of tree.
     fn depth(&self) -> u64;

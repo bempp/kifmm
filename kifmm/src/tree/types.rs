@@ -37,7 +37,7 @@ pub struct MortonKey {
 /// Iterable container of `MortonKey` data
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys {
-    /// A vector of MortonKeys
+    /// A vector of Morton_keys
     pub keys: Vec<MortonKey>,
 
     /// index for implementing the Iterator trait.
@@ -119,7 +119,7 @@ where
 /// Iterable container of `Point` data
 pub type Points<T> = Vec<Point<T>>;
 
-/// Single Node Trees
+/// Single node trees.
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where

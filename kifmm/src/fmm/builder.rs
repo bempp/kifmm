@@ -50,8 +50,8 @@ where
     /// Associate FMM builder with an FMM Tree
     ///
     /// # Arguments
-    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [ncoords, dim]
-    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [ncoords, dim]
+    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
+    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
     /// * `sparse` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
@@ -359,10 +359,10 @@ where
         // Check if we are computing matvec or matmul
         let [_ncharges, nmatvecs] = charges.shape();
         let ntarget_points = self.tree.target_tree().all_coordinates().unwrap().len() / self.dim;
-        let nsource_keys = self.tree.source_tree().nkeys_tot().unwrap();
-        let ntarget_keys = self.tree.target_tree().nkeys_tot().unwrap();
-        let ntarget_leaves = self.tree.target_tree().nleaves().unwrap();
-        let nsource_leaves = self.tree.source_tree().nleaves().unwrap();
+        let nsource_keys = self.tree.source_tree().n_keys_tot().unwrap();
+        let ntarget_keys = self.tree.target_tree().n_keys_tot().unwrap();
+        let ntarget_leaves = self.tree.target_tree().n_leaves().unwrap();
+        let nsource_leaves = self.tree.source_tree().n_leaves().unwrap();
 
         // Buffers to store all multipole and local data
         let multipoles = vec![W::default(); self.ncoeffs * nsource_keys * nmatvecs];

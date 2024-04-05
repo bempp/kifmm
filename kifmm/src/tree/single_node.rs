@@ -31,15 +31,15 @@ where
         global_idxs: &[usize],
     ) -> SingleNodeTree<T> {
         let dim = 3;
-        let ncoords = coordinates_col_major.len() / dim;
+        let n_coords = coordinates_col_major.len() / dim;
 
         // Convert column major coordinate into `Point`, containing Morton encoding
         let mut points = Points::default();
-        for i in 0..ncoords {
+        for i in 0..n_coords {
             let coord = [
                 coordinates_col_major[i],
-                coordinates_col_major[i + ncoords],
-                coordinates_col_major[i + 2 * ncoords],
+                coordinates_col_major[i + n_coords],
+                coordinates_col_major[i + 2 * n_coords],
             ];
             let base_key = MortonKey::from_point(&coord, domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(&coord, domain, depth);
@@ -179,15 +179,15 @@ where
         global_idxs: &[usize],
     ) -> SingleNodeTree<T> {
         let dim = 3;
-        let npoints = coordinates_col_major.len() / dim;
+        let n_points = coordinates_col_major.len() / dim;
 
         // Encode points at specified depth
         let mut points = Points::default();
-        for i in 0..npoints {
+        for i in 0..n_points {
             let point = [
                 coordinates_col_major[i],
-                coordinates_col_major[i + npoints],
-                coordinates_col_major[i + 2 * npoints],
+                coordinates_col_major[i + n_points],
+                coordinates_col_major[i + 2 * n_points],
             ];
             let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(&point, domain, depth);
@@ -303,9 +303,10 @@ where
         }
     }
 
-    /// Minimum depth
-    pub fn minimum_depth(npoints: u64, n_crit: u64) -> u64 {
-        let mut tmp = npoints;
+    /// Minimum depth of a tree, such that for a uniform point
+    /// distribution each leaf box has at most `n_crit` points
+    pub fn minimum_depth(n_points: u64, n_crit: u64) -> u64 {
+        let mut tmp = n_points;
         let mut level = 0;
         while tmp > n_crit {
             level += 1;
@@ -334,9 +335,9 @@ where
         let points_len = points.len();
 
         if !points.is_empty() && points_len % dim == 0 {
-            let npoints = points_len / dim;
+            let n_points = points_len / dim;
             let domain = domain.unwrap_or(Domain::from_local_points(points));
-            let global_idxs = (0..npoints).collect_vec();
+            let global_idxs = (0..n_points).collect_vec();
 
             if sparse {
                 return Ok(SingleNodeTree::uniform_tree_sparse(
@@ -364,7 +365,7 @@ where
     /// Return any keys that are unmapped.
     ///
     /// # Arguments
-    /// * `nodes` - A reference to a container of MortonKeys.
+    /// * `nodes` - A reference to a container of Morton_keys.
     /// * `points` - A mutable reference to a container of points.
     pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points<T>) -> MortonKeys {
         let mut map: HashMap<MortonKey, bool> = HashMap::new();
@@ -562,11 +563,11 @@ where
         Some(&self.keys[idx])
     }
 
-    fn nkeys_tot(&self) -> Option<usize> {
+    fn n_keys_tot(&self) -> Option<usize> {
         Some(self.keys.len())
     }
 
-    fn nkeys(&self, level: u64) -> Option<usize> {
+    fn n_keys(&self, level: u64) -> Option<usize> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
             Some(r - l)
         } else {
@@ -574,7 +575,7 @@ where
         }
     }
 
-    fn nleaves(&self) -> Option<usize> {
+    fn n_leaves(&self) -> Option<usize> {
         Some(self.leaves.len())
     }
 
@@ -651,11 +652,11 @@ mod test {
 
     #[test]
     pub fn test_uniform_tree() {
-        let npoints = 100;
+        let n_points = 100;
         let depth = 2;
 
         // Test uniformly distributed data
-        let points = points_fixture(npoints, Some(-1.0), Some(1.0), None);
+        let points = points_fixture(n_points, Some(-1.0), Some(1.0), None);
         let tree = SingleNodeTree::new(points.data(), depth, false, None);
 
         // Test that the tree really is uniform
@@ -673,7 +674,7 @@ mod test {
         assert!(first == depth);
 
         // Test a column distribution of data
-        let points = points_fixture_col::<f64>(npoints);
+        let points = points_fixture_col::<f64>(n_points);
         let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
 
         // Test that the tree really is uniform
@@ -715,8 +716,8 @@ mod test {
     #[test]
     pub fn test_assign_nodes_to_points() {
         // Generate points in a single octant of the domain
-        let npoints = 10;
-        let points = points_fixture::<f64>(npoints, Some(0.), Some(0.5), None);
+        let n_points = 10;
+        let points = points_fixture::<f64>(n_points, Some(0.), Some(0.5), None);
 
         let domain = Domain {
             origin: [0.0, 0.0, 0.0],
@@ -724,7 +725,7 @@ mod test {
         };
 
         let mut tmp = Points::default();
-        for i in 0..npoints {
+        for i in 0..n_points {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
             tmp.push(Point {
@@ -759,7 +760,7 @@ mod test {
         // Test that a single octant contains all the points
         for (_, (l, r)) in leaves_to_points.iter() {
             if (r - l) > 0 {
-                assert!((r - l) == npoints);
+                assert!((r - l) == n_points);
             }
         }
     }
@@ -770,12 +771,12 @@ mod test {
             origin: [0., 0., 0.],
             diameter: [1.0, 1.0, 1.0],
         };
-        let npoints = 10000;
-        let points = points_fixture(npoints, None, None, None);
+        let n_points = 10000;
+        let points = points_fixture(n_points, None, None, None);
 
         let mut tmp = Points::default();
 
-        for i in 0..npoints {
+        for i in 0..n_points {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
             tmp.push(Point {
@@ -837,8 +838,8 @@ mod test {
     #[test]
     pub fn test_levels_to_keys() {
         // Uniform tree
-        let npoints = 10000;
-        let points = points_fixture::<f64>(npoints, None, None, None);
+        let n_points = 10000;
+        let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
         let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
 
@@ -866,15 +867,15 @@ mod test {
                 }
             }
         }
-        assert_eq!(tot, npoints);
+        assert_eq!(tot, n_points);
     }
 
     #[test]
     fn test_siblings_in_tree() {
         // Test that siblings lie adjacently in a tree.
 
-        let npoints = 10000;
-        let points = points_fixture::<f64>(npoints, None, None, None);
+        let n_points = 10000;
+        let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
         let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
 

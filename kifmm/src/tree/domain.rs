@@ -13,10 +13,10 @@ impl<T: Float + Default + Debug> Domain<T> {
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
     pub fn from_local_points(points: &[T]) -> Domain<T> {
         let dim = 3;
-        let npoints = points.len() / dim;
-        let x = points[0..npoints].to_vec();
-        let y = points[npoints..2 * npoints].to_vec();
-        let z = points[2 * npoints..].to_vec();
+        let n_points = points.len() / dim;
+        let x = points[0..n_points].to_vec();
+        let y = points[n_points..2 * n_points].to_vec();
+        let z = points[2 * n_points..].to_vec();
 
         let max_x = x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
         let max_y = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
@@ -216,8 +216,8 @@ mod test {
         assert!(domain.diameter.iter().all(|&x| x == domain.diameter[0]));
 
         // Test that all local points are contained within the local domain
-        let npoints = points.shape()[0];
-        for i in 0..npoints {
+        let n_points = points.shape()[0];
+        for i in 0..n_points {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
 
             assert!(
@@ -234,18 +234,18 @@ mod test {
 
     #[test]
     fn test_bounds() {
-        let npoints = 10000;
+        let n_points = 10000;
 
         // Test points in positive octant only
-        let points = points_fixture::<f64>(npoints, None, None, None);
+        let points = points_fixture::<f64>(n_points, None, None, None);
         test_compute_bounds(points);
 
         // Test points in positive and negative octants
-        let points = points_fixture::<f64>(npoints, Some(-1.), Some(1.), None);
+        let points = points_fixture::<f64>(n_points, Some(-1.), Some(1.), None);
         test_compute_bounds(points);
 
         // Test rectangular distributions of points
-        let points = points_fixture_col::<f64>(npoints);
+        let points = points_fixture_col::<f64>(n_points);
         test_compute_bounds(points);
     }
 }

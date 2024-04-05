@@ -9,7 +9,7 @@ kifmm = { git = "https://github.com/bempp/kifmm" }
 ```
 
 ## Documentation
-The latest documentation of the main branch of this repo is available at [bempp.github.io/kifmm/](https://bempp.github.io/kifmm/).
+The latest documentation of the main branch of this repo is available at [bempp.github.io/kifmm/kifmm/index.html](https://bempp.github.io/kifmm/kifmm/index.html).
 
 Build docs with Latex enabled
 

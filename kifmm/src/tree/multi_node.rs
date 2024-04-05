@@ -48,14 +48,14 @@ where
 
         // Encode points at deepest level, and map to specified depth.
         let dim = 3;
-        let npoints = coordinates.len() / dim;
+        let n_points = coordinates.len() / dim;
 
         let mut points = Points::default();
-        for i in 0..npoints {
+        for i in 0..n_points {
             let point = [
                 coordinates[i],
-                coordinates[i + npoints],
-                coordinates[i + 2 * npoints],
+                coordinates[i + n_points],
+                coordinates[i + 2 * n_points],
             ];
             let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(&point, domain, depth);
@@ -209,14 +209,14 @@ where
 
         // Encode points at deepest level, and map to specified depth.
         let dim = 3;
-        let npoints = coordinates.len() / dim;
+        let n_points = coordinates.len() / dim;
 
         let mut tmp = Points::default();
-        for i in 0..npoints {
+        for i in 0..n_points {
             let point = [
                 coordinates[i],
-                coordinates[i + npoints],
-                coordinates[i + 2 * npoints],
+                coordinates[i + n_points],
+                coordinates[i + 2 * n_points],
             ];
             let base_key = MortonKey::from_point(&point, domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(&point, domain, depth);
@@ -391,13 +391,13 @@ where
 
         if !points.is_empty() && points_len & dim == 0 {
             let domain = domain.unwrap_or(Domain::from_global_points(points, world));
-            let npoints = points_len / dim;
+            let n_points = points_len / dim;
 
             // Calculate subcommunicator size for hyksort
             let hyksort_subcomm_size = 2;
 
             // Assign global indices
-            let global_idxs = global_indices(npoints, world);
+            let global_idxs = global_indices(n_points, world);
 
             if sparse {
                 return MultiNodeTree::uniform_tree_sparse(
@@ -545,13 +545,13 @@ where
 }
 
 /// Assign global indices to points owned by each process
-fn global_indices(npoints: usize, comm: &UserCommunicator) -> Vec<usize> {
+fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
     // Gather counts of coordinates at each process
     let rank = comm.rank() as usize;
 
     let nprocs = comm.size() as usize;
     let mut counts = vec![0usize; nprocs];
-    comm.all_gather_into(&npoints, &mut counts[..]);
+    comm.all_gather_into(&n_points, &mut counts[..]);
 
     // Compute displacements
     let mut displacements = vec![0usize; nprocs];
@@ -561,9 +561,9 @@ fn global_indices(npoints: usize, comm: &UserCommunicator) -> Vec<usize> {
     }
 
     // Assign unique global indices to all coordinates
-    let mut global_indices = vec![0usize; npoints];
+    let mut global_indices = vec![0usize; n_points];
 
-    for (i, global_index) in global_indices.iter_mut().enumerate().take(npoints) {
+    for (i, global_index) in global_indices.iter_mut().enumerate().take(n_points) {
         *global_index = displacements[rank] + i;
     }
 
@@ -593,11 +593,11 @@ where
         Some(&self.keys[idx])
     }
 
-    fn nkeys_tot(&self) -> Option<usize> {
+    fn n_keys_tot(&self) -> Option<usize> {
         Some(self.keys.len())
     }
 
-    fn nkeys(&self, level: u64) -> Option<usize> {
+    fn n_keys(&self, level: u64) -> Option<usize> {
         if let Some((l, r)) = self.levels_to_keys.get(&level) {
             Some(r - l)
         } else {
@@ -605,7 +605,7 @@ where
         }
     }
 
-    fn nleaves(&self) -> Option<usize> {
+    fn n_leaves(&self) -> Option<usize> {
         Some(self.leaves.len())
     }
 

@@ -12,11 +12,11 @@ pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// Points fixture for testing, uniformly samples in each axis from min to max.
 ///
 /// # Arguments
-/// * `npoints` - The number of points to sample.
+/// * `n_points` - The number of points to sample.
 /// * `min` - The minumum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
-    npoints: usize,
+    n_points: usize,
     min: Option<T>,
     max: Option<T>,
     seed: Option<u64>,
@@ -32,9 +32,9 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
         between = rand::distributions::Uniform::from(T::zero()..T::one());
     }
 
-    let mut points = rlst_dynamic_array2!(T, [npoints, 3]);
+    let mut points = rlst_dynamic_array2!(T, [n_points, 3]);
 
-    for i in 0..npoints {
+    for i in 0..n_points {
         points[[i, 0]] = between.sample(&mut range);
         points[[i, 1]] = between.sample(&mut range);
         points[[i, 2]] = between.sample(&mut range);
@@ -46,11 +46,11 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
 /// Points fixture for testing, uniformly samples on surface of a sphere of diameter 1.
 ///
 /// # Arguments
-/// * `npoints` - The number of points to sample.
+/// * `n_points` - The number of points to sample.
 /// * `min` - The minumum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
-    npoints: usize,
+    n_points: usize,
 ) -> PointsMat<T> {
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
@@ -60,16 +60,16 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
 
     let between = rand::distributions::Uniform::from(T::zero()..T::one());
 
-    let mut points = rlst_dynamic_array2!(T, [npoints, 3]);
-    let mut phi = rlst_dynamic_array2!(T, [npoints, 1]);
-    let mut theta = rlst_dynamic_array2!(T, [npoints, 1]);
+    let mut points = rlst_dynamic_array2!(T, [n_points, 3]);
+    let mut phi = rlst_dynamic_array2!(T, [n_points, 1]);
+    let mut theta = rlst_dynamic_array2!(T, [n_points, 1]);
 
-    for i in 0..npoints {
+    for i in 0..n_points {
         phi[[i, 0]] = between.sample(&mut range) * two * pi;
         theta[[i, 0]] = ((between.sample(&mut range) - half) * two).acos();
     }
 
-    for i in 0..npoints {
+    for i in 0..n_points {
         points[[i, 0]] = half * theta[[i, 0]].sin() * phi[[i, 0]].cos() + half;
         points[[i, 1]] = half * theta[[i, 0]].sin() * phi[[i, 0]].sin() + half;
         points[[i, 2]] = half * theta[[i, 0]].cos() + half;
@@ -78,13 +78,13 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     points
 }
 
-///. Points fixture for testing, uniformly samples in the bounds [[0, 1), [0, 1), [0, 500)] for the x, y, and z
+/// Points fixture for testing, uniformly samples in the bounds [[0, 1), [0, 1), [0, 500)] for the x, y, and z
 /// axes respectively.
 ///
 /// # Arguments
-/// * `npoints` - The number of points to sample.
+/// * `n_points` - The number of points to sample.
 pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
-    npoints: usize,
+    n_points: usize,
 ) -> PointsMat<T> {
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
@@ -92,9 +92,9 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::
     let between1 = rand::distributions::Uniform::from(T::zero()..T::from(0.1).unwrap());
     let between2 = rand::distributions::Uniform::from(T::zero()..T::from(500).unwrap());
 
-    let mut points = rlst_dynamic_array2!(T, [npoints, 3]);
+    let mut points = rlst_dynamic_array2!(T, [n_points, 3]);
 
-    for i in 0..npoints {
+    for i in 0..n_points {
         // One axis has a different sampling
         points[[i, 0]] = between1.sample(&mut range);
         points[[i, 1]] = between1.sample(&mut range);

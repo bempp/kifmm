@@ -246,7 +246,7 @@ fn decode_key(morton: u64) -> [u64; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-pub fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
+fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
     point: &[T; 3],
     level: u64,
     domain: &Domain<T>,
@@ -1239,8 +1239,8 @@ mod test {
 
     #[test]
     fn test_sorting() {
-        let npoints = 1000;
-        let points = points_fixture(npoints, Some(-1.), Some(1.0), None);
+        let n_points = 1000;
+        let points = points_fixture(n_points, Some(-1.), Some(1.0), None);
 
         let domain = Domain::from_local_points(points.data());
 
@@ -1518,7 +1518,7 @@ mod test {
 
     #[test]
     pub fn test_morton_keys_iterator() {
-        let npoints = 1000;
+        let n_points = 1000;
         let domain = Domain {
             origin: [-1.01, -1.01, -1.01],
             diameter: [2.0, 2.0, 2.0],
@@ -1526,7 +1526,7 @@ mod test {
         let min = Some(-1.01);
         let max = Some(0.99);
 
-        let points = points_fixture(npoints, min, max, None);
+        let points = points_fixture(n_points, min, max, None);
 
         let mut keys = Vec::new();
 
