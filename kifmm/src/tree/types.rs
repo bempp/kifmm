@@ -63,7 +63,52 @@ pub struct MortonKeys {
     pub index: usize,
 }
 
-/// Distributed trees created with MPI.
+/// Represents an MPI distributed tree structure equipped with spatial indexing capabilities for 3D
+/// particle data.
+///
+/// The struct is similar to `SingleNodeTree`, however the associated data is now local to a given
+/// processor. The major difference is that each processor owns a contiguous, non-overlapping, set of
+/// leaf nodes, as well as __all__ ancestors to their owned leaf nodes. This means that ancestor nodes
+/// may be duplicated across processors, but not leaf nodes.
+///
+/// # Fields
+/// - `world` - The global MPI communicator for this tree.
+///
+/// - `range` - The range represented as the minimum and maximum leaf key associated owned by
+/// each processor, as well as the processor's MPI rank.
+///
+/// - `depth` - The depth of the tree.
+///
+/// - `domain` - The spatial domain covered by the tree's associated point data.
+///
+/// - `coordinates` - A flat vector storing the coordinates of all points managed by the tree,
+///   in row-major format (e.g., `[x1, y1, z1, ..., xn, yn, zn]`), for efficient retrieval.
+///
+/// - `global_indices` - A vector of unique global indices corresponding to each point, allowing
+///   for efficient identification and lookup of points across different parts of the system.
+///
+/// - `leaves` - `MortonKeys` representing the leaves of the tree, each associated with specific
+///   point data encoded via Morton encoding, in Morton sorted order
+///
+/// - `keys` - `MortonKeys` representing all leaves and their ancestors.
+///
+/// - `leaves_to_coordinates` - A mapping from Morton-encoded leaves to their corresponding
+///   indices in the `coordinates` vector.
+///
+/// - `levels_to_keys` - A mapping from tree levels to indices in the `keys` vector,
+///   allowing for level-wise traversal and manipulation of the tree structure.
+///
+/// - `key_to_index` - A hash map linking each node key to its index within the
+///   `keys` vector, enabling efficient node lookup and operations.
+///
+/// - `leaf_to_index` - A hash map linking each leaf key (MortonKey) to its index within the
+///   `leaves` vector, supporting efficient leaf operations and data retrieval.
+///
+/// - `leaves_set` - A set of all MortonKeys representing the leaves, used for quick existence
+///   checks and deduplication.
+///
+/// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
+///   checks and deduplication.
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
@@ -71,6 +116,9 @@ where
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
+
+    /// Range of leaf keys at this processor, and their current rank [rank, min, max]
+    pub range: [u64; 3],
 
     /// Depth of the tree
     pub depth: u64,
@@ -107,9 +155,6 @@ where
 
     /// All keys, returned as a set.
     pub keys_set: HashSet<MortonKey>,
-
-    /// Range of Morton keys at this processor, and their current rank [rank, min, max]
-    pub range: [u64; 3],
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -154,7 +199,47 @@ where
 /// A collection of `Point` instances, each representing a 3D point within an octree structure.
 pub type Points<T> = Vec<Point<T>>;
 
-/// Single node trees.
+/// Represents a single node tree structure equipped with spatial indexing capabilities for 3D
+/// particle data.
+///
+/// This struct is designed for efficient representation and manipulation of spatial data within
+/// a specified domain. It leverages Morton encoding to index points and nodes, facilitating
+/// operations such as insertion, deletion, and querying.
+///
+/// # Fields
+///
+/// - `depth` - The depth of the tree.
+///
+/// - `domain` - The spatial domain covered by the tree's associated point data.
+///
+/// - `coordinates` - A flat vector storing the coordinates of all points managed by the tree,
+///   in row-major format (e.g., `[x1, y1, z1, ..., xn, yn, zn]`), for efficient retrieval.
+///
+/// - `global_indices` - A vector of unique global indices corresponding to each point, allowing
+///   for efficient identification and lookup of points across different parts of the system.
+///
+/// - `leaves` - `MortonKeys` representing the leaves of the tree, each associated with specific
+///   point data encoded via Morton encoding, in Morton sorted order
+///
+/// - `keys` - `MortonKeys` representing all leaves and their ancestors.
+///
+/// - `leaves_to_coordinates` - A mapping from Morton-encoded leaves to their corresponding
+///   indices in the `coordinates` vector.
+///
+/// - `levels_to_keys` - A mapping from tree levels to indices in the `keys` vector,
+///   allowing for level-wise traversal and manipulation of the tree structure.
+///
+/// - `key_to_index` - A hash map linking each node key to its index within the
+///   `keys` vector, enabling efficient node lookup and operations.
+///
+/// - `leaf_to_index` - A hash map linking each leaf key (MortonKey) to its index within the
+///   `leaves` vector, supporting efficient leaf operations and data retrieval.
+///
+/// - `leaves_set` - A set of all MortonKeys representing the leaves, used for quick existence
+///   checks and deduplication.
+///
+/// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
+///   checks and deduplication.
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where

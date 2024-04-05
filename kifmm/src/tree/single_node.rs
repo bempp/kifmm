@@ -172,7 +172,7 @@ where
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
-    fn uniform_tree_sparse(
+    fn uniform_tree_pruned(
         coordinates_col_major: &[T],
         domain: &Domain<T>,
         depth: u64,
@@ -316,39 +316,54 @@ where
         level as u64
     }
 
-    /// Create a new single-node tree. If non-adaptive (uniform) trees are created, they are specified
-    /// by a user defined maximum `depth`, if an adaptive tree is created it is specified by only by the
-    /// user defined maximum leaf maximum occupancy `n_crit`.
+    /// Constructs a new single-node tree with uniform refinement up to a specified depth.
+    ///
+    /// This method initializes a single-node tree, uniformly subdivided to a user-defined maximum
+    /// depth. If 'prune_empty' is used, the tree will exclude empty leaf nodes and their empty
+    /// ancestors, optimizing memory usage and potentially improving query performance by eliminating
+    /// unoccupied regions of the spatial domain.
     ///
     /// # Arguments
-    /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
-    /// * `depth` - The maximum depth of the tree, defines the level of recursion.
-    /// * `sparse` - Whether or not to create a 'sparse' tree, in which empty boxes are dropped.
-    /// * `domain` - Optionally specify the domain, otherwise calculated from point data
+    ///
+    /// - `coordinates_col_major` -, A slice of coordinates in column major order, structured as
+    ///   [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]. This ordering facilitates
+    ///   efficient spatial indexing and operations within the tree.
+    ///
+    /// - `depth` -, Defines the maximum recursion level of the tree, determining the granularity of
+    ///   spatial division. A greater depth results in a finer partitioning of the spatial domain.
+    ///
+    /// - `prune_empty` -, Specifies whether to prune empty leaf nodes and their unoccupied ancestors from the tree.
+    ///   Enabling this option streamlines the tree by removing nodes that do not contain any point data, potentially
+    ///   enhancing query efficiency and reducing memory usage by focusing the tree structure on regions with actual data.
+    ///
+    /// - `domain` -, Optionally specifies the spatial domain of the tree. If provided, this domain is
+    ///   used directly; otherwise, it is computed from the point data, ensuring the tree encompasses
+    ///   all points.
+    ///
     pub fn new(
-        points: &[T],
+        coordinates_col_major: &[T],
         depth: u64,
-        sparse: bool,
+        prune_empty: bool,
         domain: Option<Domain<T>>,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
-        let points_len = points.len();
+        let coords_len = coordinates_col_major.len();
 
-        if !points.is_empty() && points_len % dim == 0 {
-            let n_points = points_len / dim;
-            let domain = domain.unwrap_or(Domain::from_local_points(points));
-            let global_indices = (0..n_points).collect_vec();
+        if !coordinates_col_major.is_empty() && coords_len % dim == 0 {
+            let n_coords = coords_len / dim;
+            let domain = domain.unwrap_or(Domain::from_local_points(coordinates_col_major));
+            let global_indices = (0..n_coords).collect_vec();
 
-            if sparse {
-                return Ok(SingleNodeTree::uniform_tree_sparse(
-                    points,
+            if prune_empty {
+                return Ok(SingleNodeTree::uniform_tree_pruned(
+                    coordinates_col_major,
                     &domain,
                     depth,
                     &global_indices,
                 ));
             } else {
                 return Ok(SingleNodeTree::uniform_tree(
-                    points,
+                    coordinates_col_major,
                     &domain,
                     depth,
                     &global_indices,
