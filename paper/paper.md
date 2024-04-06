@@ -20,8 +20,6 @@ bibliography: paper.bib
 
 The Kernel Independent Fast Multipole Method (kiFMM) is ...
 
-
-
 # Statement of need
 
 `kifmm-rs` is an
@@ -36,10 +34,15 @@ The Kernel Independent Fast Multipole Method (kiFMM) is ...
   - state of the art performance on a single node.
   - design flexible, can easily extend to multi-node problems in a future release.
 
-
 Combination of
   - speed + design + extensibility to new functionality (related algorithms)
-  -
+
+
+Past and ongoing research projects
+
+- where does this software fit in?
+- Older FMM efforts
+- Embedded within new Bempp-rs
 
 
 # Mathematics
