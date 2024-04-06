@@ -1,7 +1,7 @@
 //! FMM traits
-use crate::traits::tree::FmmTree;
+use crate::{fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::traits::Kernel;
-use rlst::{Array, BaseArray, RlstScalar, VectorContainer};
+use rlst::RlstScalar;
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -53,9 +53,6 @@ pub trait SourceToTargetTranslation {
     /// * `level` - The level of the tree at which this translation is being applied.
     fn p2l(&self, level: u64);
 }
-
-/// 2D RLST array, of dimension `[ncharges, nvecs]` where each of `nvecs` is associated with `ncharges`
-type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
 /// Interface for a Kernel-Independent Fast Multipole Method (FMM).
 ///

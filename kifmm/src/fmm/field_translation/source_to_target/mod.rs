@@ -1,5 +1,4 @@
 //! # Multipole to Local (M2L) Translations
-pub mod array;
 mod blas;
 mod fft;
 mod matmul;
