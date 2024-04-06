@@ -1,7 +1,7 @@
 //! Implementation of traits for field translations via the FFT and BLAS.
-use super::{array::flip3, transfer_vector::compute_transfer_vectors};
+use super::transfer_vector::compute_transfer_vectors;
 
-use crate::fmm::helpers::ncoeffs_kifmm;
+use crate::fmm::helpers::{flip3, ncoeffs_kifmm};
 use crate::fmm::types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata};
 use crate::traits::field::ConfigureSourceToTargetData;
 use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData, tree::FmmTreeNode};
@@ -604,6 +604,7 @@ mod test {
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
+    use crate::fmm::helpers::flip3;
     use crate::fmm::helpers::m2l_scale;
 
     use super::*;
