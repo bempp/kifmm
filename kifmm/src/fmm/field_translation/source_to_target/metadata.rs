@@ -432,8 +432,7 @@ where
             for kernel_f in kernel_data_f.iter().take(NHALO) {
                 let k_f =
                     &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
-                let k_f_ =
-                    rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft = rlst_dynamic_array2!(Complex<T>, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
