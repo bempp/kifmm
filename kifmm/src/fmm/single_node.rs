@@ -297,7 +297,7 @@ mod test {
         let mut direct = vec![T::zero(); ntargets * eval_size];
 
         let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
 
@@ -344,7 +344,7 @@ mod test {
         let ntargets = leaf_targets.len() / fmm.dim();
 
         let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(T, leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
 
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
