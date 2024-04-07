@@ -141,7 +141,6 @@ where
             FmmEvalType::Vector => {
                 // Lookup multipole data from source tree
                 let multipoles = rlst_array_from_slice2!(
-                    U,
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
@@ -277,7 +276,6 @@ where
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
                 let multipoles = rlst_array_from_slice2!(
-                    U,
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,

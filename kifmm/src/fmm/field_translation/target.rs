@@ -197,7 +197,6 @@ where
                             // Compute direct
                             if ntargets > 0 {
                                 let target_coordinates_row_major = rlst_array_from_slice2!(
-                                    W,
                                     target_coordinates_row_major,
                                     [ntargets, self.dim],
                                     [self.dim, 1]
@@ -254,7 +253,6 @@ where
 
                                 if ntargets > 0 {
                                     let target_coordinates_row_major = rlst_array_from_slice2!(
-                                        W,
                                         target_coordinates_row_major,
                                         [ntargets, self.dim],
                                         [self.dim, 1]
@@ -318,7 +316,6 @@ where
 
                         if ntargets > 0 {
                             let target_coordinates_row_major = rlst_array_from_slice2!(
-                                W,
                                 target_coordinates_row_major,
                                 [ntargets, self.dim],
                                 [self.dim, 1]
@@ -357,7 +354,6 @@ where
 
                                     if nsources > 0 {
                                         let source_coordinates_row_major = rlst_array_from_slice2!(
-                                            W,
                                             source_coordinates_row_major,
                                             [nsources, self.dim],
                                             [self.dim, 1]
@@ -404,7 +400,6 @@ where
 
                             if ntargets > 0 {
                                 let target_coordinates_row_major = rlst_array_from_slice2!(
-                                    W,
                                     target_coordinates_row_major,
                                     [ntargets, self.dim],
                                     [self.dim, 1]
@@ -446,7 +441,6 @@ where
                                         let nsources =
                                             source_coordinates_row_major.len() / self.dim;
                                         let source_coordinates_row_major = rlst_array_from_slice2!(
-                                            W,
                                             source_coordinates_row_major,
                                             [nsources, self.dim],
                                             [self.dim, 1]
