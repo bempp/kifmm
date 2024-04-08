@@ -62,7 +62,6 @@ where
                             let nsources = coordinates_row_major.len() / self.dim;
                             if nsources > 0 {
                                 let coordinates_row_major = rlst_array_from_slice2!(
-                                    W,
                                     coordinates_row_major,
                                     [nsources, self.dim],
                                     [self.dim, 1]
@@ -94,8 +93,8 @@ where
                     )
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
-                            rlst_array_from_slice2!(W, check_potential, [self.ncoeffs, chunk_size]);
-                        let scale = rlst_array_from_slice2!(W, scale, [self.ncoeffs, chunk_size]);
+                            rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
+                        let scale = rlst_array_from_slice2!(scale, [self.ncoeffs, chunk_size]);
 
                         let mut cmp_prod = rlst_dynamic_array2!(W, [self.ncoeffs, chunk_size]);
                         cmp_prod.fill_from(check_potential * scale);
@@ -149,7 +148,6 @@ where
                                         [i * self.ncoeffs..(i + 1) * self.ncoeffs];
 
                                     let coordinates_mat = rlst_array_from_slice2!(
-                                        W,
                                         coordinates_row_major,
                                         [nsources, self.dim],
                                         [self.dim, 1]
@@ -178,7 +176,7 @@ where
                     .zip(self.leaf_scales_sources.par_chunks_exact(self.ncoeffs))
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
-                            rlst_array_from_slice2!(W, check_potential, [self.ncoeffs, nmatvecs]);
+                            rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
                         let mut scaled_check_potential =
                             rlst_dynamic_array2!(W, [self.ncoeffs, nmatvecs]);
@@ -255,7 +253,6 @@ where
                     .for_each(
                         |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
                             let child_multipoles_chunk_mat = rlst_array_from_slice2!(
-                                W,
                                 child_multipoles_chunk,
                                 [self.ncoeffs * NSIBLINGS, chunk_size]
                             );
@@ -319,7 +316,6 @@ where
                             let sibling_displacement = i * self.ncoeffs * nmatvecs;
 
                             let child_multipoles_i = rlst_array_from_slice2!(
-                                W,
                                 &child_multipoles[sibling_displacement
                                     ..sibling_displacement + self.ncoeffs * nmatvecs],
                                 [self.ncoeffs, nmatvecs]

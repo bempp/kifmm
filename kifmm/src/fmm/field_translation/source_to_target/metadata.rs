@@ -1,7 +1,7 @@
 //! Implementation of traits for field translations via the FFT and BLAS.
-use super::{array::flip3, transfer_vector::compute_transfer_vectors};
+use super::transfer_vector::compute_transfer_vectors;
 
-use crate::fmm::helpers::ncoeffs_kifmm;
+use crate::fmm::helpers::{flip3, ncoeffs_kifmm};
 use crate::fmm::types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata};
 use crate::traits::field::ConfigureSourceToTargetData;
 use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData, tree::FmmTreeNode};
@@ -432,8 +432,7 @@ where
             for kernel_f in kernel_data_f.iter().take(NHALO) {
                 let k_f =
                     &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
-                let k_f_ =
-                    rlst_array_from_slice2!(Complex<T>, k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft = rlst_dynamic_array2!(Complex<T>, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
@@ -604,6 +603,7 @@ mod test {
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
+    use crate::fmm::helpers::flip3;
     use crate::fmm::helpers::m2l_scale;
 
     use super::*;
