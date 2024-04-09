@@ -1,23 +1,23 @@
 //! Implementation of traits for handling, and sorting, containers of point data.
 use crate::tree::types::Point;
-use rlst::RlstScalar;
+use crate::RlstScalarFloat;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 impl<T> PartialEq for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     fn eq(&self, other: &Self) -> bool {
         self.encoded_key == other.encoded_key
     }
 }
 
-impl<T> Eq for Point<T> where T: RlstScalar<Real = T> {}
+impl<T> Eq for Point<T> where T: RlstScalarFloat<Real = T> {}
 
 impl<T> Ord for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.encoded_key.cmp(&other.encoded_key)
@@ -26,7 +26,7 @@ where
 
 impl<T> PartialOrd for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // less_than(&self.morton, &other.morton)
@@ -36,7 +36,7 @@ where
 
 impl<T> Hash for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.encoded_key.hash(state);
@@ -45,9 +45,9 @@ where
 
 #[cfg(feature = "mpi")]
 mod mpi_point {
-    use super::{Point, RlstScalar};
+    use super::Point;
 
-    use crate::tree::types::MortonKey;
+    use crate::{tree::types::MortonKey, RlstScalarFloat};
     use memoffset::offset_of;
     use mpi::{
         datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
@@ -57,7 +57,7 @@ mod mpi_point {
 
     unsafe impl<T> Equivalence for Point<T>
     where
-        T: RlstScalar<Real = T> + Float + Equivalence,
+        T: RlstScalarFloat<Real = T> + Float + Equivalence,
     {
         type Out = UserDatatype;
         fn equivalent_datatype() -> Self::Out {
@@ -119,10 +119,7 @@ mod test {
 
     #[test]
     pub fn test_ordering() {
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         let n_points = 1000;
         let coords = points_fixture(n_points, None, None, None);

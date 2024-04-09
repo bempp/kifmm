@@ -1,6 +1,8 @@
 //! Field Traits
 use green_kernels::traits::Kernel;
 
+use crate::RlstScalarFloat;
+
 use super::tree::Domain;
 
 /// Marker trait for field translations
@@ -11,15 +13,16 @@ pub trait SourceToTargetData {
 }
 
 /// Interface for configuration of field translation data used during FMM construction
-pub trait ConfigureSourceToTargetData
+pub trait ConfigureSourceToTargetData<T>
 where
     Self: SourceToTargetData,
+    T: RlstScalarFloat,
 {
     /// Kernel function associated with field translation
     type Kernel: Kernel;
 
     /// The computational domain defining the tree.
-    type Domain: Domain;
+    type Domain: Domain<T>;
 
     /// Set the field translation operators corresponding to each unique transfer vector.
     ///

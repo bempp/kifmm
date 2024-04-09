@@ -7,6 +7,7 @@ use crate::tree::{
 };
 use crate::RlstScalarFloat;
 use itertools::Itertools;
+use rlst::RlstScalar;
 
 use std::collections::{HashMap, HashSet};
 
@@ -14,7 +15,8 @@ use super::morton::complete_region;
 
 impl<T> SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
@@ -25,8 +27,8 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree(
-        coordinates_col_major: &[T],
-        &domain: &Domain<T>,
+        coordinates_col_major: &[T::Real],
+        &domain: &Domain<T::Real>,
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
@@ -34,15 +36,15 @@ where
         let n_coords = coordinates_col_major.len() / dim;
 
         // Convert column major coordinate into `Point`, containing Morton encoding
-        let mut points = Points::default();
+        let mut points: Vec<Point<T::Real>> = Points::default();
         for i in 0..n_coords {
-            let coord = [
+            let coord: [T::Real; 3] = [
                 coordinates_col_major[i],
                 coordinates_col_major[i + n_coords],
                 coordinates_col_major[i + 2 * n_coords],
             ];
-            let base_key = MortonKey::from_point(&coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&coord, &domain, depth);
+            let base_key = MortonKey::<T::Real>::from_point(&coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::<T::Real>::from_point(&coord, &domain, depth);
             points.push(Point {
                 coordinate: coord,
                 base_key,
@@ -64,16 +66,12 @@ where
                 .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
-                    MortonKey {
-                        anchor,
-                        morton,
-                        ..Default::default()
-                    }
+                    MortonKey::<T::Real>::new(&anchor, morton)
                 }),
         );
 
         // Assign keys to points
-        let unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
+        let unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&leaves, &mut points);
 
         // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
@@ -184,8 +182,8 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree_pruned(
-        coordinates_col_major: &[T],
-        &domain: &Domain<T>,
+        coordinates_col_major: &[T::Real],
+        &domain: &Domain<T::Real>,
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
@@ -372,10 +370,10 @@ where
     ///   all points.
     ///
     pub fn new(
-        coordinates_col_major: &[T],
+        coordinates_col_major: &[T::Real],
         depth: u64,
         prune_empty: bool,
-        domain: Option<Domain<T>>,
+        domain: Option<Domain<T::Real>>,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let coords_len = coordinates_col_major.len();
@@ -436,7 +434,10 @@ where
     ///
     /// - `nodes` - Morton keys discretising a spatial domain being considered.
     /// - `points` - Mutable reference to points, allowing for assignment of their encoded Morton keys, if any.
-    pub fn assign_nodes_to_points(nodes: &MortonKeys<T>, points: &mut Points<T>) -> MortonKeys<T> {
+    pub fn assign_nodes_to_points(
+        nodes: &MortonKeys<T::Real>,
+        points: &mut Points<T::Real>,
+    ) -> MortonKeys<T::Real> {
         let mut map: HashMap<MortonKey<_>, bool> = HashMap::new();
         for node in nodes.iter() {
             map.insert(*node, false);
@@ -486,7 +487,7 @@ where
     /// # Arguments
     ///
     /// - `seeds` - Mutable reference to a collection of seed octants.
-    pub fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
+    pub fn complete_block_tree(seeds: &mut MortonKeys<T::Real>) -> MortonKeys<T::Real> {
         let root = MortonKey::root();
 
         let ffc_root = root.finest_first_child();
@@ -540,7 +541,7 @@ where
     /// # Arguments
     ///
     /// - `leaves` - A reference to a collection of Morton Keys, representing leaf nodes.
-    pub fn find_seeds(leaves: &MortonKeys<T>) -> MortonKeys<T> {
+    pub fn find_seeds(leaves: &MortonKeys<T::Real>) -> MortonKeys<T::Real> {
         let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
 
         let mut seeds = MortonKeys::from(
@@ -567,17 +568,17 @@ where
     /// - `block_tree` - Initially constructed block_tree, subject to refinement through splitting.
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
     pub fn split_blocks(
-        points: &mut Points<T>,
-        mut block_tree: MortonKeys<T>,
+        points: &mut Points<T::Real>,
+        mut block_tree: MortonKeys<T::Real>,
         n_crit: usize,
-    ) -> MortonKeys<T> {
+    ) -> MortonKeys<T::Real> {
         let split_block_tree;
         let mut blocks_to_points;
         loop {
             let mut new_block_tree = MortonKeys::new();
 
             // Map between blocks and the leaves they contain
-            let unmapped = SingleNodeTree::assign_nodes_to_points(&block_tree, points);
+            let unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&block_tree, points);
             blocks_to_points = points
                 .iter()
                 .enumerate()
@@ -635,14 +636,15 @@ where
 
 impl<T> Tree for SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat
 {
     type Scalar = T;
-    type Domain = Domain<T>;
-    type Node = MortonKey<T>;
-    type NodeSlice<'a> = &'a [MortonKey<T>]
+    type Domain = Domain<T::Real>;
+    type Node = MortonKey<T::Real>;
+    type NodeSlice<'a> = &'a [MortonKey<T::Real>]
         where T: 'a;
-    type Nodes = MortonKeys<T>;
+    type Nodes = MortonKeys<T::Real>;
 
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
         self.coordinates(leaf).map(|coords| coords.len() / 3)
@@ -704,7 +706,7 @@ where
         Some(&self.leaves)
     }
 
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[<Self::Scalar as RlstScalar>::Real]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
@@ -712,7 +714,7 @@ where
         }
     }
 
-    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
+    fn all_coordinates(&self) -> Option<&[<Self::Scalar as RlstScalar>::Real]> {
         Some(&self.coordinates)
     }
 
@@ -751,7 +753,7 @@ mod test {
 
         // Test uniformly distributed data
         let points = points_fixture(n_points, Some(-1.0), Some(1.0), None);
-        let tree = SingleNodeTree::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -769,7 +771,7 @@ mod test {
 
         // Test a column distribution of data
         let points = points_fixture_col::<f64>(n_points);
-        let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
+        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None).unwrap();
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -797,7 +799,11 @@ mod test {
         assert_eq!(unique_leaves.len(), expected);
     }
 
-    pub fn test_no_overlaps_helper<T: RlstScalarFloat>(nodes: &[MortonKey<T>]) {
+    pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T::Real>])
+    where
+        T: RlstScalarFloat,
+        <T as RlstScalar>::Real: RlstScalarFloat,
+    {
         let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 
         for node in key_set.iter() {
@@ -809,7 +815,7 @@ mod test {
 
     #[test]
     pub fn test_assign_nodes_to_points() {
-        let root = MortonKey::root();
+        let root = MortonKey::<f64>::root();
 
         // Generate points in a single octant of the domain
         let n_points = 10;
@@ -828,10 +834,9 @@ mod test {
             })
         }
         let mut points = tmp;
-        points.sort();
         let keys = MortonKeys::from(root.children());
 
-        SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
+        SingleNodeTree::<f64>::assign_nodes_to_points(&keys, &mut points);
 
         let leaves_to_points = points
             .iter()
@@ -864,11 +869,7 @@ mod test {
     #[test]
     pub fn test_split_blocks() {
         let root = MortonKey::root();
-
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1.0, 1.0, 1.0],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let n_points = 10000;
         let points = points_fixture(n_points, None, None, None);
 
@@ -891,10 +892,10 @@ mod test {
         // Test case where blocks span the entire domain
         let block_tree = MortonKeys::from(vec![root]);
 
-        SingleNodeTree::split_blocks(&mut points, block_tree, n_crit);
+        SingleNodeTree::<f64>::split_blocks(&mut points, block_tree, n_crit);
         let split_block_tree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
 
-        test_no_overlaps_helper(&split_block_tree);
+        test_no_overlaps_helper::<f64>(&split_block_tree);
 
         // Test case where the block_tree only partially covers the area
         let mut children = root.children();
@@ -907,9 +908,9 @@ mod test {
 
         let block_tree = SingleNodeTree::<f64>::complete_block_tree(&mut seeds);
 
-        SingleNodeTree::split_blocks(&mut points, block_tree, 25);
+        SingleNodeTree::<f64>::split_blocks(&mut points, block_tree, 25);
         let split_block_tree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
-        test_no_overlaps_helper(&split_block_tree);
+        test_no_overlaps_helper::<f64>(&split_block_tree);
     }
 
     #[test]
@@ -941,7 +942,7 @@ mod test {
         let n_points = 10000;
         let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
+        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None).unwrap();
 
         let keys = tree.all_keys().unwrap();
 
@@ -977,7 +978,7 @@ mod test {
         let n_points = 10000;
         let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
-        let tree = SingleNodeTree::new(points.data(), depth, false, None).unwrap();
+        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None).unwrap();
 
         let keys = tree.keys(3).unwrap();
 

@@ -57,13 +57,13 @@ fn test_no_overlaps<T: RlstScalarFloatMpi<Real = T>>(
 
 /// Test that the globally defined domain contains all the points at a given node.
 #[cfg(feature = "mpi")]
-fn test_global_bounds<T: RlstScalarFloatMpi + SampleUniform>(world: &UserCommunicator) {
+fn test_global_bounds<T: RlstScalarFloatMpi<Real = T> + SampleUniform>(world: &UserCommunicator) {
     let n_points = 10000;
     let points = points_fixture::<T>(n_points, None, None, None);
 
     let comm = world.duplicate();
 
-    let domain = Domain::from_global_points(points.data(), &comm);
+    let domain = Domain::<T>::from_global_points(points.data(), &comm);
 
     // Test that all local points are contained within the global domain
     for i in 0..n_points {

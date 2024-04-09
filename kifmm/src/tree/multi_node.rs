@@ -12,13 +12,10 @@ use crate::hyksort::hyksort;
 use itertools::Itertools;
 use mpi::{
     topology::UserCommunicator,
-    traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
+    traits::{Communicator, CommunicatorCollectives, Destination, Source},
     Rank,
 };
-use num::traits::Float;
-use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
 
 use super::morton::complete_region;
 
@@ -106,7 +103,7 @@ where
         let max = leaves.iter().max().unwrap();
 
         // Assign leaves to points, disregard unmapped as they are included by definition in leaves buffer
-        let _unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
+        let _unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&leaves, &mut points);
 
         // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
@@ -294,7 +291,7 @@ where
         let max = leaves.iter().max().unwrap();
 
         // Assign leaves to points, disregard unmapped
-        let _unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
+        let _unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&leaves, &mut points);
 
         // Leaves are those that are mapped and their siblings if they exist in the processors range
         let leaves: HashSet<MortonKey<_>> = points

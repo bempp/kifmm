@@ -1,5 +1,5 @@
 //! FMM traits
-use crate::{fmm::types::Charges, traits::tree::FmmTree};
+use crate::{fmm::types::Charges, traits::tree::FmmTree, RlstScalarFloat};
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
@@ -60,15 +60,18 @@ pub trait SourceToTargetTranslation {
 /// data structures, kernels, and precision types. It supports operations essential for
 /// executing FMM calculations, including accessing multipole and local expansions, evaluating
 /// potentials, and managing the underlying tree structure and kernel functions.
-pub trait Fmm {
+pub trait Fmm
+where
+    <Self::Scalar as RlstScalar>::Real: RlstScalarFloat
+{
     /// Data associated with FMM, must implement RlstScalar.
-    type Scalar: RlstScalar;
+    type Scalar: RlstScalarFloat;
 
     /// Node index for accessing data in the tree.
     type Node;
 
     /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
-    type Tree: FmmTree;
+    type Tree: FmmTree<Scalar = Self::Scalar>;
 
     /// Kernel associated with this FMMl
     type Kernel: Kernel;

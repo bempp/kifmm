@@ -11,7 +11,7 @@ use crate::tree::{
 };
 use crate::RlstScalarFloat;
 use itertools::{izip, Itertools};
-use num::Float;
+use num::{Float, ToPrimitive};
 use rlst::RlstScalar;
 use std::marker::PhantomData;
 use std::{
@@ -31,7 +31,7 @@ use std::{
 /// # Arguments
 ///
 /// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
-fn linearize_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
+fn linearize_keys<T: RlstScalarFloat<Real = T>>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
     let depth = keys.iter().map(|k| k.level()).max().unwrap();
     let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
@@ -65,7 +65,7 @@ fn linearize_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>
 ///
 /// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
 /// contiguous space without gaps.
-fn balance_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
+fn balance_keys<T: RlstScalarFloat<Real = T>>(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
     let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
     let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
 
@@ -105,7 +105,7 @@ fn balance_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> HashSet<MortonKey<
 ///
 /// - `start` - The Morton Key defining the beginning of the region to complete.
 /// - `end` - The Morton Key marking the end of the region.
-pub fn complete_region<T: RlstScalarFloat>(
+pub fn complete_region<T: RlstScalarFloat<Real = T>>(
     start: &MortonKey<T>,
     end: &MortonKey<T>,
 ) -> Vec<MortonKey<T>> {
@@ -137,7 +137,10 @@ pub fn complete_region<T: RlstScalarFloat>(
     minimal_tree
 }
 
-impl<T: RlstScalarFloat> MortonKeys<T> {
+impl<T> MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     /// Create new
     pub fn new() -> MortonKeys<T> {
         MortonKeys {
@@ -182,7 +185,10 @@ impl<T: RlstScalarFloat> MortonKeys<T> {
     }
 }
 
-impl<T> Deref for MortonKeys<T> {
+impl<T> Deref for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     type Target = Vec<MortonKey<T>>;
 
     fn deref(&self) -> &Self::Target {
@@ -190,13 +196,19 @@ impl<T> Deref for MortonKeys<T> {
     }
 }
 
-impl<T> DerefMut for MortonKeys<T> {
+impl<T> DerefMut for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.keys
     }
 }
 
-impl<T: Copy> Iterator for MortonKeys<T> {
+impl<T> Iterator for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     type Item = MortonKey<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -209,7 +221,10 @@ impl<T: Copy> Iterator for MortonKeys<T> {
     }
 }
 
-impl<T: RlstScalarFloat> FromIterator<MortonKey<T>> for MortonKeys<T> {
+impl<T> FromIterator<MortonKey<T>> for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     fn from_iter<I: IntoIterator<Item = MortonKey<T>>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
 
@@ -220,13 +235,13 @@ impl<T: RlstScalarFloat> FromIterator<MortonKey<T>> for MortonKeys<T> {
     }
 }
 
-impl<T> From<Vec<MortonKey<T>>> for MortonKeys<T> {
+impl<T: RlstScalarFloat<Real = T>> From<Vec<MortonKey<T>>> for MortonKeys<T> {
     fn from(keys: Vec<MortonKey<T>>) -> Self {
         MortonKeys { keys, index: 0 }
     }
 }
 
-impl<T> From<HashSet<MortonKey<T>>> for MortonKeys<T> {
+impl<T: RlstScalarFloat<Real = T>> From<HashSet<MortonKey<T>>> for MortonKeys<T> {
     fn from(keys: HashSet<MortonKey<T>>) -> Self {
         MortonKeys {
             keys: keys.into_iter().collect_vec(),
@@ -235,26 +250,26 @@ impl<T> From<HashSet<MortonKey<T>>> for MortonKeys<T> {
     }
 }
 
-impl<T> PartialEq for MortonKey<T> {
+impl<T: RlstScalarFloat<Real = T>> PartialEq for MortonKey<T> {
     fn eq(&self, other: &Self) -> bool {
         self.morton == other.morton
     }
 }
-impl<T> Eq for MortonKey<T> {}
+impl<T: RlstScalarFloat<Real = T>> Eq for MortonKey<T> {}
 
-impl<T> Ord for MortonKey<T> {
+impl<T: RlstScalarFloat<Real = T>> Ord for MortonKey<T> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.morton.cmp(&other.morton)
     }
 }
 
-impl<T> PartialOrd for MortonKey<T> {
+impl<T: RlstScalarFloat<Real = T>> PartialOrd for MortonKey<T> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.morton.cmp(&other.morton))
     }
 }
 
-impl<T> Hash for MortonKey<T> {
+impl<T: RlstScalarFloat<Real = T>> Hash for MortonKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
     }
@@ -299,8 +314,8 @@ fn decode_key(morton: u64) -> [u64; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-fn point_to_anchor<T: RlstScalarFloat>(
-    point: &[T; 3],
+fn point_to_anchor<T: RlstScalarFloat<Real = T> + ToPrimitive>(
+    point: &[T::Real; 3],
     level: u64,
     domain: &Domain<T>,
 ) -> Result<[u64; 3], std::io::Error> {
@@ -316,11 +331,11 @@ fn point_to_anchor<T: RlstScalarFloat>(
         true => {
             let mut anchor = [u64::default(); 3];
 
-            let side_length: Vec<T> = domain
+            let side_length = domain
                 .side_length
                 .iter()
-                .map(|d| *d / T::from(1 << level).unwrap())
-                .collect();
+                .map(|d| *d / T::from(1 << level).unwrap().re())
+                .collect_vec();
 
             let scaling_factor = 1 << (DEEPEST_LEVEL - level);
 
@@ -360,45 +375,34 @@ pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
     key | level
 }
 
-impl<T: RlstScalarFloat> MortonKey<T> {
+impl<T> MortonKey<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     /// Constructor for Morton key
     pub fn new(anchor: &[u64; 3], morton: u64) -> Self {
         Self {
             anchor: *anchor,
             morton,
-            scalar: PhantomData::<T>,
+            scalar: PhantomData::<T::Real>,
         }
     }
 
     /// The Morton key corresponding to an octree root node
     pub fn root() -> Self {
-        Self {
-            anchor: [0, 0, 0],
-            morton: 0,
-            ..Default::default()
-        }
+        Self::new(&[0, 0, 0], 0)
     }
 
     /// Construct a `MortonKey` type from a Morton index
     pub fn from_morton(morton: u64) -> Self {
         let anchor = decode_key(morton);
-
-        Self {
-            anchor,
-            morton,
-            ..Default::default()
-        }
+        Self::new(&anchor, morton)
     }
 
     /// Construct a `MortonKey` type from the anchor at a given level
     pub fn from_anchor(anchor: &[u64; 3], level: u64) -> Self {
         let morton = encode_anchor(anchor, level);
-
-        Self {
-            anchor: *anchor,
-            morton,
-            ..Default::default()
-        }
+        Self::new(anchor, morton)
     }
 
     /// Construct a `MortonKey` associated with the box that encloses the point on the deepest level.
@@ -407,7 +411,7 @@ impl<T: RlstScalarFloat> MortonKey<T> {
     /// * `point` - Cartesian coordinate for a given point.
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
-    pub fn from_point(point: &[T; 3], domain: &Domain<T>, level: u64) -> Self {
+    pub fn from_point(point: &[T::Real; 3], domain: &Domain<T>, level: u64) -> Self {
         let anchor = point_to_anchor(point, level, domain).unwrap();
         MortonKey::from_anchor(&anchor, level)
     }
@@ -549,20 +553,12 @@ impl<T: RlstScalarFloat> MortonKey<T> {
 
     /// Return the first child of a Morton Key.
     pub fn first_child(&self) -> Self {
-        MortonKey {
-            anchor: self.anchor,
-            morton: 1 + self.morton,
-            ..Default::default()
-        }
+        Self::new(&self.anchor, 1 + self.morton)
     }
 
     /// Return the first child of a Morton Key on the deepest level.
     pub fn finest_first_child(&self) -> Self {
-        MortonKey {
-            anchor: self.anchor,
-            morton: DEEPEST_LEVEL - self.level() + self.morton,
-            ..Default::default()
-        }
+        Self::new(&self.anchor, DEEPEST_LEVEL - self.level() + self.morton)
     }
 
     /// Return the last child of a Morton Key on the deepest level.
@@ -789,11 +785,7 @@ impl<T: RlstScalarFloat> MortonKey<T> {
         {
             let new_anchor: [u64; 3] = [x as u64, y as u64, z as u64];
             let new_morton = encode_anchor(&new_anchor, level);
-            Some(MortonKey {
-                anchor: new_anchor,
-                morton: new_morton,
-                ..Default::default()
-            })
+            Some(Self::new(&new_anchor, new_morton))
         } else {
             None
         }
@@ -857,9 +849,13 @@ impl<T: RlstScalarFloat> MortonKey<T> {
     }
 }
 
-impl<T: RlstScalarFloat> TreeNode<T> for MortonKey<T> {
-    type Nodes = MortonKeys<T>;
-    type Domain = Domain<T>;
+impl<T> TreeNode<T> for MortonKey<T::Real>
+where
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
+{
+    type Nodes = MortonKeys<T::Real>;
+    type Domain = Domain<T::Real>;
 
     fn children(&self) -> Self::Nodes {
         MortonKeys {
@@ -1052,7 +1048,7 @@ use mpi::{
 };
 
 #[cfg(feature = "mpi")]
-unsafe impl<T> Equivalence for MortonKey<T> {
+unsafe impl<T: RlstScalarFloat<Real = T>> Equivalence for MortonKey<T> {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(
@@ -1083,7 +1079,7 @@ mod test {
 
     /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
     /// `a` is less than key `b`, this function evaluates to true.
-    fn less_than<T: RlstScalarFloat>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
+    fn less_than<T: RlstScalarFloat<Real = T>>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
         // If anchors match, the one at the coarser level has the lesser Morton id.
         let same_anchor = (a.anchor[0] == b.anchor[0])
             & (a.anchor[1] == b.anchor[1])
@@ -1247,7 +1243,7 @@ mod test {
         let n_points = 1000;
         let points = points_fixture(n_points, Some(-1.), Some(1.0), None);
 
-        let domain = Domain::from_local_points(points.data());
+        let domain = Domain::<f64>::from_local_points(points.data());
 
         let mut keys: Vec<MortonKey<_>> = Vec::new();
 
@@ -1320,7 +1316,7 @@ mod test {
 
     #[test]
     fn test_ancestors() {
-        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let point = [0.5, 0.5, 0.5];
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
@@ -1360,7 +1356,7 @@ mod test {
     #[test]
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         // Simple case, at the leaf level
@@ -1501,7 +1497,7 @@ mod test {
     #[test]
     pub fn test_morton_keys_iterator() {
         let n_points = 1000;
-        let domain = Domain::new(&[-1.01, -1.01, -1.01], &[2.0, 2.0, 2.0]);
+        let domain = Domain::<f64>::new(&[-1.01, -1.01, -1.01], &[2.0, 2.0, 2.0]);
         let min = Some(-1.01);
         let max = Some(0.99);
 
@@ -1535,7 +1531,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor() {
-        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test points in the domain
         let point = [0.9999, 0.9999, 0.9999];
@@ -1547,7 +1543,7 @@ mod test {
             assert_eq!(a, &expected[i])
         }
 
-        let domain = Domain::new(&[-0.7, -0.6, -0.5], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[-0.7, -0.6, -0.5], &[1., 1., 1.]);
 
         let point = [-0.499, -0.499, -0.499];
         let level = 1;
@@ -1561,7 +1557,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor_fails() {
-        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test a point not in the domain
         let point = [1.9, 0.9, 0.9];
@@ -1571,7 +1567,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor_fails_negative_domain() {
-        let domain = Domain::new(&[-0.5, -0.5, -0.5], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[-0.5, -0.5, -0.5], &[1., 1., 1.]);
 
         // Test a point not in the domain
         let point = [-0.51, -0.5, -0.5];
@@ -1712,7 +1708,7 @@ mod test {
     #[test]
     fn test_is_adjacent() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain::new(&[-0.1, -0.1, -0.1], &[1., 1., 1.]);
+        let domain = Domain::<f64>::new(&[-0.1, -0.1, -0.1], &[1., 1., 1.]);
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 

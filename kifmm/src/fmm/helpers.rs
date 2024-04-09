@@ -166,7 +166,8 @@ pub fn level_expansion_pointers<T>(
     expansions: &[T],
 ) -> Vec<Vec<Vec<SendPtrMut<T>>>>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat
 {
     let mut result = vec![Vec::new(); (tree.depth() + 1).try_into().unwrap()];
 
@@ -204,7 +205,8 @@ pub fn leaf_expansion_pointers<T>(
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat
 {
     let mut result = vec![Vec::new(); n_leaves];
 
@@ -236,7 +238,8 @@ pub fn potential_pointers<T>(
     potentials: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat
 {
     let mut result = vec![SendPtrMut::default(); n_leaves * nmatvecs];
     let dim = 3;

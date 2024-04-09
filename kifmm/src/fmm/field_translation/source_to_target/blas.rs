@@ -14,8 +14,7 @@ use itertools::Itertools;
 
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MatrixSvd,
-    MultIntoResize, RawAccess, RawAccessMut, VectorContainer,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer
 };
 use std::{
     collections::{HashMap, HashSet},
@@ -25,7 +24,8 @@ use std::{
 impl<T, U, V> KiFmm<V, BlasFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalarFloat<Real = U>,
+    U: RlstScalarFloat,
+    <U as RlstScalar>::Real: RlstScalarFloat,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {

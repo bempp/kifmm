@@ -5,7 +5,7 @@ use crate::RlstScalarFloat;
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Complex;
 use num_complex::ComplexFloat;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
 
 #[cfg(feature = "mpi")]
@@ -155,12 +155,14 @@ pub struct SendPtr<T> {
 /// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
 ///
 ///
-pub struct KiFmm<
+pub struct KiFmm<T, U, V, W>
+where
     T: FmmTree<Tree = SingleNodeTree<W>>,
     U: SourceToTargetData,
     V: Kernel,
-    W: RlstScalarFloat<Real = W>,
-> {
+    W: RlstScalarFloat,
+    <W as RlstScalar>::Real: RlstScalarFloat
+{
     /// Dimension of the FMM
     pub dim: usize,
 
@@ -195,10 +197,10 @@ pub struct KiFmm<
     pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_surfaces_sources: Vec<W>,
+    pub leaf_upward_surfaces_sources: Vec<W::Real>,
 
     /// Upward surfaces associated with target leaves
-    pub leaf_upward_surfaces_targets: Vec<W>,
+    pub leaf_upward_surfaces_targets: Vec<W::Real>,
 
     /// Scales of each source leaf box
     pub leaf_scales_sources: Vec<W>,
@@ -253,10 +255,10 @@ pub struct KiFmm<
     pub level_locals: Vec<Vec<Vec<SendPtrMut<W>>>>,
 
     /// Index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_locals: Vec<HashMap<MortonKey<W>, usize>>,
+    pub level_index_pointer_locals: Vec<HashMap<MortonKey<W::Real>, usize>>,
 
     /// Index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<W>, usize>>,
+    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<W::Real>, usize>>,
 
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<W>>,
@@ -420,13 +422,17 @@ where
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[derive(Default)]
-pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T>> {
+pub struct SingleNodeFmmTree<T>
+where
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat
+{
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
     pub target_tree: SingleNodeTree<T>,
     /// The computational domain associated with this FMM calculation.
-    pub domain: Domain<T>,
+    pub domain: Domain<T::Real>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on distributed nodes.
@@ -524,11 +530,12 @@ where
 #[derive(Default)]
 pub struct BlasFieldTranslation<T, U>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
     U: Kernel<T = T> + Default,
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Threshold
-    pub threshold: T,
+    pub threshold: T::Real,
 
     /// Precomputed metadata
     pub metadata: BlasMetadata<T>,
@@ -563,7 +570,11 @@ where
 ///
 /// - `target`- The Morton key of the target box.
 #[derive(Debug)]
-pub struct TransferVector<T> {
+pub struct TransferVector<T>
+where
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
+{
     /// Three vector of components.
     pub components: [i64; 3],
 
@@ -571,10 +582,10 @@ pub struct TransferVector<T> {
     pub hash: usize,
 
     /// The `source` Morton key associated with this transfer vector.
-    pub source: MortonKey<T>,
+    pub source: MortonKey<T::Real>,
 
     /// The `target` Morton key associated with this transfer vector.
-    pub target: MortonKey<T>,
+    pub target: MortonKey<T::Real>,
 }
 
 /// Stores metadata for FFT based acceleration scheme for field translation.

@@ -4,8 +4,8 @@
 use crate::RlstScalarFloatMpi;
 #[cfg(feature = "mpi")]
 use mpi::topology::UserCommunicator;
-
 use rlst::RlstScalar;
+
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
@@ -25,13 +25,13 @@ use crate::RlstScalarFloat;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
-    pub origin: [T; 3],
+    pub origin: [T::Real; 3],
 
     /// The extent of the point distribution along the x, y, z axes respectively.
-    pub side_length: [T; 3],
+    pub side_length: [T::Real; 3],
 }
 
 /// Represents a Morton key associated with a node within an octree structure.
@@ -52,18 +52,24 @@ where
 ///   spatial indexing and operations.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-pub struct MortonKey<T> {
+pub struct MortonKey<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
     /// The Morton encoded anchor.
     pub morton: u64,
     /// Scalar type of coordinate data associated with the key
-    pub scalar: PhantomData<T>,
+    pub scalar: PhantomData<T::Real>,
 }
 
 /// A collection that stores and allows iteration over a sequence of `MortonKey` values.
 #[derive(Clone, Debug, Default)]
-pub struct MortonKeys<T> {
+pub struct MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     /// A vector of Morton_keys
     pub keys: Vec<MortonKey<T>>,
 
@@ -120,7 +126,8 @@ pub struct MortonKeys<T> {
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
-    T: RlstScalarFloatMpi<Real = T>,
+    T: RlstScalarFloatMpi,
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
@@ -132,37 +139,37 @@ where
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain<T>,
+    pub domain: Domain<T::Real>,
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T>,
+    pub coordinates: Vec<T::Real>,
 
     /// All global indices
     pub global_indices: Vec<usize>,
 
     /// The leaves that span the tree.
-    pub leaves: MortonKeys<T>,
+    pub leaves: MortonKeys<T::Real>,
 
     /// All nodes in tree.
-    pub keys: MortonKeys<T>,
+    pub keys: MortonKeys<T::Real>,
 
     /// Associate leaves with point indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey<T::Real>, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
     /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T>, usize>,
+    pub key_to_index: HashMap<MortonKey<T::Real>, usize>,
 
     /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+    pub leaf_to_index: HashMap<MortonKey<T::Real>, usize>,
 
     /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T>>,
+    pub leaves_set: HashSet<MortonKey<T::Real>>,
 
     /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T>>,
+    pub keys_set: HashSet<MortonKey<T::Real>>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -189,7 +196,7 @@ where
 #[derive(Clone, Debug, Default, Copy)]
 pub struct Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     /// Physical coordinate in Cartesian space.
     pub coordinate: [T; 3],
@@ -251,41 +258,42 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Depth of a tree.
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain<T>,
+    pub domain: Domain<T::Real>,
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T>,
+    pub coordinates: Vec<T::Real>,
 
     /// All global indices
     pub global_indices: Vec<usize>,
 
     /// The leaves that span the tree, and associated Point data.
-    pub leaves: MortonKeys<T>,
+    pub leaves: MortonKeys<T::Real>,
 
     /// All nodes in tree, and associated Node data.
-    pub keys: MortonKeys<T>,
+    pub keys: MortonKeys<T::Real>,
 
     /// Associate leaves with coordinate indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey<T::Real>, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
     /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T>, usize>,
+    pub key_to_index: HashMap<MortonKey<T::Real>, usize>,
 
     /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+    pub leaf_to_index: HashMap<MortonKey<T::Real>, usize>,
 
     /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T>>,
+    pub leaves_set: HashSet<MortonKey<T::Real>>,
 
     /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T>>,
+    pub keys_set: HashSet<MortonKey<T::Real>>,
 }

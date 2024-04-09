@@ -1,4 +1,6 @@
 //! Implementation of FmmTree Trait
+use rlst::RlstScalar;
+
 use super::types::SingleNodeFmmTree;
 use crate::traits::tree::{FmmTree, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
@@ -6,10 +8,11 @@ use crate::RlstScalarFloat;
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat
 {
     type Scalar = T;
-    type Node = MortonKey<T>;
+    type Node = MortonKey<T::Real>;
     type Tree = SingleNodeTree<T>;
 
     fn source_tree(&self) -> &Self::Tree {

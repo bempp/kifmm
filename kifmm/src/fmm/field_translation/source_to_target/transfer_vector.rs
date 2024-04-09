@@ -3,23 +3,25 @@ use crate::fmm::types::TransferVector;
 use crate::tree::types::{Domain, MortonKey};
 use crate::RlstScalarFloat;
 use itertools::Itertools;
+use rlst::RlstScalar;
 use std::collections::HashSet;
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
 /// There are at most 316 such interactions, corresponding to unique `transfer vectors'. Here we compute all of them
 /// with respect to level 3 of an associated octree.
-pub fn compute_transfer_vectors<T: RlstScalarFloat>() -> Vec<TransferVector<T>> {
-    let half = T::from(0.5).unwrap();
-    let zero = T::zero();
-    let one = T::one();
+pub fn compute_transfer_vectors<T>() -> Vec<TransferVector<T>>
+where
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
+{
+    let half = T::from(0.5).unwrap().re();
+    let zero = T::zero().re();
+    let one = T::one().re();
     let point = [half, half, half];
-    let domain = Domain {
-        origin: [zero, zero, zero],
-        side_length: [one, one, one],
-    };
+    let domain = Domain::<T::Real>::new(&[zero, zero, zero], &[one, one, one]);
 
     // Encode point in centre of domain
-    let key = MortonKey::from_point(&point, &domain, 3);
+    let key = MortonKey::<T::Real>::from_point(&point, &domain, 3);
 
     // Add neighbours, and their resp. siblings to v list.
     let mut neighbours = key.neighbors();

@@ -20,7 +20,7 @@ use crate::fmm::{
 };
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut,
+    RawAccessMut, RlstScalar,
 };
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
@@ -28,7 +28,8 @@ where
     T: FmmTree<Tree = SingleNodeTree<W>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalarFloat<Real = W>,
+    W: RlstScalarFloat,
+    <W as RlstScalar>::Real: RlstScalarFloat
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.source_tree().all_leaves() else {
@@ -37,7 +38,7 @@ where
 
         let n_leaves = self.tree.source_tree().n_leaves().unwrap();
         let surface_size = self.ncoeffs * self.dim;
-        let coordinates = self.tree.source_tree().all_coordinates().unwrap();
+        let coordinates: &[W::Real] = self.tree.source_tree().all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
 
         match self.fmm_eval_type {
@@ -69,7 +70,7 @@ where
                                     [self.dim, 1]
                                 );
                                 let mut coordinates_col_major =
-                                    rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                    rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
                                 coordinates_col_major.fill_from(coordinates_row_major.view());
 
                                 self.kernel.evaluate_st(
@@ -135,7 +136,7 @@ where
                     .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
-                            let coordinates_row_major = &coordinates[charge_index_pointer.0
+                            let coordinates_row_major: &[W::Real] = &coordinates[charge_index_pointer.0
                                 * self.dim
                                 ..charge_index_pointer.1 * self.dim];
                             let nsources = coordinates_row_major.len() / self.dim;
@@ -155,7 +156,7 @@ where
                                         [self.dim, 1]
                                     );
                                     let mut coordinates_col_major =
-                                        rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                        rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
                                     coordinates_col_major.fill_from(coordinates_mat.view());
 
                                     self.kernel.evaluate_st(

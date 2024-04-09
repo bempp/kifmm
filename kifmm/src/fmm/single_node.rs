@@ -12,15 +12,15 @@ use crate::tree::types::{MortonKey, SingleNodeTree};
 use crate::RlstScalarFloat;
 use green_kernels::traits::Kernel;
 use green_kernels::types::EvalType;
-
-use rlst::{rlst_dynamic_array2, RawAccess, Shape};
+use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey<W>> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey<W::Real>, Scalar = W> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
-    W: RlstScalarFloat<Real = W>,
+    W: RlstScalarFloat,
+    <W as RlstScalar>::Real: RlstScalarFloat,
     Self: SourceToTargetTranslation,
 {
     type Node = T::Node;
