@@ -19,7 +19,7 @@
 //! let depth = 3; // The depth of the tree
 //!
 //! // Create a single node tree
-//! let single_node = SingleNodeTree::new(
+//! let single_node = SingleNodeTree::<f32>::new(
 //!     points.data(),
 //!     depth,
 //!     sparse,

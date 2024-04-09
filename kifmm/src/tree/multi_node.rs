@@ -5,25 +5,21 @@ use crate::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
     },
+    RlstScalarFloatMpi,
 };
 
 use crate::hyksort::hyksort;
 use itertools::Itertools;
 use mpi::{
     topology::UserCommunicator,
-    traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
+    traits::{Communicator, CommunicatorCollectives, Destination, Source},
     Rank,
 };
-use num::traits::Float;
-use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
-use std::fmt::Debug;
-
-use super::{constants::ROOT, morton::complete_region};
 
 impl<T> MultiNodeTree<T>
 where
-    T: Float + Default + Equivalence + Debug + RlstScalar<Real = T>,
+    T: RlstScalarFloatMpi<Real = T>,
 {
     /// Constructor for uniform trees, distributed with MPI, node refined to a user defined depth.
     ///
@@ -77,7 +73,7 @@ where
         hyksort(&mut points, hyksort_subcomm_size, comm)?;
 
         // Find unique leaves specified by points on each processor
-        let leaves: HashSet<MortonKey> = points.iter().map(|p| p.encoded_key).collect();
+        let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
         let mut leaves = MortonKeys::from(leaves);
         leaves.complete();
 
@@ -105,7 +101,7 @@ where
         let max = leaves.iter().max().unwrap();
 
         // Assign leaves to points, disregard unmapped as they are included by definition in leaves buffer
-        let _unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
+        let _unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&leaves, &mut points);
 
         // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
@@ -125,14 +121,14 @@ where
         // Find all keys in tree
         let range = [world.rank() as u64, min.morton, max.morton];
 
-        let tmp: HashSet<MortonKey> = leaves
+        let tmp: HashSet<MortonKey<_>> = leaves
             .iter()
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
         // This additional step is needed in distributed trees to ensure that siblings of ancestors
         // are contained on each processor
-        let tmp: HashSet<MortonKey> = tmp
+        let tmp: HashSet<MortonKey<_>> = tmp
             .iter()
             .flat_map(|key| {
                 if key.level() != 0 {
@@ -146,8 +142,8 @@ where
         let mut keys = MortonKeys::from(tmp);
 
         // Create sets for inclusion testing
-        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey<_>> = leaves.iter().cloned().collect();
+        let keys_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup
         keys.sort_by_key(|a| a.level());
@@ -265,7 +261,7 @@ where
         hyksort(&mut points, hyksort_subcomm_size, comm)?;
 
         // Find unique leaves specified by points on each processor
-        let leaves: HashSet<MortonKey> = points.iter().map(|p| p.encoded_key).collect();
+        let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
         let mut leaves = MortonKeys::from(leaves);
         leaves.complete();
 
@@ -293,10 +289,10 @@ where
         let max = leaves.iter().max().unwrap();
 
         // Assign leaves to points, disregard unmapped
-        let _unmapped = SingleNodeTree::assign_nodes_to_points(&leaves, &mut points);
+        let _unmapped = SingleNodeTree::<T>::assign_nodes_to_points(&leaves, &mut points);
 
         // Leaves are those that are mapped and their siblings if they exist in the processors range
-        let leaves: HashSet<MortonKey> = points
+        let leaves: HashSet<MortonKey<_>> = points
             .iter()
             .map(|p| p.encoded_key)
             .flat_map(|k| k.siblings())
@@ -323,14 +319,14 @@ where
         // Find all keys in tree
         let range = [world.rank() as u64, min.morton, max.morton];
 
-        let tmp: HashSet<MortonKey> = leaves
+        let tmp: HashSet<MortonKey<_>> = leaves
             .iter()
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
         // This additional step is needed in distributed trees to ensure that siblings of ancestors
         // are contained on each processor
-        let tmp: HashSet<MortonKey> = tmp
+        let tmp: HashSet<MortonKey<_>> = tmp
             .iter()
             .flat_map(|key| {
                 if key.level() != 0 {
@@ -344,8 +340,8 @@ where
         let mut keys = MortonKeys::from(tmp);
 
         // Create sets for inclusion testing
-        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey<_>> = leaves.iter().cloned().collect();
+        let keys_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup of nodes
         keys.sort_by_key(|a| a.level());
@@ -485,14 +481,15 @@ where
     }
 
     fn complete_block_tree(
-        seeds: &mut MortonKeys,
+        seeds: &mut MortonKeys<T>,
         rank: i32,
         size: i32,
         world: &UserCommunicator,
-    ) -> MortonKeys {
+    ) -> MortonKeys<T> {
+        let root = MortonKey::root();
         // Define the tree's global domain with the finest first/last descendants
         if rank == 0 {
-            let ffc_root = ROOT.finest_first_child();
+            let ffc_root = root.finest_first_child();
             let min = seeds.iter().min().unwrap();
             let fa = ffc_root.finest_ancestor(min);
             let first_child = fa.children().into_iter().min().unwrap();
@@ -501,7 +498,7 @@ where
         }
 
         if rank == (size - 1) {
-            let flc_root = ROOT.finest_last_child();
+            let flc_root = root.finest_last_child();
             let max = seeds.iter().max().unwrap();
             let fa = flc_root.finest_ancestor(max);
             let last_child = fa.children().into_iter().max().unwrap();
@@ -534,7 +531,7 @@ where
             let a = seeds[i];
             let b = seeds[i + 1];
 
-            let mut tmp: MortonKeys = complete_region(&a, &b).into();
+            let mut tmp: MortonKeys<T> = MortonKeys::complete_region(&a, &b).into();
             complete.keys.push(a);
             complete.keys.append(&mut tmp);
         }
@@ -551,7 +548,7 @@ where
     fn transfer_points_to_blocktree(
         world: &UserCommunicator,
         points: &[Point<T>],
-        seeds: &[MortonKey],
+        seeds: &[MortonKey<T>],
         &rank: &Rank,
         &size: &Rank,
     ) -> Points<T> {
@@ -630,14 +627,14 @@ fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
 
 impl<T> Tree for MultiNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloatMpi<Real = T>,
 {
     type Scalar = T;
     type Domain = Domain<T>;
-    type Node = MortonKey;
-    type NodeSlice<'a> = &'a [MortonKey]
+    type Node = MortonKey<T>;
+    type NodeSlice<'a> = &'a [MortonKey<T>]
         where T: 'a;
-    type Nodes = MortonKeys;
+    type Nodes = MortonKeys<T>;
 
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
         self.coordinates(leaf).map(|coords| coords.len() / 3)

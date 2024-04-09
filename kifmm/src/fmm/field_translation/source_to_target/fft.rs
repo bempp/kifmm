@@ -8,32 +8,31 @@ use crate::tree::{
     constants::{NHALO, NSIBLINGS},
     types::{MortonKey, SingleNodeTree},
 };
+use crate::{RlstScalarComplexFloat, RlstScalarFloat};
 
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
-use num::{Complex, Float};
-use num_complex::ComplexFloat;
+use num::Complex;
 use rayon::prelude::*;
+use rlst::Array;
 use rlst::BaseArray;
 use rlst::VectorContainer;
 use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess};
-use rlst::{Array, RlstScalar};
 use rlst::{MatrixSvd, RandomAccessMut};
 use std::{collections::HashSet, sync::RwLock};
 
 impl<T, U, V> KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
-    Complex<U>: RlstScalar,
+    U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: ComplexFloat,
+    Complex<U>: RlstScalarComplexFloat,
 {
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
         let targets = self.tree.target_tree().keys(level).unwrap();
 
-        let targets_parents: HashSet<MortonKey> =
+        let targets_parents: HashSet<MortonKey<_>> =
             targets.iter().map(|target| target.parent()).collect();
         let mut targets_parents = targets_parents.into_iter().collect_vec();
         targets_parents.sort();
@@ -41,7 +40,7 @@ where
 
         let sources = self.tree.source_tree().keys(level).unwrap();
 
-        let sources_parents: HashSet<MortonKey> =
+        let sources_parents: HashSet<MortonKey<_>> =
             sources.iter().map(|source| source.parent()).collect();
         let mut sources_parents = sources_parents.into_iter().collect_vec();
         sources_parents.sort();
@@ -84,11 +83,10 @@ where
 impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
-    U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
-    Complex<U>: RlstScalar,
+    U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: ComplexFloat,
+    Complex<U>: RlstScalarComplexFloat,
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {
@@ -110,13 +108,13 @@ where
                 let nconv_pad = nconv + 1;
 
                 // Find parents of targets
-                let targets_parents: HashSet<MortonKey> =
+                let targets_parents: HashSet<MortonKey<_>> =
                     targets.iter().map(|target| target.parent()).collect();
 
                 let targets_parents = targets_parents.into_iter().collect_vec();
                 let ntargets_parents = targets_parents.len();
 
-                let sources_parents: HashSet<MortonKey> =
+                let sources_parents: HashSet<MortonKey<_>> =
                     sources.iter().map(|source| source.parent()).collect();
                 let nsources_parents = sources_parents.len();
 
