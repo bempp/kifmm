@@ -157,7 +157,7 @@ pub struct SendPtr<T> {
 ///
 pub struct KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>>,
+    T: FmmTree<Tree = SingleNodeTree<W::Real>>,
     U: SourceToTargetData,
     V: Kernel,
     W: RlstScalarFloat,
@@ -428,9 +428,9 @@ where
     <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// An octree structure containing the source points for the FMM calculation.
-    pub source_tree: SingleNodeTree<T>,
+    pub source_tree: SingleNodeTree<T::Real>,
     /// An octree structure containing the target points for the FMM calculation.
-    pub target_tree: SingleNodeTree<T>,
+    pub target_tree: SingleNodeTree<T::Real>,
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T::Real>,
 }

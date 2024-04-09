@@ -160,7 +160,7 @@ where
 
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
 pub fn level_expansion_pointers<T>(
-    tree: &SingleNodeTree<T>,
+    tree: &SingleNodeTree<T::Real>,
     ncoeffs: usize,
     nmatvecs: usize,
     expansions: &[T],
@@ -198,7 +198,7 @@ where
 
 /// Create mutable pointers for leaf expansions in a tree
 pub fn leaf_expansion_pointers<T>(
-    tree: &SingleNodeTree<T>,
+    tree: &SingleNodeTree<T::Real>,
     ncoeffs: usize,
     nmatvecs: usize,
     n_leaves: usize,
@@ -230,7 +230,7 @@ where
 
 /// Create mutable pointers for potentials in a tree
 pub fn potential_pointers<T>(
-    tree: &SingleNodeTree<T>,
+    tree: &SingleNodeTree<T::Real>,
     nmatvecs: usize,
     n_leaves: usize,
     n_points: usize,

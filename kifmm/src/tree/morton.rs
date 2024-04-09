@@ -851,8 +851,7 @@ where
 
 impl<T> TreeNode<T> for MortonKey<T::Real>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     type Nodes = MortonKeys<T::Real>;
     type Domain = Domain<T::Real>;

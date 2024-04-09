@@ -1,5 +1,6 @@
 //! Field Traits
 use green_kernels::traits::Kernel;
+use rlst::RlstScalar;
 
 use crate::RlstScalarFloat;
 
@@ -17,12 +18,13 @@ pub trait ConfigureSourceToTargetData<T>
 where
     Self: SourceToTargetData,
     T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Kernel function associated with field translation
     type Kernel: Kernel;
 
     /// The computational domain defining the tree.
-    type Domain: Domain<T>;
+    type Domain: Domain<T::Real>;
 
     /// Set the field translation operators corresponding to each unique transfer vector.
     ///

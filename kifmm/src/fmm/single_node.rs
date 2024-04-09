@@ -16,7 +16,7 @@ use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey<W::Real>, Scalar = W> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>, Scalar = W> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalarFloat,

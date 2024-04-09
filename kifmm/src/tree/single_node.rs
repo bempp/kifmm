@@ -15,8 +15,7 @@ use super::morton::complete_region;
 
 impl<T> SingleNodeTree<T>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
@@ -27,8 +26,8 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree(
-        coordinates_col_major: &[T::Real],
-        &domain: &Domain<T::Real>,
+        coordinates_col_major: &[T],
+        &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
@@ -36,15 +35,15 @@ where
         let n_coords = coordinates_col_major.len() / dim;
 
         // Convert column major coordinate into `Point`, containing Morton encoding
-        let mut points: Vec<Point<T::Real>> = Points::default();
+        let mut points: Vec<Point<T>> = Points::default();
         for i in 0..n_coords {
-            let coord: [T::Real; 3] = [
+            let coord: [T; 3] = [
                 coordinates_col_major[i],
                 coordinates_col_major[i + n_coords],
                 coordinates_col_major[i + 2 * n_coords],
             ];
-            let base_key = MortonKey::<T::Real>::from_point(&coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::<T::Real>::from_point(&coord, &domain, depth);
+            let base_key = MortonKey::<T>::from_point(&coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::<T>::from_point(&coord, &domain, depth);
             points.push(Point {
                 coordinate: coord,
                 base_key,
@@ -66,7 +65,7 @@ where
                 .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
-                    MortonKey::<T::Real>::new(&anchor, morton)
+                    MortonKey::<T>::new(&anchor, morton)
                 }),
         );
 
@@ -182,8 +181,8 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree_pruned(
-        coordinates_col_major: &[T::Real],
-        &domain: &Domain<T::Real>,
+        coordinates_col_major: &[T],
+        &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
@@ -370,10 +369,10 @@ where
     ///   all points.
     ///
     pub fn new(
-        coordinates_col_major: &[T::Real],
+        coordinates_col_major: &[T],
         depth: u64,
         prune_empty: bool,
-        domain: Option<Domain<T::Real>>,
+        domain: Option<Domain<T>>,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let coords_len = coordinates_col_major.len();
@@ -434,10 +433,7 @@ where
     ///
     /// - `nodes` - Morton keys discretising a spatial domain being considered.
     /// - `points` - Mutable reference to points, allowing for assignment of their encoded Morton keys, if any.
-    pub fn assign_nodes_to_points(
-        nodes: &MortonKeys<T::Real>,
-        points: &mut Points<T::Real>,
-    ) -> MortonKeys<T::Real> {
+    pub fn assign_nodes_to_points(nodes: &MortonKeys<T>, points: &mut Points<T>) -> MortonKeys<T> {
         let mut map: HashMap<MortonKey<_>, bool> = HashMap::new();
         for node in nodes.iter() {
             map.insert(*node, false);
@@ -487,7 +483,7 @@ where
     /// # Arguments
     ///
     /// - `seeds` - Mutable reference to a collection of seed octants.
-    pub fn complete_block_tree(seeds: &mut MortonKeys<T::Real>) -> MortonKeys<T::Real> {
+    pub fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
         let root = MortonKey::root();
 
         let ffc_root = root.finest_first_child();
@@ -541,7 +537,7 @@ where
     /// # Arguments
     ///
     /// - `leaves` - A reference to a collection of Morton Keys, representing leaf nodes.
-    pub fn find_seeds(leaves: &MortonKeys<T::Real>) -> MortonKeys<T::Real> {
+    pub fn find_seeds(leaves: &MortonKeys<T>) -> MortonKeys<T> {
         let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
 
         let mut seeds = MortonKeys::from(
@@ -568,10 +564,10 @@ where
     /// - `block_tree` - Initially constructed block_tree, subject to refinement through splitting.
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
     pub fn split_blocks(
-        points: &mut Points<T::Real>,
-        mut block_tree: MortonKeys<T::Real>,
+        points: &mut Points<T>,
+        mut block_tree: MortonKeys<T>,
         n_crit: usize,
-    ) -> MortonKeys<T::Real> {
+    ) -> MortonKeys<T> {
         let split_block_tree;
         let mut blocks_to_points;
         loop {
@@ -636,15 +632,14 @@ where
 
 impl<T> Tree for SingleNodeTree<T>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     type Scalar = T;
-    type Domain = Domain<T::Real>;
-    type Node = MortonKey<T::Real>;
-    type NodeSlice<'a> = &'a [MortonKey<T::Real>]
+    type Domain = Domain<T>;
+    type Node = MortonKey<T>;
+    type NodeSlice<'a> = &'a [MortonKey<T>]
         where T: 'a;
-    type Nodes = MortonKeys<T::Real>;
+    type Nodes = MortonKeys<T>;
 
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
         self.coordinates(leaf).map(|coords| coords.len() / 3)
@@ -799,10 +794,9 @@ mod test {
         assert_eq!(unique_leaves.len(), expected);
     }
 
-    pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T::Real>])
+    pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T>])
     where
-        T: RlstScalarFloat,
-        <T as RlstScalar>::Real: RlstScalarFloat,
+        T: RlstScalarFloat<Real = T>,
     {
         let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 

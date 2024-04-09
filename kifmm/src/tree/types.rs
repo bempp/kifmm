@@ -4,7 +4,6 @@
 use crate::RlstScalarFloatMpi;
 #[cfg(feature = "mpi")]
 use mpi::topology::UserCommunicator;
-use rlst::RlstScalar;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -28,10 +27,10 @@ where
     T: RlstScalarFloat<Real = T>,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
-    pub origin: [T::Real; 3],
+    pub origin: [T; 3],
 
     /// The extent of the point distribution along the x, y, z axes respectively.
-    pub side_length: [T::Real; 3],
+    pub side_length: [T; 3],
 }
 
 /// Represents a Morton key associated with a node within an octree structure.
@@ -61,7 +60,7 @@ where
     /// The Morton encoded anchor.
     pub morton: u64,
     /// Scalar type of coordinate data associated with the key
-    pub scalar: PhantomData<T::Real>,
+    pub scalar: PhantomData<T>,
 }
 
 /// A collection that stores and allows iteration over a sequence of `MortonKey` values.
@@ -126,8 +125,7 @@ where
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
-    T: RlstScalarFloatMpi,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloatMpi<Real = T>,
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
@@ -139,37 +137,37 @@ where
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain<T::Real>,
+    pub domain: Domain<T>,
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T::Real>,
+    pub coordinates: Vec<T>,
 
     /// All global indices
     pub global_indices: Vec<usize>,
 
     /// The leaves that span the tree.
-    pub leaves: MortonKeys<T::Real>,
+    pub leaves: MortonKeys<T>,
 
     /// All nodes in tree.
-    pub keys: MortonKeys<T::Real>,
+    pub keys: MortonKeys<T>,
 
     /// Associate leaves with point indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T::Real>, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
     /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T::Real>, usize>,
+    pub key_to_index: HashMap<MortonKey<T>, usize>,
 
     /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T::Real>, usize>,
+    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
 
     /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T::Real>>,
+    pub leaves_set: HashSet<MortonKey<T>>,
 
     /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T::Real>>,
+    pub keys_set: HashSet<MortonKey<T>>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -258,42 +256,41 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     /// Depth of a tree.
     pub depth: u64,
 
     /// Domain spanned by the points.
-    pub domain: Domain<T::Real>,
+    pub domain: Domain<T>,
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T::Real>,
+    pub coordinates: Vec<T>,
 
     /// All global indices
     pub global_indices: Vec<usize>,
 
     /// The leaves that span the tree, and associated Point data.
-    pub leaves: MortonKeys<T::Real>,
+    pub leaves: MortonKeys<T>,
 
     /// All nodes in tree, and associated Node data.
-    pub keys: MortonKeys<T::Real>,
+    pub keys: MortonKeys<T>,
 
     /// Associate leaves with coordinate indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T::Real>, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
 
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
     /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T::Real>, usize>,
+    pub key_to_index: HashMap<MortonKey<T>, usize>,
 
     /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T::Real>, usize>,
+    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
 
     /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T::Real>>,
+    pub leaves_set: HashSet<MortonKey<T>>,
 
     /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T::Real>>,
+    pub keys_set: HashSet<MortonKey<T>>,
 }

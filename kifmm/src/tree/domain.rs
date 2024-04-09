@@ -93,16 +93,16 @@ where
     }
 }
 
-impl<T> DomainTrait<T> for Domain<T::Real>
+impl<T> DomainTrait<T> for Domain<T>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
+    // <T as RlstScalar>::Real: RlstScalarFloat,
 {
-    fn diameter(&self) -> &[T::Real; 3] {
+    fn diameter(&self) -> &[T; 3] {
         &self.side_length
     }
 
-    fn origin(&self) -> &[T::Real; 3] {
+    fn origin(&self) -> &[T; 3] {
         &self.origin
     }
 }
@@ -211,7 +211,6 @@ mod mpi_domain {
 #[cfg(feature = "mpi")]
 pub use mpi_domain::*;
 use num::Float;
-use rlst::RlstScalar;
 
 #[cfg(test)]
 mod test {

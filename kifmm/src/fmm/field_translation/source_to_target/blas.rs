@@ -28,7 +28,7 @@ where
     U: RlstScalarFloat,
     <U as RlstScalar>::Real: RlstScalarFloat,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
+    V: FmmTree<Tree = SingleNodeTree<U::Real>> + Send + Sync,
 {
     /// Displacements
     pub fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {

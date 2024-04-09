@@ -25,7 +25,7 @@ use rlst::{
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W::Real>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
     W: RlstScalarFloat,
