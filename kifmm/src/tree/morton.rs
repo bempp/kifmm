@@ -53,7 +53,8 @@ where
         let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
         for level in (0..=depth).rev() {
-            let work_set: Vec<&MortonKey<_>> = keys.iter().filter(|&&k| k.level() == level).collect();
+            let work_set: Vec<&MortonKey<_>> =
+                keys.iter().filter(|&&k| k.level() == level).collect();
 
             for work_item in work_set.iter() {
                 let mut ancestors = work_item.ancestors();
@@ -122,10 +123,7 @@ where
     ///
     /// - `start` - The Morton Key defining the beginning of the region to complete.
     /// - `end` - The Morton Key marking the end of the region.
-    pub fn complete_region(
-        start: &MortonKey<T>,
-        end: &MortonKey<T>,
-    ) -> Vec<MortonKey<T>> {
+    pub fn complete_region(start: &MortonKey<T>, end: &MortonKey<T>) -> Vec<MortonKey<T>> {
         let mut start_ancestors: HashSet<MortonKey<_>> = start.ancestors();
         let mut end_ancestors: HashSet<MortonKey<_>> = end.ancestors();
 
@@ -138,7 +136,9 @@ where
             start.finest_ancestor(end).children().into_iter().collect();
 
         while let Some(current_item) = work_list.pop() {
-            if (current_item > *start) & (current_item < *end) & !end_ancestors.contains(&current_item)
+            if (current_item > *start)
+                & (current_item < *end)
+                & !end_ancestors.contains(&current_item)
             {
                 minimal_tree.push(current_item);
             } else if (start_ancestors.contains(&current_item))

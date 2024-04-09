@@ -11,7 +11,6 @@ use rlst::RlstScalar;
 
 use std::collections::{HashMap, HashSet};
 
-
 impl<T> SingleNodeTree<T>
 where
     T: RlstScalarFloat<Real = T>,

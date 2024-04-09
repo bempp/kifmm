@@ -122,7 +122,6 @@ pub trait RlstScalarFloatMpi: RlstScalarFloat + Equivalence {}
 /// Super trait of RlstScalar and Complex Float trait, and MPI Equivalence trait
 pub trait RlstScalarComplexFloatMpi: RlstScalarFloatMpi + Equivalence {}
 
-
 impl RlstScalarFloat for f64 {}
 impl RlstScalarFloat for f32 {}
 

@@ -17,7 +17,6 @@ use mpi::{
 };
 use std::collections::{HashMap, HashSet};
 
-
 impl<T> MultiNodeTree<T>
 where
     T: RlstScalarFloatMpi<Real = T>,
