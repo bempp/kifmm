@@ -1276,8 +1276,8 @@ mod test {
 
     #[test]
     fn test_find_children() {
-        let key = MortonKey::<f64>::new(&[0, 0, 0], 0);
-        let displacement = 1 << (DEEPEST_LEVEL - key.level() - 1);
+        let root = MortonKey::<f64>::root();
+        let displacement = 1 << (DEEPEST_LEVEL - root.level() - 1);
 
         let expected: Vec<MortonKey<f64>> = vec![
             MortonKey::new(&[0, 0, 0], 1),
@@ -1311,7 +1311,7 @@ mod test {
             ),
         ];
 
-        let children = key.children();
+        let children = root.children();
 
         for child in &children {
             assert!(expected.contains(child));
@@ -1320,10 +1320,7 @@ mod test {
 
     #[test]
     fn test_ancestors() {
-        let domain: Domain<f64> = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
         let point = [0.5, 0.5, 0.5];
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
@@ -1343,13 +1340,13 @@ mod test {
     #[test]
     pub fn test_finest_ancestor() {
         // Trivial case
-        let key = MortonKey::<f64>::new(&[0, 0, 0], 0);
-        let result = key.finest_ancestor(&key);
-        let expected = MortonKey::<f64>::new(&[0, 0, 0], 0);
+        let root = MortonKey::<f64>::root();
+        let result = root.finest_ancestor(&root);
+        let expected = root.clone();
         assert!(result == expected);
 
         // Standard case
-        let displacement = 1 << (DEEPEST_LEVEL - key.level() - 1);
+        let displacement = 1 << (DEEPEST_LEVEL - root.level() - 1);
         let a = MortonKey::<f64>::new(&[0, 0, 0], 16);
         let b = MortonKey::new(
             &[displacement, displacement, displacement],
@@ -1363,10 +1360,7 @@ mod test {
     #[test]
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
-        let domain: Domain<f64> = Domain {
-            side_length: [1., 1., 1.],
-            origin: [0., 0., 0.],
-        };
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         // Simple case, at the leaf level
@@ -1541,10 +1535,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor() {
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test points in the domain
         let point = [0.9999, 0.9999, 0.9999];
@@ -1556,10 +1547,7 @@ mod test {
             assert_eq!(a, &expected[i])
         }
 
-        let domain = Domain {
-            origin: [-0.7, -0.6, -0.5],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::new(&[-0.7, -0.6, -0.5], &[1., 1., 1.]);
 
         let point = [-0.499, -0.499, -0.499];
         let level = 1;
@@ -1573,10 +1561,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor_fails() {
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test a point not in the domain
         let point = [1.9, 0.9, 0.9];
@@ -1586,10 +1571,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor_fails_negative_domain() {
-        let domain = Domain {
-            origin: [-0.5, -0.5, -0.5],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::new(&[-0.5, -0.5, -0.5], &[1., 1., 1.]);
 
         // Test a point not in the domain
         let point = [-0.51, -0.5, -0.5];
@@ -1614,9 +1596,9 @@ mod test {
 
     #[test]
     fn test_find_descendants() {
-        let key = MortonKey::<f64>::new(&[0, 0, 0], 0);
+        let root = MortonKey::<f64>::root();
 
-        let descendants = key.descendants(1).unwrap();
+        let descendants = root.descendants(1).unwrap();
         assert_eq!(descendants.len(), 8);
 
         // Ensure this also works for other keys in hierarchy
@@ -1627,8 +1609,8 @@ mod test {
 
     #[test]
     fn test_find_descendants_errors() {
-        let key = MortonKey::<f64>::new(&[0, 0, 0], 0);
-        assert!(key.descendants(17).is_err());
+        let root = MortonKey::<f64>::root();
+        assert!(root.descendants(17).is_err());
     }
 
     #[test]
@@ -1730,10 +1712,7 @@ mod test {
     #[test]
     fn test_is_adjacent() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [-0.1, -0.1, 0.1],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::new(&[-0.1, -0.1, -0.1], &[1., 1., 1.]);
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
@@ -1810,10 +1789,7 @@ mod test {
     #[test]
     fn test_transfer_vector_errors() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
         assert!(key.find_transfer_vector(&sibling).is_err());
@@ -1822,10 +1798,7 @@ mod test {
     #[test]
     fn test_surface_grid() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, 0);
 
         let expansion_order = 2;
