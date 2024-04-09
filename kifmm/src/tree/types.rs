@@ -1,9 +1,9 @@
 //! Data structures to create distributed octrees with MPI.
 
 #[cfg(feature = "mpi")]
-use mpi::topology::UserCommunicator;
-#[cfg(feature = "mpi")]
 use crate::RlstScalarFloatMpi;
+#[cfg(feature = "mpi")]
+use mpi::topology::UserCommunicator;
 
 use rlst::RlstScalar;
 use std::{
@@ -52,9 +52,7 @@ where
 ///   spatial indexing and operations.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-pub struct MortonKey<T>
-
-{
+pub struct MortonKey<T> {
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
     /// The Morton encoded anchor.

@@ -1,10 +1,13 @@
 //! Multipole Translations
-use crate::{traits::{
-    field::SourceToTargetData,
-    fmm::SourceTranslation,
-    tree::{FmmTree, Tree},
-}, RlstScalarFloat};
 use crate::tree::{constants::NSIBLINGS, types::SingleNodeTree};
+use crate::{
+    traits::{
+        field::SourceToTargetData,
+        fmm::SourceTranslation,
+        tree::{FmmTree, Tree},
+    },
+    RlstScalarFloat,
+};
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use rayon::prelude::*;

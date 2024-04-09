@@ -3,7 +3,7 @@ use crate::fmm::types::{Charges, SendPtrMut};
 use crate::traits::tree::{FmmTreeNode, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
 use crate::RlstScalarFloat;
-use num::{Num};
+use num::Num;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
     RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,

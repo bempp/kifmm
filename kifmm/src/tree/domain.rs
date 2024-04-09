@@ -89,7 +89,7 @@ impl<T: RlstScalarFloat> Domain<T> {
     }
 }
 
-impl<T: RlstScalarFloat > DomainTrait for Domain<T> {
+impl<T: RlstScalarFloat> DomainTrait for Domain<T> {
     type Scalar = T;
 
     fn diameter(&self) -> &[Self::Scalar; 3] {
@@ -203,7 +203,6 @@ mod mpi_domain {
 pub use mpi_domain::*;
 use num::Float;
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -212,7 +211,7 @@ mod test {
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where
-        T:  RlstScalarFloat,
+        T: RlstScalarFloat,
     {
         let domain = Domain::from_local_points(points.data());
 

@@ -4,7 +4,8 @@ use crate::{
     tree::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
-    }, RlstScalarFloatMpi,
+    },
+    RlstScalarFloatMpi,
 };
 
 use crate::hyksort::hyksort;
@@ -631,7 +632,7 @@ fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
 
 impl<T> Tree for MultiNodeTree<T>
 where
-    T:  RlstScalarFloatMpi<Real = T>,
+    T: RlstScalarFloatMpi<Real = T>,
 {
     type Scalar = T;
     type Domain = Domain<T>;

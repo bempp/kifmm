@@ -814,11 +814,7 @@ mod test {
         // Generate points in a single octant of the domain
         let n_points = 10;
         let points = points_fixture::<f64>(n_points, Some(0.), Some(0.5), None);
-
-        let domain = Domain {
-            origin: [0.0, 0.0, 0.0],
-            side_length: [1.0, 1.0, 1.0],
-        };
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         let mut tmp = Points::default();
         for i in 0..n_points {
@@ -832,6 +828,7 @@ mod test {
             })
         }
         let mut points = tmp;
+        points.sort();
         let keys = MortonKeys::from(root.children());
 
         SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
@@ -853,9 +850,11 @@ mod test {
             )
             .0;
 
+        println!("HERE {:?}", leaves_to_points);
 
         // Test that a single octant contains all the points
         for (_, (l, r)) in leaves_to_points.iter() {
+            // println!("HERE {:?} {:?}", r, l);
             if (r - l) > 0 {
                 assert!((r - l) == n_points);
             }

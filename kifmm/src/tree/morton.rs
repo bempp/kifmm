@@ -65,9 +65,7 @@ fn linearize_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>
 ///
 /// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
 /// contiguous space without gaps.
-fn balance_keys<T: RlstScalarFloat>(
-    keys: &[MortonKey<T>],
-) -> HashSet<MortonKey<T>> {
+fn balance_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
     let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
     let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
 
@@ -368,7 +366,7 @@ impl<T: RlstScalarFloat> MortonKey<T> {
         Self {
             anchor: *anchor,
             morton,
-            scalar: PhantomData::<T>
+            scalar: PhantomData::<T>,
         }
     }
 
@@ -376,7 +374,7 @@ impl<T: RlstScalarFloat> MortonKey<T> {
     pub fn root() -> Self {
         Self {
             anchor: [0, 0, 0],
-            morton: 1,
+            morton: 0,
             ..Default::default()
         }
     }
@@ -494,9 +492,9 @@ impl<T: RlstScalarFloat> MortonKey<T> {
     /// # Arguments
     /// `domain` - The physical domain with which we calculate the diameter with respect to.
     pub fn diameter(&self, domain: &Domain<T>) -> [T; 3] {
-        domain
-            .side_length
-            .map(|x| RlstScalar::powf(T::from(0.5).unwrap(), T::from(self.level()).unwrap().re()) * x)
+        domain.side_length.map(|x| {
+            RlstScalar::powf(T::from(0.5).unwrap(), T::from(self.level()).unwrap().re()) * x
+        })
     }
 
     /// The physical centre of a box specified by this Morton Key, calculated with respect to

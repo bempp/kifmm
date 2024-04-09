@@ -4,8 +4,6 @@ use crate::traits::tree::{FmmTree, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
 use crate::RlstScalarFloat;
 
-
-
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
     T: RlstScalarFloat<Real = T>,
