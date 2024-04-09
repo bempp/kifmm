@@ -22,126 +22,11 @@ use std::{
     vec,
 };
 
-/// Linearizes a collection of Morton Keys by removing overlaps, prioritizing smaller keys in case of overlaps.
-///
-/// This function processes a slice of Morton Keys to produce a new, owned vector of keys where any overlapping
-/// keys have been resolved. In scenarios where keys overlap, the smaller (by Morton order) keys are preferred
-/// and retained in the output vector. Requires a copy of the input keys.
-///
-/// # Arguments
-///
-/// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
-fn linearize_keys<T: RlstScalarFloat<Real = T>>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
-    let depth = keys.iter().map(|k| k.level()).max().unwrap();
-    let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
-
-    for level in (0..=depth).rev() {
-        let work_set: Vec<&MortonKey<_>> = keys.iter().filter(|&&k| k.level() == level).collect();
-
-        for work_item in work_set.iter() {
-            let mut ancestors = work_item.ancestors();
-            ancestors.remove(work_item);
-            for ancestor in ancestors.iter() {
-                if key_set.contains(ancestor) {
-                    key_set.remove(ancestor);
-                }
-            }
-        }
-    }
-
-    let result: Vec<MortonKey<_>> = key_set.into_iter().collect();
-    result
-}
-
-/// Ensures a 2:1 balance among a set of Morton Keys.
-///
-/// This function applies a 2:1 balance constraint to a slice of Morton Keys, where neighbouring
-/// nodes are at most twice as large as each other in terms of side length.  It assumes the input
-/// keys form a 'complete' set, meaning there are no gaps in the spatial coverage they represent.
-/// The balancing process may add new keys to meet this criterion, with the resulting, balanced
-/// set of keys returned as a `HashSet`.
-///
-/// # Arguments
-///
-/// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
-/// contiguous space without gaps.
-fn balance_keys<T: RlstScalarFloat<Real = T>>(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
-    let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
-    let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
-
-    for level in (0..=deepest_level).rev() {
-        let work_list = balanced
-            .iter()
-            .filter(|&key| key.level() == level)
-            .cloned()
-            .collect_vec(); // each key has its siblings here at deepest level
-
-        for key in work_list.iter() {
-            let neighbors = key.neighbors();
-            for neighbor in neighbors.iter() {
-                let parent = neighbor.parent();
-
-                if !balanced.contains(neighbor) && !balanced.contains(&parent) {
-                    balanced.insert(parent);
-                    if parent.level() > 0 {
-                        for sibling in parent.siblings() {
-                            balanced.insert(sibling);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    balanced
-}
-
-/// Fills the spatial region between two Morton Keys with the minimal set of covering boxes.
-///
-/// This function computes and returns the smallest set of Morton Keys necessary to fully cover
-/// the space between two given keys, `start` and `end`. These keys define the bounds of the region
-/// to be completed.
-///
-/// # Arguments
-///
-/// - `start` - The Morton Key defining the beginning of the region to complete.
-/// - `end` - The Morton Key marking the end of the region.
-pub fn complete_region<T: RlstScalarFloat<Real = T>>(
-    start: &MortonKey<T>,
-    end: &MortonKey<T>,
-) -> Vec<MortonKey<T>> {
-    let mut start_ancestors: HashSet<MortonKey<_>> = start.ancestors();
-    let mut end_ancestors: HashSet<MortonKey<_>> = end.ancestors();
-
-    // Remove endpoints from ancestors
-    start_ancestors.remove(start);
-    end_ancestors.remove(end);
-
-    let mut minimal_tree: Vec<MortonKey<_>> = Vec::new();
-    let mut work_list: Vec<MortonKey<_>> =
-        start.finest_ancestor(end).children().into_iter().collect();
-
-    while let Some(current_item) = work_list.pop() {
-        if (current_item > *start) & (current_item < *end) & !end_ancestors.contains(&current_item)
-        {
-            minimal_tree.push(current_item);
-        } else if (start_ancestors.contains(&current_item))
-            | (end_ancestors.contains(&current_item))
-        {
-            let mut children = current_item.children();
-            work_list.append(&mut children);
-        }
-    }
-
-    // Sort the minimal tree before returning
-    minimal_tree.sort();
-    minimal_tree
-}
-
 impl<T> MortonKeys<T>
 where
     T: RlstScalarFloat<Real = T>,
 {
-    /// Create new
+    /// Instantiate Morton Keys
     pub fn new() -> MortonKeys<T> {
         MortonKeys {
             keys: Vec::new(),
@@ -154,12 +39,127 @@ where
         self.keys.push(item);
     }
 
+    /// Linearizes a collection of Morton Keys by removing overlaps, prioritizing smaller keys in case of overlaps.
+    ///
+    /// This function processes a slice of Morton Keys to produce a new, owned vector of keys where any overlapping
+    /// keys have been resolved. In scenarios where keys overlap, the smaller (by Morton order) keys are preferred
+    /// and retained in the output vector. Requires a copy of the input keys.
+    ///
+    /// # Arguments
+    ///
+    /// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
+    pub fn linearize_keys(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
+        let depth = keys.iter().map(|k| k.level()).max().unwrap();
+        let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
+
+        for level in (0..=depth).rev() {
+            let work_set: Vec<&MortonKey<_>> = keys.iter().filter(|&&k| k.level() == level).collect();
+
+            for work_item in work_set.iter() {
+                let mut ancestors = work_item.ancestors();
+                ancestors.remove(work_item);
+                for ancestor in ancestors.iter() {
+                    if key_set.contains(ancestor) {
+                        key_set.remove(ancestor);
+                    }
+                }
+            }
+        }
+
+        let result: Vec<MortonKey<_>> = key_set.into_iter().collect();
+        result
+    }
+
+    /// Ensures a 2:1 balance among a set of Morton Keys.
+    ///
+    /// This function applies a 2:1 balance constraint to a slice of Morton Keys, where neighbouring
+    /// nodes are at most twice as large as each other in terms of side length.  It assumes the input
+    /// keys form a 'complete' set, meaning there are no gaps in the spatial coverage they represent.
+    /// The balancing process may add new keys to meet this criterion, with the resulting, balanced
+    /// set of keys returned as a `HashSet`.
+    ///
+    /// # Arguments
+    ///
+    /// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
+    /// contiguous space without gaps.
+    pub fn balance_keys(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
+        let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
+        let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
+
+        for level in (0..=deepest_level).rev() {
+            let work_list = balanced
+                .iter()
+                .filter(|&key| key.level() == level)
+                .cloned()
+                .collect_vec(); // each key has its siblings here at deepest level
+
+            for key in work_list.iter() {
+                let neighbors = key.neighbors();
+                for neighbor in neighbors.iter() {
+                    let parent = neighbor.parent();
+
+                    if !balanced.contains(neighbor) && !balanced.contains(&parent) {
+                        balanced.insert(parent);
+                        if parent.level() > 0 {
+                            for sibling in parent.siblings() {
+                                balanced.insert(sibling);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        balanced
+    }
+
+    /// Fills the spatial region between two Morton Keys with the minimal set of covering boxes.
+    ///
+    /// This function computes and returns the smallest set of Morton Keys necessary to fully cover
+    /// the space between two given keys, `start` and `end`. These keys define the bounds of the region
+    /// to be completed.
+    ///
+    /// # Arguments
+    ///
+    /// - `start` - The Morton Key defining the beginning of the region to complete.
+    /// - `end` - The Morton Key marking the end of the region.
+    pub fn complete_region(
+        start: &MortonKey<T>,
+        end: &MortonKey<T>,
+    ) -> Vec<MortonKey<T>> {
+        let mut start_ancestors: HashSet<MortonKey<_>> = start.ancestors();
+        let mut end_ancestors: HashSet<MortonKey<_>> = end.ancestors();
+
+        // Remove endpoints from ancestors
+        start_ancestors.remove(start);
+        end_ancestors.remove(end);
+
+        let mut minimal_tree: Vec<MortonKey<_>> = Vec::new();
+        let mut work_list: Vec<MortonKey<_>> =
+            start.finest_ancestor(end).children().into_iter().collect();
+
+        while let Some(current_item) = work_list.pop() {
+            if (current_item > *start) & (current_item < *end) & !end_ancestors.contains(&current_item)
+            {
+                minimal_tree.push(current_item);
+            } else if (start_ancestors.contains(&current_item))
+                | (end_ancestors.contains(&current_item))
+            {
+                let mut children = current_item.children();
+                work_list.append(&mut children);
+            }
+        }
+
+        // Sort the minimal tree before returning
+        minimal_tree.sort();
+        minimal_tree
+    }
+
     /// Complete the region between all elements in an vector of Morton keys that doesn't
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
-        let completion = complete_region(a, b);
+        let completion = Self::complete_region(a, b);
         let start_val = vec![*a];
         let end_val = vec![*b];
         self.keys = start_val
@@ -171,7 +171,7 @@ where
 
     /// Wrapper for linearising a container of Morton Keys.
     pub fn linearize(&mut self) {
-        self.keys = linearize_keys(&self.keys);
+        self.keys = Self::linearize_keys(&self.keys);
     }
 
     /// Wrapper for sorting a container of Morton Keys.
@@ -181,7 +181,7 @@ where
 
     /// Enforce a 2:1 balance for a vector of Morton keys, and remove any overlaps.
     pub fn balance(&mut self) {
-        self.keys = balance_keys(self).into_iter().collect();
+        self.keys = Self::balance_keys(self).into_iter().collect();
     }
 }
 
@@ -1523,7 +1523,7 @@ mod test {
     fn test_linearize_keys() {
         let key = MortonKey::<f64>::new(&[0, 0, 0], 15);
         let ancestors = key.ancestors().into_iter().collect_vec();
-        let linearized = linearize_keys(&ancestors);
+        let linearized = MortonKeys::linearize_keys(&ancestors);
 
         assert_eq!(linearized.len(), 1);
         assert_eq!(linearized[0], key);
@@ -1617,7 +1617,7 @@ mod test {
             0b111111111111111111111111111111111111111111111111000000000010000,
         );
 
-        let region = complete_region(&a, &b);
+        let region = MortonKeys::complete_region(&a, &b);
 
         let fa = a.finest_ancestor(&b);
 
@@ -1661,7 +1661,7 @@ mod test {
         let a = MortonKey::<f64>::from_anchor(&[0, 0, 0], DEEPEST_LEVEL);
         let b = MortonKey::<f64>::from_anchor(&[1, 1, 1], DEEPEST_LEVEL);
 
-        let mut complete = complete_region(&a, &b);
+        let mut complete = MortonKeys::complete_region(&a, &b);
         let start_val = vec![a];
         let end_val = vec![b];
         complete = start_val

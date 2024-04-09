@@ -3,7 +3,6 @@ use crate::fmm::types::TransferVector;
 use crate::tree::types::{Domain, MortonKey};
 use crate::RlstScalarFloat;
 use itertools::Itertools;
-use rlst::RlstScalar;
 use std::collections::HashSet;
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).

@@ -4,7 +4,6 @@ use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
 use crate::{RlstScalarComplexFloat, RlstScalarFloat};
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Complex;
-use num_complex::ComplexFloat;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
 
@@ -478,7 +477,8 @@ pub struct MultiNodeFmmTree<T: RlstScalarFloatMpi<Real = T>> {
 #[derive(Default)]
 pub struct FftFieldTranslation<T, U>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
     U: Kernel<T = T> + Default,
     Complex<T>: RlstScalarComplexFloat,
 {
@@ -492,7 +492,7 @@ where
     pub metadata: FftMetadata<Complex<T>>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
-    pub transfer_vectors: Vec<TransferVector<T>>,
+    pub transfer_vectors: Vec<TransferVector<T::Real>>,
 
     /// The associated kernel with this translation operator.
     pub kernel: U,

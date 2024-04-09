@@ -17,7 +17,6 @@ use mpi::{
 };
 use std::collections::{HashMap, HashSet};
 
-use super::morton::complete_region;
 
 impl<T> MultiNodeTree<T>
 where
@@ -533,7 +532,7 @@ where
             let a = seeds[i];
             let b = seeds[i + 1];
 
-            let mut tmp: MortonKeys<T> = complete_region(&a, &b).into();
+            let mut tmp: MortonKeys<T> = MortonKeys::complete_region(&a, &b).into();
             complete.keys.push(a);
             complete.keys.append(&mut tmp);
         }

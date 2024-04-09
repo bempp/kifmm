@@ -108,15 +108,20 @@ use rlst::{c32, c64};
 #[doc(inline)]
 pub use traits::fmm::Fmm;
 
-/// Super trait of RlstScalar and num_traits Float trait
+/// Super trait of RlstScalar and  Float trait
 pub trait RlstScalarFloat: RlstScalar + Float + Default {}
 
 /// Super trait of RlstScalar and Complex Float trait
 pub trait RlstScalarComplexFloat: RlstScalar + ComplexFloat + Default {}
 
 #[cfg(feature = "mpi")]
-/// Combination of RlstScalar and num_traits Float trait, with a equivalent MPI type
+/// Super trait of RlstScalar and Float trait, and MPI Equivalence trait
 pub trait RlstScalarFloatMpi: RlstScalarFloat + Equivalence {}
+
+#[cfg(feature = "mpi")]
+/// Super trait of RlstScalar and Complex Float trait, and MPI Equivalence trait
+pub trait RlstScalarComplexFloatMpi: RlstScalarFloatMpi + Equivalence {}
+
 
 impl RlstScalarFloat for f64 {}
 impl RlstScalarFloat for f32 {}

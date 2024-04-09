@@ -11,7 +11,6 @@ use rlst::RlstScalar;
 
 use std::collections::{HashMap, HashSet};
 
-use super::morton::complete_region;
 
 impl<T> SingleNodeTree<T>
 where
@@ -515,7 +514,7 @@ where
         for i in 0..(seeds.iter().len() - 1) {
             let a = seeds[i];
             let b = seeds[i + 1];
-            let mut tmp = complete_region(&a, &b);
+            let mut tmp = MortonKeys::complete_region(&a, &b);
             block_tree.keys.push(a);
             block_tree.keys.append(&mut tmp);
         }
