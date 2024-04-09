@@ -1,8 +1,0 @@
-- MortonKeys has to have a phantom field for carrying the precison
-    - Should always be using morton constructors...
-- Need to figure out which parts need real numbers only, and which parts can be generic over any scalar
-- Need to implement Helmholtz FMM
-    - The only bit that might break is the
-        - Pinv part
-    - The P2P part may be significantly slower, especially for gradients.
-    - As might the other operators, M2M and L2L, as these are now both zgemm operations.
