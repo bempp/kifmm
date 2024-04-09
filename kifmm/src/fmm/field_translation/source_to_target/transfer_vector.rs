@@ -11,8 +11,7 @@ use std::collections::HashSet;
 /// with respect to level 3 of an associated octree.
 pub fn compute_transfer_vectors<T>() -> Vec<TransferVector<T>>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     let half = T::from(0.5).unwrap().re();
     let zero = T::zero().re();

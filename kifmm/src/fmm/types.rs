@@ -537,7 +537,7 @@ where
     pub metadata: BlasMetadata<T>,
 
     /// Unique transfer vectors corresponding to each metadata
-    pub transfer_vectors: Vec<TransferVector<T>>,
+    pub transfer_vectors: Vec<TransferVector<T::Real>>,
 
     /// The associated kernel with this translation operator.
     pub kernel: U,
@@ -568,8 +568,7 @@ where
 #[derive(Debug)]
 pub struct TransferVector<T>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T>,
 {
     /// Three vector of components.
     pub components: [i64; 3],
@@ -578,10 +577,10 @@ where
     pub hash: usize,
 
     /// The `source` Morton key associated with this transfer vector.
-    pub source: MortonKey<T::Real>,
+    pub source: MortonKey<T>,
 
     /// The `target` Morton key associated with this transfer vector.
-    pub target: MortonKey<T::Real>,
+    pub target: MortonKey<T>,
 }
 
 /// Stores metadata for FFT based acceleration scheme for field translation.
@@ -604,7 +603,7 @@ where
 #[derive(Default)]
 pub struct FftMetadata<T>
 where
-    T: ComplexFloat,
+    T: RlstScalarComplexFloat,
 {
     /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster
     pub kernel_data: Vec<Vec<T>>,
