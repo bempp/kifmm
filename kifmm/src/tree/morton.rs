@@ -9,14 +9,14 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey, MortonKeys},
 };
+use crate::RlstScalarFloat;
 use itertools::{izip, Itertools};
-use num::{Float, ToPrimitive};
+use num::Float;
 use rlst::RlstScalar;
 use std::marker::PhantomData;
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
     vec,
@@ -31,7 +31,7 @@ use std::{
 /// # Arguments
 ///
 /// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
-fn linearize_keys<T: Debug + Default + Float>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
+fn linearize_keys<T: RlstScalarFloat>(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
     let depth = keys.iter().map(|k| k.level()).max().unwrap();
     let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
@@ -65,7 +65,7 @@ fn linearize_keys<T: Debug + Default + Float>(keys: &[MortonKey<T>]) -> Vec<Mort
 ///
 /// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
 /// contiguous space without gaps.
-fn balance_keys<T: Clone + Float + Default + Debug>(
+fn balance_keys<T: RlstScalarFloat>(
     keys: &[MortonKey<T>],
 ) -> HashSet<MortonKey<T>> {
     let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
@@ -107,7 +107,7 @@ fn balance_keys<T: Clone + Float + Default + Debug>(
 ///
 /// - `start` - The Morton Key defining the beginning of the region to complete.
 /// - `end` - The Morton Key marking the end of the region.
-pub fn complete_region<T: Debug + Default + Float>(
+pub fn complete_region<T: RlstScalarFloat>(
     start: &MortonKey<T>,
     end: &MortonKey<T>,
 ) -> Vec<MortonKey<T>> {
@@ -139,7 +139,7 @@ pub fn complete_region<T: Debug + Default + Float>(
     minimal_tree
 }
 
-impl<T: Debug + Default + Float> MortonKeys<T> {
+impl<T: RlstScalarFloat> MortonKeys<T> {
     /// Create new
     pub fn new() -> MortonKeys<T> {
         MortonKeys {
@@ -211,7 +211,7 @@ impl<T: Copy> Iterator for MortonKeys<T> {
     }
 }
 
-impl<T: Debug + Default + Float> FromIterator<MortonKey<T>> for MortonKeys<T> {
+impl<T: RlstScalarFloat> FromIterator<MortonKey<T>> for MortonKeys<T> {
     fn from_iter<I: IntoIterator<Item = MortonKey<T>>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
 
@@ -301,7 +301,7 @@ fn decode_key(morton: u64) -> [u64; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
+fn point_to_anchor<T: RlstScalarFloat>(
     point: &[T; 3],
     level: u64,
     domain: &Domain<T>,
@@ -362,13 +362,13 @@ pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
     key | level
 }
 
-impl<T: Float + Default + Debug> MortonKey<T> {
+impl<T: RlstScalarFloat> MortonKey<T> {
     /// Constructor for Morton key
     pub fn new(anchor: &[u64; 3], morton: u64) -> Self {
         Self {
             anchor: *anchor,
             morton,
-            scalar: PhantomData::<T>::default(),
+            scalar: PhantomData::<T>
         }
     }
 
@@ -496,7 +496,7 @@ impl<T: Float + Default + Debug> MortonKey<T> {
     pub fn diameter(&self, domain: &Domain<T>) -> [T; 3] {
         domain
             .side_length
-            .map(|x| T::from(0.5).unwrap().powf(T::from(self.level()).unwrap()) * x)
+            .map(|x| RlstScalar::powf(T::from(0.5).unwrap(), T::from(self.level()).unwrap().re()) * x)
     }
 
     /// The physical centre of a box specified by this Morton Key, calculated with respect to
@@ -859,7 +859,7 @@ impl<T: Float + Default + Debug> MortonKey<T> {
     }
 }
 
-impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey<T> {
+impl<T: RlstScalarFloat> TreeNode<T> for MortonKey<T> {
     type Nodes = MortonKeys<T>;
     type Domain = Domain<T>;
 
@@ -939,7 +939,7 @@ pub fn surface_grid<T: RlstScalar + Float + Default>(expansion_order: usize) -> 
     surface
 }
 
-impl<T: RlstScalar<Real = T> + Float + Default> FmmTreeNode<T> for MortonKey<T> {
+impl<T: RlstScalarFloat<Real = T>> FmmTreeNode<T> for MortonKey<T> {
     fn convolution_grid(
         &self,
         expansion_order: usize,
@@ -1085,7 +1085,7 @@ mod test {
 
     /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
     /// `a` is less than key `b`, this function evaluates to true.
-    fn less_than<T: Default + Float + Debug>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
+    fn less_than<T: RlstScalarFloat>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
         // If anchors match, the one at the coarser level has the lesser Morton id.
         let same_anchor = (a.anchor[0] == b.anchor[0])
             & (a.anchor[1] == b.anchor[1])

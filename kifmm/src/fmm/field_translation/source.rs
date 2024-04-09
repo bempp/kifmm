@@ -1,13 +1,12 @@
 //! Multipole Translations
-use crate::traits::{
+use crate::{traits::{
     field::SourceToTargetData,
     fmm::SourceTranslation,
     tree::{FmmTree, Tree},
-};
+}, RlstScalarFloat};
 use crate::tree::{constants::NSIBLINGS, types::SingleNodeTree};
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
-use num::Float;
 use rayon::prelude::*;
 use std::collections::HashSet;
 
@@ -18,7 +17,7 @@ use crate::fmm::{
 };
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    RawAccessMut,
 };
 
 impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
@@ -26,7 +25,7 @@ where
     T: FmmTree<Tree = SingleNodeTree<W>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat<Real = W>,
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.source_tree().all_leaves() else {

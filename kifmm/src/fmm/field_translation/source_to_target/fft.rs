@@ -8,10 +8,11 @@ use crate::tree::{
     constants::{NHALO, NSIBLINGS},
     types::{MortonKey, SingleNodeTree},
 };
+use crate::RlstScalarFloat;
 
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
-use num::{Complex, Float};
+use num::{Complex};
 use num_complex::ComplexFloat;
 use rayon::prelude::*;
 use rlst::BaseArray;
@@ -24,7 +25,7 @@ use std::{collections::HashSet, sync::RwLock};
 impl<T, U, V> KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
+    U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
@@ -84,7 +85,7 @@ where
 impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + Default + Send + Sync,
-    U: RlstScalar<Real = U> + Float + Default + RealToComplexFft3D,
+    U: RlstScalarFloat<Real = U> +RealToComplexFft3D,
     Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,

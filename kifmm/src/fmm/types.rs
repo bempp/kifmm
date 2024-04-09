@@ -1,14 +1,17 @@
 //! Data structures for kernel independent FMM
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
 use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
+use crate::RlstScalarFloat;
 use green_kernels::{traits::Kernel, types::EvalType};
-use num::{Complex, Float};
+use num::Complex;
 use num_complex::ComplexFloat;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
 use std::collections::HashMap;
 
 #[cfg(feature = "mpi")]
 use crate::tree::types::MultiNodeTree;
+#[cfg(feature = "mpi")]
+use crate::RlstScalarFloatMpi;
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in column-major order.
@@ -156,7 +159,7 @@ pub struct KiFmm<
     T: FmmTree<Tree = SingleNodeTree<W>>,
     U: SourceToTargetData,
     V: Kernel,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat<Real = W>,
 > {
     /// Dimension of the FMM
     pub dim: usize,
@@ -369,7 +372,7 @@ pub enum FmmEvalType {
 pub struct SingleNodeBuilder<T, U, V>
 where
     T: SourceToTargetData,
-    U: RlstScalar<Real = U> + Float + Default,
+    U: RlstScalarFloat<Real = U>,
     V: Kernel,
 {
     /// Tree
@@ -417,7 +420,7 @@ where
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[derive(Default)]
-pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
+pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T>> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
@@ -443,7 +446,7 @@ pub struct SingleNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[cfg(feature = "mpi")]
-pub struct MultiNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
+pub struct MultiNodeFmmTree<T: RlstScalarFloatMpi<Real = T>> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: MultiNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
@@ -473,7 +476,7 @@ pub struct MultiNodeFmmTree<T: RlstScalar<Real = T> + Float + Default> {
 #[derive(Default)]
 pub struct FftFieldTranslation<T, U>
 where
-    T: Default + RlstScalar<Real = T> + Float,
+    T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
     Complex<T>: ComplexFloat,
 {
@@ -521,7 +524,7 @@ where
 #[derive(Default)]
 pub struct BlasFieldTranslation<T, U>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
 {
     /// Threshold
@@ -654,7 +657,7 @@ where
 /// - `c_vt`- Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 pub struct BlasMetadata<T>
 where
-    T: RlstScalar,
+    T: RlstScalarFloat,
 {
     /// Left singular vectors from SVD of fat M2L matrix, truncated to a maximum cutoff rank
     pub u: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -671,7 +674,7 @@ where
 
 impl<T> Default for BlasMetadata<T>
 where
-    T: RlstScalar,
+    T: RlstScalarFloat,
 {
     fn default() -> Self {
         let u = rlst_dynamic_array2!(T, [1, 1]);

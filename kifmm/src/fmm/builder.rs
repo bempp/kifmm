@@ -19,11 +19,11 @@ use crate::tree::{
     constants::{ALPHA_INNER, ALPHA_OUTER},
     types::{Domain, MortonKey, SingleNodeTree},
 };
+use crate::RlstScalarFloat;
 use green_kernels::{traits::Kernel, types::EvalType};
-use num::Float;
 use rlst::{
     empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar, Shape, VectorContainer,
+    RawAccessMut, Shape, VectorContainer,
 };
 
 use super::constants::DEFAULT_NCRIT;
@@ -31,7 +31,7 @@ use super::constants::DEFAULT_NCRIT;
 impl<T, U, V> SingleNodeBuilder<T, U, V>
 where
     T: ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
-    U: RlstScalar<Real = U> + Float + Default,
+    U: RlstScalarFloat<Real = U>,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,
 {
@@ -213,7 +213,7 @@ where
     T::Tree: Tree<Domain = Domain<W>, Scalar = W, Node = MortonKey<W>>,
     U: SourceToTargetData,
     V: Kernel<T = W>,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat<Real = W>,
     Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>: MatrixSvd<Item = W>,
 {
     /// Calculate source and target field translation metadata

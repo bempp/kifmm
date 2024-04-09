@@ -12,6 +12,7 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey},
 };
+use crate::RlstScalarFloat;
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
@@ -40,7 +41,7 @@ fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
 impl<T, U> SourceToTargetData for BlasFieldTranslation<T, U>
 where
     T: Float + Default,
-    T: RlstScalar<Real = T> + Gemm,
+    T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -49,7 +50,7 @@ where
 
 impl<T, U> ConfigureSourceToTargetData for BlasFieldTranslation<T, U>
 where
-    T: Float + Default + RlstScalar<Real = T> + Gemm,
+    T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -223,7 +224,7 @@ where
 impl<T, U> BlasFieldTranslation<T, U>
 where
     T: Float + Default,
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -240,7 +241,7 @@ where
 
 impl<T, U> SourceToTargetData for FftFieldTranslation<T, U>
 where
-    T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
     Complex<T>: RlstScalar + ComplexFloat,
     U: Kernel<T = T> + Default,
 {
@@ -249,7 +250,7 @@ where
 
 impl<T, U> ConfigureSourceToTargetData for FftFieldTranslation<T, U>
 where
-    T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
     Complex<T>: RlstScalar + ComplexFloat,
     U: Kernel<T = T> + Default,
 {
@@ -463,7 +464,7 @@ where
 
 impl<T, U> FftFieldTranslation<T, U>
 where
-    T: Float + RlstScalar<Real = T> + Default + RealToComplexFft3D,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
     Complex<T>: RlstScalar + ComplexFloat,
     U: Kernel<T = T> + Default,
 {
@@ -612,11 +613,7 @@ mod test {
     fn test_blas_field_translation() {
         let kernel = Laplace3dKernel::new();
         let expansion_order = 6;
-
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let alpha = 1.05;
         let threshold = 1e-5;
         let cutoff_rank = 1000;

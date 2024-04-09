@@ -2,7 +2,8 @@
 use crate::fmm::types::{Charges, SendPtrMut};
 use crate::traits::tree::{FmmTreeNode, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
-use num::{Float, Num};
+use crate::RlstScalarFloat;
+use num::{Num};
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
     RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
@@ -71,7 +72,7 @@ pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Erro
 /// * `ncoeffs`- Number of interpolation points on leaf box
 pub fn leaf_scales<T>(tree: &SingleNodeTree<T>, ncoeffs: usize) -> Vec<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let mut result = vec![T::default(); tree.n_leaves().unwrap() * ncoeffs];
 
@@ -99,7 +100,7 @@ pub fn leaf_surfaces<T>(
     expansion_order: usize,
 ) -> Vec<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let dim = 3;
     let n_keys = tree.n_leaves().unwrap();
@@ -120,7 +121,7 @@ where
 /// between the local indices for each leaf and their associated charges
 pub fn coordinate_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let mut index_pointer = 0;
 
@@ -144,7 +145,7 @@ where
 /// Create index pointers for each key at each level of an octree
 pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey<T>, usize>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let mut result = vec![HashMap::new(); (tree.depth() + 1).try_into().unwrap()];
 
@@ -165,7 +166,7 @@ pub fn level_expansion_pointers<T>(
     expansions: &[T],
 ) -> Vec<Vec<Vec<SendPtrMut<T>>>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let mut result = vec![Vec::new(); (tree.depth() + 1).try_into().unwrap()];
 
@@ -203,7 +204,7 @@ pub fn leaf_expansion_pointers<T>(
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let mut result = vec![Vec::new(); n_leaves];
 
@@ -235,7 +236,7 @@ pub fn potential_pointers<T>(
     potentials: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     let mut result = vec![SendPtrMut::default(); n_leaves * nmatvecs];
     let dim = 3;

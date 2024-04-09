@@ -1,10 +1,7 @@
 //! Constructor for a single node Domain.
-use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain};
-use num::Float;
-use rlst::RlstScalar;
-use std::fmt::Debug;
+use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain, RlstScalarFloat};
 
-impl<T: Float + Default + Debug> Domain<T> {
+impl<T: RlstScalarFloat> Domain<T> {
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
     /// ensure correct Morton encoding.
@@ -27,9 +24,9 @@ impl<T: Float + Default + Debug> Domain<T> {
         let min_z = z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
         // Find maximum dimension, this will define the size of the boxes in the domain
-        let diameter_x = (*max_x - *min_x).abs();
-        let diameter_y = (*max_y - *min_y).abs();
-        let diameter_z = (*max_z - *min_z).abs();
+        let diameter_x = Float::abs(*max_x - *min_x);
+        let diameter_y = Float::abs(*max_y - *min_y);
+        let diameter_z = Float::abs(*max_z - *min_z);
 
         // Want a cubic box to place everything in
         let diameter = diameter_x.max(diameter_y).max(diameter_z);
@@ -92,7 +89,7 @@ impl<T: Float + Default + Debug> Domain<T> {
     }
 }
 
-impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
+impl<T: RlstScalarFloat > DomainTrait for Domain<T> {
     type Scalar = T;
 
     fn diameter(&self) -> &[Self::Scalar; 3] {
@@ -107,7 +104,9 @@ impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
 #[cfg(feature = "mpi")]
 mod mpi_domain {
 
-    use super::{Debug, Domain, Float};
+    use crate::{RlstScalarFloat, RlstScalarFloatMpi};
+
+    use super::Domain;
     use memoffset::offset_of;
     use mpi::{
         datatype::{UncommittedUserDatatype, UserDatatype},
@@ -116,7 +115,7 @@ mod mpi_domain {
         Address,
     };
 
-    unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
+    unsafe impl<T: RlstScalarFloatMpi> Equivalence for Domain<T> {
         type Out = UserDatatype;
         fn equivalent_datatype() -> Self::Out {
             UserDatatype::structured(
@@ -133,7 +132,7 @@ mod mpi_domain {
         }
     }
 
-    impl<T: Float + Default + Debug> Domain<T>
+    impl<T: RlstScalarFloatMpi> Domain<T>
     where
         [Domain<T>]: BufferMut,
         Vec<Domain<T>>: Buffer,
@@ -202,16 +201,18 @@ mod mpi_domain {
 #[allow(unused_imports)]
 #[cfg(feature = "mpi")]
 pub use mpi_domain::*;
+use num::Float;
+
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::tree::helpers::{points_fixture, points_fixture_col, PointsMat};
-    use rlst::{RawAccess, RlstScalar, Shape};
+    use rlst::{RawAccess, Shape};
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where
-        T: Float + Default + RlstScalar,
+        T:  RlstScalarFloat,
     {
         let domain = Domain::from_local_points(points.data());
 

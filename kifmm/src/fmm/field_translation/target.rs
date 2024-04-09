@@ -15,13 +15,13 @@ use crate::tree::{
     constants::NSIBLINGS,
     types::{MortonKey, SingleNodeTree},
 };
+use crate::RlstScalarFloat;
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
-use num::Float;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    RawAccessMut,
 };
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
@@ -29,7 +29,7 @@ where
     T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey<W>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat<Real = W>,
 {
     fn l2l(&self, level: u64) {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {

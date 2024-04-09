@@ -2,13 +2,16 @@
 
 #[cfg(feature = "mpi")]
 use mpi::topology::UserCommunicator;
+#[cfg(feature = "mpi")]
+use crate::RlstScalarFloatMpi;
 
-use num::traits::Float;
 use rlst::RlstScalar;
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
 };
+
+use crate::RlstScalarFloat;
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
@@ -22,7 +25,7 @@ use std::{
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: Float + Default,
+    T: RlstScalarFloat,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
     pub origin: [T; 3],
@@ -49,7 +52,9 @@ where
 ///   spatial indexing and operations.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
-pub struct MortonKey<T> {
+pub struct MortonKey<T>
+
+{
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
     /// The Morton encoded anchor.
@@ -117,7 +122,7 @@ pub struct MortonKeys<T> {
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
-    T: Default + Float + RlstScalar<Real = T>,
+    T: RlstScalarFloatMpi<Real = T>,
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
@@ -248,7 +253,7 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     /// Depth of a tree.
     pub depth: u64,

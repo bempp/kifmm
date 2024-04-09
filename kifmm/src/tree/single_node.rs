@@ -5,16 +5,16 @@ use crate::tree::{
     morton::encode_anchor,
     types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
 };
+use crate::RlstScalarFloat;
 use itertools::Itertools;
-use num::Float;
-use rlst::RlstScalar;
+
 use std::collections::{HashMap, HashSet};
 
 use super::morton::complete_region;
 
 impl<T> SingleNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
@@ -635,7 +635,7 @@ where
 
 impl<T> Tree for SingleNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
 {
     type Scalar = T;
     type Domain = Domain<T>;
@@ -739,7 +739,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use std::fmt::Debug;
 
     use super::*;
     use crate::tree::helpers::{points_fixture, points_fixture_col};
@@ -798,7 +797,7 @@ mod test {
         assert_eq!(unique_leaves.len(), expected);
     }
 
-    pub fn test_no_overlaps_helper<T: Clone + Float + Debug + Default>(nodes: &[MortonKey<T>]) {
+    pub fn test_no_overlaps_helper<T: RlstScalarFloat>(nodes: &[MortonKey<T>]) {
         let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 
         for node in key_set.iter() {
@@ -853,6 +852,7 @@ mod test {
                 },
             )
             .0;
+
 
         // Test that a single octant contains all the points
         for (_, (l, r)) in leaves_to_points.iter() {

@@ -4,7 +4,7 @@ use crate::{
     tree::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
-    },
+    }, RlstScalarFloatMpi,
 };
 
 use crate::hyksort::hyksort;
@@ -23,7 +23,7 @@ use super::morton::complete_region;
 
 impl<T> MultiNodeTree<T>
 where
-    T: Float + Default + Equivalence + Debug + RlstScalar<Real = T>,
+    T: RlstScalarFloatMpi<Real = T>,
 {
     /// Constructor for uniform trees, distributed with MPI, node refined to a user defined depth.
     ///
@@ -631,7 +631,7 @@ fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
 
 impl<T> Tree for MultiNodeTree<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T:  RlstScalarFloatMpi<Real = T>,
 {
     type Scalar = T;
     type Domain = Domain<T>;

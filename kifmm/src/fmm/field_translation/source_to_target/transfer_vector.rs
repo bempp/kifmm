@@ -1,15 +1,14 @@
 //! Functions for handling transfer vectors
 use crate::fmm::types::TransferVector;
 use crate::tree::types::{Domain, MortonKey};
+use crate::RlstScalarFloat;
 use itertools::Itertools;
-use num::Float;
 use std::collections::HashSet;
-use std::fmt::Debug;
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
 /// There are at most 316 such interactions, corresponding to unique `transfer vectors'. Here we compute all of them
 /// with respect to level 3 of an associated octree.
-pub fn compute_transfer_vectors<T: Float + Default + Debug>() -> Vec<TransferVector<T>> {
+pub fn compute_transfer_vectors<T: RlstScalarFloat>() -> Vec<TransferVector<T>> {
     let half = T::from(0.5).unwrap();
     let zero = T::zero();
     let one = T::one();
