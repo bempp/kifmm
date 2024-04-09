@@ -1337,7 +1337,8 @@ mod test {
         // Trivial case
         let root = MortonKey::<f64>::root();
         let result = root.finest_ancestor(&root);
-        let expected = root.clone();
+        let expected = root;
+
         assert!(result == expected);
 
         // Standard case

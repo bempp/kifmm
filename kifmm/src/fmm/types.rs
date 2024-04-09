@@ -422,17 +422,13 @@ where
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[derive(Default)]
-pub struct SingleNodeFmmTree<T>
-where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
-{
+pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T>> {
     /// An octree structure containing the source points for the FMM calculation.
-    pub source_tree: SingleNodeTree<T::Real>,
+    pub source_tree: SingleNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
-    pub target_tree: SingleNodeTree<T::Real>,
+    pub target_tree: SingleNodeTree<T>,
     /// The computational domain associated with this FMM calculation.
-    pub domain: Domain<T::Real>,
+    pub domain: Domain<T>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on distributed nodes.
