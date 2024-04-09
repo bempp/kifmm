@@ -75,8 +75,8 @@ mod mpi_point {
                     UncommittedUserDatatype::structured(
                         &[1, 1],
                         &[
-                            offset_of!(MortonKey, anchor) as Address,
-                            offset_of!(MortonKey, morton) as Address,
+                            offset_of!(MortonKey<T>, anchor) as Address,
+                            offset_of!(MortonKey<T>, morton) as Address,
                         ],
                         &[
                             UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
@@ -89,8 +89,8 @@ mod mpi_point {
                     UncommittedUserDatatype::structured(
                         &[1, 1],
                         &[
-                            offset_of!(MortonKey, anchor) as Address,
-                            offset_of!(MortonKey, morton) as Address,
+                            offset_of!(MortonKey<T>, anchor) as Address,
+                            offset_of!(MortonKey<T>, morton) as Address,
                         ],
                         &[
                             UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())

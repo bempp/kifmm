@@ -33,7 +33,7 @@ where
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
         let targets = self.tree.target_tree().keys(level).unwrap();
 
-        let targets_parents: HashSet<MortonKey> =
+        let targets_parents: HashSet<MortonKey<_>> =
             targets.iter().map(|target| target.parent()).collect();
         let mut targets_parents = targets_parents.into_iter().collect_vec();
         targets_parents.sort();
@@ -41,7 +41,7 @@ where
 
         let sources = self.tree.source_tree().keys(level).unwrap();
 
-        let sources_parents: HashSet<MortonKey> =
+        let sources_parents: HashSet<MortonKey<_>> =
             sources.iter().map(|source| source.parent()).collect();
         let mut sources_parents = sources_parents.into_iter().collect_vec();
         sources_parents.sort();
@@ -110,13 +110,13 @@ where
                 let nconv_pad = nconv + 1;
 
                 // Find parents of targets
-                let targets_parents: HashSet<MortonKey> =
+                let targets_parents: HashSet<MortonKey<_>> =
                     targets.iter().map(|target| target.parent()).collect();
 
                 let targets_parents = targets_parents.into_iter().collect_vec();
                 let ntargets_parents = targets_parents.len();
 
-                let sources_parents: HashSet<MortonKey> =
+                let sources_parents: HashSet<MortonKey<_>> =
                     sources.iter().map(|source| source.parent()).collect();
                 let nsources_parents = sources_parents.len();
 

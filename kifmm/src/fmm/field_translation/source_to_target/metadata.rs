@@ -335,7 +335,7 @@ where
                     source.surface_grid(expansion_order, &domain, alpha);
                 let target_check_surface = target.surface_grid(expansion_order, &domain, alpha);
 
-                let v_list: HashSet<MortonKey> = target
+                let v_list: HashSet<MortonKey<_>> = target
                     .parent()
                     .neighbors()
                     .iter()

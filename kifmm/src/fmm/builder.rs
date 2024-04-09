@@ -16,7 +16,7 @@ use crate::traits::{
     tree::{FmmTree, Tree},
 };
 use crate::tree::{
-    constants::{ALPHA_INNER, ALPHA_OUTER, ROOT},
+    constants::{ALPHA_INNER, ALPHA_OUTER},
     types::{Domain, MortonKey, SingleNodeTree},
 };
 use green_kernels::{traits::Kernel, types::EvalType};
@@ -210,7 +210,7 @@ where
 impl<T, U, V, W> KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTree<W>>,
-    T::Tree: Tree<Domain = Domain<W>, Scalar = W, Node = MortonKey>,
+    T::Tree: Tree<Domain = Domain<W>, Scalar = W, Node = MortonKey<W>>,
     U: SourceToTargetData,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,
@@ -218,6 +218,8 @@ where
 {
     /// Calculate source and target field translation metadata
     fn set_source_and_target_operator_data(&mut self) {
+        let root = MortonKey::root();
+
         // Cast surface parameters
         let alpha_outer = W::from(ALPHA_OUTER).unwrap();
         let alpha_inner = W::from(ALPHA_INNER).unwrap();
@@ -225,11 +227,11 @@ where
 
         // Compute required surfaces
         let upward_equivalent_surface =
-            ROOT.surface_grid(self.expansion_order, domain, alpha_inner);
-        let upward_check_surface = ROOT.surface_grid(self.expansion_order, domain, alpha_outer);
+            root.surface_grid(self.expansion_order, domain, alpha_inner);
+        let upward_check_surface = root.surface_grid(self.expansion_order, domain, alpha_outer);
         let downward_equivalent_surface =
-            ROOT.surface_grid(self.expansion_order, domain, alpha_outer);
-        let downward_check_surface = ROOT.surface_grid(self.expansion_order, domain, alpha_inner);
+            root.surface_grid(self.expansion_order, domain, alpha_outer);
+        let downward_check_surface = root.surface_grid(self.expansion_order, domain, alpha_inner);
 
         let nequiv_surface = upward_equivalent_surface.len() / self.dim;
         let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -280,7 +282,7 @@ where
         let dc2e_inv_2 = ut;
 
         // Calculate M2M and L2L operator matrices
-        let children = ROOT.children();
+        let children = root.children();
         let mut m2m = rlst_dynamic_array2!(W, [nequiv_surface, 8 * nequiv_surface]);
         let mut m2m_vec = Vec::new();
 

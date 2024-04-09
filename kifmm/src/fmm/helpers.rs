@@ -142,7 +142,7 @@ where
 }
 
 /// Create index pointers for each key at each level of an octree
-pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey, usize>>
+pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey<T>, usize>>
 where
     T: Float + Default + RlstScalar<Real = T>,
 {

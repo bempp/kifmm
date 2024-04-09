@@ -84,10 +84,10 @@ impl<T: Float + Default + Debug> Domain<T> {
     /// # Arguments
     /// * `origin` - The point from which to construct a cuboid domain.
     /// * `diameter` - The diameter along each axis of the domain.
-    pub fn new(origin: &[T; 3], diameter: &[T; 3]) -> Self {
+    pub fn new(origin: &[T; 3], side_length: &[T; 3]) -> Self {
         Domain {
             origin: *origin,
-            side_length: *diameter,
+            side_length: *side_length,
         }
     }
 }

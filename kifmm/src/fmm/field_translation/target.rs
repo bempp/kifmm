@@ -26,7 +26,7 @@ use rlst::{
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey<W>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
     W: RlstScalar<Real = W> + Float + Default,
@@ -36,7 +36,7 @@ where
             return;
         };
 
-        let parent_sources: HashSet<MortonKey> =
+        let parent_sources: HashSet<MortonKey<_>> =
             child_targets.iter().map(|source| source.parent()).collect();
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();

@@ -16,7 +16,7 @@ use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey<W>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalar<Real = W> + Float + Default,
@@ -256,7 +256,7 @@ mod test {
 
     use super::*;
     use crate::traits::tree::FmmTreeNode;
-    use crate::tree::constants::{ALPHA_INNER, ROOT};
+    use crate::tree::constants::ALPHA_INNER;
     use crate::tree::helpers::points_fixture;
     use crate::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder, SingleNodeFmmTree};
     use green_kernels::laplace_3d::Laplace3dKernel;
@@ -272,7 +272,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                Node = MortonKey,
+                Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -288,7 +288,7 @@ mod test {
         };
 
         let leaf_idx = 0;
-        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
@@ -321,7 +321,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                Node = MortonKey,
+                Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -337,7 +337,7 @@ mod test {
         };
 
         let leaf_idx = 0;
-        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
@@ -637,7 +637,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                Node = MortonKey,
+                Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -646,8 +646,10 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-        let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.surface_grid(
+        let root = MortonKey::root();
+
+        let multipole = fmm.multipole(&root).unwrap();
+        let upward_equivalent_surface = root.surface_grid(
             fmm.expansion_order(),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap(),

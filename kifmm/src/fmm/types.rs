@@ -250,10 +250,10 @@ pub struct KiFmm<
     pub level_locals: Vec<Vec<Vec<SendPtrMut<W>>>>,
 
     /// Index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_locals: Vec<HashMap<MortonKey, usize>>,
+    pub level_index_pointer_locals: Vec<HashMap<MortonKey<W>, usize>>,
 
     /// Index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey, usize>>,
+    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<W>, usize>>,
 
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<W>>,
@@ -487,7 +487,7 @@ where
     pub metadata: FftMetadata<Complex<T>>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
-    pub transfer_vectors: Vec<TransferVector>,
+    pub transfer_vectors: Vec<TransferVector<T>>,
 
     /// The associated kernel with this translation operator.
     pub kernel: U,
@@ -531,7 +531,7 @@ where
     pub metadata: BlasMetadata<T>,
 
     /// Unique transfer vectors corresponding to each metadata
-    pub transfer_vectors: Vec<TransferVector>,
+    pub transfer_vectors: Vec<TransferVector<T>>,
 
     /// The associated kernel with this translation operator.
     pub kernel: U,
@@ -560,7 +560,7 @@ where
 ///
 /// - `target`- The Morton key of the target box.
 #[derive(Debug)]
-pub struct TransferVector {
+pub struct TransferVector<T> {
     /// Three vector of components.
     pub components: [i64; 3],
 
@@ -568,10 +568,10 @@ pub struct TransferVector {
     pub hash: usize,
 
     /// The `source` Morton key associated with this transfer vector.
-    pub source: MortonKey,
+    pub source: MortonKey<T>,
 
     /// The `target` Morton key associated with this transfer vector.
-    pub target: MortonKey,
+    pub target: MortonKey<T>,
 }
 
 /// Stores metadata for FFT based acceleration scheme for field translation.

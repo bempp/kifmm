@@ -1,7 +1,7 @@
 //! Implementation of constructors for single node trees.
 use crate::traits::tree::Tree;
 use crate::tree::{
-    constants::{DEEPEST_LEVEL, LEVEL_SIZE, ROOT},
+    constants::{DEEPEST_LEVEL, LEVEL_SIZE},
     morton::encode_anchor,
     types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
 };
@@ -64,7 +64,11 @@ where
                 .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
-                    MortonKey { anchor, morton }
+                    MortonKey {
+                        anchor,
+                        morton,
+                        ..Default::default()
+                    }
                 }),
         );
 
@@ -98,7 +102,7 @@ where
         leaves.sort();
 
         // Find all keys in tree
-        let tmp: HashSet<MortonKey> = leaves
+        let tmp: HashSet<MortonKey<_>> = leaves
             .iter()
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
@@ -106,8 +110,8 @@ where
         let mut keys = MortonKeys::from(tmp);
 
         // Create sets for inclusion testing
-        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey<_>> = leaves.iter().cloned().collect();
+        let keys_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup
         keys.sort_by_key(|a| a.level());
@@ -224,7 +228,7 @@ where
         leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
         // Ensure that final leaf set contains siblings of all encoded keys
-        let leaves: HashSet<MortonKey> = leaves_to_coordinates
+        let leaves: HashSet<MortonKey<_>> = leaves_to_coordinates
             .keys()
             .flat_map(|k| k.siblings())
             .collect();
@@ -234,13 +238,13 @@ where
         leaves.sort();
 
         // Find all keys in tree
-        let tmp: HashSet<MortonKey> = leaves
+        let tmp: HashSet<MortonKey<_>> = leaves
             .iter()
             .flat_map(|leaf| leaf.ancestors().into_iter())
             .collect();
 
         // Ensure all siblings of ancestors are included
-        let tmp: HashSet<MortonKey> = tmp
+        let tmp: HashSet<MortonKey<_>> = tmp
             .iter()
             .flat_map(|key| {
                 if key.level() != 0 {
@@ -254,8 +258,8 @@ where
         let mut keys = MortonKeys::from(tmp);
 
         // Create sets for inclusion testing
-        let leaves_set: HashSet<MortonKey> = leaves.iter().cloned().collect();
-        let keys_set: HashSet<MortonKey> = keys.iter().cloned().collect();
+        let leaves_set: HashSet<MortonKey<_>> = leaves.iter().cloned().collect();
+        let keys_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
         // Group by level to perform efficient lookup
         keys.sort_by_key(|a| a.level());
@@ -432,8 +436,8 @@ where
     ///
     /// - `nodes` - Morton keys discretising a spatial domain being considered.
     /// - `points` - Mutable reference to points, allowing for assignment of their encoded Morton keys, if any.
-    pub fn assign_nodes_to_points(nodes: &MortonKeys, points: &mut Points<T>) -> MortonKeys {
-        let mut map: HashMap<MortonKey, bool> = HashMap::new();
+    pub fn assign_nodes_to_points(nodes: &MortonKeys<T>, points: &mut Points<T>) -> MortonKeys<T> {
+        let mut map: HashMap<MortonKey<_>, bool> = HashMap::new();
         for node in nodes.iter() {
             map.insert(*node, false);
         }
@@ -482,8 +486,10 @@ where
     /// # Arguments
     ///
     /// - `seeds` - Mutable reference to a collection of seed octants.
-    pub fn complete_block_tree(seeds: &mut MortonKeys) -> MortonKeys {
-        let ffc_root = ROOT.finest_first_child();
+    pub fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
+        let root = MortonKey::root();
+
+        let ffc_root = root.finest_first_child();
         let min = seeds.iter().min().unwrap();
         let fa = ffc_root.finest_ancestor(min);
         let first_child = fa.children().into_iter().min().unwrap();
@@ -493,7 +499,7 @@ where
             seeds.push(first_child)
         }
 
-        let flc_root = ROOT.finest_last_child();
+        let flc_root = root.finest_last_child();
         let max = seeds.iter().max().unwrap();
         let fa = flc_root.finest_ancestor(max);
         let last_child = fa.children().into_iter().max().unwrap();
@@ -534,7 +540,7 @@ where
     /// # Arguments
     ///
     /// - `leaves` - A reference to a collection of Morton Keys, representing leaf nodes.
-    pub fn find_seeds(leaves: &MortonKeys) -> MortonKeys {
+    pub fn find_seeds(leaves: &MortonKeys<T>) -> MortonKeys<T> {
         let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
 
         let mut seeds = MortonKeys::from(
@@ -562,9 +568,9 @@ where
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
     pub fn split_blocks(
         points: &mut Points<T>,
-        mut block_tree: MortonKeys,
+        mut block_tree: MortonKeys<T>,
         n_crit: usize,
-    ) -> MortonKeys {
+    ) -> MortonKeys<T> {
         let split_block_tree;
         let mut blocks_to_points;
         loop {
@@ -633,10 +639,10 @@ where
 {
     type Scalar = T;
     type Domain = Domain<T>;
-    type Node = MortonKey;
-    type NodeSlice<'a> = &'a [MortonKey]
+    type Node = MortonKey<T>;
+    type NodeSlice<'a> = &'a [MortonKey<T>]
         where T: 'a;
-    type Nodes = MortonKeys;
+    type Nodes = MortonKeys<T>;
 
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
         self.coordinates(leaf).map(|coords| coords.len() / 3)
@@ -733,6 +739,8 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::fmt::Debug;
+
     use super::*;
     use crate::tree::helpers::{points_fixture, points_fixture_col};
     use rlst::RawAccess;
@@ -790,18 +798,20 @@ mod test {
         assert_eq!(unique_leaves.len(), expected);
     }
 
-    pub fn test_no_overlaps_helper(nodes: &[MortonKey]) {
-        let key_set: HashSet<MortonKey> = nodes.iter().cloned().collect();
+    pub fn test_no_overlaps_helper<T: Clone + Float + Debug + Default>(nodes: &[MortonKey<T>]) {
+        let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 
         for node in key_set.iter() {
             let ancestors = node.ancestors();
-            let int: Vec<&MortonKey> = key_set.intersection(&ancestors).collect();
+            let int = key_set.intersection(&ancestors).collect_vec();
             assert!(int.len() == 1);
         }
     }
 
     #[test]
     pub fn test_assign_nodes_to_points() {
+        let root = MortonKey::root();
+
         // Generate points in a single octant of the domain
         let n_points = 10;
         let points = points_fixture::<f64>(n_points, Some(0.), Some(0.5), None);
@@ -823,7 +833,7 @@ mod test {
             })
         }
         let mut points = tmp;
-        let keys = MortonKeys::from(ROOT.children());
+        let keys = MortonKeys::from(root.children());
 
         SingleNodeTree::assign_nodes_to_points(&keys, &mut points);
 
@@ -854,6 +864,8 @@ mod test {
 
     #[test]
     pub fn test_split_blocks() {
+        let root = MortonKey::root();
+
         let domain = Domain {
             origin: [0., 0., 0.],
             side_length: [1.0, 1.0, 1.0],
@@ -878,7 +890,7 @@ mod test {
         let n_crit = 15;
 
         // Test case where blocks span the entire domain
-        let block_tree = MortonKeys::from(vec![ROOT]);
+        let block_tree = MortonKeys::from(vec![root]);
 
         SingleNodeTree::split_blocks(&mut points, block_tree, n_crit);
         let split_block_tree = MortonKeys::from(points.iter().map(|p| p.encoded_key).collect_vec());
@@ -886,7 +898,7 @@ mod test {
         test_no_overlaps_helper(&split_block_tree);
 
         // Test case where the block_tree only partially covers the area
-        let mut children = ROOT.children();
+        let mut children = root.children();
         children.sort();
 
         let a = children[0];
@@ -903,8 +915,10 @@ mod test {
 
     #[test]
     fn test_complete_blocktree() {
-        let a = ROOT.first_child();
-        let b = *ROOT.children().last().unwrap();
+        let root = MortonKey::root();
+
+        let a = root.first_child();
+        let b = *root.children().last().unwrap();
 
         let mut seeds = MortonKeys::from(vec![a, b]);
 
@@ -912,7 +926,7 @@ mod test {
 
         block_tree.sort();
 
-        let mut children = ROOT.children();
+        let mut children = root.children();
         children.sort();
         // Test that the block_tree is completed
         assert_eq!(block_tree.len(), 8);

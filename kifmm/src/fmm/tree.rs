@@ -10,7 +10,7 @@ where
     T: RlstScalar<Real = T> + Float + Default,
 {
     type Scalar = T;
-    type Node = MortonKey;
+    type Node = MortonKey<T>;
     type Tree = SingleNodeTree<T>;
 
     fn source_tree(&self) -> &Self::Tree {
