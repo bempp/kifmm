@@ -1,16 +1,17 @@
 //! Tree Traits
 use std::{collections::HashSet, hash::Hash};
 
-use num::Float;
 use rlst::RlstScalar;
+
+use crate::RlstScalarFloat;
 
 /// Interface for single and multi-node trees
 pub trait Tree {
-    /// The computational domain defining the tree.
-    type Domain: Domain;
-
     /// Scalar type
-    type Scalar: RlstScalar<Real = Self::Scalar> + Float + Default;
+    type Scalar: RlstScalarFloat;
+
+    /// The computational domain defining the tree.
+    type Domain: Domain<Self::Scalar>;
 
     /// A tree node.
     type Node: TreeNode<Self::Scalar, Domain = Self::Domain> + Clone + Copy;
@@ -54,7 +55,7 @@ pub trait Tree {
     ///
     /// # arguments
     /// - `leaf` - node being query.
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]>;
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[<Self::Scalar as RlstScalar>::Real]>;
 
     /// Query number of coordinates contained at a given leaf node
     ///
@@ -63,7 +64,7 @@ pub trait Tree {
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
-    fn all_coordinates(&self) -> Option<&[Self::Scalar]>;
+    fn all_coordinates(&self) -> Option<&[<Self::Scalar as RlstScalar>::Real]>;
 
     /// Total number of coordinates (local in a multi node setting)
     fn n_coordinates_tot(&self) -> Option<usize>;
@@ -127,10 +128,10 @@ pub trait FmmTree {
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
-    T: RlstScalar,
+    T: RlstScalarFloat,
 {
     /// The computational domain defining the tree.
-    type Domain: Domain;
+    type Domain: Domain<T>;
 
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
@@ -158,7 +159,7 @@ where
 pub trait FmmTreeNode<T>
 where
     Self: TreeNode<T>,
-    T: RlstScalar,
+    T: RlstScalarFloat,
 {
     /// Scale a surface centered at this node, used in the discretisation of the kernel independent fast nultipole
     /// method
@@ -205,13 +206,13 @@ where
 }
 
 /// Interface for computational domain
-pub trait Domain {
-    /// Scalar type
-    type Scalar: RlstScalar;
-
+pub trait Domain<T>
+where
+    T: RlstScalarFloat,
+{
     /// Origin of computational domain.
-    fn origin(&self) -> &[Self::Scalar; 3];
+    fn origin(&self) -> &[T::Real; 3];
 
     /// Side length along each axis
-    fn diameter(&self) -> &[Self::Scalar; 3];
+    fn diameter(&self) -> &[T::Real; 3];
 }

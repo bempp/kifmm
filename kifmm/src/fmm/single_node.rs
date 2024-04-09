@@ -9,17 +9,18 @@ use crate::traits::{
     tree::{FmmTree, Tree},
 };
 use crate::tree::types::{MortonKey, SingleNodeTree};
+use crate::RlstScalarFloat;
 use green_kernels::traits::Kernel;
 use green_kernels::types::EvalType;
-use num::Float;
 use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>, Scalar = W> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat,
+    <W as RlstScalar>::Real: RlstScalarFloat,
     Self: SourceToTargetTranslation,
 {
     type Node = T::Node;
@@ -205,7 +206,7 @@ where
     T: FmmTree<Tree = SingleNodeTree<W>> + Default,
     U: SourceToTargetData + Default,
     V: Kernel + Default,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat<Real = W>,
 {
     fn default() -> Self {
         let uc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
@@ -256,7 +257,7 @@ mod test {
 
     use super::*;
     use crate::traits::tree::FmmTreeNode;
-    use crate::tree::constants::{ALPHA_INNER, ROOT};
+    use crate::tree::constants::ALPHA_INNER;
     use crate::tree::helpers::points_fixture;
     use crate::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder, SingleNodeFmmTree};
     use green_kernels::laplace_3d::Laplace3dKernel;
@@ -268,11 +269,11 @@ mod test {
     use rlst::RawAccessMut;
     use rlst::VectorContainer;
 
-    fn test_single_node_fmm_vector_helper<T: RlstScalar<Real = T> + Float + Default>(
+    fn test_single_node_fmm_vector_helper<T: RlstScalarFloat<Real = T>>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                Node = MortonKey,
+                Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -288,7 +289,7 @@ mod test {
         };
 
         let leaf_idx = 0;
-        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
@@ -317,11 +318,11 @@ mod test {
         });
     }
 
-    fn test_single_node_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
+    fn test_single_node_fmm_matrix_helper<T: RlstScalarFloat<Real = T>>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                Node = MortonKey,
+                Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -337,7 +338,7 @@ mod test {
         };
 
         let leaf_idx = 0;
-        let leaf: MortonKey = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
@@ -633,11 +634,11 @@ mod test {
         }
     }
 
-    fn test_root_multipole_laplace_single_node<T: RlstScalar<Real = T> + Float + Default>(
+    fn test_root_multipole_laplace_single_node<T: RlstScalarFloat<Real = T>>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
-                Node = MortonKey,
+                Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
             >,
@@ -646,8 +647,10 @@ mod test {
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T,
     ) {
-        let multipole = fmm.multipole(&ROOT).unwrap();
-        let upward_equivalent_surface = ROOT.surface_grid(
+        let root = MortonKey::root();
+
+        let multipole = fmm.multipole(&root).unwrap();
+        let upward_equivalent_surface = root.surface_grid(
             fmm.expansion_order(),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap(),

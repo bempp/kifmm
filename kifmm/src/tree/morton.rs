@@ -9,132 +9,25 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey, MortonKeys},
 };
+use crate::RlstScalarFloat;
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
 use rlst::RlstScalar;
+use std::marker::PhantomData;
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    fmt::Debug,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
     vec,
 };
 
-/// Linearizes a collection of Morton Keys by removing overlaps, prioritizing smaller keys in case of overlaps.
-///
-/// This function processes a slice of Morton Keys to produce a new, owned vector of keys where any overlapping
-/// keys have been resolved. In scenarios where keys overlap, the smaller (by Morton order) keys are preferred
-/// and retained in the output vector. Requires a copy of the input keys.
-///
-/// # Arguments
-///
-/// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
-fn linearize_keys(keys: &[MortonKey]) -> Vec<MortonKey> {
-    let depth = keys.iter().map(|k| k.level()).max().unwrap();
-    let mut key_set: HashSet<MortonKey> = keys.iter().cloned().collect();
-
-    for level in (0..=depth).rev() {
-        let work_set: Vec<&MortonKey> = keys.iter().filter(|&&k| k.level() == level).collect();
-
-        for work_item in work_set.iter() {
-            let mut ancestors = work_item.ancestors();
-            ancestors.remove(work_item);
-            for ancestor in ancestors.iter() {
-                if key_set.contains(ancestor) {
-                    key_set.remove(ancestor);
-                }
-            }
-        }
-    }
-
-    let result: Vec<MortonKey> = key_set.into_iter().collect();
-    result
-}
-
-/// Ensures a 2:1 balance among a set of Morton Keys.
-///
-/// This function applies a 2:1 balance constraint to a slice of Morton Keys, where neighbouring
-/// nodes are at most twice as large as each other in terms of side length.  It assumes the input
-/// keys form a 'complete' set, meaning there are no gaps in the spatial coverage they represent.
-/// The balancing process may add new keys to meet this criterion, with the resulting, balanced
-/// set of keys returned as a `HashSet`.
-///
-/// # Arguments
-///
-/// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
-/// contiguous space without gaps.
-fn balance_keys(keys: &[MortonKey]) -> HashSet<MortonKey> {
-    let mut balanced: HashSet<MortonKey> = keys.iter().cloned().collect();
-    let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
-
-    for level in (0..=deepest_level).rev() {
-        let work_list = balanced
-            .iter()
-            .filter(|&key| key.level() == level)
-            .cloned()
-            .collect_vec(); // each key has its siblings here at deepest level
-
-        for key in work_list.iter() {
-            let neighbors = key.neighbors();
-            for neighbor in neighbors.iter() {
-                let parent = neighbor.parent();
-
-                if !balanced.contains(neighbor) && !balanced.contains(&parent) {
-                    balanced.insert(parent);
-                    if parent.level() > 0 {
-                        for sibling in parent.siblings() {
-                            balanced.insert(sibling);
-                        }
-                    }
-                }
-            }
-        }
-    }
-    balanced
-}
-
-/// Fills the spatial region between two Morton Keys with the minimal set of covering boxes.
-///
-/// This function computes and returns the smallest set of Morton Keys necessary to fully cover
-/// the space between two given keys, `start` and `end`. These keys define the bounds of the region
-/// to be completed.
-///
-/// # Arguments
-///
-/// - `start` - The Morton Key defining the beginning of the region to complete.
-/// - `end` - The Morton Key marking the end of the region.
-pub fn complete_region(start: &MortonKey, end: &MortonKey) -> Vec<MortonKey> {
-    let mut start_ancestors: HashSet<MortonKey> = start.ancestors();
-    let mut end_ancestors: HashSet<MortonKey> = end.ancestors();
-
-    // Remove endpoints from ancestors
-    start_ancestors.remove(start);
-    end_ancestors.remove(end);
-
-    let mut minimal_tree: Vec<MortonKey> = Vec::new();
-    let mut work_list: Vec<MortonKey> = start.finest_ancestor(end).children().into_iter().collect();
-
-    while let Some(current_item) = work_list.pop() {
-        if (current_item > *start) & (current_item < *end) & !end_ancestors.contains(&current_item)
-        {
-            minimal_tree.push(current_item);
-        } else if (start_ancestors.contains(&current_item))
-            | (end_ancestors.contains(&current_item))
-        {
-            let mut children = current_item.children();
-            work_list.append(&mut children);
-        }
-    }
-
-    // Sort the minimal tree before returning
-    minimal_tree.sort();
-    minimal_tree
-}
-
-impl MortonKeys {
-    /// Create new
-    pub fn new() -> MortonKeys {
+impl<T> MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    /// Instantiate Morton Keys
+    pub fn new() -> MortonKeys<T> {
         MortonKeys {
             keys: Vec::new(),
             index: 0,
@@ -142,8 +35,123 @@ impl MortonKeys {
     }
 
     /// Add a key
-    pub fn add(&mut self, item: MortonKey) {
+    pub fn add(&mut self, item: MortonKey<T>) {
         self.keys.push(item);
+    }
+
+    /// Linearizes a collection of Morton Keys by removing overlaps, prioritizing smaller keys in case of overlaps.
+    ///
+    /// This function processes a slice of Morton Keys to produce a new, owned vector of keys where any overlapping
+    /// keys have been resolved. In scenarios where keys overlap, the smaller (by Morton order) keys are preferred
+    /// and retained in the output vector. Requires a copy of the input keys.
+    ///
+    /// # Arguments
+    ///
+    /// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
+    pub fn linearize_keys(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
+        let depth = keys.iter().map(|k| k.level()).max().unwrap();
+        let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
+
+        for level in (0..=depth).rev() {
+            let work_set: Vec<&MortonKey<_>> =
+                keys.iter().filter(|&&k| k.level() == level).collect();
+
+            for work_item in work_set.iter() {
+                let mut ancestors = work_item.ancestors();
+                ancestors.remove(work_item);
+                for ancestor in ancestors.iter() {
+                    if key_set.contains(ancestor) {
+                        key_set.remove(ancestor);
+                    }
+                }
+            }
+        }
+
+        let result: Vec<MortonKey<_>> = key_set.into_iter().collect();
+        result
+    }
+
+    /// Ensures a 2:1 balance among a set of Morton Keys.
+    ///
+    /// This function applies a 2:1 balance constraint to a slice of Morton Keys, where neighbouring
+    /// nodes are at most twice as large as each other in terms of side length.  It assumes the input
+    /// keys form a 'complete' set, meaning there are no gaps in the spatial coverage they represent.
+    /// The balancing process may add new keys to meet this criterion, with the resulting, balanced
+    /// set of keys returned as a `HashSet`.
+    ///
+    /// # Arguments
+    ///
+    /// - `keys` - A slice of Morton Keys to enforce the 2:1 balance upon. The keys should represent a
+    /// contiguous space without gaps.
+    pub fn balance_keys(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
+        let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
+        let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
+
+        for level in (0..=deepest_level).rev() {
+            let work_list = balanced
+                .iter()
+                .filter(|&key| key.level() == level)
+                .cloned()
+                .collect_vec(); // each key has its siblings here at deepest level
+
+            for key in work_list.iter() {
+                let neighbors = key.neighbors();
+                for neighbor in neighbors.iter() {
+                    let parent = neighbor.parent();
+
+                    if !balanced.contains(neighbor) && !balanced.contains(&parent) {
+                        balanced.insert(parent);
+                        if parent.level() > 0 {
+                            for sibling in parent.siblings() {
+                                balanced.insert(sibling);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        balanced
+    }
+
+    /// Fills the spatial region between two Morton Keys with the minimal set of covering boxes.
+    ///
+    /// This function computes and returns the smallest set of Morton Keys necessary to fully cover
+    /// the space between two given keys, `start` and `end`. These keys define the bounds of the region
+    /// to be completed.
+    ///
+    /// # Arguments
+    ///
+    /// - `start` - The Morton Key defining the beginning of the region to complete.
+    /// - `end` - The Morton Key marking the end of the region.
+    pub fn complete_region(start: &MortonKey<T>, end: &MortonKey<T>) -> Vec<MortonKey<T>> {
+        let mut start_ancestors: HashSet<MortonKey<_>> = start.ancestors();
+        let mut end_ancestors: HashSet<MortonKey<_>> = end.ancestors();
+
+        // Remove endpoints from ancestors
+        start_ancestors.remove(start);
+        end_ancestors.remove(end);
+
+        let mut minimal_tree: Vec<MortonKey<_>> = Vec::new();
+        let mut work_list: Vec<MortonKey<_>> =
+            start.finest_ancestor(end).children().into_iter().collect();
+
+        while let Some(current_item) = work_list.pop() {
+            if (current_item > *start)
+                & (current_item < *end)
+                & !end_ancestors.contains(&current_item)
+            {
+                minimal_tree.push(current_item);
+            } else if (start_ancestors.contains(&current_item))
+                | (end_ancestors.contains(&current_item))
+            {
+                let mut children = current_item.children();
+                work_list.append(&mut children);
+            }
+        }
+
+        // Sort the minimal tree before returning
+        minimal_tree.sort();
+        minimal_tree
     }
 
     /// Complete the region between all elements in an vector of Morton keys that doesn't
@@ -151,7 +159,7 @@ impl MortonKeys {
     pub fn complete(&mut self) {
         let a = self.keys.iter().min().unwrap();
         let b = self.keys.iter().max().unwrap();
-        let completion = complete_region(a, b);
+        let completion = Self::complete_region(a, b);
         let start_val = vec![*a];
         let end_val = vec![*b];
         self.keys = start_val
@@ -163,7 +171,7 @@ impl MortonKeys {
 
     /// Wrapper for linearising a container of Morton Keys.
     pub fn linearize(&mut self) {
-        self.keys = linearize_keys(&self.keys);
+        self.keys = Self::linearize_keys(&self.keys);
     }
 
     /// Wrapper for sorting a container of Morton Keys.
@@ -173,26 +181,35 @@ impl MortonKeys {
 
     /// Enforce a 2:1 balance for a vector of Morton keys, and remove any overlaps.
     pub fn balance(&mut self) {
-        self.keys = balance_keys(self).into_iter().collect();
+        self.keys = Self::balance_keys(self).into_iter().collect();
     }
 }
 
-impl Deref for MortonKeys {
-    type Target = Vec<MortonKey>;
+impl<T> Deref for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    type Target = Vec<MortonKey<T>>;
 
     fn deref(&self) -> &Self::Target {
         &self.keys
     }
 }
 
-impl DerefMut for MortonKeys {
+impl<T> DerefMut for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.keys
     }
 }
 
-impl Iterator for MortonKeys {
-    type Item = MortonKey;
+impl<T> Iterator for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    type Item = MortonKey<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.keys.len() {
@@ -204,8 +221,11 @@ impl Iterator for MortonKeys {
     }
 }
 
-impl FromIterator<MortonKey> for MortonKeys {
-    fn from_iter<I: IntoIterator<Item = MortonKey>>(iter: I) -> Self {
+impl<T> FromIterator<MortonKey<T>> for MortonKeys<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    fn from_iter<I: IntoIterator<Item = MortonKey<T>>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
 
         for i in iter {
@@ -215,18 +235,43 @@ impl FromIterator<MortonKey> for MortonKeys {
     }
 }
 
-impl From<Vec<MortonKey>> for MortonKeys {
-    fn from(keys: Vec<MortonKey>) -> Self {
+impl<T: RlstScalarFloat<Real = T>> From<Vec<MortonKey<T>>> for MortonKeys<T> {
+    fn from(keys: Vec<MortonKey<T>>) -> Self {
         MortonKeys { keys, index: 0 }
     }
 }
 
-impl From<HashSet<MortonKey>> for MortonKeys {
-    fn from(keys: HashSet<MortonKey>) -> Self {
+impl<T: RlstScalarFloat<Real = T>> From<HashSet<MortonKey<T>>> for MortonKeys<T> {
+    fn from(keys: HashSet<MortonKey<T>>) -> Self {
         MortonKeys {
             keys: keys.into_iter().collect_vec(),
             index: 0,
         }
+    }
+}
+
+impl<T: RlstScalarFloat<Real = T>> PartialEq for MortonKey<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.morton == other.morton
+    }
+}
+impl<T: RlstScalarFloat<Real = T>> Eq for MortonKey<T> {}
+
+impl<T: RlstScalarFloat<Real = T>> Ord for MortonKey<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.morton.cmp(&other.morton)
+    }
+}
+
+impl<T: RlstScalarFloat<Real = T>> PartialOrd for MortonKey<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.morton.cmp(&other.morton))
+    }
+}
+
+impl<T: RlstScalarFloat<Real = T>> Hash for MortonKey<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.morton.hash(state);
     }
 }
 
@@ -269,8 +314,8 @@ fn decode_key(morton: u64) -> [u64; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
-    point: &[T; 3],
+fn point_to_anchor<T: RlstScalarFloat<Real = T> + ToPrimitive>(
+    point: &[T::Real; 3],
     level: u64,
     domain: &Domain<T>,
 ) -> Result<[u64; 3], std::io::Error> {
@@ -286,11 +331,11 @@ fn point_to_anchor<T: Float + ToPrimitive + Default + Debug>(
         true => {
             let mut anchor = [u64::default(); 3];
 
-            let side_length: Vec<T> = domain
+            let side_length = domain
                 .side_length
                 .iter()
-                .map(|d| *d / T::from(1 << level).unwrap())
-                .collect();
+                .map(|d| *d / T::from(1 << level).unwrap().re())
+                .collect_vec();
 
             let scaling_factor = 1 << (DEEPEST_LEVEL - level);
 
@@ -330,22 +375,34 @@ pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
     key | level
 }
 
-impl MortonKey {
+impl<T> MortonKey<T>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    /// Constructor for Morton key
+    pub fn new(anchor: &[u64; 3], morton: u64) -> Self {
+        Self {
+            anchor: *anchor,
+            morton,
+            scalar: PhantomData::<T::Real>,
+        }
+    }
+
+    /// The Morton key corresponding to an octree root node
+    pub fn root() -> Self {
+        Self::new(&[0, 0, 0], 0)
+    }
+
     /// Construct a `MortonKey` type from a Morton index
     pub fn from_morton(morton: u64) -> Self {
         let anchor = decode_key(morton);
-
-        MortonKey { anchor, morton }
+        Self::new(&anchor, morton)
     }
 
     /// Construct a `MortonKey` type from the anchor at a given level
     pub fn from_anchor(anchor: &[u64; 3], level: u64) -> Self {
         let morton = encode_anchor(anchor, level);
-
-        MortonKey {
-            anchor: *anchor,
-            morton,
-        }
+        Self::new(anchor, morton)
     }
 
     /// Construct a `MortonKey` associated with the box that encloses the point on the deepest level.
@@ -354,11 +411,7 @@ impl MortonKey {
     /// * `point` - Cartesian coordinate for a given point.
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
-    pub fn from_point<T: Float + Default + Debug>(
-        point: &[T; 3],
-        domain: &Domain<T>,
-        level: u64,
-    ) -> Self {
+    pub fn from_point(point: &[T::Real; 3], domain: &Domain<T>, level: u64) -> Self {
         let anchor = point_to_anchor(point, level, domain).unwrap();
         MortonKey::from_anchor(&anchor, level)
     }
@@ -369,7 +422,7 @@ impl MortonKey {
     /// * `other` - A Morton Key with which to calculate a transfer vector to.
     pub fn find_transfer_vector_components(
         &self,
-        &other: &MortonKey,
+        &other: &MortonKey<T>,
     ) -> Result<[i64; 3], std::io::Error> {
         // Only valid for keys at level 2 and below
         if self.level() < 2 || other.level() < 2 {
@@ -431,9 +484,9 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `other` - A Morton Key with which to calculate a transfer vector to.
-    pub fn find_transfer_vector(&self, &other: &MortonKey) -> Result<usize, std::io::Error> {
+    pub fn find_transfer_vector(&self, &other: &MortonKey<T>) -> Result<usize, std::io::Error> {
         let tmp = self.find_transfer_vector_components(&other)?;
-        Ok(MortonKey::find_transfer_vector_from_components(&tmp))
+        Ok(MortonKey::<T>::find_transfer_vector_from_components(&tmp))
     }
 
     /// The physical diameter of a box specified by this Morton Key, calculated with respect to
@@ -442,10 +495,10 @@ impl MortonKey {
     ///
     /// # Arguments
     /// `domain` - The physical domain with which we calculate the diameter with respect to.
-    pub fn diameter<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
-        domain
-            .side_length
-            .map(|x| T::from(0.5).unwrap().powf(T::from(self.level()).unwrap()) * x)
+    pub fn diameter(&self, domain: &Domain<T>) -> [T; 3] {
+        domain.side_length.map(|x| {
+            RlstScalar::powf(T::from(0.5).unwrap(), T::from(self.level()).unwrap().re()) * x
+        })
     }
 
     /// The physical centre of a box specified by this Morton Key, calculated with respect to
@@ -453,7 +506,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The physical domain with which we calculate the centre with respect to.
-    pub fn centre<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
+    pub fn centre(&self, domain: &Domain<T>) -> [T; 3] {
         let mut result = [T::zero(); 3];
 
         let anchor_coordinate = self.to_coordinates(domain);
@@ -500,18 +553,12 @@ impl MortonKey {
 
     /// Return the first child of a Morton Key.
     pub fn first_child(&self) -> Self {
-        MortonKey {
-            anchor: self.anchor,
-            morton: 1 + self.morton,
-        }
+        Self::new(&self.anchor, 1 + self.morton)
     }
 
     /// Return the first child of a Morton Key on the deepest level.
     pub fn finest_first_child(&self) -> Self {
-        MortonKey {
-            anchor: self.anchor,
-            morton: DEEPEST_LEVEL - self.level() + self.morton,
-        }
+        Self::new(&self.anchor, DEEPEST_LEVEL - self.level() + self.morton)
     }
 
     /// Return the last child of a Morton Key on the deepest level.
@@ -537,12 +584,12 @@ impl MortonKey {
     }
 
     /// Return all children of a Morton Key in sorted order.
-    pub fn children(&self) -> Vec<MortonKey> {
+    pub fn children(&self) -> Vec<MortonKey<T>> {
         let level = self.level();
         let morton = self.morton() >> LEVEL_DISPLACEMENT;
 
         let mut children_morton: [u64; 8] = [0; 8];
-        let mut children: Vec<MortonKey> = Vec::with_capacity(8);
+        let mut children = Vec::with_capacity(8);
         let bit_shift = 3 * (DEEPEST_LEVEL - level - 1);
         for (index, item) in children_morton.iter_mut().enumerate() {
             *item = ((morton | (index << bit_shift) as u64) << LEVEL_DISPLACEMENT) | (level + 1);
@@ -557,24 +604,24 @@ impl MortonKey {
     }
 
     /// Return all children of the parent of this Morton Key.
-    pub fn siblings(&self) -> Vec<MortonKey> {
+    pub fn siblings(&self) -> Vec<MortonKey<T>> {
         self.parent().children()
     }
 
     /// Check if the key is ancestor of `other`.
-    pub fn is_ancestor(&self, other: &MortonKey) -> bool {
+    pub fn is_ancestor(&self, other: &MortonKey<T>) -> bool {
         let ancestors = other.ancestors();
         ancestors.contains(self)
     }
 
     /// Check if key is descendant of another key.
-    pub fn is_descendant(&self, other: &MortonKey) -> bool {
+    pub fn is_descendant(&self, other: &MortonKey<T>) -> bool {
         other.is_ancestor(self)
     }
 
     /// Return set of all ancestors of this Morton Key.
-    pub fn ancestors(&self) -> HashSet<MortonKey> {
-        let mut ancestors = HashSet::<MortonKey>::new();
+    pub fn ancestors(&self) -> HashSet<MortonKey<T>> {
+        let mut ancestors = HashSet::<MortonKey<_>>::new();
 
         let mut current = *self;
 
@@ -592,7 +639,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `n` - The level below the key's level to return descendants from.
-    pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey>, std::io::Error> {
+    pub fn descendants(&self, n: u64) -> Result<Vec<MortonKey<T>>, std::io::Error> {
         let valid: bool = self.level() + n <= DEEPEST_LEVEL;
 
         match valid {
@@ -603,7 +650,7 @@ impl MortonKey {
             true => {
                 let mut descendants = vec![*self];
                 for _ in 0..n {
-                    let mut tmp = Vec::<MortonKey>::new();
+                    let mut tmp = Vec::<MortonKey<_>>::new();
                     for key in descendants {
                         tmp.append(&mut key.children());
                     }
@@ -618,7 +665,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `other` - The key with which we are calculating the shared finest ancestor with respect to.
-    pub fn finest_ancestor(&self, other: &MortonKey) -> MortonKey {
+    pub fn finest_ancestor(&self, other: &MortonKey<T>) -> MortonKey<T> {
         if self == other {
             *other
         } else {
@@ -635,7 +682,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The domain with which we are calculating with respect to.
-    pub fn to_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> [T; 3] {
+    pub fn to_coordinates(&self, domain: &Domain<T>) -> [T; 3] {
         let mut coord: [T; 3] = [T::zero(); 3];
 
         for (anchor_value, coord_ref, origin_value, diameter_value) in
@@ -665,7 +712,7 @@ impl MortonKey {
     ///
     /// # Arguments
     /// * `domain` - The domain with which we are calculating with respect to.
-    pub fn box_coordinates<T: Float + Default>(&self, domain: &Domain<T>) -> Vec<T> {
+    pub fn box_coordinates(&self, domain: &Domain<T>) -> Vec<T> {
         let mut serialized = Vec::<T>::with_capacity(24);
         let level = self.level();
         let step = (1 << (DEEPEST_LEVEL - level)) as u64;
@@ -715,7 +762,7 @@ impl MortonKey {
     /// # Arguments
     /// * `direction` - A vector describing how many boxes we move along each coordinate direction.
     ///               Negative values are possible (meaning that we move backwards).
-    pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<MortonKey> {
+    pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<MortonKey<T>> {
         let level = self.level();
 
         let max_number_of_boxes: i64 = 1 << DEEPEST_LEVEL;
@@ -738,17 +785,14 @@ impl MortonKey {
         {
             let new_anchor: [u64; 3] = [x as u64, y as u64, z as u64];
             let new_morton = encode_anchor(&new_anchor, level);
-            Some(MortonKey {
-                anchor: new_anchor,
-                morton: new_morton,
-            })
+            Some(Self::new(&new_anchor, new_morton))
         } else {
             None
         }
     }
 
     /// Find all neighbors for to a given key. Filter out 'invalid' neighbours that lie outside of the tree domain.
-    pub fn neighbors(&self) -> Vec<MortonKey> {
+    pub fn neighbors(&self) -> Vec<MortonKey<T>> {
         DIRECTIONS
             .iter()
             .map(|d| self.find_key_in_direction(d))
@@ -758,7 +802,7 @@ impl MortonKey {
     }
 
     /// Find all neighbors for to a given key, even if they lie outside of the tree domain.
-    pub fn all_neighbors(&self) -> Vec<Option<MortonKey>> {
+    pub fn all_neighbors(&self) -> Vec<Option<MortonKey<T>>> {
         DIRECTIONS
             .iter()
             .map(|d| self.find_key_in_direction(d))
@@ -766,7 +810,7 @@ impl MortonKey {
     }
 
     /// Check if two keys are adjacent with respect to each other when they are known to on the same tree level.
-    pub fn is_adjacent_same_level(&self, other: &MortonKey) -> bool {
+    pub fn is_adjacent_same_level(&self, other: &MortonKey<T>) -> bool {
         // Calculate distance between centres of each node
         let da = 1 << (DEEPEST_LEVEL - self.level());
         let db = 1 << (DEEPEST_LEVEL - other.level());
@@ -792,7 +836,7 @@ impl MortonKey {
     }
 
     /// Check if two keys are adjacent with respect to each other
-    pub fn is_adjacent(&self, other: &MortonKey) -> bool {
+    pub fn is_adjacent(&self, other: &MortonKey<T>) -> bool {
         let ancestors = self.ancestors();
         let other_ancestors = other.ancestors();
 
@@ -805,35 +849,12 @@ impl MortonKey {
     }
 }
 
-impl PartialEq for MortonKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.morton == other.morton
-    }
-}
-impl Eq for MortonKey {}
-
-impl Ord for MortonKey {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.morton.cmp(&other.morton)
-    }
-}
-
-impl PartialOrd for MortonKey {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.morton.cmp(&other.morton))
-    }
-}
-
-impl Hash for MortonKey {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.morton.hash(state);
-    }
-}
-
-impl<T: RlstScalar + Float + Default> TreeNode<T> for MortonKey {
-    type Nodes = MortonKeys;
-
-    type Domain = Domain<T>;
+impl<T> TreeNode<T> for MortonKey<T::Real>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    type Nodes = MortonKeys<T::Real>;
+    type Domain = Domain<T::Real>;
 
     fn children(&self) -> Self::Nodes {
         MortonKeys {
@@ -911,7 +932,7 @@ pub fn surface_grid<T: RlstScalar + Float + Default>(expansion_order: usize) -> 
     surface
 }
 
-impl<T: RlstScalar<Real = T> + Float + Default> FmmTreeNode<T> for MortonKey {
+impl<T: RlstScalarFloat<Real = T>> FmmTreeNode<T> for MortonKey<T> {
     fn convolution_grid(
         &self,
         expansion_order: usize,
@@ -1026,14 +1047,14 @@ use mpi::{
 };
 
 #[cfg(feature = "mpi")]
-unsafe impl Equivalence for MortonKey {
+unsafe impl<T: RlstScalarFloat<Real = T>> Equivalence for MortonKey<T> {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(
             &[1, 1],
             &[
-                offset_of!(MortonKey, anchor) as Address,
-                offset_of!(MortonKey, morton) as Address,
+                offset_of!(MortonKey<T>, anchor) as Address,
+                offset_of!(MortonKey<T>, morton) as Address,
             ],
             &[
                 UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype()).as_ref(),
@@ -1057,7 +1078,7 @@ mod test {
 
     /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
     /// `a` is less than key `b`, this function evaluates to true.
-    fn less_than(a: &MortonKey, b: &MortonKey) -> Option<bool> {
+    fn less_than<T: RlstScalarFloat<Real = T>>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
         // If anchors match, the one at the coarser level has the lesser Morton id.
         let same_anchor = (a.anchor[0] == b.anchor[0])
             & (a.anchor[1] == b.anchor[1])
@@ -1204,8 +1225,8 @@ mod test {
         let a = [0, 0, 0];
         let b = [1, 1, 1];
 
-        let a = MortonKey::from_anchor(&a, DEEPEST_LEVEL);
-        let b = MortonKey::from_anchor(&b, DEEPEST_LEVEL);
+        let a = MortonKey::<f64>::from_anchor(&a, DEEPEST_LEVEL);
+        let b = MortonKey::<f64>::from_anchor(&b, DEEPEST_LEVEL);
         let mut sa = a.siblings();
         let mut sb = b.siblings();
         sa.sort();
@@ -1221,9 +1242,9 @@ mod test {
         let n_points = 1000;
         let points = points_fixture(n_points, Some(-1.), Some(1.0), None);
 
-        let domain = Domain::from_local_points(points.data());
+        let domain = Domain::<f64>::from_local_points(points.data());
 
-        let mut keys: Vec<MortonKey> = Vec::new();
+        let mut keys: Vec<MortonKey<_>> = Vec::new();
 
         for i in 0..points.shape()[0] {
             let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
@@ -1232,7 +1253,7 @@ mod test {
         }
 
         // Add duplicates to keys, to test ordering in terms of equality
-        let mut cpy: Vec<MortonKey> = keys.to_vec();
+        let mut cpy = keys.to_vec();
         keys.append(&mut cpy);
 
         // Add duplicates to ensure equality is also sorted
@@ -1250,48 +1271,42 @@ mod test {
 
     #[test]
     fn test_find_children() {
-        let key = MortonKey {
-            morton: 0,
-            anchor: [0, 0, 0],
-        };
-        let displacement = 1 << (DEEPEST_LEVEL - key.level() - 1);
+        let root = MortonKey::<f64>::root();
+        let displacement = 1 << (DEEPEST_LEVEL - root.level() - 1);
 
-        let expected: Vec<MortonKey> = vec![
-            MortonKey {
-                anchor: [0, 0, 0],
-                morton: 1,
-            },
-            MortonKey {
-                anchor: [displacement, 0, 0],
-                morton: 0b100000000000000000000000000000000000000000000000000000000000001,
-            },
-            MortonKey {
-                anchor: [0, displacement, 0],
-                morton: 0b10000000000000000000000000000000000000000000000000000000000001,
-            },
-            MortonKey {
-                anchor: [0, 0, displacement],
-                morton: 0b1000000000000000000000000000000000000000000000000000000000001,
-            },
-            MortonKey {
-                anchor: [displacement, displacement, 0],
-                morton: 0b110000000000000000000000000000000000000000000000000000000000001,
-            },
-            MortonKey {
-                anchor: [displacement, 0, displacement],
-                morton: 0b101000000000000000000000000000000000000000000000000000000000001,
-            },
-            MortonKey {
-                anchor: [0, displacement, displacement],
-                morton: 0b11000000000000000000000000000000000000000000000000000000000001,
-            },
-            MortonKey {
-                anchor: [displacement, displacement, displacement],
-                morton: 0b111000000000000000000000000000000000000000000000000000000000001,
-            },
+        let expected: Vec<MortonKey<f64>> = vec![
+            MortonKey::new(&[0, 0, 0], 1),
+            MortonKey::new(
+                &[displacement, 0, 0],
+                0b100000000000000000000000000000000000000000000000000000000000001,
+            ),
+            MortonKey::new(
+                &[0, displacement, 0],
+                0b10000000000000000000000000000000000000000000000000000000000001,
+            ),
+            MortonKey::new(
+                &[0, 0, displacement],
+                0b1000000000000000000000000000000000000000000000000000000000001,
+            ),
+            MortonKey::new(
+                &[displacement, displacement, 0],
+                0b110000000000000000000000000000000000000000000000000000000000001,
+            ),
+            MortonKey::new(
+                &[displacement, 0, displacement],
+                0b101000000000000000000000000000000000000000000000000000000000001,
+            ),
+            MortonKey::new(
+                &[0, displacement, displacement],
+                0b11000000000000000000000000000000000000000000000000000000000001,
+            ),
+            MortonKey::new(
+                &[displacement, displacement, displacement],
+                0b111000000000000000000000000000000000000000000000000000000000001,
+            ),
         ];
 
-        let children = key.children();
+        let children = root.children();
 
         for child in &children {
             assert!(expected.contains(child));
@@ -1300,15 +1315,12 @@ mod test {
 
     #[test]
     fn test_ancestors() {
-        let domain: Domain<f64> = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let point = [0.5, 0.5, 0.5];
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
-        let mut ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
+        let mut ancestors: Vec<MortonKey<_>> = key.ancestors().into_iter().collect();
         ancestors.sort();
 
         // Test that all ancestors found
@@ -1323,42 +1335,28 @@ mod test {
     #[test]
     pub fn test_finest_ancestor() {
         // Trivial case
-        let key: MortonKey = MortonKey {
-            anchor: [0, 0, 0],
-            morton: 0,
-        };
-        let result = key.finest_ancestor(&key);
-        let expected: MortonKey = MortonKey {
-            anchor: [0, 0, 0],
-            morton: 0,
-        };
+        let root = MortonKey::<f64>::root();
+        let result = root.finest_ancestor(&root);
+        let expected = root;
+
         assert!(result == expected);
 
         // Standard case
-        let displacement = 1 << (DEEPEST_LEVEL - key.level() - 1);
-        let a: MortonKey = MortonKey {
-            anchor: [0, 0, 0],
-            morton: 16,
-        };
-        let b: MortonKey = MortonKey {
-            anchor: [displacement, displacement, displacement],
-            morton: 0b111000000000000000000000000000000000000000000000000000000000001,
-        };
+        let displacement = 1 << (DEEPEST_LEVEL - root.level() - 1);
+        let a = MortonKey::<f64>::new(&[0, 0, 0], 16);
+        let b = MortonKey::new(
+            &[displacement, displacement, displacement],
+            0b111000000000000000000000000000000000000000000000000000000000001,
+        );
         let result = a.finest_ancestor(&b);
-        let expected: MortonKey = MortonKey {
-            anchor: [0, 0, 0],
-            morton: 0,
-        };
+        let expected = MortonKey::new(&[0, 0, 0], 0);
         assert!(result == expected);
     }
 
     #[test]
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
-        let domain: Domain<f64> = Domain {
-            side_length: [1., 1., 1.],
-            origin: [0., 0., 0.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
         // Simple case, at the leaf level
@@ -1401,7 +1399,7 @@ mod test {
                 [displacement, displacement, displacement],
             ];
 
-            let mut expected: Vec<MortonKey> = expected
+            let mut expected: Vec<MortonKey<_>> = expected
                 .iter()
                 .map(|n| {
                     [
@@ -1465,7 +1463,7 @@ mod test {
                 [displacement, displacement, displacement],
             ];
 
-            let mut expected: Vec<MortonKey> = expected
+            let mut expected: Vec<MortonKey<_>> = expected
                 .iter()
                 .map(|n| {
                     [
@@ -1474,11 +1472,12 @@ mod test {
                         (n[2] + (anchor[2] as i64)) as u64,
                     ]
                 })
-                .map(|anchor| MortonKey::from_anchor(&anchor, DEEPEST_LEVEL))
-                .map(|key| MortonKey {
-                    anchor: key.anchor,
-                    morton: ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT)
-                        | parent.level(),
+                .map(|anchor| MortonKey::<f64>::from_anchor(&anchor, DEEPEST_LEVEL))
+                .map(|key| {
+                    let anchor = key.anchor;
+                    let morton =
+                        ((key.morton >> LEVEL_DISPLACEMENT) << LEVEL_DISPLACEMENT) | parent.level();
+                    MortonKey::new(&anchor, morton)
                 })
                 .collect();
             expected.sort();
@@ -1498,10 +1497,7 @@ mod test {
     #[test]
     pub fn test_morton_keys_iterator() {
         let n_points = 1000;
-        let domain = Domain {
-            origin: [-1.01, -1.01, -1.01],
-            side_length: [2.0, 2.0, 2.0],
-        };
+        let domain = Domain::<f64>::new(&[-1.01, -1.01, -1.01], &[2.0, 2.0, 2.0]);
         let min = Some(-1.01);
         let max = Some(0.99);
 
@@ -1525,13 +1521,9 @@ mod test {
 
     #[test]
     fn test_linearize_keys() {
-        let key = MortonKey {
-            morton: 15,
-            anchor: [0, 0, 0],
-        };
-
-        let ancestors: Vec<MortonKey> = key.ancestors().into_iter().collect();
-        let linearized = linearize_keys(&ancestors);
+        let key = MortonKey::<f64>::new(&[0, 0, 0], 15);
+        let ancestors = key.ancestors().into_iter().collect_vec();
+        let linearized = MortonKeys::linearize_keys(&ancestors);
 
         assert_eq!(linearized.len(), 1);
         assert_eq!(linearized[0], key);
@@ -1539,10 +1531,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor() {
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test points in the domain
         let point = [0.9999, 0.9999, 0.9999];
@@ -1554,10 +1543,7 @@ mod test {
             assert_eq!(a, &expected[i])
         }
 
-        let domain = Domain {
-            origin: [-0.7, -0.6, -0.5],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[-0.7, -0.6, -0.5], &[1., 1., 1.]);
 
         let point = [-0.499, -0.499, -0.499];
         let level = 1;
@@ -1571,10 +1557,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor_fails() {
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test a point not in the domain
         let point = [1.9, 0.9, 0.9];
@@ -1584,10 +1567,7 @@ mod test {
 
     #[test]
     fn test_point_to_anchor_fails_negative_domain() {
-        let domain = Domain {
-            origin: [-0.5, -0.5, -0.5],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[-0.5, -0.5, -0.5], &[1., 1., 1.]);
 
         // Test a point not in the domain
         let point = [-0.51, -0.5, -0.5];
@@ -1612,12 +1592,9 @@ mod test {
 
     #[test]
     fn test_find_descendants() {
-        let key = MortonKey {
-            morton: 0,
-            anchor: [0, 0, 0],
-        };
+        let root = MortonKey::<f64>::root();
 
-        let descendants = key.descendants(1).unwrap();
+        let descendants = root.descendants(1).unwrap();
         assert_eq!(descendants.len(), 8);
 
         // Ensure this also works for other keys in hierarchy
@@ -1628,25 +1605,19 @@ mod test {
 
     #[test]
     fn test_find_descendants_errors() {
-        let key = MortonKey {
-            morton: 0,
-            anchor: [0, 0, 0],
-        };
-        assert!(key.descendants(17).is_err());
+        let root = MortonKey::<f64>::root();
+        assert!(root.descendants(17).is_err());
     }
 
     #[test]
     fn test_complete_region() {
-        let a: MortonKey = MortonKey {
-            anchor: [0, 0, 0],
-            morton: 16,
-        };
-        let b: MortonKey = MortonKey {
-            anchor: [65535, 65535, 65535],
-            morton: 0b111111111111111111111111111111111111111111111111000000000010000,
-        };
+        let a = MortonKey::<f64>::new(&[0, 0, 0], 16);
+        let b = MortonKey::<f64>::new(
+            &[LEVEL_SIZE - 1, LEVEL_SIZE - 1, LEVEL_SIZE - 1],
+            0b111111111111111111111111111111111111111111111111000000000010000,
+        );
 
-        let region = complete_region(&a, &b);
+        let region = MortonKeys::complete_region(&a, &b);
 
         let fa = a.finest_ancestor(&b);
 
@@ -1687,10 +1658,10 @@ mod test {
 
     #[test]
     pub fn test_balance() {
-        let a = MortonKey::from_anchor(&[0, 0, 0], DEEPEST_LEVEL);
-        let b = MortonKey::from_anchor(&[1, 1, 1], DEEPEST_LEVEL);
+        let a = MortonKey::<f64>::from_anchor(&[0, 0, 0], DEEPEST_LEVEL);
+        let b = MortonKey::<f64>::from_anchor(&[1, 1, 1], DEEPEST_LEVEL);
 
-        let mut complete = complete_region(&a, &b);
+        let mut complete = MortonKeys::complete_region(&a, &b);
         let start_val = vec![a];
         let end_val = vec![b];
         complete = start_val
@@ -1737,10 +1708,7 @@ mod test {
     #[test]
     fn test_is_adjacent() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [-0.1, -0.1, 0.1],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[-0.1, -0.1, -0.1], &[1., 1., 1.]);
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
 
@@ -1768,7 +1736,7 @@ mod test {
 
         // Test keys on different levels
         let anchor_a = [0, 0, 0];
-        let a = MortonKey::from_anchor(&anchor_a, DEEPEST_LEVEL - 1);
+        let a = MortonKey::<f64>::from_anchor(&anchor_a, DEEPEST_LEVEL - 1);
         let anchor_b = [2, 2, 2];
         let b = MortonKey::from_anchor(&anchor_b, DEEPEST_LEVEL);
         assert!(a.is_adjacent(&b));
@@ -1777,10 +1745,7 @@ mod test {
     #[test]
     fn test_encoding_is_always_absolute() {
         let point = [-0.099999, -0.099999, -0.099999];
-        let domain: Domain<f64> = Domain {
-            origin: [-0.1, -0.1, -0.1],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[-0.1, -0.1, -0.1], &[1., 1., 1.]);
 
         let a = MortonKey::from_point(&point, &domain, 1);
         let b = MortonKey::from_point(&point, &domain, 16);
@@ -1791,10 +1756,7 @@ mod test {
     #[test]
     fn test_transfer_vector() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         // Test scale independence of transfer vectors
         let a = MortonKey::from_point(&point, &domain, 2);
@@ -1823,10 +1785,7 @@ mod test {
     #[test]
     fn test_transfer_vector_errors() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, 1);
         let sibling = key.siblings()[0];
         assert!(key.find_transfer_vector(&sibling).is_err());
@@ -1835,10 +1794,7 @@ mod test {
     #[test]
     fn test_surface_grid() {
         let point = [0.5, 0.5, 0.5];
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let key = MortonKey::from_point(&point, &domain, 0);
 
         let expansion_order = 2;

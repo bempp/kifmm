@@ -15,9 +15,9 @@ use crate::tree::{
     constants::NSIBLINGS,
     types::{MortonKey, SingleNodeTree},
 };
+use crate::RlstScalarFloat;
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
-use num::Float;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
@@ -26,17 +26,18 @@ use rlst::{
 
 impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W>, Node = MortonKey> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalar<Real = W> + Float + Default,
+    W: RlstScalarFloat,
+    <W as RlstScalar>::Real: RlstScalarFloat,
 {
     fn l2l(&self, level: u64) {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
             return;
         };
 
-        let parent_sources: HashSet<MortonKey> =
+        let parent_sources: HashSet<MortonKey<_>> =
             child_targets.iter().map(|source| source.parent()).collect();
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();
@@ -202,7 +203,7 @@ where
                                     [self.dim, 1]
                                 );
                                 let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(W, [ntargets, self.dim]);
+                                    rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
                                 target_coordinates_col_major
                                     .fill_from(target_coordinates_row_major.view());
 
@@ -258,7 +259,7 @@ where
                                         [self.dim, 1]
                                     );
                                     let mut target_coordinates_col_major =
-                                        rlst_dynamic_array2!(W, [ntargets, self.dim]);
+                                        rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
                                     target_coordinates_col_major
                                         .fill_from(target_coordinates_row_major.view());
 
@@ -321,7 +322,7 @@ where
                                 [self.dim, 1]
                             );
                             let mut target_coordinates_col_major =
-                                rlst_dynamic_array2!(W, [ntargets, self.dim]);
+                                rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
                             target_coordinates_col_major
                                 .fill_from(target_coordinates_row_major.view());
 
@@ -359,7 +360,7 @@ where
                                             [self.dim, 1]
                                         );
                                         let mut source_coordinates_col_major =
-                                            rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                            rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
                                         source_coordinates_col_major
                                             .fill_from(source_coordinates_row_major.view());
 
@@ -405,7 +406,7 @@ where
                                     [self.dim, 1]
                                 );
                                 let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(W, [ntargets, self.dim]);
+                                    rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
                                 target_coordinates_col_major
                                     .fill_from(target_coordinates_row_major.view());
 
@@ -446,7 +447,7 @@ where
                                             [self.dim, 1]
                                         );
                                         let mut source_coordinates_col_major =
-                                            rlst_dynamic_array2!(W, [nsources, self.dim]);
+                                            rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
                                         source_coordinates_col_major
                                             .fill_from(source_coordinates_row_major.view());
 

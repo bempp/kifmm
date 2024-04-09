@@ -1,25 +1,29 @@
 //! Functions for handling transfer vectors
 use crate::fmm::types::TransferVector;
 use crate::tree::types::{Domain, MortonKey};
+use crate::RlstScalarFloat;
 use itertools::Itertools;
 use std::collections::HashSet;
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
 /// There are at most 316 such interactions, corresponding to unique `transfer vectors'. Here we compute all of them
 /// with respect to level 3 of an associated octree.
-pub fn compute_transfer_vectors() -> Vec<TransferVector> {
-    let point = [0.5, 0.5, 0.5];
-    let domain = Domain {
-        origin: [0., 0., 0.],
-        side_length: [1., 1., 1.],
-    };
+pub fn compute_transfer_vectors<T>() -> Vec<TransferVector<T>>
+where
+    T: RlstScalarFloat<Real = T>,
+{
+    let half = T::from(0.5).unwrap().re();
+    let zero = T::zero().re();
+    let one = T::one().re();
+    let point = [half, half, half];
+    let domain = Domain::<T::Real>::new(&[zero, zero, zero], &[one, one, one]);
 
     // Encode point in centre of domain
-    let key = MortonKey::from_point(&point, &domain, 3);
+    let key = MortonKey::<T::Real>::from_point(&point, &domain, 3);
 
     // Add neighbours, and their resp. siblings to v list.
     let mut neighbours = key.neighbors();
-    let mut keys: Vec<MortonKey> = Vec::new();
+    let mut keys = Vec::new();
     keys.push(key);
     keys.append(&mut neighbours);
 
@@ -29,11 +33,11 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     }
 
     // Keep only unique keys
-    let keys: Vec<&MortonKey> = keys.iter().unique().collect();
+    let keys = keys.iter().unique().collect_vec();
 
     let mut transfer_vectors: Vec<usize> = Vec::new();
-    let mut targets: Vec<MortonKey> = Vec::new();
-    let mut sources: Vec<MortonKey> = Vec::new();
+    let mut targets = Vec::new();
+    let mut sources = Vec::new();
 
     for key in keys.iter() {
         // Dense v_list
@@ -70,21 +74,21 @@ pub fn compute_transfer_vectors() -> Vec<TransferVector> {
     }
 
     // Identify sources/targets which correspond to unique transfer vectors.
-    let unique_sources: Vec<MortonKey> = sources
+    let unique_sources = sources
         .iter()
         .enumerate()
         .filter(|(i, _)| unique_indices.contains(i))
         .map(|(_, x)| *x)
         .collect_vec();
 
-    let unique_targets: Vec<MortonKey> = targets
+    let unique_targets = targets
         .iter()
         .enumerate()
         .filter(|(i, _)| unique_indices.contains(i))
         .map(|(_, x)| *x)
         .collect_vec();
 
-    let mut result = Vec::<TransferVector>::new();
+    let mut result = Vec::<TransferVector<T>>::new();
 
     for ((t, s), v) in unique_targets
         .into_iter()

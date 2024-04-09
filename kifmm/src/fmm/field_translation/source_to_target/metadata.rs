@@ -12,10 +12,10 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey},
 };
+use crate::{RlstScalarComplexFloat, RlstScalarFloat};
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
-use num_complex::ComplexFloat;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
@@ -39,21 +39,22 @@ fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
 // T: SourceToTargetData + ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
 impl<T, U> SourceToTargetData for BlasFieldTranslation<T, U>
 where
-    T: Float + Default,
-    T: RlstScalar<Real = T> + Gemm,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type Metadata = BlasMetadata<T>;
 }
 
-impl<T, U> ConfigureSourceToTargetData for BlasFieldTranslation<T, U>
+impl<T, U> ConfigureSourceToTargetData<T> for BlasFieldTranslation<T, U>
 where
-    T: Float + Default + RlstScalar<Real = T> + Gemm,
+    T: RlstScalarFloat,
+    <T as RlstScalar>::Real: RlstScalarFloat,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    type Domain = Domain<T>;
+    type Domain = Domain<T::Real>;
     type Kernel = U;
 
     fn operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
@@ -66,7 +67,7 @@ where
         let mut se2tc_fat = rlst_dynamic_array2!(T, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
         let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
-        let alpha = T::from(ALPHA_INNER).unwrap();
+        let alpha = T::from(ALPHA_INNER).unwrap().re();
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.surface_grid(expansion_order, &domain, alpha);
@@ -104,7 +105,7 @@ where
         let k = std::cmp::min(mu, nvt);
 
         let mut u_big = rlst_dynamic_array2!(T, [mu, k]);
-        let mut sigma = vec![T::zero(); k];
+        let mut sigma = vec![T::zero().re(); k];
         let mut vt_big = rlst_dynamic_array2!(T, [k, nvt]);
 
         se2tc_fat
@@ -133,7 +134,7 @@ where
         let nst = se2tc_thin.shape()[1];
         let k = std::cmp::min(thin_nrows, nst);
         let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, k]);
-        let mut _r = vec![T::zero(); k];
+        let mut _r = vec![T::zero().re(); k];
         let mut st = rlst_dynamic_array2!(T, [k, nst]);
 
         se2tc_thin
@@ -164,7 +165,7 @@ where
             );
 
             let mut u_i = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
-            let mut sigma_i = vec![T::zero(); cutoff_rank];
+            let mut sigma_i = vec![T::zero().re(); cutoff_rank];
             let mut vt_i = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
 
             tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
@@ -223,7 +224,7 @@ where
 impl<T, U> BlasFieldTranslation<T, U>
 where
     T: Float + Default,
-    T: RlstScalar<Real = T>,
+    T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -240,17 +241,17 @@ where
 
 impl<T, U> SourceToTargetData for FftFieldTranslation<T, U>
 where
-    T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
-    Complex<T>: RlstScalar + ComplexFloat,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
+    Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
     type Metadata = FftMetadata<Complex<T>>;
 }
 
-impl<T, U> ConfigureSourceToTargetData for FftFieldTranslation<T, U>
+impl<T, U> ConfigureSourceToTargetData<T> for FftFieldTranslation<T, U>
 where
-    T: RlstScalar<Real = T> + Float + Default + RealToComplexFft3D,
-    Complex<T>: RlstScalar + ComplexFloat,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
+    Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
     type Domain = Domain<T>;
@@ -335,7 +336,7 @@ where
                     source.surface_grid(expansion_order, &domain, alpha);
                 let target_check_surface = target.surface_grid(expansion_order, &domain, alpha);
 
-                let v_list: HashSet<MortonKey> = target
+                let v_list: HashSet<MortonKey<_>> = target
                     .parent()
                     .neighbors()
                     .iter()
@@ -463,8 +464,8 @@ where
 
 impl<T, U> FftFieldTranslation<T, U>
 where
-    T: Float + RlstScalar<Real = T> + Default + RealToComplexFft3D,
-    Complex<T>: RlstScalar + ComplexFloat,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
+    Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
     /// Create new
@@ -612,11 +613,7 @@ mod test {
     fn test_blas_field_translation() {
         let kernel = Laplace3dKernel::new();
         let expansion_order = 6;
-
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let alpha = 1.05;
         let threshold = 1e-5;
         let cutoff_rank = 1000;
@@ -644,7 +641,7 @@ mod test {
 
         let idx = 123;
 
-        let transfer_vectors = compute_transfer_vectors();
+        let transfer_vectors = compute_transfer_vectors::<f64>();
         let transfer_vector = &transfer_vectors[idx];
 
         // Lookup correct components of SVD compressed M2L operator matrix
@@ -906,7 +903,7 @@ mod test {
         // Compute all M2L operators
         // Pick a random source/target pair
         let idx = 123;
-        let all_transfer_vectors = compute_transfer_vectors();
+        let all_transfer_vectors = compute_transfer_vectors::<f64>();
 
         let transfer_vector = &all_transfer_vectors[idx];
 
