@@ -29,7 +29,7 @@ where
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
     W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat
+    <W as RlstScalar>::Real: RlstScalarFloat,
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.source_tree().all_leaves() else {
@@ -136,9 +136,9 @@ where
                     .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
-                            let coordinates_row_major: &[W::Real] = &coordinates[charge_index_pointer.0
-                                * self.dim
-                                ..charge_index_pointer.1 * self.dim];
+                            let coordinates_row_major: &[W::Real] = &coordinates
+                                [charge_index_pointer.0 * self.dim
+                                    ..charge_index_pointer.1 * self.dim];
                             let nsources = coordinates_row_major.len() / self.dim;
 
                             if nsources > 0 {

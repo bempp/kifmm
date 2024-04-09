@@ -8,17 +8,16 @@ use crate::tree::{
     constants::{NHALO, NSIBLINGS},
     types::{MortonKey, SingleNodeTree},
 };
-use crate::RlstScalarFloat;
+use crate::{RlstScalarComplexFloat, RlstScalarFloat};
 
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use num::Complex;
-use num_complex::ComplexFloat;
 use rayon::prelude::*;
+use rlst::Array;
 use rlst::BaseArray;
 use rlst::VectorContainer;
 use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess};
-use rlst::{Array, RlstScalar};
 use rlst::{MatrixSvd, RandomAccessMut};
 use std::{collections::HashSet, sync::RwLock};
 
@@ -26,10 +25,9 @@ impl<T, U, V> KiFmm<V, FftFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
-    Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: ComplexFloat,
+    Complex<U>: RlstScalarComplexFloat,
 {
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
         let targets = self.tree.target_tree().keys(level).unwrap();
@@ -86,10 +84,9 @@ impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslation<U, T>, 
 where
     T: Kernel<T = U> + Default + Send + Sync,
     U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
-    Complex<U>: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: ComplexFloat,
+    Complex<U>: RlstScalarComplexFloat,
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {

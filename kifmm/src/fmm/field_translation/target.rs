@@ -30,7 +30,7 @@ where
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
     W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat
+    <W as RlstScalar>::Real: RlstScalarFloat,
 {
     fn l2l(&self, level: u64) {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {

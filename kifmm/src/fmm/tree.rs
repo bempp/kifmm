@@ -9,7 +9,7 @@ use crate::RlstScalarFloat;
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
     T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     type Scalar = T;
     type Node = MortonKey<T::Real>;

@@ -62,7 +62,7 @@ pub trait SourceToTargetTranslation {
 /// potentials, and managing the underlying tree structure and kernel functions.
 pub trait Fmm
 where
-    <Self::Scalar as RlstScalar>::Real: RlstScalarFloat
+    <Self::Scalar as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Data associated with FMM, must implement RlstScalar.
     type Scalar: RlstScalarFloat;

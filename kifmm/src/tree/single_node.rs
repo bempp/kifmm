@@ -637,7 +637,7 @@ where
 impl<T> Tree for SingleNodeTree<T>
 where
     T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     type Scalar = T;
     type Domain = Domain<T::Real>;

@@ -1,7 +1,7 @@
 //! Data structures for kernel independent FMM
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
 use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
-use crate::RlstScalarFloat;
+use crate::{RlstScalarComplexFloat, RlstScalarFloat};
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Complex;
 use num_complex::ComplexFloat;
@@ -161,7 +161,7 @@ where
     U: SourceToTargetData,
     V: Kernel,
     W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat
+    <W as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Dimension of the FMM
     pub dim: usize,
@@ -425,7 +425,7 @@ where
 pub struct SingleNodeFmmTree<T>
 where
     T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat
+    <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
@@ -484,7 +484,7 @@ pub struct FftFieldTranslation<T, U>
 where
     T: RlstScalarFloat<Real = T>,
     U: Kernel<T = T> + Default,
-    Complex<T>: ComplexFloat,
+    Complex<T>: RlstScalarComplexFloat,
 {
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,

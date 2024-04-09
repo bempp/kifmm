@@ -12,11 +12,10 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey},
 };
-use crate::RlstScalarFloat;
+use crate::{RlstScalarComplexFloat, RlstScalarFloat};
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
-use num_complex::ComplexFloat;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
@@ -243,7 +242,7 @@ where
 impl<T, U> SourceToTargetData for FftFieldTranslation<T, U>
 where
     T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
-    Complex<T>: RlstScalar + ComplexFloat,
+    Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
     type Metadata = FftMetadata<Complex<T>>;
@@ -252,7 +251,7 @@ where
 impl<T, U> ConfigureSourceToTargetData<T> for FftFieldTranslation<T, U>
 where
     T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
-    Complex<T>: RlstScalar + ComplexFloat,
+    Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
     type Domain = Domain<T>;
@@ -466,7 +465,7 @@ where
 impl<T, U> FftFieldTranslation<T, U>
 where
     T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
-    Complex<T>: RlstScalar + ComplexFloat,
+    Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
     /// Create new

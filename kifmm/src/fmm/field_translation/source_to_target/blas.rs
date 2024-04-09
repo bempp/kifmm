@@ -14,7 +14,8 @@ use itertools::Itertools;
 
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MatrixSvd,
+    MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer,
 };
 use std::{
     collections::{HashMap, HashSet},
