@@ -1,17 +1,17 @@
 //! Data structures to create distributed octrees with MPI.
 
 #[cfg(feature = "mpi")]
-use crate::RlstScalarFloatMpi;
+use mpi::traits::Equivalence;
+
 #[cfg(feature = "mpi")]
 use mpi::topology::UserCommunicator;
+use num::Float;
 use rlst::RlstScalar;
 
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
 };
-
-use crate::{Float, RlstScalarFloat};
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
@@ -257,7 +257,7 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T> + Float,
+    T: RlstScalar + Float,
 {
     /// Depth of a tree.
     pub depth: u64,

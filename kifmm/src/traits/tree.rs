@@ -3,15 +3,15 @@ use std::{collections::HashSet, hash::Hash};
 
 use rlst::RlstScalar;
 
-use crate::{Float, RlstScalarFloat};
+use num::traits::Float;
 
 /// Interface for single and multi-node trees
 pub trait Tree {
     /// Scalar type
-    type Scalar: RlstScalarFloat + Float;
+    type Scalar: RlstScalar + Float;
 
     /// The computational domain defining the tree.
-    type Domain: Domain<Self::Scalar>;
+    type Domain: Domain<Scalar = Self::Scalar>;
 
     /// A tree node.
     type Node: TreeNode<Self::Scalar, Domain = Self::Domain> + Clone + Copy;
@@ -55,7 +55,7 @@ pub trait Tree {
     ///
     /// # arguments
     /// - `leaf` - node being query.
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[<Self::Scalar as RlstScalar>::Real]>;
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]>;
 
     /// Query number of coordinates contained at a given leaf node
     ///
@@ -64,7 +64,7 @@ pub trait Tree {
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
-    fn all_coordinates(&self) -> Option<&[<Self::Scalar as RlstScalar>::Real]>;
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]>;
 
     /// Total number of coordinates (local in a multi node setting)
     fn n_coordinates_tot(&self) -> Option<usize>;
@@ -131,7 +131,7 @@ where
     T: RlstScalar + Float,
 {
     /// The computational domain defining the tree.
-    type Domain: Domain<T>;
+    type Domain: Domain<Scalar = T>;
 
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
@@ -169,8 +169,7 @@ where
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which nodes are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn scale_surface(&self, surface: Vec<T>, domain: &Self::Domain, alpha: T)
-        -> Vec<T>;
+    fn scale_surface(&self, surface: Vec<T>, domain: &Self::Domain, alpha: T) -> Vec<T>;
 
     /// Compute the convolution grid, centered at this node. This method is used in the FFT acceleration of
     /// the field translation operator for kernel independent fast multipole method.
@@ -201,18 +200,20 @@ where
     /// * `domain` - The physical domain with which node are being constructed with respect to.
     /// * `expansion_order` - The expansion order of the FMM
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: T)
-        -> Vec<T>;
+    fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: T) -> Vec<T>;
 }
 
 /// Interface for computational domain
-pub trait Domain<T>
+pub trait Domain
 where
-    T: RlstScalar + Float
+    Self::Scalar: RlstScalar + Float,
 {
+    /// Scalar type
+    type Scalar;
+
     /// Origin of computational domain.
-    fn origin(&self) -> &[T; 3];
+    fn origin(&self) -> &[Self::Scalar; 3];
 
     /// Side length along each axis
-    fn diameter(&self) -> &[T; 3];
+    fn diameter(&self) -> &[Self::Scalar; 3];
 }

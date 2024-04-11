@@ -24,7 +24,7 @@ where
     type Kernel: Kernel;
 
     /// The computational domain defining the tree.
-    type Domain: Domain<T>;
+    type Domain: Domain<Scalar = T>;
 
     /// Set the field translation operators corresponding to each unique transfer vector.
     ///

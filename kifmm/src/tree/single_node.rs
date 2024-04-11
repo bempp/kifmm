@@ -5,7 +5,7 @@ use crate::tree::{
     morton::encode_anchor,
     types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
 };
-use crate::{Float, RlstScalarFloat};
+use crate::Float;
 use itertools::Itertools;
 use rlst::RlstScalar;
 
@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 impl<T> SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T> + Float,
+    T: RlstScalar + Float,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
@@ -630,7 +630,7 @@ where
 
 impl<T> Tree for SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T> + Float,
+    T: RlstScalar + Float,
 {
     type Scalar = T;
     type Domain = Domain<T>;
@@ -699,7 +699,7 @@ where
         Some(&self.leaves)
     }
 
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[<Self::Scalar as RlstScalar>::Real]> {
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
@@ -707,7 +707,7 @@ where
         }
     }
 
-    fn all_coordinates(&self) -> Option<&[<Self::Scalar as RlstScalar>::Real]> {
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
         Some(&self.coordinates)
     }
 
@@ -794,7 +794,7 @@ mod test {
 
     pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T>])
     where
-        T: RlstScalarFloat<Real = T> + Float,
+        T: RlstScalar + Float,
     {
         let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 

@@ -6,7 +6,6 @@ use green_kernels::{traits::Kernel, types::EvalType};
 use num::Complex;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
-use std::io::Read;
 
 #[cfg(feature = "mpi")]
 use crate::tree::types::MultiNodeTree;

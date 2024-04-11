@@ -1,9 +1,9 @@
 //! Implementation of traits for handling, and sorting, containers of point data.
 use crate::tree::types::Point;
-use std::cmp::Ordering;
-use std::hash::{Hash, Hasher};
 use num::Float;
 use rlst::RlstScalar;
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 impl<T> PartialEq for Point<T>
 where
@@ -47,14 +47,13 @@ where
 #[cfg(feature = "mpi")]
 mod mpi_point {
     use super::Point;
-
-    use crate::{tree::types::MortonKey, RlstScalarFloat};
+    use super::{Float, RlstScalar};
+    use crate::tree::types::MortonKey;
     use memoffset::offset_of;
     use mpi::{
         datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
         Address,
     };
-    use num::Float;
 
     unsafe impl<T> Equivalence for Point<T>
     where

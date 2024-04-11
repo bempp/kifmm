@@ -9,9 +9,8 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey, MortonKeys},
 };
-use crate::{RlstScalarFloat};
+use crate::RlstScalarFloat;
 use itertools::{izip, Itertools};
-use num::traits::float;
 use num::{Float, ToPrimitive};
 use rlst::RlstScalar;
 use std::marker::PhantomData;
@@ -188,7 +187,7 @@ where
 
 impl<T> Deref for MortonKeys<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     type Target = Vec<MortonKey<T>>;
 
@@ -199,7 +198,7 @@ where
 
 impl<T> DerefMut for MortonKeys<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.keys
@@ -208,7 +207,7 @@ where
 
 impl<T> Iterator for MortonKeys<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     type Item = MortonKey<T>;
 
@@ -224,7 +223,7 @@ where
 
 impl<T> FromIterator<MortonKey<T>> for MortonKeys<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn from_iter<I: IntoIterator<Item = MortonKey<T>>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
@@ -238,7 +237,7 @@ where
 
 impl<T> From<Vec<MortonKey<T>>> for MortonKeys<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn from(keys: Vec<MortonKey<T>>) -> Self {
         MortonKeys { keys, index: 0 }
@@ -247,7 +246,7 @@ where
 
 impl<T> From<HashSet<MortonKey<T>>> for MortonKeys<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn from(keys: HashSet<MortonKey<T>>) -> Self {
         MortonKeys {
@@ -259,20 +258,17 @@ where
 
 impl<T> PartialEq for MortonKey<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn eq(&self, other: &Self) -> bool {
         self.morton == other.morton
     }
 }
-impl<T> Eq for MortonKey<T>
-where
-    T: RlstScalar + Float {}
+impl<T> Eq for MortonKey<T> where T: RlstScalar + Float {}
 
 impl<T> Ord for MortonKey<T>
 where
-    T: RlstScalar + Float
-
+    T: RlstScalar + Float,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.morton.cmp(&other.morton)
@@ -281,7 +277,7 @@ where
 
 impl<T> PartialOrd for MortonKey<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.morton.cmp(&other.morton))
@@ -290,7 +286,7 @@ where
 
 impl<T> Hash for MortonKey<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
@@ -399,7 +395,7 @@ pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
 
 impl<T> MortonKey<T>
 where
-    T: RlstScalar + Float
+    T: RlstScalar + Float,
 {
     /// Constructor for Morton key
     pub fn new(anchor: &[u64; 3], morton: u64) -> Self {
@@ -1039,8 +1035,8 @@ impl<T: RlstScalar + Float> FmmTreeNode<T> for MortonKey<T> {
         let two = T::from(2.0).unwrap();
         let ncoeffs = surface.len() / 3;
         for i in 0..ncoeffs {
-            scaled_surface[i] =
-                (surface[i] * T::from(dilated_diameter[0] / two).unwrap()) + T::from(centre[0]).unwrap();
+            scaled_surface[i] = (surface[i] * T::from(dilated_diameter[0] / two).unwrap())
+                + T::from(centre[0]).unwrap();
             scaled_surface[(dim - 2) * ncoeffs + i] = (surface[(dim - 2) * ncoeffs + i]
                 * T::from(dilated_diameter[1] / two).unwrap())
                 + T::from(centre[1]).unwrap();

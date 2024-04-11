@@ -13,7 +13,6 @@ use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashSet;
-use std::io::Read;
 
 use crate::fmm::helpers::chunk_size;
 use crate::fmm::{
