@@ -101,15 +101,13 @@ pub trait Tree {
 }
 
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
-pub trait FmmTree {
-    /// Scalar type
-    type Scalar;
+pub trait FmmTree
+where
+    Self::Tree: Tree
+{
 
-    /// Node type
-    type Node;
-
-    /// Tree type
-    type Tree: Tree<Scalar = Self::Scalar, Node = Self::Node>;
+    /// Tree associated with this FMM tree
+    type Tree;
 
     /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
@@ -121,7 +119,7 @@ pub trait FmmTree {
     fn domain(&self) -> &<Self::Tree as Tree>::Domain;
 
     /// Get the near field of a leaf node
-    fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>>;
+    fn near_field(&self, leaf: &<Self::Tree as Tree>::Node) -> Option<Vec<<Self::Tree as Tree>::Node>>;
 }
 
 /// Interface for tree nodes

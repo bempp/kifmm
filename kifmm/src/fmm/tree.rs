@@ -2,15 +2,15 @@
 
 use super::types::SingleNodeFmmTree;
 use crate::traits::tree::{FmmTree, Tree};
-use crate::tree::types::{MortonKey, SingleNodeTree};
+use crate::tree::types::{SingleNodeTree};
 use crate::{Float, RlstScalarFloat};
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
     T: RlstScalarFloat<Real = T> + Float,
 {
-    type Scalar = T;
-    type Node = MortonKey<T::Real>;
+    // type Scalar = T;
+    // type Node = MortonKey<T::Real>;
     type Tree = SingleNodeTree<T::Real>;
 
     fn source_tree(&self) -> &Self::Tree {
@@ -25,7 +25,7 @@ where
         &self.domain
     }
 
-    fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>> {
+    fn near_field(&self, leaf: &<Self::Tree as Tree>::Node) -> Option<Vec<<Self::Tree as Tree>::Node>> {
         let mut u_list = Vec::new();
         let neighbours = leaf.neighbors();
 

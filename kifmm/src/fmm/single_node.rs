@@ -8,7 +8,7 @@ use crate::traits::{
     fmm::{Fmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
     tree::{FmmTree, Tree},
 };
-use crate::tree::types::{MortonKey, SingleNodeTree};
+use crate::tree::types::SingleNodeTree;
 use crate::{Float, RlstScalarFloat};
 use green_kernels::traits::Kernel;
 use green_kernels::types::EvalType;
@@ -16,15 +16,16 @@ use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
 
 impl<T, U, V, W> Fmm for KiFmm<T, U, V, W>
 where
-    T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>, Scalar = W> + Send + Sync,
+    T: FmmTree<Tree = SingleNodeTree<W::Real>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
     W: RlstScalarFloat + Float,
     <W as RlstScalar>::Real: RlstScalarFloat + Float,
     Self: SourceToTargetTranslation,
 {
-    type Node = T::Node;
+    type Node = <T::Tree as Tree>::Node;
     type Scalar = W;
+    type Real = W;
     type Kernel = V;
     type Tree = T;
 
@@ -638,6 +639,7 @@ mod test {
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
+                Real = T,
                 Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
