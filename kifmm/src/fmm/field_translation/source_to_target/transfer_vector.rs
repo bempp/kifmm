@@ -1,8 +1,9 @@
 //! Functions for handling transfer vectors
 use crate::fmm::types::TransferVector;
 use crate::tree::types::{Domain, MortonKey};
-use crate::{Float, RlstScalarFloat};
+use crate::Float;
 use itertools::Itertools;
+use rlst::RlstScalar;
 use std::collections::HashSet;
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
@@ -10,16 +11,16 @@ use std::collections::HashSet;
 /// with respect to level 3 of an associated octree.
 pub fn compute_transfer_vectors<T>() -> Vec<TransferVector<T>>
 where
-    T: RlstScalarFloat<Real = T> + Float,
+    T: RlstScalar + Float,
 {
-    let half = T::from(0.5).unwrap().re();
-    let zero = T::zero().re();
-    let one = T::one().re();
+    let half = T::from(0.5).unwrap();
+    let zero = T::zero();
+    let one = T::one();
     let point = [half, half, half];
-    let domain = Domain::<T::Real>::new(&[zero, zero, zero], &[one, one, one]);
+    let domain = Domain::<T>::new(&[zero, zero, zero], &[one, one, one]);
 
     // Encode point in centre of domain
-    let key = MortonKey::<T::Real>::from_point(&point, &domain, 3);
+    let key = MortonKey::<T>::from_point(&point, &domain, 3);
 
     // Add neighbours, and their resp. siblings to v list.
     let mut neighbours = key.neighbors();

@@ -54,7 +54,7 @@ where
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MortonKey<T>
 where
-    T: RlstScalar + Float,
+    T: RlstScalar,
 {
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
@@ -68,7 +68,7 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys<T>
 where
-    T: RlstScalar + Float,
+    T: RlstScalar,
 {
     /// A vector of Morton_keys
     pub keys: Vec<MortonKey<T>>,

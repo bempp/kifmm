@@ -14,17 +14,18 @@ pub trait SourceToTargetData {
 }
 
 /// Interface for configuration of field translation data used during FMM construction
-pub trait ConfigureSourceToTargetData<T>
+pub trait ConfigureSourceToTargetData
 where
     Self: SourceToTargetData,
-    T: RlstScalarFloat + Float,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    Self::Scalar: RlstScalar,
 {
+    type Scalar;
+
     /// Kernel function associated with field translation
-    type Kernel: Kernel;
+    type Kernel: Kernel<T = Self::Scalar>;
 
     /// The computational domain defining the tree.
-    type Domain: Domain<Scalar = T>;
+    type Domain: Domain<Scalar = <Self::Scalar as RlstScalar>::Real>;
 
     /// Set the field translation operators corresponding to each unique transfer vector.
     ///

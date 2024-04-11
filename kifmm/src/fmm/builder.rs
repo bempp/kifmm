@@ -30,7 +30,7 @@ use super::constants::DEFAULT_NCRIT;
 
 impl<T, U, V> SingleNodeBuilder<T, U, V>
 where
-    T: ConfigureSourceToTargetData<U, Kernel = V, Domain = Domain<U>> + Default,
+    T: ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
     U: RlstScalarFloat<Real = U> + Float,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: Kernel<T = U> + Clone + Default,

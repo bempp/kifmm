@@ -22,10 +22,11 @@ use std::{
     sync::Mutex,
 };
 
-impl<T, U, V> KiFmm<V, BlasFieldTranslation<U, T>, T, U>
+impl<T, U, V, W> KiFmm<V, BlasFieldTranslation<U, W, T>, T, U>
 where
-    T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = W> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalarFloat + Float,
+    W: RlstScalar,
     <U as RlstScalar>::Real: RlstScalarFloat + Float,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U::Real>> + Send + Sync,
@@ -89,10 +90,11 @@ where
     }
 }
 
-impl<T, U, V> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslation<U, T>, T, U>
+impl<T, U, V, W> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslation<U, W, T>, T, U>
 where
-    T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
+    T: Kernel<T = W> + std::marker::Send + std::marker::Sync + Default,
     U: RlstScalarFloat<Real = U> + Float,
+    W: RlstScalar,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {

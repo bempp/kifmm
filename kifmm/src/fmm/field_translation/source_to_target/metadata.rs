@@ -12,7 +12,7 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey},
 };
-use crate::{RlstScalarComplexFloat, RlstScalarFloat};
+use crate::RlstScalarComplexFloat;
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
@@ -23,7 +23,7 @@ use rlst::{
 };
 use std::collections::HashSet;
 
-fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
+fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
     singular_values: &[T],
     threshold: T,
 ) -> usize {
@@ -37,25 +37,28 @@ fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
 }
 
 // T: SourceToTargetData + ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
-impl<T, U> SourceToTargetData for BlasFieldTranslation<T, U>
+impl<T, U, V> SourceToTargetData for BlasFieldTranslation<T, U, V>
 where
-    T: RlstScalarFloat + Float,
-    <T as RlstScalar>::Real: RlstScalarFloat + Float,
-    U: Kernel<T = T> + Default,
+    T: RlstScalar + Float,
+    U: RlstScalar,
+    V: Kernel<T = U> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     type Metadata = BlasMetadata<T>;
 }
 
-impl<T, U> ConfigureSourceToTargetData<T> for BlasFieldTranslation<T, U>
+impl<T, U, V> ConfigureSourceToTargetData for BlasFieldTranslation<T, U, V>
 where
-    T: RlstScalarFloat<Real = T> + Float,
-    <T as RlstScalar>::Real: RlstScalarFloat + Float,
-    U: Kernel<T = T> + Default,
+    T: RlstScalar + Float,
+    U: RlstScalar<Real = T>,
+    V: Kernel<T = U> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
+    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
 {
+    type Real = T;
+    type Scalar = U;
     type Domain = Domain<T>;
-    type Kernel = U;
+    type Kernel = V;
 
     fn operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
@@ -64,19 +67,19 @@ where
         let nrows = ncoeffs_kifmm(expansion_order);
         let ncols = ncoeffs_kifmm(expansion_order);
 
-        let mut se2tc_fat = rlst_dynamic_array2!(T, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
-        let mut se2tc_thin = rlst_dynamic_array2!(T, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        let mut se2tc_fat = rlst_dynamic_array2!(U, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin = rlst_dynamic_array2!(U, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
-        let alpha = T::from(ALPHA_INNER).unwrap().re();
+        let alpha = T::from(ALPHA_INNER).unwrap();
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t.source.surface_grid(expansion_order, &domain, alpha);
+            let source_equivalent_surface= t.source.surface_grid(expansion_order, &domain, alpha);
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
             let target_check_surface = t.target.surface_grid(expansion_order, &domain, alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram_t = rlst_dynamic_array2!(T, [ntargets, nsources]);
+            let mut tmp_gram_t = rlst_dynamic_array2!(U, [ntargets, nsources]);
 
             self.kernel.assemble_st(
                 EvalType::Value,
@@ -86,7 +89,7 @@ where
             );
 
             // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut tmp_gram = rlst_dynamic_array2!(T, [nsources, ntargets]);
+            let mut tmp_gram = rlst_dynamic_array2!(U, [nsources, ntargets]);
             tmp_gram.fill_from(tmp_gram_t.transpose());
 
             let mut block = se2tc_fat
@@ -104,9 +107,9 @@ where
         let nvt = se2tc_fat.shape()[1];
         let k = std::cmp::min(mu, nvt);
 
-        let mut u_big = rlst_dynamic_array2!(T, [mu, k]);
-        let mut sigma = vec![T::zero().re(); k];
-        let mut vt_big = rlst_dynamic_array2!(T, [k, nvt]);
+        let mut u_big = rlst_dynamic_array2!(U, [mu, k]);
+        let mut sigma = vec![U::zero().re(); k];
+        let mut vt_big = rlst_dynamic_array2!(U, [k, nvt]);
 
         se2tc_fat
             .into_svd_alloc(
@@ -117,15 +120,15 @@ where
             )
             .unwrap();
         let cutoff_rank = find_cutoff_rank(&sigma, self.threshold);
-        let mut u = rlst_dynamic_array2!(T, [mu, cutoff_rank]);
-        let mut sigma_mat = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
-        let mut vt = rlst_dynamic_array2!(T, [cutoff_rank, nvt]);
+        let mut u = rlst_dynamic_array2!(U, [mu, cutoff_rank]);
+        let mut sigma_mat = rlst_dynamic_array2!(U, [cutoff_rank, cutoff_rank]);
+        let mut vt = rlst_dynamic_array2!(U, [cutoff_rank, nvt]);
 
         u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
         vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
         for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
             unsafe {
-                *sigma_mat.get_unchecked_mut([j, j]) = T::from(*s).unwrap();
+                *sigma_mat.get_unchecked_mut([j, j]) = U::from(*s).unwrap();
             }
         }
 
@@ -133,9 +136,9 @@ where
         let thin_nrows = se2tc_thin.shape()[0];
         let nst = se2tc_thin.shape()[1];
         let k = std::cmp::min(thin_nrows, nst);
-        let mut _gamma = rlst_dynamic_array2!(T, [thin_nrows, k]);
-        let mut _r = vec![T::zero().re(); k];
-        let mut st = rlst_dynamic_array2!(T, [k, nst]);
+        let mut _gamma = rlst_dynamic_array2!(U, [thin_nrows, k]);
+        let mut _r = vec![U::zero().re(); k];
+        let mut st = rlst_dynamic_array2!(U, [k, nst]);
 
         se2tc_thin
             .into_svd_alloc(
@@ -146,7 +149,7 @@ where
             )
             .unwrap();
 
-        let mut s_trunc = rlst_dynamic_array2!(T, [nst, cutoff_rank]);
+        let mut s_trunc = rlst_dynamic_array2!(U, [nst, cutoff_rank]);
         for j in 0..cutoff_rank {
             for i in 0..nst {
                 unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
@@ -159,14 +162,14 @@ where
         for i in 0..self.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
-            let tmp = empty_array::<T, 2>().simple_mult_into_resize(
+            let tmp = empty_array::<U, 2>().simple_mult_into_resize(
                 sigma_mat.view(),
                 empty_array::<T, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
             );
 
-            let mut u_i = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
-            let mut sigma_i = vec![T::zero().re(); cutoff_rank];
-            let mut vt_i = rlst_dynamic_array2!(T, [cutoff_rank, cutoff_rank]);
+            let mut u_i = rlst_dynamic_array2!(U, [cutoff_rank, cutoff_rank]);
+            let mut sigma_i = vec![U::zero().re(); cutoff_rank];
+            let mut vt_i = rlst_dynamic_array2!(U, [cutoff_rank, cutoff_rank]);
 
             tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
@@ -216,16 +219,17 @@ where
         self.expansion_order = expansion_order;
     }
 
-    fn kernel(&mut self, kernel: U) {
+    fn kernel(&mut self, kernel: V) {
         self.kernel = kernel;
     }
 }
 
-impl<T, U> BlasFieldTranslation<T, U>
+impl<T, U, V> BlasFieldTranslation<T, U, V>
 where
     T: Float + Default,
-    T: RlstScalarFloat<Real = T> + Float,
-    U: Kernel<T = T> + Default,
+    T: RlstScalar + Float,
+    U: RlstScalar + Default,
+    V: Kernel<T = U> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     /// Create new
@@ -239,24 +243,28 @@ where
     }
 }
 
-impl<T, U> SourceToTargetData for FftFieldTranslation<T, U>
+impl<T, U, V> SourceToTargetData for FftFieldTranslation<T, U, V>
 where
-    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
+    T: RlstScalar + Float + RealToComplexFft3D,
+    U: RlstScalar,
     Complex<T>: RlstScalarComplexFloat,
-    U: Kernel<T = T> + Default,
+    V: Kernel<T = U> + Default,
 {
     type Metadata = FftMetadata<Complex<T>>;
 }
 
-impl<T, U> ConfigureSourceToTargetData<T> for FftFieldTranslation<T, U>
+impl<T, U, V> ConfigureSourceToTargetData for FftFieldTranslation<T, U, V>
 where
-    T: RlstScalarFloat<Real = T> + RealToComplexFft3D + Float,
+    T: RlstScalar + RealToComplexFft3D + Float,
     Complex<T>: RlstScalarComplexFloat,
-    U: Kernel<T = T> + Default,
+    U: RlstScalar,
+    V: Kernel<T = U> + Default,
 {
+    type Real = T;
+    type Scalar = U;
     type Domain = Domain<T>;
 
-    type Kernel = U;
+    type Kernel = V;
 
     fn operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
@@ -457,16 +465,17 @@ where
         self.expansion_order = expansion_order;
     }
 
-    fn kernel(&mut self, kernel: U) {
+    fn kernel(&mut self, kernel: V) {
         self.kernel = kernel;
     }
 }
 
-impl<T, U> FftFieldTranslation<T, U>
+impl<T, U, V> FftFieldTranslation<T, U, V>
 where
-    T: RlstScalarFloat<Real = T> + RealToComplexFft3D + Float,
+    T: RlstScalar + RealToComplexFft3D + Float + Default,
+    U: RlstScalar + Default,
     Complex<T>: RlstScalarComplexFloat,
-    U: Kernel<T = T> + Default,
+    V: Kernel<T = U> + Default,
 {
     /// Create new
     pub fn new() -> Self {

@@ -260,8 +260,10 @@ mod test {
     use crate::traits::tree::FmmTreeNode;
     use crate::tree::constants::ALPHA_INNER;
     use crate::tree::helpers::points_fixture;
+    use crate::tree::types::MortonKey;
     use crate::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder, SingleNodeFmmTree};
     use green_kernels::laplace_3d::Laplace3dKernel;
+    use green_kernels::types;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng};
     use rlst::rlst_array_from_slice2;
@@ -270,10 +272,11 @@ mod test {
     use rlst::RawAccessMut;
     use rlst::VectorContainer;
 
-    fn test_single_node_fmm_vector_helper<T: RlstScalarFloat<Real = T> + Float>(
+    fn test_single_node_fmm_vector_helper<T: RlstScalar + Float, V: RlstScalar>(
         fmm: Box<
             dyn Fmm<
-                Scalar = T,
+                Scalar = V,
+                Real = T,
                 Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,
@@ -319,10 +322,11 @@ mod test {
         });
     }
 
-    fn test_single_node_fmm_matrix_helper<T: RlstScalarFloat<Real = T> + Float>(
+    fn test_single_node_fmm_matrix_helper<T: RlstScalar + Float, V: RlstScalar>(
         fmm: Box<
             dyn Fmm<
-                Scalar = T,
+                Scalar = V,
+                Real = T,
                 Node = MortonKey<T>,
                 Kernel = Laplace3dKernel<T>,
                 Tree = SingleNodeFmmTree<T>,

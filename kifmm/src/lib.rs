@@ -78,25 +78,26 @@
 #![warn(missing_docs)]
 
 pub mod fftw;
-pub mod fmm;
+// pub mod fmm;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
+pub mod new_fmm;
 pub mod traits;
 pub mod tree;
 
-// Public API
-#[doc(inline)]
-pub use fmm::types::BlasFieldTranslation;
-#[doc(inline)]
-pub use fmm::types::FftFieldTranslation;
-#[doc(inline)]
-pub use fmm::types::SingleNodeBuilder;
-#[doc(inline)]
-pub use fmm::types::SingleNodeFmmTree;
+// // Public API
+// #[doc(inline)]
+// pub use fmm::types::BlasFieldTranslation;
+// #[doc(inline)]
+// pub use fmm::types::FftFieldTranslation;
+// #[doc(inline)]
+// pub use fmm::types::SingleNodeBuilder;
+// #[doc(inline)]
+// pub use fmm::types::SingleNodeFmmTree;
 
-#[cfg(feature = "mpi")]
-#[doc(inline)]
-pub use fmm::types::MultiNodeFmmTree;
+// #[cfg(feature = "mpi")]
+// #[doc(inline)]
+// pub use fmm::types::MultiNodeFmmTree;
 
 #[cfg(feature = "mpi")]
 use mpi::traits::Equivalence;
@@ -105,8 +106,8 @@ use num::Float;
 use num_complex::ComplexFloat;
 use rlst::RlstScalar;
 use rlst::{c32, c64};
-#[doc(inline)]
-pub use traits::fmm::Fmm;
+// #[doc(inline)]
+// pub use traits::fmm::Fmm;
 
 /// Super trait of RlstScalar and  Float trait
 pub trait RlstScalarFloat: RlstScalar + Float + Default {}
