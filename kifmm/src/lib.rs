@@ -101,6 +101,7 @@ pub use fmm::types::MultiNodeFmmTree;
 #[cfg(feature = "mpi")]
 use mpi::traits::Equivalence;
 
+use num::Complex;
 use num::Float;
 use num_complex::ComplexFloat;
 use rlst::RlstScalar;
@@ -134,11 +135,11 @@ impl RlstScalarComplexFloat for c64 {}
 impl RlstScalarComplexFloat for c32 {}
 
 
-/// Marker trait for real numbers
-pub trait RealScalar
+pub trait ComplexScalar
 where
-    Self: Float
+    Self: ComplexFloat
 {}
 
-impl RealScalar for f32 {}
-impl RealScalar for f64 {}
+
+impl ComplexScalar for f32 {}
+impl ComplexScalar for f64 {}

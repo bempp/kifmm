@@ -8,7 +8,7 @@ use crate::traits::{
     tree::{FmmTree, Tree},
 };
 use crate::tree::{constants::NTRANSFER_VECTORS_KIFMM, types::SingleNodeTree};
-use crate::{RealScalar, RlstScalarFloat};
+use crate::{Float, RlstScalarFloat};
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
 
@@ -25,8 +25,8 @@ use std::{
 impl<T, U, V> KiFmm<V, BlasFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalarFloat + RealScalar,
-    <U as RlstScalar>::Real: RlstScalarFloat + RealScalar,
+    U: RlstScalarFloat + Float,
+    <U as RlstScalar>::Real: RlstScalarFloat + Float,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U::Real>> + Send + Sync,
 {
@@ -92,7 +92,7 @@ where
 impl<T, U, V> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslation<U, T>, T, U>
 where
     T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalarFloat<Real = U> + RealScalar,
+    U: RlstScalarFloat<Real = U> + Float,
     Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
     V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
 {

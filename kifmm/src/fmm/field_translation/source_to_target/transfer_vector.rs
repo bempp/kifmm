@@ -1,7 +1,7 @@
 //! Functions for handling transfer vectors
 use crate::fmm::types::TransferVector;
 use crate::tree::types::{Domain, MortonKey};
-use crate::{RealScalar, RlstScalarFloat};
+use crate::{Float, RlstScalarFloat};
 use itertools::Itertools;
 use std::collections::HashSet;
 
@@ -10,7 +10,7 @@ use std::collections::HashSet;
 /// with respect to level 3 of an associated octree.
 pub fn compute_transfer_vectors<T>() -> Vec<TransferVector<T>>
 where
-    T: RlstScalarFloat<Real = T> + RealScalar,
+    T: RlstScalarFloat<Real = T> + Float,
 {
     let half = T::from(0.5).unwrap().re();
     let zero = T::zero().re();

@@ -1,6 +1,6 @@
 //! Multipole Translations
 use crate::tree::{constants::NSIBLINGS, types::SingleNodeTree};
-use crate::RealScalar;
+use crate::Float;
 use crate::{
     traits::{
         field::SourceToTargetData,
@@ -30,8 +30,8 @@ where
     T: FmmTree<Tree = SingleNodeTree<W::Real>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalarFloat + RealScalar,
-    <W as RlstScalar>::Real: RlstScalarFloat + RealScalar,
+    W: RlstScalarFloat + Float,
+    <W as RlstScalar>::Real: RlstScalarFloat + Float,
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.source_tree().all_leaves() else {

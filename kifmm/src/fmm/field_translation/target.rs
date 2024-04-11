@@ -15,7 +15,7 @@ use crate::tree::{
     constants::NSIBLINGS,
     types::{MortonKey, SingleNodeTree},
 };
-use crate::{RealScalar, RlstScalarFloat};
+use crate::{Float, RlstScalarFloat};
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -29,8 +29,8 @@ where
     T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalarFloat + RealScalar,
-    <W as RlstScalar>::Real: RlstScalarFloat + RealScalar,
+    W: RlstScalarFloat + Float,
+    <W as RlstScalar>::Real: RlstScalarFloat + Float,
 {
     fn l2l(&self, level: u64) {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {

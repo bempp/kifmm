@@ -1,9 +1,9 @@
 //! Constructor for a single node Domain.
-use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain, RealScalar, RlstScalarFloat};
+use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain, RlstScalarFloat};
 
 impl<T> Domain<T>
 where
-    T: RlstScalar + RealScalar
+    T: RlstScalar + Float
 {
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
@@ -94,7 +94,7 @@ where
 
 impl<T> DomainTrait<T> for Domain<T>
 where
-    T: RlstScalar + RealScalar
+    T: RlstScalar + Float
 {
     fn diameter(&self) -> &[T; 3] {
         &self.side_length
@@ -121,7 +121,7 @@ mod mpi_domain {
 
     unsafe impl<T> Equivalence for Domain<T>
     where
-        T: RlstScalar + RealScalar
+        T: RlstScalar + Float
     {
         type Out = UserDatatype;
         fn equivalent_datatype() -> Self::Out {
@@ -143,7 +143,7 @@ mod mpi_domain {
     where
         [Domain<T>]: BufferMut,
         Vec<Domain<T>>: Buffer,
-        T: RlstScalar + RealScalar
+        T: RlstScalar + Float
     {
         /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
         /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
@@ -223,7 +223,7 @@ mod test {
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where
-        T: RlstScalar + RealScalar,
+        T: RlstScalar + Float,
     {
         let domain = Domain::<T>::from_local_points(points.data());
 

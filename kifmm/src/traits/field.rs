@@ -2,7 +2,7 @@
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
-use crate::{RealScalar, RlstScalarFloat};
+use crate::{Float, RlstScalarFloat};
 
 use super::tree::Domain;
 
@@ -17,7 +17,7 @@ pub trait SourceToTargetData {
 pub trait ConfigureSourceToTargetData<T>
 where
     Self: SourceToTargetData,
-    T: RlstScalarFloat + RealScalar,
+    T: RlstScalarFloat + Float,
     <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Kernel function associated with field translation

@@ -11,7 +11,7 @@ use std::{
     marker::PhantomData,
 };
 
-use crate::{RealScalar, RlstScalarFloat};
+use crate::{Float, RlstScalarFloat};
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
@@ -25,7 +25,7 @@ use crate::{RealScalar, RlstScalarFloat};
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: RlstScalar + RealScalar,
+    T: RlstScalar + Float,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
     pub origin: [T; 3],
@@ -257,7 +257,7 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T> + RealScalar,
+    T: RlstScalarFloat<Real = T> + Float,
 {
     /// Depth of a tree.
     pub depth: u64,
