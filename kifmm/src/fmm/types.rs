@@ -1,11 +1,12 @@
 //! Data structures for kernel independent FMM
 use crate::traits::{field::SourceToTargetData, tree::FmmTree};
 use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
-use crate::{RlstScalarComplexFloat, RlstScalarFloat};
+use crate::{RealScalar, RlstScalarComplexFloat, RlstScalarFloat};
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Complex;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
+use std::io::Read;
 
 #[cfg(feature = "mpi")]
 use crate::tree::types::MultiNodeTree;
@@ -159,8 +160,8 @@ where
     T: FmmTree<Tree = SingleNodeTree<W::Real>>,
     U: SourceToTargetData,
     V: Kernel,
-    W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat,
+    W: RlstScalarFloat + RealScalar,
+    <W as RlstScalar>::Real: RlstScalarFloat + RealScalar,
 {
     /// Dimension of the FMM
     pub dim: usize,
@@ -373,7 +374,7 @@ pub enum FmmEvalType {
 pub struct SingleNodeBuilder<T, U, V>
 where
     T: SourceToTargetData,
-    U: RlstScalarFloat<Real = U>,
+    U: RlstScalarFloat<Real = U> + RealScalar,
     V: Kernel,
 {
     /// Tree
@@ -421,7 +422,7 @@ where
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[derive(Default)]
-pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T>> {
+pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T> + RealScalar> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.

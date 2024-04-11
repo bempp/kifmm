@@ -9,7 +9,7 @@ use crate::traits::{
     tree::{FmmTree, Tree},
 };
 use crate::tree::types::{MortonKey, SingleNodeTree};
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 use green_kernels::traits::Kernel;
 use green_kernels::types::EvalType;
 use rlst::{rlst_dynamic_array2, RawAccess, RlstScalar, Shape};
@@ -19,8 +19,8 @@ where
     T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>, Scalar = W> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W> + Send + Sync,
-    W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat,
+    W: RlstScalarFloat + RealScalar,
+    <W as RlstScalar>::Real: RlstScalarFloat + RealScalar,
     Self: SourceToTargetTranslation,
 {
     type Node = T::Node;
@@ -206,7 +206,7 @@ where
     T: FmmTree<Tree = SingleNodeTree<W>> + Default,
     U: SourceToTargetData + Default,
     V: Kernel + Default,
-    W: RlstScalarFloat<Real = W>,
+    W: RlstScalarFloat<Real = W> + RealScalar,
 {
     fn default() -> Self {
         let uc2e_inv_1 = rlst_dynamic_array2!(W, [1, 1]);
@@ -269,7 +269,7 @@ mod test {
     use rlst::RawAccessMut;
     use rlst::VectorContainer;
 
-    fn test_single_node_fmm_vector_helper<T: RlstScalarFloat<Real = T>>(
+    fn test_single_node_fmm_vector_helper<T: RlstScalarFloat<Real = T> + RealScalar>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
@@ -318,7 +318,7 @@ mod test {
         });
     }
 
-    fn test_single_node_fmm_matrix_helper<T: RlstScalarFloat<Real = T>>(
+    fn test_single_node_fmm_matrix_helper<T: RlstScalarFloat<Real = T> + RealScalar>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T,
@@ -634,7 +634,7 @@ mod test {
         }
     }
 
-    fn test_root_multipole_laplace_single_node<T: RlstScalarFloat<Real = T>>(
+    fn test_root_multipole_laplace_single_node<T: RlstScalarFloat<Real = T> + RealScalar>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T,

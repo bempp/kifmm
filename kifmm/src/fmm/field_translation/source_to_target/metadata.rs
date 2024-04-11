@@ -12,7 +12,7 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey},
 };
-use crate::{RlstScalarComplexFloat, RlstScalarFloat};
+use crate::{RealScalar, RlstScalarComplexFloat, RlstScalarFloat};
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use num::{Complex, Float, Zero};
@@ -22,6 +22,7 @@ use rlst::{
     SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer,
 };
 use std::collections::HashSet;
+use std::io::Read;
 
 fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
     singular_values: &[T],
@@ -39,8 +40,8 @@ fn find_cutoff_rank<T: Float + Default + RlstScalar<Real = T> + Gemm>(
 // T: SourceToTargetData + ConfigureSourceToTargetData<Kernel = V, Domain = Domain<U>> + Default,
 impl<T, U> SourceToTargetData for BlasFieldTranslation<T, U>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat + RealScalar,
+    <T as RlstScalar>::Real: RlstScalarFloat + RealScalar,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -49,12 +50,12 @@ where
 
 impl<T, U> ConfigureSourceToTargetData<T> for BlasFieldTranslation<T, U>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    T: RlstScalarFloat<Real = T> + RealScalar,
+    <T as RlstScalar>::Real: RlstScalarFloat + RealScalar,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    type Domain = Domain<T::Real>;
+    type Domain = Domain<T>;
     type Kernel = U;
 
     fn operator_data<'a>(&mut self, expansion_order: usize, domain: Self::Domain) {
@@ -224,7 +225,7 @@ where
 impl<T, U> BlasFieldTranslation<T, U>
 where
     T: Float + Default,
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
     U: Kernel<T = T> + Default,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
@@ -250,7 +251,7 @@ where
 
 impl<T, U> ConfigureSourceToTargetData<T> for FftFieldTranslation<T, U>
 where
-    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D + RealScalar,
     Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {
@@ -464,7 +465,7 @@ where
 
 impl<T, U> FftFieldTranslation<T, U>
 where
-    T: RlstScalarFloat<Real = T> + RealToComplexFft3D,
+    T: RlstScalarFloat<Real = T> + RealToComplexFft3D + RealScalar,
     Complex<T>: RlstScalarComplexFloat,
     U: Kernel<T = T> + Default,
 {

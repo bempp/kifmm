@@ -2,7 +2,7 @@
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 
 use super::tree::Domain;
 
@@ -17,14 +17,14 @@ pub trait SourceToTargetData {
 pub trait ConfigureSourceToTargetData<T>
 where
     Self: SourceToTargetData,
-    T: RlstScalarFloat,
+    T: RlstScalarFloat + RealScalar,
     <T as RlstScalar>::Real: RlstScalarFloat,
 {
     /// Kernel function associated with field translation
     type Kernel: Kernel;
 
     /// The computational domain defining the tree.
-    type Domain: Domain<T::Real>;
+    type Domain: Domain<T>;
 
     /// Set the field translation operators corresponding to each unique transfer vector.
     ///

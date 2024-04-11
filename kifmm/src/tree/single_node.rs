@@ -5,7 +5,7 @@ use crate::tree::{
     morton::encode_anchor,
     types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
 };
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 use itertools::Itertools;
 use rlst::RlstScalar;
 
@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 impl<T> SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
@@ -630,7 +630,7 @@ where
 
 impl<T> Tree for SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     type Scalar = T;
     type Domain = Domain<T>;
@@ -794,7 +794,7 @@ mod test {
 
     pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T>])
     where
-        T: RlstScalarFloat<Real = T>,
+        T: RlstScalarFloat<Real = T> + RealScalar,
     {
         let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 

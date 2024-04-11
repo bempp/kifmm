@@ -3,12 +3,12 @@ use std::{collections::HashSet, hash::Hash};
 
 use rlst::RlstScalar;
 
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 
 /// Interface for single and multi-node trees
 pub trait Tree {
     /// Scalar type
-    type Scalar: RlstScalarFloat;
+    type Scalar: RlstScalarFloat + RealScalar;
 
     /// The computational domain defining the tree.
     type Domain: Domain<Self::Scalar>;
@@ -128,7 +128,7 @@ pub trait FmmTree {
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
-    T: RlstScalarFloat,
+    T: RlstScalarFloat + RealScalar,
 {
     /// The computational domain defining the tree.
     type Domain: Domain<T>;
@@ -159,7 +159,7 @@ where
 pub trait FmmTreeNode<T>
 where
     Self: TreeNode<T>,
-    T: RlstScalarFloat,
+    T: RlstScalarFloat + RealScalar,
 {
     /// Scale a surface centered at this node, used in the discretisation of the kernel independent fast nultipole
     /// method
@@ -208,11 +208,11 @@ where
 /// Interface for computational domain
 pub trait Domain<T>
 where
-    T: RlstScalarFloat,
+    T: RlstScalar + RealScalar
 {
     /// Origin of computational domain.
-    fn origin(&self) -> &[T::Real; 3];
+    fn origin(&self) -> &[T; 3];
 
     /// Side length along each axis
-    fn diameter(&self) -> &[T::Real; 3];
+    fn diameter(&self) -> &[T; 3];
 }

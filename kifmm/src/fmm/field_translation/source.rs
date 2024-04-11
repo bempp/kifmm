@@ -1,5 +1,6 @@
 //! Multipole Translations
 use crate::tree::{constants::NSIBLINGS, types::SingleNodeTree};
+use crate::RealScalar;
 use crate::{
     traits::{
         field::SourceToTargetData,
@@ -12,6 +13,7 @@ use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashSet;
+use std::io::Read;
 
 use crate::fmm::helpers::chunk_size;
 use crate::fmm::{
@@ -28,8 +30,8 @@ where
     T: FmmTree<Tree = SingleNodeTree<W::Real>> + Send + Sync,
     U: SourceToTargetData + Send + Sync,
     V: Kernel<T = W>,
-    W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat,
+    W: RlstScalarFloat + RealScalar,
+    <W as RlstScalar>::Real: RlstScalarFloat + RealScalar,
 {
     fn p2m(&self) {
         let Some(_leaves) = self.tree.source_tree().all_leaves() else {

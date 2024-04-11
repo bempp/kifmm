@@ -4,13 +4,14 @@
 use crate::RlstScalarFloatMpi;
 #[cfg(feature = "mpi")]
 use mpi::topology::UserCommunicator;
+use rlst::RlstScalar;
 
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
 };
 
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
@@ -24,7 +25,7 @@ use crate::RlstScalarFloat;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + RealScalar,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
     pub origin: [T; 3],
@@ -256,7 +257,7 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     /// Depth of a tree.
     pub depth: u64,

@@ -9,7 +9,7 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey, MortonKeys},
 };
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
 use rlst::RlstScalar;
@@ -24,7 +24,7 @@ use std::{
 
 impl<T> MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     /// Instantiate Morton Keys
     pub fn new() -> MortonKeys<T> {
@@ -223,7 +223,7 @@ where
 
 impl<T> FromIterator<MortonKey<T>> for MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     fn from_iter<I: IntoIterator<Item = MortonKey<T>>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
@@ -314,7 +314,7 @@ fn decode_key(morton: u64) -> [u64; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-fn point_to_anchor<T: RlstScalarFloat<Real = T> + ToPrimitive>(
+fn point_to_anchor<T: RlstScalarFloat<Real = T> + RlstScalar + RealScalar + ToPrimitive>(
     point: &[T::Real; 3],
     level: u64,
     domain: &Domain<T>,
@@ -378,6 +378,7 @@ pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
 impl<T> MortonKey<T>
 where
     T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + RealScalar
 {
     /// Constructor for Morton key
     pub fn new(anchor: &[u64; 3], morton: u64) -> Self {
@@ -851,7 +852,7 @@ where
 
 impl<T> TreeNode<T> for MortonKey<T::Real>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     type Nodes = MortonKeys<T::Real>;
     type Domain = Domain<T::Real>;
@@ -932,7 +933,7 @@ pub fn surface_grid<T: RlstScalar + Float + Default>(expansion_order: usize) -> 
     surface
 }
 
-impl<T: RlstScalarFloat<Real = T>> FmmTreeNode<T> for MortonKey<T> {
+impl<T: RlstScalarFloat<Real = T> + RealScalar> FmmTreeNode<T> for MortonKey<T> {
     fn convolution_grid(
         &self,
         expansion_order: usize,
@@ -1078,7 +1079,7 @@ mod test {
 
     /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
     /// `a` is less than key `b`, this function evaluates to true.
-    fn less_than<T: RlstScalarFloat<Real = T>>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
+    fn less_than<T: RlstScalarFloat<Real = T> + RealScalar>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
         // If anchors match, the one at the coarser level has the lesser Morton id.
         let same_anchor = (a.anchor[0] == b.anchor[0])
             & (a.anchor[1] == b.anchor[1])

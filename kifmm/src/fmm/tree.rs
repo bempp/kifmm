@@ -3,11 +3,11 @@
 use super::types::SingleNodeFmmTree;
 use crate::traits::tree::{FmmTree, Tree};
 use crate::tree::types::{MortonKey, SingleNodeTree};
-use crate::RlstScalarFloat;
+use crate::{RealScalar, RlstScalarFloat};
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalarFloat<Real = T> + RealScalar,
 {
     type Scalar = T;
     type Node = MortonKey<T::Real>;
@@ -70,5 +70,5 @@ where
     }
 }
 
-unsafe impl<T: RlstScalarFloat<Real = T>> Send for SingleNodeFmmTree<T> {}
-unsafe impl<T: RlstScalarFloat<Real = T>> Sync for SingleNodeFmmTree<T> {}
+unsafe impl<T: RlstScalarFloat<Real = T> + RealScalar> Send for SingleNodeFmmTree<T> {}
+unsafe impl<T: RlstScalarFloat<Real = T> + RealScalar> Sync for SingleNodeFmmTree<T> {}

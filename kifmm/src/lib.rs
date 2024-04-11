@@ -132,3 +132,13 @@ impl RlstScalarFloatMpi for f32 {}
 
 impl RlstScalarComplexFloat for c64 {}
 impl RlstScalarComplexFloat for c32 {}
+
+
+/// Marker trait for real numbers
+pub trait RealScalar
+where
+    Self: Float
+{}
+
+impl RealScalar for f32 {}
+impl RealScalar for f64 {}
