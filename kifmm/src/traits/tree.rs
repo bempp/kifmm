@@ -128,7 +128,7 @@ pub trait FmmTree {
 pub trait TreeNode<T>
 where
     Self: Hash + Eq,
-    T: RlstScalarFloat + Float,
+    T: RlstScalar + Float,
 {
     /// The computational domain defining the tree.
     type Domain: Domain<T>;
@@ -159,7 +159,7 @@ where
 pub trait FmmTreeNode<T>
 where
     Self: TreeNode<T>,
-    T: RlstScalarFloat + Float,
+    T: RlstScalar + Float,
 {
     /// Scale a surface centered at this node, used in the discretisation of the kernel independent fast nultipole
     /// method
@@ -169,8 +169,8 @@ where
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which nodes are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn scale_surface(&self, surface: Vec<T::Real>, domain: &Self::Domain, alpha: T)
-        -> Vec<T::Real>;
+    fn scale_surface(&self, surface: Vec<T>, domain: &Self::Domain, alpha: T)
+        -> Vec<T>;
 
     /// Compute the convolution grid, centered at this node. This method is used in the FFT acceleration of
     /// the field translation operator for kernel independent fast multipole method.
@@ -202,7 +202,7 @@ where
     /// * `expansion_order` - The expansion order of the FMM
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
     fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: T)
-        -> Vec<T::Real>;
+        -> Vec<T>;
 }
 
 /// Interface for computational domain

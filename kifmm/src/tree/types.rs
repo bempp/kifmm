@@ -54,7 +54,7 @@ where
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MortonKey<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
@@ -68,7 +68,7 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// A vector of Morton_keys
     pub keys: Vec<MortonKey<T>>,
@@ -126,7 +126,7 @@ where
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
-    T: RlstScalarFloatMpi<Real = T>,
+    T: RlstScalar + Float + Equivalence,
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
@@ -195,7 +195,7 @@ where
 #[derive(Clone, Debug, Default, Copy)]
 pub struct Point<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Physical coordinate in Cartesian space.
     pub coordinate: [T; 3],
