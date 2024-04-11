@@ -171,7 +171,12 @@ where
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which nodes are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn scale_surface(&self, surface: Vec<Self::Scalar>, domain: &Self::Domain, alpha: Self::Scalar) -> Vec<Self::Scalar>;
+    fn scale_surface(
+        &self,
+        surface: Vec<Self::Scalar>,
+        domain: &Self::Domain,
+        alpha: Self::Scalar,
+    ) -> Vec<Self::Scalar>;
 
     /// Compute the convolution grid, centered at this node. This method is used in the FFT acceleration of
     /// the field translation operator for kernel independent fast multipole method.
@@ -202,7 +207,12 @@ where
     /// * `domain` - The physical domain with which node are being constructed with respect to.
     /// * `expansion_order` - The expansion order of the FMM
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: Self::Scalar) -> Vec<Self::Scalar>;
+    fn surface_grid(
+        &self,
+        expansion_order: usize,
+        domain: &Self::Domain,
+        alpha: Self::Scalar,
+    ) -> Vec<Self::Scalar>;
 }
 
 /// Interface for computational domain

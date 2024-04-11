@@ -12,9 +12,11 @@ use crate::hyksort::hyksort;
 use itertools::Itertools;
 use mpi::{
     topology::UserCommunicator,
-    traits::{Communicator, CommunicatorCollectives, Destination, Source},
+    traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
     Rank,
 };
+use num::Float;
+use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 
 impl<T> MultiNodeTree<T>
@@ -627,7 +629,7 @@ fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
 
 impl<T> Tree for MultiNodeTree<T>
 where
-    T: RlstScalarFloatMpi<Real = T>,
+    T: RlstScalar + Float + Equivalence,
 {
     type Scalar = T;
     type Domain = Domain<T>;

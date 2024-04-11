@@ -1023,7 +1023,12 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         (grid, conv_idxs)
     }
 
-    fn scale_surface(&self, surface: Vec<Self::Scalar>, domain: &Domain<Self::Scalar>, alpha: Self::Scalar) -> Vec<Self::Scalar> {
+    fn scale_surface(
+        &self,
+        surface: Vec<Self::Scalar>,
+        domain: &Domain<Self::Scalar>,
+        alpha: Self::Scalar,
+    ) -> Vec<Self::Scalar> {
         let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
@@ -1049,7 +1054,12 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         scaled_surface
     }
 
-    fn surface_grid(&self, expansion_order: usize, domain: &Domain<Self::Scalar>, alpha: Self::Scalar) -> Vec<Self::Scalar> {
+    fn surface_grid(
+        &self,
+        expansion_order: usize,
+        domain: &Domain<Self::Scalar>,
+        alpha: Self::Scalar,
+    ) -> Vec<Self::Scalar> {
         let surface: Vec<T> = surface_grid(expansion_order);
 
         self.scale_surface(surface, domain, alpha)
@@ -1066,7 +1076,7 @@ use mpi::{
 };
 
 #[cfg(feature = "mpi")]
-unsafe impl<T: RlstScalarFloat<Real = T>> Equivalence for MortonKey<T> {
+unsafe impl<T: RlstScalar + Float> Equivalence for MortonKey<T> {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(
