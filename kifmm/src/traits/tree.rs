@@ -14,7 +14,7 @@ pub trait Tree {
     type Domain: Domain<Scalar = Self::Scalar>;
 
     /// A tree node.
-    type Node: TreeNode<Self::Scalar, Domain = Self::Domain> + Clone + Copy;
+    type Node: TreeNode<Scalar = Self::Scalar, Domain = Self::Domain> + Clone + Copy;
 
     /// Slice of nodes.
     type NodeSlice<'a>: IntoIterator<Item = &'a Self::Node>
@@ -125,13 +125,16 @@ pub trait FmmTree {
 }
 
 /// Interface for tree nodes
-pub trait TreeNode<T>
+pub trait TreeNode
 where
     Self: Hash + Eq,
-    T: RlstScalar + Float,
+    Self::Scalar: RlstScalar + Float,
 {
+    /// Scalar type
+    type Scalar;
+
     /// The computational domain defining the tree.
-    type Domain: Domain<Scalar = T>;
+    type Domain: Domain<Scalar = Self::Scalar>;
 
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
@@ -156,10 +159,9 @@ where
 }
 
 /// Interface for a tree node that provides functionality required by the FMM
-pub trait FmmTreeNode<T>
+pub trait FmmTreeNode
 where
-    Self: TreeNode<T>,
-    T: RlstScalar + Float,
+    Self: TreeNode,
 {
     /// Scale a surface centered at this node, used in the discretisation of the kernel independent fast nultipole
     /// method
@@ -169,7 +171,7 @@ where
     /// associated function `surface_grid`.
     /// * `domain` - The physical domain with which nodes are being constructed with respect to.
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn scale_surface(&self, surface: Vec<T>, domain: &Self::Domain, alpha: T) -> Vec<T>;
+    fn scale_surface(&self, surface: Vec<Self::Scalar>, domain: &Self::Domain, alpha: Self::Scalar) -> Vec<Self::Scalar>;
 
     /// Compute the convolution grid, centered at this node. This method is used in the FFT acceleration of
     /// the field translation operator for kernel independent fast multipole method.
@@ -188,10 +190,10 @@ where
         &self,
         expansion_order: usize,
         domain: &Self::Domain,
-        alpha: T,
-        conv_point_corner: &[T],
+        alpha: Self::Scalar,
+        conv_point_corner: &[Self::Scalar],
         conv_point_corner_index: usize,
-    ) -> (Vec<T>, Vec<usize>);
+    ) -> (Vec<Self::Scalar>, Vec<usize>);
 
     /// Compute the surface grid, centered at this node, for a given expansion order and alpha parameter. This is used
     /// in the discretisation of the kernel independent fast multipole method
@@ -200,7 +202,7 @@ where
     /// * `domain` - The physical domain with which node are being constructed with respect to.
     /// * `expansion_order` - The expansion order of the FMM
     /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
-    fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: T) -> Vec<T>;
+    fn surface_grid(&self, expansion_order: usize, domain: &Self::Domain, alpha: Self::Scalar) -> Vec<Self::Scalar>;
 }
 
 /// Interface for computational domain

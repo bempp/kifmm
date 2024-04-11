@@ -9,7 +9,6 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey, MortonKeys},
 };
-use crate::RlstScalarFloat;
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
 use rlst::RlstScalar;
@@ -867,10 +866,12 @@ where
     }
 }
 
-impl<T> TreeNode<T> for MortonKey<T>
+impl<T> TreeNode for MortonKey<T>
 where
     T: RlstScalar + Float,
 {
+    type Scalar = T;
+
     type Nodes = MortonKeys<T>;
     type Domain = Domain<T>;
 
@@ -950,15 +951,15 @@ pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
     surface
 }
 
-impl<T: RlstScalar + Float> FmmTreeNode<T> for MortonKey<T> {
+impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
     fn convolution_grid(
         &self,
         expansion_order: usize,
         domain: &Self::Domain,
-        alpha: T,
-        conv_point_corner: &[T],
+        alpha: Self::Scalar,
+        conv_point_corner: &[Self::Scalar],
         conv_point_corner_index: usize,
-    ) -> (Vec<T>, Vec<usize>) {
+    ) -> (Vec<Self::Scalar>, Vec<usize>) {
         // Number of convolution points along each axis
         let n = 2 * expansion_order - 1;
 
@@ -1022,7 +1023,7 @@ impl<T: RlstScalar + Float> FmmTreeNode<T> for MortonKey<T> {
         (grid, conv_idxs)
     }
 
-    fn scale_surface(&self, surface: Vec<T>, domain: &Domain<T>, alpha: T) -> Vec<T> {
+    fn scale_surface(&self, surface: Vec<Self::Scalar>, domain: &Domain<Self::Scalar>, alpha: Self::Scalar) -> Vec<Self::Scalar> {
         let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
@@ -1048,7 +1049,7 @@ impl<T: RlstScalar + Float> FmmTreeNode<T> for MortonKey<T> {
         scaled_surface
     }
 
-    fn surface_grid(&self, expansion_order: usize, domain: &Domain<T>, alpha: T) -> Vec<T> {
+    fn surface_grid(&self, expansion_order: usize, domain: &Domain<Self::Scalar>, alpha: Self::Scalar) -> Vec<Self::Scalar> {
         let surface: Vec<T> = surface_grid(expansion_order);
 
         self.scale_surface(surface, domain, alpha)
