@@ -38,7 +38,7 @@ impl Epsilon for c64 {
 
 /// Returns a complex representation of this type
 pub trait AsComplex {
-    /// Bar
+    /// The associated complex type, implements RlstScalar
     type ComplexType: RlstScalar + Default;
 }
 

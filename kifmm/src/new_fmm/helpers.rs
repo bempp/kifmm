@@ -52,7 +52,7 @@ pub fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> T {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Error> {
+pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
     if level < 2 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -64,7 +64,10 @@ pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Erro
         Ok(T::from(1. / 2.).unwrap())
     } else {
         let two = T::from(2.0).unwrap();
-        Ok(<T as RlstScalar>::powf(two, T::from(level - 3).unwrap()))
+        Ok(<T as RlstScalar>::powf(
+            two,
+            T::from(level - 3).unwrap().re(),
+        ))
     }
 }
 
