@@ -1,7 +1,6 @@
 //! FMM traits
 use crate::{new_fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::traits::Kernel;
-use num::Float;
 use rlst::RlstScalar;
 
 /// Interface for source field translations.

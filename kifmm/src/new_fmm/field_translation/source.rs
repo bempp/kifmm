@@ -1,22 +1,26 @@
 //! Multipole Translations
-use crate::traits::{
-    field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceTranslation, tree::FmmTree,
-    tree::Tree,
-};
-use crate::tree::constants::NSIBLINGS;
+use std::collections::HashSet;
+
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
 use rayon::prelude::*;
-use std::collections::HashSet;
 
-use crate::new_fmm::helpers::chunk_size;
-use crate::new_fmm::{
-    constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
-    types::{FmmEvalType, KiFmm},
-};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar,
+};
+
+use crate::{
+    new_fmm::{
+        constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
+        helpers::chunk_size,
+        types::{FmmEvalType, KiFmm},
+    },
+    traits::{
+        field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceTranslation,
+        tree::FmmTree, tree::Tree,
+    },
+    tree::constants::NSIBLINGS,
 };
 
 impl<Scalar, Kernel, SourceToTargetData> SourceTranslation

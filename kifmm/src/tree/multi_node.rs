@@ -5,7 +5,6 @@ use crate::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
     },
-    RlstScalarFloatMpi,
 };
 
 use crate::hyksort::hyksort;
@@ -21,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 
 impl<T> MultiNodeTree<T>
 where
-    T: RlstScalarFloatMpi<Real = T>,
+    T: RlstScalar + Float + Equivalence + Default,
 {
     /// Constructor for uniform trees, distributed with MPI, node refined to a user defined depth.
     ///

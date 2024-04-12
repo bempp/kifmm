@@ -1,14 +1,17 @@
 //! Helper Functions
-use crate::new_fmm::types::{Charges, SendPtrMut};
-use crate::traits::tree::{FmmTreeNode, Tree};
-use crate::tree::types::{MortonKey, SingleNodeTree};
-use crate::{Float, RlstScalarFloat};
-use num::Num;
+use std::collections::HashMap;
+
+use num::traits::Float;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
     RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
-use std::collections::HashMap;
+
+use crate::{
+    new_fmm::types::{Charges, SendPtrMut},
+    traits::tree::{FmmTreeNode, Tree},
+    tree::types::{MortonKey, SingleNodeTree},
+};
 
 /// Number of coefficients for multipole and local expansions for the kernel independent FMM
 /// for a given expansion order. Coefficients correspond to points on the equivalent surface.
@@ -306,7 +309,7 @@ pub fn pad3<T: RlstScalar>(
     pad_index: (usize, usize, usize),
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
-    T: Clone + Copy + Num,
+    T: Clone + Copy + RlstScalar,
 {
     let [m, n, o] = arr.shape();
 
@@ -337,7 +340,7 @@ pub fn flip3<T: RlstScalar>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
-    T: Clone + Copy + Num,
+    T: Clone + Copy + RlstScalar,
 {
     let mut flipped = rlst_dynamic_array3!(T, arr.shape());
 

@@ -1,30 +1,35 @@
-//! Implementation of traits for field translations via the FFT and BLAS.
-// use super::transfer_vector::compute_transfer_vectors;
+//! Implementation of traits to compute metadata for field translation operations.
+use std::collections::HashSet;
 
-use crate::new_fmm::field_translation::source_to_target::transfer_vector::compute_transfer_vectors;
-use crate::new_fmm::helpers::{flip3, ncoeffs_kifmm};
-use crate::new_fmm::types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata};
-use crate::traits::field::ConfigureSourceToTargetData;
-use crate::traits::{fftw::RealToComplexFft3D, field::SourceToTargetData, tree::FmmTreeNode};
-
-use crate::tree::{
-    constants::{
-        ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
-    },
-    helpers::find_corners,
-    types::{Domain, MortonKey},
-};
-use crate::RlstScalarComplexFloat;
 use green_kernels::{traits::Kernel, types::EvalType};
 use itertools::Itertools;
-use num::{Complex, Float, Zero};
-use num_complex::ComplexFloat;
+use num::{Float, Zero};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
     SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer,
 };
-use std::collections::HashSet;
+
+use crate::{
+    new_fmm::{
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors,
+        helpers::{flip3, ncoeffs_kifmm},
+        types::{BlasFieldTranslation, BlasMetadata, FftFieldTranslation, FftMetadata},
+    },
+    traits::{
+        fftw::{Dft, DftType},
+        field::{ConfigureSourceToTargetData, SourceToTargetData},
+        general::{AsComplex, Epsilon},
+        tree::FmmTreeNode,
+    },
+    tree::{
+        constants::{
+            ALPHA_INNER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
+        },
+        helpers::find_corners,
+        types::{Domain, MortonKey},
+    },
+};
 
 fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(singular_values: &[T], threshold: T) -> usize {
     for (i, &s) in singular_values.iter().enumerate() {
@@ -36,86 +41,18 @@ fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(singular_values: &[T], thresho
     singular_values.len() - 1
 }
 
-impl<Scalar, Kern> SourceToTargetData for FftFieldTranslation<Scalar, Kern>
-where
-    Scalar: RlstScalar,
-    Scalar::Real: RealToComplexFft3D,
-    Kern: Kernel<T = Scalar> + Default,
-{
-    type Metadata = FftMetadata<Scalar>;
-}
-
 impl<Scalar, Kern> FftFieldTranslation<Scalar, Kern>
 where
-    Scalar: RlstScalar + Default,
-    Scalar::Real: RealToComplexFft3D + Default,
+    Scalar: RlstScalar + AsComplex + Dft + Default,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
     Kern: Kernel<T = Scalar> + Default,
 {
-    /// Insantiate empty instance
+    /// Constructor for FFT based field translations
     pub fn new() -> Self {
         Self {
             transfer_vectors: compute_transfer_vectors(),
             ..Default::default()
         }
-    }
-
-    /// Compute map between convolution grid indices and surface indices, return mapping and inverse mapping.
-    ///
-    /// # Arguments
-    /// * `expansion_order` - The expansion order of the FMM
-    pub fn compute_surf_to_conv_map(expansion_order: usize) -> (Vec<usize>, Vec<usize>) {
-        // Number of points along each axis of convolution grid
-        let n = 2 * expansion_order - 1;
-        let npad = n + 1;
-
-        let nsurf_grid = 6 * (expansion_order - 1).pow(2) + 2;
-
-        // Index maps between surface and convolution grids
-        let mut surf_to_conv = vec![0usize; nsurf_grid];
-        let mut conv_to_surf = vec![0usize; nsurf_grid];
-
-        // Initialise surface grid index
-        let mut surf_index = 0;
-
-        // The boundaries of the surface grid when embedded within the convolution grid
-        let lower = expansion_order;
-        let upper = 2 * expansion_order - 1;
-
-        for k in 0..npad {
-            for j in 0..npad {
-                for i in 0..npad {
-                    let conv_index = i + npad * j + npad * npad * k;
-                    if (i >= lower && j >= lower && (k == lower || k == upper))
-                        || (j >= lower && k >= lower && (i == lower || i == upper))
-                        || (k >= lower && i >= lower && (j == lower || j == upper))
-                    {
-                        surf_to_conv[surf_index] = conv_index;
-                        surf_index += 1;
-                    }
-                }
-            }
-        }
-
-        let lower = 0;
-        let upper = expansion_order - 1;
-        let mut surf_index = 0;
-
-        for k in 0..npad {
-            for j in 0..npad {
-                for i in 0..npad {
-                    let conv_index = i + npad * j + npad * npad * k;
-                    if (i <= upper && j <= upper && (k == lower || k == upper))
-                        || (j <= upper && k <= upper && (i == lower || i == upper))
-                        || (k <= upper && i <= upper && (j == lower || j == upper))
-                    {
-                        conv_to_surf[surf_index] = conv_index;
-                        surf_index += 1;
-                    }
-                }
-            }
-        }
-
-        (surf_to_conv, conv_to_surf)
     }
 
     /// Computes the unique kernel evaluations and places them on a convolution grid on the source box wrt to a given target point on the target box surface grid.
@@ -179,16 +116,87 @@ where
 
         result
     }
+
+    /// Compute map between convolution grid indices and surface indices, return mapping and inverse mapping.
+    ///
+    /// # Arguments
+    /// * `expansion_order` - The expansion order of the FMM
+    pub fn compute_surf_to_conv_map(expansion_order: usize) -> (Vec<usize>, Vec<usize>) {
+        // Number of points along each axis of convolution grid
+        let n = 2 * expansion_order - 1;
+        let npad = n + 1;
+
+        let nsurf_grid = 6 * (expansion_order - 1).pow(2) + 2;
+
+        // Index maps between surface and convolution grids
+        let mut surf_to_conv = vec![0usize; nsurf_grid];
+        let mut conv_to_surf = vec![0usize; nsurf_grid];
+
+        // Initialise surface grid index
+        let mut surf_index = 0;
+
+        // The boundaries of the surface grid when embedded within the convolution grid
+        let lower = expansion_order;
+        let upper = 2 * expansion_order - 1;
+
+        for k in 0..npad {
+            for j in 0..npad {
+                for i in 0..npad {
+                    let conv_index = i + npad * j + npad * npad * k;
+                    if (i >= lower && j >= lower && (k == lower || k == upper))
+                        || (j >= lower && k >= lower && (i == lower || i == upper))
+                        || (k >= lower && i >= lower && (j == lower || j == upper))
+                    {
+                        surf_to_conv[surf_index] = conv_index;
+                        surf_index += 1;
+                    }
+                }
+            }
+        }
+
+        let lower = 0;
+        let upper = expansion_order - 1;
+        let mut surf_index = 0;
+
+        for k in 0..npad {
+            for j in 0..npad {
+                for i in 0..npad {
+                    let conv_index = i + npad * j + npad * npad * k;
+                    if (i <= upper && j <= upper && (k == lower || k == upper))
+                        || (j <= upper && k <= upper && (i == lower || i == upper))
+                        || (k <= upper && i <= upper && (j == lower || j == upper))
+                    {
+                        conv_to_surf[surf_index] = conv_index;
+                        surf_index += 1;
+                    }
+                }
+            }
+        }
+
+        (surf_to_conv, conv_to_surf)
+    }
+}
+
+impl<Scalar, Kern> SourceToTargetData for FftFieldTranslation<Scalar, Kern>
+where
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
+    Kern: Kernel<T = Scalar> + Default,
+{
+    type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
 }
 
 impl<Scalar, Kern> ConfigureSourceToTargetData for FftFieldTranslation<Scalar, Kern>
 where
-    Scalar: RlstScalar + ComplexFloat + Default,
-    <Scalar as RlstScalar>::Real: RealToComplexFft3D + Default,
+    Scalar: RlstScalar
+        + AsComplex
+        + Default
+        + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
     Kern: Kernel<T = Scalar> + Default,
 {
     type Scalar = Scalar;
-    type Domain = Domain<<Scalar as RlstScalar>::Real>;
+    type Domain = Domain<Scalar::Real>;
     type Kernel = Kern;
 
     fn expansion_order(&mut self, expansion_order: usize) {
@@ -207,7 +215,7 @@ where
         let size_real = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
 
         // Pick a point in the middle of the domain
-        let two = <Scalar as RlstScalar>::Scalar::from(2.0).unwrap().re();
+        let two = Scalar::real(2.0);
         let midway = domain.side_length.iter().map(|d| *d / two).collect_vec();
         let point = midway
             .iter()
@@ -317,17 +325,20 @@ where
                     let mut kernel = flip3(&kernel);
 
                     // Compute FFT of padded kernel
-                    let mut kernel_hat = rlst_dynamic_array3!(Scalar, [p, p, p / 2 + 1]);
+                    let mut kernel_hat =
+                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, [p, p, p / 2 + 1]);
 
                     // TODO: is kernel_hat the transpose of what it used to be?
-                    let _ = Scalar::r2c(kernel.data_mut(), kernel_hat.data_mut(), &[p, p, p]);
+                    let _ =
+                        Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[p, p, p]);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
                     // Fill with zeros when interaction doesn't exist
                     let n = 2 * expansion_order - 1;
                     let p = n + 1;
-                    let kernel_hat_zeros = rlst_dynamic_array3!(Scalar, [p, p, p / 2 + 1]);
+                    let kernel_hat_zeros =
+                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, [p, p, p / 2 + 1]);
                     kernel_data_vec[i].push(kernel_hat_zeros);
                 }
             }
@@ -335,7 +346,10 @@ where
 
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
         let mut kernel_data =
-            vec![vec![Scalar::zero(); NSIBLINGS_SQUARED * size_real]; halo_children.len()];
+            vec![
+                vec![<Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * size_real];
+                halo_children.len()
+            ];
 
         // For each halo position
         for i in 0..halo_children.len() {
@@ -375,7 +389,8 @@ where
                 let k_f =
                     &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-                let mut k_ft = rlst_dynamic_array2!(Complex<T>, [NSIBLINGS, NSIBLINGS]);
+                let mut k_ft =
+                    rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
@@ -391,7 +406,26 @@ where
 
         // Set required maps, TODO: Should be a part of operator data
         (self.surf_to_conv_map, self.conv_to_surf_map) =
-            FftFieldTranslation::<T, U>::compute_surf_to_conv_map(self.expansion_order);
+            FftFieldTranslation::<Scalar, Kern>::compute_surf_to_conv_map(self.expansion_order);
+    }
+}
+
+impl<Scalar, Kern> BlasFieldTranslation<Scalar, Kern>
+where
+    Scalar: RlstScalar + Epsilon + Default,
+    <Scalar as RlstScalar>::Real: Default,
+    Kern: Kernel<T = Scalar> + Default,
+{
+    /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
+    /// TODO: More docs
+    pub fn new(threshold: Option<Scalar::Real>) -> Self {
+        let tmp = Scalar::real(4) * Scalar::epsilon().re();
+
+        Self {
+            threshold: threshold.unwrap_or(tmp),
+            transfer_vectors: compute_transfer_vectors(),
+            ..Default::default()
+        }
     }
 }
 
@@ -400,7 +434,7 @@ where
     Scalar: RlstScalar,
     Kern: Kernel<T = Scalar> + Default,
 {
-    type Metadata = FftMetadata<Scalar>;
+    type Metadata = BlasMetadata<Scalar>;
 }
 
 impl<Scalar, Kern> ConfigureSourceToTargetData for BlasFieldTranslation<Scalar, Kern>

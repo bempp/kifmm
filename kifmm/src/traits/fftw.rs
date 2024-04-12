@@ -1,8 +1,9 @@
 //! FFTW Traits
-use crate::fftw::types::{FftError, Sign};
 use num::Float;
 use num_complex::{Complex, ComplexFloat};
 use rlst::RlstScalar;
+
+use crate::fftw::types::{FftError, Sign};
 
 /// Interface for Real-to_Complex DFT computed with FFT library for 3D real data.
 ///
@@ -211,4 +212,135 @@ where
     /// * `sign` - Direction of transform
     fn c2c(in_: &mut [Self], out: &mut [Self], shape: &[usize], sign: Sign)
         -> Result<(), FftError>;
+}
+
+use rlst::{c32, c64};
+
+/// Interface for DFT for use from FMM
+pub trait Dft
+where
+    Self: Sized + RlstScalar + DftType,
+{
+    /// Forward transform, if real data is used as input computes R2C dft
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+}
+
+impl Dft for f32 {
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f32::r2c(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f32::c2r(in_, out, shape)?;
+        Ok(())
+    }
+}
+
+impl Dft for f64 {
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f64::r2c(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f64::c2r(in_, out, shape)?;
+        Ok(())
+    }
+}
+
+impl Dft for c32 {
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c32::c2c(in_, out, shape, Sign::Forward)?;
+        Ok(())
+    }
+
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c32::c2c(in_, out, shape, Sign::Backward)?;
+        Ok(())
+    }
+}
+
+impl Dft for c64 {
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c64::c2c(in_, out, shape, Sign::Forward)?;
+        Ok(())
+    }
+
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c64::c2c(in_, out, shape, Sign::Backward)?;
+        Ok(())
+    }
+}
+
+/// Input and output types for which DFT trait is defined
+pub trait DftType {
+    /// Input type
+    type InputType: RlstScalar + Default + Sized;
+
+    /// Output type
+    type OutputType: RlstScalar + Default + Sized;
+}
+
+impl DftType for f64 {
+    type InputType = Self;
+    type OutputType = c64;
+}
+
+impl DftType for f32 {
+    type InputType = Self;
+    type OutputType = c32;
+}
+
+impl DftType for c32 {
+    type InputType = Self;
+    type OutputType = Self;
+}
+
+impl DftType for c64 {
+    type InputType = Self;
+    type OutputType = Self;
 }

@@ -78,88 +78,25 @@
 #![warn(missing_docs)]
 
 pub mod fftw;
-// pub mod fmm;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
 pub mod new_fmm;
 pub mod traits;
 pub mod tree;
 
-// // Public API
-// #[doc(inline)]
-// pub use fmm::types::BlasFieldTranslation;
-// #[doc(inline)]
-// pub use fmm::types::FftFieldTranslation;
-// #[doc(inline)]
-// pub use fmm::types::SingleNodeBuilder;
-// #[doc(inline)]
-// pub use fmm::types::SingleNodeFmmTree;
-
-// #[cfg(feature = "mpi")]
-// #[doc(inline)]
-// pub use fmm::types::MultiNodeFmmTree;
+// Public API
+#[doc(inline)]
+pub use new_fmm::types::BlasFieldTranslation;
+#[doc(inline)]
+pub use new_fmm::types::FftFieldTranslation;
+#[doc(inline)]
+pub use new_fmm::types::SingleNodeBuilder;
+#[doc(inline)]
+pub use new_fmm::types::SingleNodeFmmTree;
 
 #[cfg(feature = "mpi")]
-use mpi::traits::Equivalence;
+#[doc(inline)]
+pub use new_fmm::types::MultiNodeFmmTree;
 
-use num::Float;
-use num_complex::ComplexFloat;
-use rlst::RlstScalar;
-use rlst::{c32, c64};
-// #[doc(inline)]
-// pub use traits::fmm::Fmm;
-
-/// Super trait of RlstScalar and  Float trait
-pub trait RlstScalarFloat: RlstScalar + Float + Default {}
-
-/// Super trait of RlstScalar and Complex Float trait
-pub trait RlstScalarComplexFloat: RlstScalar + ComplexFloat + Default {}
-
-#[cfg(feature = "mpi")]
-/// Super trait of RlstScalar and Float trait, and MPI Equivalence trait
-pub trait RlstScalarFloatMpi: RlstScalarFloat + Equivalence {}
-
-#[cfg(feature = "mpi")]
-/// Super trait of RlstScalar and Complex Float trait, and MPI Equivalence trait
-pub trait RlstScalarComplexFloatMpi: RlstScalarFloatMpi + Equivalence {}
-
-impl RlstScalarFloat for f64 {}
-impl RlstScalarFloat for f32 {}
-
-#[cfg(feature = "mpi")]
-impl RlstScalarFloatMpi for f64 {}
-#[cfg(feature = "mpi")]
-impl RlstScalarFloatMpi for f32 {}
-
-impl RlstScalarComplexFloat for c64 {}
-impl RlstScalarComplexFloat for c32 {}
-
-/// Machine precision
-pub trait Epsilon {
-    /// Returns epsilon, a small positive value.
-    fn epsilon() -> Self;
-}
-
-impl Epsilon for f32 {
-    fn epsilon() -> Self {
-        f32::EPSILON
-    }
-}
-
-impl Epsilon for f64 {
-    fn epsilon() -> Self {
-        f64::EPSILON
-    }
-}
-
-impl Epsilon for c32 {
-    fn epsilon() -> Self {
-        f32::EPSILON.into()
-    }
-}
-
-impl Epsilon for c64 {
-    fn epsilon() -> Self {
-        f64::EPSILON.into()
-    }
-}
+#[doc(inline)]
+pub use traits::fmm::Fmm;

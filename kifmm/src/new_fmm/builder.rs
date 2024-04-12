@@ -1,30 +1,31 @@
 //! Builder objects to construct FMMs
-use crate::new_fmm::helpers::{
-    coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
-    leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, ncoeffs_kifmm,
-    potential_pointers,
-};
-use crate::{
-    new_fmm::types::{
-        Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree,
-    },
-    Epsilon,
-};
-
-use crate::traits::field::ConfigureSourceToTargetData;
-use crate::traits::tree::FmmTreeNode;
-use crate::traits::{field::SourceToTargetData as SourceToTargetDataTrait, tree::Tree};
-use crate::tree::{
-    constants::{ALPHA_INNER, ALPHA_OUTER},
-    types::{Domain, MortonKey, SingleNodeTree},
-};
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use rlst::{
     empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
-use super::{constants::DEFAULT_NCRIT, pinv::pinv};
+use crate::{
+    new_fmm::{
+        constants::DEFAULT_NCRIT,
+        helpers::{
+            coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers,
+            leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges,
+            ncoeffs_kifmm, potential_pointers,
+        },
+        pinv::pinv,
+        types::{Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
+    },
+    traits::{
+        field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait},
+        general::Epsilon,
+        tree::{FmmTreeNode, Tree},
+    },
+    tree::{
+        constants::{ALPHA_INNER, ALPHA_OUTER},
+        types::{Domain, MortonKey, SingleNodeTree},
+    },
+};
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where

@@ -1,9 +1,12 @@
+//! Implementation of FMM compatible trees
+use num::traits::Float;
 use rlst::RlstScalar;
 
-use super::types::SingleNodeFmmTree;
-use crate::traits::tree::{FmmTree, Tree};
-use crate::tree::types::SingleNodeTree;
-use crate::{Float, RlstScalarFloat};
+use crate::{
+    new_fmm::types::SingleNodeFmmTree,
+    traits::tree::{FmmTree, Tree},
+    tree::types::SingleNodeTree,
+};
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where

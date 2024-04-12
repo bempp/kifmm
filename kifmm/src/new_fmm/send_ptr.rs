@@ -1,5 +1,4 @@
-//! Send ptr
-
+//! Implementation of traits for threadsafe pointers
 use crate::new_fmm::types::{SendPtr, SendPtrMut};
 use num::Complex;
 

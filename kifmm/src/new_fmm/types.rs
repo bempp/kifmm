@@ -1,18 +1,23 @@
 //! Data structures for kernel independent FMM
-use crate::traits::fftw::RealToComplexFft3D;
-use crate::traits::field::ConfigureSourceToTargetData;
-use crate::traits::{field::SourceToTargetData as SourceToTargetDataTrait, tree::FmmTree};
-use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
-use crate::{Float, RlstScalarComplexFloat, RlstScalarFloat};
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
-use num::Complex;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
+
+use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use num::traits::Float;
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
+
+use crate::{
+    traits::{
+        fftw::Dft,
+        field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait},
+        general::AsComplex,
+    },
+    tree::types::{Domain, MortonKey, SingleNodeTree},
+};
 
 #[cfg(feature = "mpi")]
 use crate::tree::types::MultiNodeTree;
-#[cfg(feature = "mpi")]
-use crate::RlstScalarFloatMpi;
+// #[cfg(feature = "mpi")]
+// use crate::RlstScalarFloatMpi;
 #[cfg(feature = "mpi")]
 use mpi::traits::Equivalence;
 
@@ -528,7 +533,8 @@ pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence> {
 #[derive(Default)]
 pub struct FftFieldTranslation<Scalar, Kernel>
 where
-    Scalar: RlstScalar,
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + Default,
 {
     /// Map between indices of surface convolution grid points.
@@ -538,7 +544,7 @@ where
     pub conv_to_surf_map: Vec<usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
-    pub metadata: FftMetadata<Scalar>,
+    pub metadata: FftMetadata<<Scalar as AsComplex>::ComplexType>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,

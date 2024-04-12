@@ -1,9 +1,9 @@
 //! Implementation of Moore-Penrose PseudoInverse
-use num::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, MatrixSvd, Shape, SvdMode, VectorContainer};
-use rlst::{RlstError, RlstResult, RlstScalar};
-
-use crate::Epsilon;
+use crate::traits::general::Epsilon;
+use rlst::{
+    rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RlstError, RlstResult, RlstScalar, Shape,
+    SvdMode, VectorContainer,
+};
 
 /// Matrix type
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;

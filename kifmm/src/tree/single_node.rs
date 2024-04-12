@@ -1,15 +1,20 @@
 //! Implementation of constructors for single node trees.
-use crate::traits::tree::Tree;
-use crate::tree::{
-    constants::{DEEPEST_LEVEL, LEVEL_SIZE},
-    morton::encode_anchor,
-    types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
-};
-use crate::Float;
+
+use std::collections::{HashMap, HashSet};
+
+use num::traits::Float;
+
 use itertools::Itertools;
 use rlst::RlstScalar;
 
-use std::collections::{HashMap, HashSet};
+use crate::{
+    traits::tree::Tree,
+    tree::{
+        constants::{DEEPEST_LEVEL, LEVEL_SIZE},
+        morton::encode_anchor,
+        types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
+    },
+};
 
 impl<T> SingleNodeTree<T>
 where

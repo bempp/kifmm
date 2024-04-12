@@ -28,8 +28,6 @@ fn validate_shape_r2c(
     let n_d = in_shape.last().unwrap();
     let n_sub = (n / n_d) * (n_d / 2 + 1);
 
-    println!("{:?} {:?} {:?}", n, n_d, n_sub);
-
     let valid = in_shape.len() == 3 && in_len % n == 0 && out_len % n_sub == 0;
     if valid {
         Ok(ShapeInfo {
