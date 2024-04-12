@@ -292,11 +292,8 @@ mod test {
             &mut found,
         );
 
-        println!("expected {:?}", multipole);
-        let error = (expected[0] - found[0]).abs();
-        // let abs_error = <T as RlstScalar>::norm(expected[0] - found[0]);
-        // let rel_error = abs_error / expected[0];
-        assert!(error <= threshold);
+        let abs_error = (expected[0] - found[0]).abs();
+        assert!(abs_error <= threshold);
     }
 
     #[test]
@@ -374,7 +371,7 @@ mod test {
         let tmp = vec![c64::one(); nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
-        let wavenumber = 1.0;
+        let wavenumber = 0.00001;
 
         let fmm_fft = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
@@ -393,7 +390,5 @@ mod test {
 
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
-
-
     }
 }
