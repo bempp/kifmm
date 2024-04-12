@@ -4,7 +4,8 @@ use green_kernels::{
 use kifmm::{
     new_fmm::types::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder},
     traits::fmm::SourceTranslation,
-    tree::{helpers::points_fixture, types::MortonKey}, Fmm,
+    tree::{helpers::points_fixture, types::MortonKey},
+    Fmm,
 };
 use num::traits::One;
 use rlst::{c64, rlst_dynamic_array2, RawAccessMut};

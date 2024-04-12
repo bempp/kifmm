@@ -78,17 +78,24 @@ where
     /// Get the multipole expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The source node.
-    fn multipole(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node) -> Option<&[Self::Scalar]>;
+    fn multipole(
+        &self,
+        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<&[Self::Scalar]>;
 
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
-    fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node) -> Option<&[Self::Scalar]>;
+    fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node)
+        -> Option<&[Self::Scalar]>;
 
     /// Get the potential data associated with the particles contained at a given node
     /// # Arguments
     /// * `key` - The target leaf node.
-    fn potential(&self, leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node) -> Option<Vec<&[Self::Scalar]>>;
+    fn potential(
+        &self,
+        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get the expansion order associated with this FMM
     fn expansion_order(&self) -> usize;

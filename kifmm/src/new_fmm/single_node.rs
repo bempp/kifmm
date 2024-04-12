@@ -4,20 +4,27 @@ use green_kernels::traits::Kernel as KernelTrait;
 use rlst::{RawAccess, RlstScalar, Shape};
 
 use crate::{
-    new_fmm::types::{FmmEvalType, KiFmm}, traits::{field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceTranslation, tree::{FmmTree, Tree}}, Fmm, SingleNodeFmmTree
+    new_fmm::types::{FmmEvalType, KiFmm},
+    traits::{
+        field::SourceToTargetData as SourceToTargetDataTrait,
+        fmm::SourceTranslation,
+        tree::{FmmTree, Tree},
+    },
+    Fmm, SingleNodeFmmTree,
 };
 
-use super::{helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers}, types::Charges};
+use super::{
+    helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
+    types::Charges,
+};
 
-
-impl <Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + Default,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-
     type Scalar = Scalar;
     type Kernel = Kernel;
     type Tree = SingleNodeFmmTree<Scalar::Real>;
@@ -38,7 +45,10 @@ where
         &self.tree
     }
 
-    fn multipole(&self, key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node) -> Option<&[Self::Scalar]> {
+    fn multipole(
+        &self,
+        key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
+    ) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree().source_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -54,7 +64,10 @@ where
         }
     }
 
-    fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node) -> Option<&[Self::Scalar]> {
+    fn local(
+        &self,
+        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree.target_tree().index(key) {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -70,7 +83,10 @@ where
         }
     }
 
-    fn potential(&self, leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node) -> Option<Vec<&[Self::Scalar]>> {
+    fn potential(
+        &self,
+        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<Vec<&[Self::Scalar]>> {
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
             let ntargets = r - l;
@@ -110,9 +126,7 @@ where
         }
 
         // Downward pass
-        {
-
-        }
+        {}
 
         // Leaf level computations
     }
@@ -184,19 +198,26 @@ where
         .data()
         .to_vec();
     }
-
 }
-
 
 #[cfg(test)]
 mod test {
-    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel, types::EvalType};
+    use green_kernels::{
+        helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
+        types::EvalType,
+    };
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use rlst::{rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, VectorContainer, c64};
+    use rlst::{
+        c64, rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar,
+        VectorContainer,
+    };
 
-    use crate::{traits::tree::{FmmTree, FmmTreeNode}, tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey}, BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree};
-
+    use crate::{
+        traits::tree::{FmmTree, FmmTreeNode},
+        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
+        BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+    };
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
         fmm: Box<
@@ -209,10 +230,9 @@ mod test {
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         threshold: T::Real,
-    )
-    where
-        T::Real: Default
-     {
+    ) where
+        T::Real: Default,
+    {
         let root = MortonKey::root();
 
         let multipole = fmm.multipole(&root).unwrap();
@@ -250,19 +270,14 @@ mod test {
 
     fn test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<
-                Scalar = T,
-                Kernel = Helmholtz3dKernel<T>,
-                Tree = SingleNodeFmmTree<T::Real>,
-            >,
+            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T::Real,
-    )
-    where
-        T::Real: Default
-     {
+    ) where
+        T::Real: Default,
+    {
         let root = MortonKey::<T::Real>::root();
         let multipole = fmm.multipole(&root).unwrap();
 
@@ -293,6 +308,10 @@ mod test {
         );
 
         let abs_error = (expected[0] - found[0]).abs();
+        println!(
+            "abs {:?} \n expected {:?} found {:?}",
+            abs_error, expected, found
+        );
         assert!(abs_error <= threshold);
     }
 
@@ -350,7 +369,6 @@ mod test {
         let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_fft, &sources, &charges, 1e-5);
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
-
     }
 
     #[test]
@@ -388,7 +406,25 @@ mod test {
             .unwrap();
         fmm_fft.evaluate();
 
+        let svd_threshold = Some(1e-5);
+        let fmm_svd = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                EvalType::Value,
+                BlasFieldTranslation::new(svd_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_svd.evaluate();
+
         let fmm_fft = Box::new(fmm_fft);
+        let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
+        test_root_multipole_helmholtz_single_node::<c64>(fmm_svd, &sources, &charges, 1e-5);
     }
 }
