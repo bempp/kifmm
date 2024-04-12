@@ -425,17 +425,17 @@ mod test {
         let nd = 3;
         let n = nd * nd * nd;
         let n_sub = nd * nd * (nd / 2 + 1);
-        let mut a = vec![c64::zero(); n_sub];
-        let mut b = vec![0.0; n];
+        let mut a = vec![0.0; n];
+        let mut b = vec![c64::zero(); n_sub];
 
-        for i in 0..n {
-            b[i] = i as f64;
+        for (i, a_i) in a.iter_mut().enumerate().take(n) {
+            *a_i = i as f64;
         }
 
-        f64::r2c(&mut b, &mut a, &[nd, nd, nd]).unwrap();
-        f64::c2r(&mut a, &mut b, &[nd, nd, nd]).unwrap();
+        f64::r2c(&mut a, &mut b, &[nd, nd, nd]).unwrap();
+        f64::c2r(&mut b, &mut a, &[nd, nd, nd]).unwrap();
 
-        for (i, &v) in b.iter().enumerate() {
+        for (i, &v) in a.iter().enumerate() {
             let expected = i as f64;
             let dif = (v - expected).abs();
             if dif > 1e-7 {

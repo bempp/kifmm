@@ -42,7 +42,7 @@ impl ComplexToComplexFft3D for c64 {
         shape: &[usize],
         sign: Sign,
     ) -> Result<(), FftError> {
-        let info = validate_shape_c2c(&shape, in_.len(), out.len())?;
+        let info = validate_shape_c2c(shape, in_.len(), out.len())?;
 
         let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft(
             shape.len() as i32,
@@ -74,7 +74,7 @@ impl ComplexToComplexFft3D for c64 {
         shape: &[usize],
         sign: Sign,
     ) -> Result<(), FftError> {
-        let info = validate_shape_c2c(&shape, in_.len(), out.len())?;
+        let info = validate_shape_c2c(shape, in_.len(), out.len())?;
 
         let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft(
             shape.len() as i32,
@@ -99,7 +99,7 @@ impl ComplexToComplexFft3D for c64 {
                     ffi::fftw_execute_dft(plan.0, in_.as_mut_ptr(), out.as_mut_ptr())
                 });
                 out.iter_mut()
-                    .for_each(|value| *value =  value.mul_real(1.0 / (info.n_input as f64)))
+                    .for_each(|value| *value = value.mul_real(1.0 / (info.n_input as f64)))
             }
         }
 
@@ -114,7 +114,7 @@ impl ComplexToComplexFft3D for c64 {
         shape: &[usize],
         sign: Sign,
     ) -> Result<(), FftError> {
-        let info = validate_shape_c2c(&shape, in_.len(), out.len())?;
+        let info = validate_shape_c2c(shape, in_.len(), out.len())?;
 
         let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft(
             shape.len() as i32,
@@ -141,7 +141,7 @@ impl ComplexToComplexFft3D for c64 {
                     unsafe { ffi::fftw_execute_dft(p.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
                 });
                 out.iter_mut()
-                    .for_each(|value| *value =  value.mul_real(1.0 / (info.n_input as f64)))
+                    .for_each(|value| *value = value.mul_real(1.0 / (info.n_input as f64)))
             }
         }
 
@@ -157,7 +157,7 @@ impl ComplexToComplexFft3D for c32 {
         shape: &[usize],
         sign: Sign,
     ) -> Result<(), FftError> {
-        let info = validate_shape_c2c(&shape, in_.len(), out.len())?;
+        let info = validate_shape_c2c(shape, in_.len(), out.len())?;
 
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft(
             shape.len() as i32,
@@ -189,7 +189,7 @@ impl ComplexToComplexFft3D for c32 {
         shape: &[usize],
         sign: Sign,
     ) -> Result<(), FftError> {
-        let info = validate_shape_c2c(&shape, in_.len(), out.len())?;
+        let info = validate_shape_c2c(shape, in_.len(), out.len())?;
 
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft(
             shape.len() as i32,
@@ -229,7 +229,7 @@ impl ComplexToComplexFft3D for c32 {
         shape: &[usize],
         sign: Sign,
     ) -> Result<(), FftError> {
-        let info = validate_shape_c2c(&shape, in_.len(), out.len())?;
+        let info = validate_shape_c2c(shape, in_.len(), out.len())?;
 
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft(
             shape.len() as i32,
@@ -279,8 +279,8 @@ mod test {
         let mut a = vec![c64::zero(); n];
         let mut b = vec![c64::zero(); n];
 
-        for i in 0..n {
-            a[i] = c64::new(i as f64, 0.);
+        for (i, a_i) in a.iter_mut().enumerate().take(n) {
+            *a_i = c64::new(i as f64, 0.);
         }
 
         c64::c2c(
