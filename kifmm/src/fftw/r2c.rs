@@ -1,40 +1,17 @@
-//! # FFTW Implementations
+//! # Real to Complex Transform
 use fftw_sys as ffi;
 
 use itertools::Itertools;
 use num_complex::Complex;
 
-use lazy_static::lazy_static;
 use rayon::prelude::*;
-use std::sync::Mutex;
 
+use super::helpers::validate_plan;
 use super::types::{FftError, Plan32, Plan64, ShapeInfo};
 use crate::traits::fftw::RealToComplexFft3D;
 
-unsafe impl Send for Plan32 {}
-unsafe impl Send for Plan64 {}
-unsafe impl Sync for Plan32 {}
-unsafe impl Sync for Plan64 {}
-
-/// FFTW in 'estimate' mode. A sub-optimal heuristic is used to create FFT plan.
-/// input/output arrays are not overwritten during planning, see [original doc](https://www.fftw.org/fftw3_doc/Planner-Flags.html) for detail
-const FFTW_ESTIMATE: u32 = 1 << 6;
-
-lazy_static! {
-    /// Mutex for FFTW call.
-    ///
-    /// This mutex is necessary because most of calls in FFTW are not thread-safe.
-    /// See the [original document](http://www.fftw.org/fftw3_doc/Thread-safety.html) for detail
-    pub static ref FFTW_MUTEX: Mutex<()> = Mutex::new(());
-}
-
-/// Exclusive call of FFTW interface.
-macro_rules! excall {
-    ($call:expr) => {{
-        let _lock = FFTW_MUTEX.lock().expect("Cannot get lock");
-        unsafe { $call }
-    }};
-}
+use crate::excall;
+use crate::fftw::types::{FFTW_ESTIMATE, FFTW_MUTEX};
 
 /// Validate the dimensions of the (batch) input and output sequences in real-to-complex DFTs
 ///
@@ -51,9 +28,14 @@ fn validate_shape_r2c(
     let n_d = in_shape.last().unwrap();
     let n_sub = (n / n_d) * (n_d / 2 + 1);
 
+    println!("{:?} {:?} {:?}", n, n_d, n_sub);
+
     let valid = in_shape.len() == 3 && in_len % n == 0 && out_len % n_sub == 0;
     if valid {
-        Ok(ShapeInfo { n, n_sub })
+        Ok(ShapeInfo {
+            n_input: n,
+            n_output: n_sub,
+        })
     } else {
         Err(FftError::InvalidDimensionError)
     }
@@ -73,24 +55,16 @@ fn validate_shape_c2r(
     let n: usize = in_shape.iter().product();
     let n_d = in_shape.last().unwrap();
     let n_sub = (n / n_d) * (n_d / 2 + 1);
+    println!("{:?} {:?} {:?}", in_len, out_len, 42);
 
     let valid = in_shape.len() == 3 && in_len % n_sub == 0 && out_len % n == 0;
     if valid {
-        Ok(ShapeInfo { n, n_sub })
+        Ok(ShapeInfo {
+            n_input: n,
+            n_output: n_sub,
+        })
     } else {
         Err(FftError::InvalidDimensionError)
-    }
-}
-
-/// Validate a DFT plan created with FFTW
-///
-/// # Arguments
-/// * `plan` - Raw pointer for a plan
-fn validate_plan<T: Sized>(plan: *mut T) -> Result<*mut T, FftError> {
-    if plan.is_null() {
-        Err(FftError::InvalidPlanError {})
-    } else {
-        Ok(plan)
     }
 }
 
@@ -109,8 +83,8 @@ impl RealToComplexFft3D for f32 {
             FFTW_ESTIMATE,
         )))?);
 
-        let it_in_ = in_.par_chunks_exact_mut(info.n);
-        let it_out = out.par_chunks_exact_mut(info.n_sub);
+        let it_in_ = in_.par_chunks_exact_mut(info.n_input);
+        let it_out = out.par_chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             let p = plan;
@@ -138,8 +112,8 @@ impl RealToComplexFft3D for f32 {
             FFTW_ESTIMATE,
         )))?);
 
-        let it_in_ = in_.par_chunks_exact_mut(info.n_sub);
-        let it_out = out.par_chunks_exact_mut(info.n);
+        let it_in_ = in_.par_chunks_exact_mut(info.n_output);
+        let it_out = out.par_chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             let p = plan;
@@ -147,7 +121,7 @@ impl RealToComplexFft3D for f32 {
 
             // Normalise output
             out.iter_mut()
-                .for_each(|value| *value *= 1.0 / (info.n as f32));
+                .for_each(|value| *value *= 1.0 / (info.n_input as f32));
         });
 
         unsafe {
@@ -176,8 +150,8 @@ impl RealToComplexFft3D for f32 {
             FFTW_ESTIMATE
         )))?);
 
-        let it_in_ = in_.chunks_exact_mut(info.n);
-        let it_out = out.chunks_exact_mut(info.n_sub);
+        let it_in_ = in_.chunks_exact_mut(info.n_input);
+        let it_out = out.chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             unsafe { ffi::fftwf_execute_dft_r2c(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
@@ -204,15 +178,15 @@ impl RealToComplexFft3D for f32 {
             FFTW_ESTIMATE
         )))?);
 
-        let it_in_ = in_.chunks_exact_mut(info.n_sub);
-        let it_out = out.chunks_exact_mut(info.n);
+        let it_in_ = in_.chunks_exact_mut(info.n_output);
+        let it_out = out.chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             unsafe { ffi::fftwf_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
-                .for_each(|value| *value *= 1.0 / (info.n as f32));
+                .for_each(|value| *value *= 1.0 / (info.n_input as f32));
         });
 
         unsafe {
@@ -258,7 +232,7 @@ impl RealToComplexFft3D for f32 {
 
         // Normalise
         out.iter_mut()
-            .for_each(|value| *value *= 1.0 / (info.n as f32));
+            .for_each(|value| *value *= 1.0 / (info.n_input as f32));
 
         unsafe {
             ffi::fftwf_destroy_plan(plan.0);
@@ -282,8 +256,8 @@ impl RealToComplexFft3D for f64 {
             FFTW_ESTIMATE,
         )))?);
 
-        let it_in_ = in_.par_chunks_exact_mut(info.n);
-        let it_out = out.par_chunks_exact_mut(info.n_sub);
+        let it_in_ = in_.par_chunks_exact_mut(info.n_input);
+        let it_out = out.par_chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             let p = plan;
@@ -311,8 +285,8 @@ impl RealToComplexFft3D for f64 {
             FFTW_ESTIMATE,
         )))?);
 
-        let it_in_ = in_.par_chunks_exact_mut(info.n_sub);
-        let it_out = out.par_chunks_exact_mut(info.n);
+        let it_in_ = in_.par_chunks_exact_mut(info.n_output);
+        let it_out = out.par_chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             let p = plan;
@@ -320,7 +294,7 @@ impl RealToComplexFft3D for f64 {
 
             // Normalise output
             out.iter_mut()
-                .for_each(|value| *value *= 1.0 / (info.n as f64));
+                .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
 
         unsafe {
@@ -349,8 +323,8 @@ impl RealToComplexFft3D for f64 {
             FFTW_ESTIMATE
         )))?);
 
-        let it_in_ = in_.chunks_exact_mut(info.n);
-        let it_out = out.chunks_exact_mut(info.n_sub);
+        let it_in_ = in_.chunks_exact_mut(info.n_input);
+        let it_out = out.chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             unsafe { ffi::fftw_execute_dft_r2c(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
@@ -377,15 +351,15 @@ impl RealToComplexFft3D for f64 {
             FFTW_ESTIMATE
         )))?);
 
-        let it_in_ = in_.chunks_exact_mut(info.n_sub);
-        let it_out = out.chunks_exact_mut(info.n);
+        let it_in_ = in_.chunks_exact_mut(info.n_output);
+        let it_out = out.chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
             unsafe { ffi::fftw_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
-                .for_each(|value| *value *= 1.0 / (info.n as f64));
+                .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
 
         unsafe {
@@ -430,11 +404,43 @@ impl RealToComplexFft3D for f64 {
 
         // Normalise
         out.iter_mut()
-            .for_each(|value| *value *= 1.0 / (info.n as f64));
+            .for_each(|value| *value *= 1.0 / (info.n_input as f64));
 
         unsafe {
             ffi::fftw_destroy_plan(plan.0);
         };
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::RealToComplexFft3D;
+    use num::traits::Zero;
+    use rlst::c64;
+
+    #[test]
+    fn test_r2c2r_identity() {
+        let nd = 3;
+        let n = nd * nd * nd;
+        let n_sub = nd * nd * (nd / 2 + 1);
+        let mut a = vec![0.0; n];
+        let mut b = vec![c64::zero(); n_sub];
+
+        for (i, a_i) in a.iter_mut().enumerate().take(n) {
+            *a_i = i as f64;
+        }
+
+        f64::r2c(&mut a, &mut b, &[nd, nd, nd]).unwrap();
+        f64::c2r(&mut b, &mut a, &[nd, nd, nd]).unwrap();
+
+        for (i, &v) in a.iter().enumerate() {
+            let expected = i as f64;
+            let dif = (v - expected).abs();
+            if dif > 1e-7 {
+                panic!("Large difference: v={}, dif={}", v, dif);
+            }
+        }
     }
 }
