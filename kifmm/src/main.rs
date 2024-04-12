@@ -1,11 +1,14 @@
-use green_kernels::{
-    helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, types::EvalType,
-};
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
 use kifmm::{
-    new_fmm::types::{BlasFieldTranslation, FftFieldTranslation, KiFmm, SingleNodeBuilder},
+    new_fmm::types::{BlasFieldTranslation, SingleNodeBuilder},
+    traits::fmm::SourceTranslation,
     tree::helpers::points_fixture,
 };
+use num::One;
 use rlst::{c64, rlst_dynamic_array2, RawAccessMut};
+
+extern crate blas_src;
+extern crate lapack_src;
 
 fn main() {
     let nsources = 1000;
@@ -15,16 +18,21 @@ fn main() {
 
     // FMM parameters
     let n_crit = Some(150);
-    let expansion_order = 5;
+    let expansion_order = 2;
     let sparse = true;
 
     // FFT based M2L for a vector of charges
     let nvecs = 1;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+
+    // let tmp = vec![1.0; nsources * nvecs];
+    // let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+    // charges.data_mut().copy_from_slice(&tmp);
+    // let kernel = Laplace3dKernel::<f64>::new();
+
+    let tmp = vec![c64::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
-    let kernel = Laplace3dKernel::<f64>::new();
-    // let kernel = Helmholtz3dKernel::<c64>::new(1.0);
+    let kernel = Helmholtz3dKernel::<c64>::new(1.0);
 
     let fmm = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
@@ -34,10 +42,13 @@ fn main() {
             expansion_order,
             kernel,
             EvalType::Value,
-            FftFieldTranslation::default(),
+            BlasFieldTranslation::default(),
         )
         .unwrap()
         .build()
         .unwrap();
-    // .parameters();
+
+    fmm.p2m();
+
+    // println!("HERE {:?}", fmm.multipoles);
 }

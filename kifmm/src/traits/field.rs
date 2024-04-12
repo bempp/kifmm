@@ -2,8 +2,6 @@
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
-use crate::{Float, RlstScalarFloat};
-
 use super::tree::Domain;
 
 /// Marker trait for field translations
@@ -19,6 +17,7 @@ where
     Self: SourceToTargetData,
     Self::Scalar: RlstScalar,
 {
+    /// Scalar type
     type Scalar;
 
     /// Kernel function associated with field translation

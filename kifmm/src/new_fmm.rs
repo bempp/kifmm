@@ -1,6 +1,9 @@
 pub mod builder;
 pub mod constants;
+pub mod helpers;
+pub mod pinv;
 mod send_ptr;
+mod tree;
 pub mod types;
 
 mod field_translation;

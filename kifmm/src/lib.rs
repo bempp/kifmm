@@ -133,3 +133,33 @@ impl RlstScalarFloatMpi for f32 {}
 
 impl RlstScalarComplexFloat for c64 {}
 impl RlstScalarComplexFloat for c32 {}
+
+/// Machine precision
+pub trait Epsilon {
+    /// Returns epsilon, a small positive value.
+    fn epsilon() -> Self;
+}
+
+impl Epsilon for f32 {
+    fn epsilon() -> Self {
+        f32::EPSILON
+    }
+}
+
+impl Epsilon for f64 {
+    fn epsilon() -> Self {
+        f64::EPSILON
+    }
+}
+
+impl Epsilon for c32 {
+    fn epsilon() -> Self {
+        f32::EPSILON.into()
+    }
+}
+
+impl Epsilon for c64 {
+    fn epsilon() -> Self {
+        f64::EPSILON.into()
+    }
+}

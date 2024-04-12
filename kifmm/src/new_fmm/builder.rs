@@ -1,41 +1,41 @@
 //! Builder objects to construct FMMs
-// use crate::fmm::helpers::{
-//     coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
-//     leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, ncoeffs_kifmm,
-//     potential_pointers,
-// };
-use crate::new_fmm::{
-    // pinv::pinv,
-    types::{Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
+use crate::new_fmm::helpers::{
+    coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales,
+    leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, ncoeffs_kifmm,
+    potential_pointers,
+};
+use crate::{
+    new_fmm::types::{
+        Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree,
+    },
+    Epsilon,
 };
 
 use crate::traits::field::ConfigureSourceToTargetData;
 use crate::traits::tree::FmmTreeNode;
-use crate::traits::{
-    field::SourceToTargetData,
-    tree::{FmmTree, Tree},
-};
+use crate::traits::{field::SourceToTargetData as SourceToTargetDataTrait, tree::Tree};
 use crate::tree::{
     constants::{ALPHA_INNER, ALPHA_OUTER},
     types::{Domain, MortonKey, SingleNodeTree},
 };
-use crate::{Float, RlstScalarFloat};
-use green_kernels::{traits::Kernel, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use rlst::{
     empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
-use super::constants::DEFAULT_NCRIT;
+use super::{constants::DEFAULT_NCRIT, pinv::pinv};
 
-impl<Scalar, Kern, SourceToTarget> SingleNodeBuilder<Scalar, Kern, SourceToTarget>
+impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
-    Scalar: RlstScalar + Default,
-    <Scalar as RlstScalar>::Real: Default,
-    Kern: Kernel<T = Scalar> + Clone + Default,
-    SourceToTarget: ConfigureSourceToTargetData<Scalar = Scalar, Kernel = Kern, Domain = Domain<Scalar::Real>>
+    Scalar: RlstScalar + Default + Epsilon,
+    <Scalar as RlstScalar>::Real: Default + Epsilon,
+    Kernel: KernelTrait<T = Scalar> + Clone + Default,
+    SourceToTargetData: ConfigureSourceToTargetData<Scalar = Scalar, Kernel = Kernel, Domain = Domain<Scalar::Real>>
         + Default,
+    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
+    /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
         Self {
             tree: None,
@@ -50,7 +50,13 @@ where
         }
     }
 
-    /// Foo
+    /// Associate FMM builder with an FMM Tree
+    ///
+    /// # Arguments
+    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
+    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
+    /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
+    /// * `sparse` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
         mut self,
         sources: &Coordinates<Scalar::Real>,
@@ -106,13 +112,20 @@ where
         }
     }
 
+    /// For an FMM builder with an associated FMM tree, specify simulation specific parameters
+    ///
+    /// # Arguments
+    /// * `charges` - 2D RLST array, of dimensions `[ncharges, nvecs]` where each of `nvecs` is associated with `ncharges`
+    /// * `expansion_order` - The expansion order of the FMM
+    /// * `kernel` - The kernel associated with this FMM
+    /// * `eval_type` - Either `ValueDeriv` - to evaluate potentials and gradients, or `Value` to evaluate potentials alone
     pub fn parameters(
         mut self,
-        charges: &Charges<Scalar::Real>,
+        charges: &Charges<Scalar>,
         expansion_order: usize,
-        kernel: Kern,
+        kernel: Kernel,
         eval_type: EvalType,
-        mut source_to_target: SourceToTarget,
+        mut source_to_target: SourceToTargetData,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -129,19 +142,17 @@ where
                 .all_global_indices()
                 .unwrap();
 
-            // let [_ncharges, nmatvecs] = charges.shape();
+            let [_ncharges, nmatvecs] = charges.shape();
 
-            // self.charges = Some(map_charges(global_indices, charges));
+            self.charges = Some(map_charges(global_indices, charges));
 
-            let nmatvecs = 1;
             if nmatvecs > 1 {
                 self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
             self.expansion_order = Some(expansion_order);
-            // self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
-            self.ncoeffs = Some(98);
+            self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
 
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);
@@ -163,7 +174,8 @@ where
         }
     }
 
-    pub fn build(self) -> Result<KiFmm<Scalar, Kern, SourceToTarget>, std::io::Error> {
+    /// Finalize and build the single node FMM
+    pub fn build(self) -> Result<KiFmm<Scalar, Kernel, SourceToTargetData>, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -188,21 +200,253 @@ where
 
             result.set_source_and_target_operator_data();
 
-            result.set_metadata();
+            result.set_metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
 
             Ok(result)
         }
     }
 }
 
-impl<Scalar, Kern, SourceToTarget> KiFmm<Scalar, Kern, SourceToTarget>
+impl<Scalar, Kernel, SourceToTargetData> KiFmm<Scalar, Kernel, SourceToTargetData>
 where
-    Scalar: RlstScalar,
-    Kern: Kernel<T = Scalar>,
-    SourceToTarget: SourceToTargetData,
+    Scalar: RlstScalar + Epsilon + Default,
+    Kernel: KernelTrait<T = Scalar>,
+    SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
+    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
-    fn set_source_and_target_operator_data(&mut self) {}
+    fn set_source_and_target_operator_data(&mut self) {
+        let root = MortonKey::<Scalar::Real>::root();
 
-    fn set_metadata(&mut self) {}
+        // Cast surface parameters
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
+        let domain = self.tree.domain;
+
+        // Compute required surfaces
+        let upward_equivalent_surface =
+            root.surface_grid(self.expansion_order, &domain, alpha_inner);
+        let upward_check_surface = root.surface_grid(self.expansion_order, &domain, alpha_outer);
+        let downward_equivalent_surface =
+            root.surface_grid(self.expansion_order, &domain, alpha_outer);
+        let downward_check_surface = root.surface_grid(self.expansion_order, &domain, alpha_inner);
+
+        let nequiv_surface = upward_equivalent_surface.len() / self.dim;
+        let ncheck_surface = upward_check_surface.len() / self.dim;
+
+        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+        // As well as estimating their inverses using SVD
+        let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+        self.kernel.assemble_st(
+            EvalType::Value,
+            &upward_equivalent_surface[..],
+            &upward_check_surface[..],
+            uc2e_t.data_mut(),
+        );
+
+        // Need to transpose so that rows correspond to targets and columns to sources
+        let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+        uc2e.fill_from(uc2e_t.transpose());
+
+        let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+        self.kernel.assemble_st(
+            EvalType::Value,
+            &downward_equivalent_surface[..],
+            &downward_check_surface[..],
+            dc2e_t.data_mut(),
+        );
+
+        // Need to transpose so that rows correspond to targets and columns to sources
+        let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+        dc2e.fill_from(dc2e_t.transpose());
+
+        let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = Scalar::from_real(s[i]);
+        }
+
+        let uc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+        let uc2e_inv_2 = ut;
+
+        let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = Scalar::from_real(s[i]);
+        }
+
+        let dc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+        let dc2e_inv_2 = ut;
+
+        // Calculate M2M and L2L operator matrices
+        let children = root.children();
+        let mut m2m = rlst_dynamic_array2!(Scalar, [nequiv_surface, 8 * nequiv_surface]);
+        let mut m2m_vec = Vec::new();
+        let mut l2l = Vec::new();
+
+        for (i, child) in children.iter().enumerate() {
+            let child_upward_equivalent_surface =
+                child.surface_grid(self.expansion_order, &domain, alpha_inner);
+            let child_downward_check_surface =
+                child.surface_grid(self.expansion_order, &domain, alpha_inner);
+
+            let mut pc2ce_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &child_upward_equivalent_surface,
+                &upward_check_surface,
+                pc2ce_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut pc2ce = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+            pc2ce.fill_from(pc2ce_t.transpose());
+
+            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                uc2e_inv_1.view(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2.view(), pc2ce.view()),
+            );
+            let l = i * nequiv_surface * nequiv_surface;
+            let r = l + nequiv_surface * nequiv_surface;
+
+            m2m.data_mut()[l..r].copy_from_slice(tmp.data());
+            m2m_vec.push(tmp);
+
+            let mut cc2pe_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &downward_equivalent_surface,
+                &child_downward_check_surface,
+                cc2pe_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut cc2pe = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+            cc2pe.fill_from(cc2pe_t.transpose());
+            let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                dc2e_inv_1.view(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2.view(), cc2pe.view()),
+            );
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+
+            l2l.push(tmp);
+        }
+
+        self.source = m2m;
+        self.source_vec = m2m_vec;
+        self.target_vec = l2l;
+        self.dc2e_inv_1 = dc2e_inv_1;
+        self.dc2e_inv_2 = dc2e_inv_2;
+        self.uc2e_inv_1 = uc2e_inv_1;
+        self.uc2e_inv_2 = uc2e_inv_2;
+    }
+
+    fn set_metadata(&mut self, eval_type: EvalType, charges: &Charges<Scalar>) {
+        let alpha_outer = Scalar::real(ALPHA_OUTER);
+
+        // Check if computing potentials, or potentials and derivatives
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => self.dim + 1,
+        };
+
+        // Check if we are computing matvec or matmul
+        let [_ncharges, nmatvecs] = charges.shape();
+        let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
+        let nsource_keys = self.tree.source_tree.n_keys_tot().unwrap();
+        let ntarget_keys = self.tree.target_tree.n_keys_tot().unwrap();
+        let ntarget_leaves = self.tree.target_tree.n_leaves().unwrap();
+        let nsource_leaves = self.tree.source_tree.n_leaves().unwrap();
+
+        // Buffers to store all multipole and local data
+        let multipoles = vec![Scalar::default(); self.ncoeffs * nsource_keys * nmatvecs];
+        let locals = vec![Scalar::default(); self.ncoeffs * ntarget_keys * nmatvecs];
+
+        // Index pointers of multipole and local data, indexed by level
+        let level_index_pointer_multipoles = level_index_pointer(&self.tree.source_tree);
+        let level_index_pointer_locals = level_index_pointer(&self.tree.target_tree);
+
+        // Buffer to store evaluated potentials and/or gradients at target points
+        let potentials = vec![Scalar::default(); ntarget_points * eval_size * nmatvecs];
+
+        // Kernel scale at each target and source leaf
+        let source_leaf_scales = leaf_scales(&self.tree.source_tree, self.ncoeffs);
+
+        // Pre compute check surfaces
+        let leaf_upward_surfaces_sources = leaf_surfaces(
+            &self.tree.source_tree,
+            self.ncoeffs,
+            alpha_outer,
+            self.expansion_order,
+        );
+        let leaf_upward_surfaces_targets = leaf_surfaces(
+            &self.tree.target_tree,
+            self.ncoeffs,
+            alpha_outer,
+            self.expansion_order,
+        );
+
+        // Mutable pointers to multipole and local data, indexed by level
+        let level_multipoles =
+            level_expansion_pointers(&self.tree.source_tree, self.ncoeffs, nmatvecs, &multipoles);
+
+        let level_locals =
+            level_expansion_pointers(&self.tree.source_tree, self.ncoeffs, nmatvecs, &locals);
+
+        // Mutable pointers to multipole and local data only at leaf level
+        let leaf_multipoles = leaf_expansion_pointers(
+            &self.tree.source_tree,
+            self.ncoeffs,
+            nmatvecs,
+            nsource_leaves,
+            &multipoles,
+        );
+
+        let leaf_locals = leaf_expansion_pointers(
+            &self.tree.target_tree,
+            self.ncoeffs,
+            nmatvecs,
+            ntarget_leaves,
+            &locals,
+        );
+
+        // Mutable pointers to potential data at each target leaf
+        let potentials_send_pointers = potential_pointers(
+            &self.tree.target_tree,
+            nmatvecs,
+            ntarget_leaves,
+            ntarget_points,
+            eval_size,
+            &potentials,
+        );
+
+        // Index pointer of charge data at each target leaf
+        let charge_index_pointer_targets = coordinate_index_pointer(&self.tree.target_tree);
+        let charge_index_pointer_sources = coordinate_index_pointer(&self.tree.source_tree);
+
+        // Set data
+        self.multipoles = multipoles;
+        self.locals = locals;
+        self.leaf_multipoles = leaf_multipoles;
+        self.level_multipoles = level_multipoles;
+        self.leaf_locals = leaf_locals;
+        self.level_locals = level_locals;
+        self.level_index_pointer_locals = level_index_pointer_locals;
+        self.level_index_pointer_multipoles = level_index_pointer_multipoles;
+        self.potentials = potentials;
+        self.potentials_send_pointers = potentials_send_pointers;
+        self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
+        self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
+        self.charges = charges.data().to_vec();
+        self.charge_index_pointer_targets = charge_index_pointer_targets;
+        self.charge_index_pointer_sources = charge_index_pointer_sources;
+        self.leaf_scales_sources = source_leaf_scales;
+        self.kernel_eval_size = eval_size;
+    }
 }
