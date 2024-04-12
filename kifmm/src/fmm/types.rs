@@ -153,8 +153,6 @@ pub struct SendPtr<T> {
 ///
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
 /// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
-///
-///
 pub struct KiFmm<T, U, V, W>
 where
     T: FmmTree<Tree = SingleNodeTree<W::Real>>,

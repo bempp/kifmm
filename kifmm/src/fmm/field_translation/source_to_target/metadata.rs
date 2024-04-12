@@ -448,7 +448,7 @@ where
             }
         }
 
-        let result = FftMetadata {
+        let result = fftmetadata {
             kernel_data,
             kernel_data_f: kernel_data_ft,
         };
