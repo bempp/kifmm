@@ -4,7 +4,7 @@ use green_kernels::{
 use kifmm::{
     new_fmm::types::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder},
     traits::fmm::SourceTranslation,
-    tree::helpers::points_fixture,
+    tree::{helpers::points_fixture, types::MortonKey}, Fmm,
 };
 use num::traits::One;
 use rlst::{c64, rlst_dynamic_array2, RawAccessMut};
@@ -31,10 +31,10 @@ fn main() {
     charges.data_mut().copy_from_slice(&tmp);
     let kernel = Laplace3dKernel::<f64>::new();
 
-    // let tmp = vec![c64::one(); nsources * nvecs];
-    // let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-    // charges.data_mut().copy_from_slice(&tmp);
-    // let kernel = Helmholtz3dKernel::<c64>::new(1.0);
+    let tmp = vec![c64::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+    let kernel = Helmholtz3dKernel::<c64>::new(1.0);
 
     let fmm = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
@@ -50,7 +50,7 @@ fn main() {
         .build()
         .unwrap();
 
-    fmm.p2m();
+    fmm.evaluate();
 
-    // println!("HERE {:?}", fmm.multipoles);
+    println!("HERE {:?}", fmm.multipole(&MortonKey::root()));
 }

@@ -5,7 +5,8 @@ use rlst::RlstScalar;
 use super::tree::Domain;
 
 /// Marker trait for field translations
-pub trait SourceToTargetData {
+pub trait SourceToTargetData
+{
     /// Metadata for applying each to source to target translation, depends on both the kernel
     /// and translation method
     type Metadata;
