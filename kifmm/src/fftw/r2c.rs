@@ -6,8 +6,8 @@ use num_complex::Complex;
 
 use rayon::prelude::*;
 
+use super::helpers::validate_plan;
 use super::types::{FftError, Plan32, Plan64, ShapeInfo};
-use super::validate_plan;
 use crate::traits::fftw::RealToComplexFft3D;
 
 use crate::excall;

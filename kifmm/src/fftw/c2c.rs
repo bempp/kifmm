@@ -6,8 +6,8 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{c32, c64, RlstScalar};
 
+use super::helpers::validate_plan;
 use super::types::{FftError, Plan32, Plan64, ShapeInfo, Sign};
-use super::validate_plan;
 use crate::traits::fftw::ComplexToComplexFft3D;
 
 use crate::excall;
