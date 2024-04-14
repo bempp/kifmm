@@ -134,12 +134,7 @@ impl RealToComplexFft3D for f32 {
         out: &mut [Complex<Self>],
         shape: &[usize],
     ) -> Result<(), FftError> {
-        // let size: usize = shape.iter().product();
-        // let size_d = shape.last().unwrap();
-        // let size_real = (size / size_d) * (size_d / 2 + 1);
-
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
             shape.len() as i32,
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
@@ -217,7 +212,6 @@ impl RealToComplexFft3D for f32 {
 
     fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize]) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
             shape.len() as i32,
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
@@ -307,12 +301,7 @@ impl RealToComplexFft3D for f64 {
         out: &mut [Complex<Self>],
         shape: &[usize],
     ) -> Result<(), FftError> {
-        // let size: usize = shape.iter().product();
-        // let size_d = shape.last().unwrap();
-        // let size_real = (size / size_d) * (size_d / 2 + 1);
-
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-
         let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_r2c(
             shape.len() as i32,
             shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,

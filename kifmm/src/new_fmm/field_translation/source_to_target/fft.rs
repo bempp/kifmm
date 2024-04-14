@@ -4,8 +4,7 @@ use itertools::Itertools;
 use num::Zero;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MultInto, MultIntoResize, RandomAccessMut, RawAccess,
-    RlstScalar,
+    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -118,10 +117,6 @@ where
                 let ntargets = targets.len();
                 let nsources = sources.len();
 
-                // Size of convolution grid
-                let nconv = 2 * self.expansion_order - 1;
-                let nconv_pad = nconv + 1;
-
                 // Find parents of targets
                 let targets_parents: HashSet<MortonKey<_>> =
                     targets.iter().map(|target| target.parent()).collect();
@@ -133,11 +128,12 @@ where
                     sources.iter().map(|source| source.parent()).collect();
                 let nsources_parents = sources_parents.len();
 
-                // Size of FFT sequence
-                let fft_size = nconv_pad * nconv_pad * nconv_pad;
+                // Size of input FFT sequence
+                let shape_in = <Scalar as Dft>::shape_in(self.expansion_order);
+                let size_in: usize = <Scalar as Dft>::size_in(self.expansion_order);
 
-                // Size of real FFT sequence
-                let fft_size_real = nconv_pad * nconv_pad * (nconv_pad / 2 + 1);
+                // Size of transformed FFT sequence
+                let size_out = <Scalar as Dft>::size_out(self.expansion_order);
 
                 // Calculate displacements of multipole data with respect to source tree
                 let all_displacements = self.displacements(level);
@@ -153,13 +149,13 @@ where
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
                 let mut signals_hat_f_buffer =
-                    vec![Scalar::zero(); fft_size_real * (nsources + nzeros) * 2];
+                    vec![Scalar::zero(); size_out * (nsources + nzeros) * 2];
                 let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
                     let ptr = signals_hat_f_buffer.as_mut_ptr()
                         as *mut <Scalar as AsComplex>::ComplexType;
                     signals_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, fft_size_real * (nsources + nzeros));
+                        std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
                 }
 
                 // A thread safe mutable pointer for saving to this vector
@@ -180,13 +176,13 @@ where
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
                 let mut check_potentials_hat_f_buffer =
-                    vec![Scalar::zero(); 2 * fft_size_real * ntargets];
+                    vec![Scalar::zero(); 2 * size_out * ntargets];
                 let check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
                     let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
                         as *mut <Scalar as AsComplex>::ComplexType;
                     check_potentials_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, fft_size_real * ntargets);
+                        std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
                 }
 
                 // Amount to scale the application of the kernel by
@@ -197,16 +193,15 @@ where
                 let kernel_data_ft = &self.source_to_target.metadata.kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
-                let mut check_potential_hat = vec![Scalar::zero(); fft_size_real * ntargets * 2];
+                let mut check_potential_hat = vec![Scalar::zero(); size_out * ntargets * 2];
 
                 // Allocate buffer to store the check potentials in box order
-                let mut check_potential = vec![Scalar::zero(); fft_size * ntargets];
+                let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
                 let check_potential_hat_c;
                 unsafe {
                     let ptr =
                         check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
-                    check_potential_hat_c =
-                        std::slice::from_raw_parts_mut(ptr, fft_size_real * ntargets)
+                    check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
                 }
 
                 // 1. Compute FFT of all multipoles in source boxes at this level
@@ -217,12 +212,12 @@ where
                         .for_each(|(i, multipole_chunk)| {
                             // Place Signal on convolution grid
                             let mut signal_chunk =
-                                vec![Scalar::zero(); fft_size * NSIBLINGS * chunk_size_pre_proc];
+                                vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
                                 let multipole =
                                     &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
-                                let signal = &mut signal_chunk[i * fft_size..(i + 1) * fft_size];
+                                let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
                                 for (surf_idx, &conv_idx) in
                                     self.source_to_target.surf_to_conv_map.iter().enumerate()
                                 {
@@ -233,7 +228,7 @@ where
                             // Temporary buffer to hold results of FFT
                             let signal_hat_chunk_buffer = vec![
                                     <Scalar as AsComplex>::ComplexType::zero();
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc * 2
+                                    size_out * NSIBLINGS * chunk_size_pre_proc * 2
                                 ];
                             let signal_hat_chunk_c;
                             unsafe {
@@ -241,21 +236,21 @@ where
                                     as *mut <Scalar as AsComplex>::ComplexType;
                                 signal_hat_chunk_c = std::slice::from_raw_parts_mut(
                                     ptr,
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc,
+                                    size_out * NSIBLINGS * chunk_size_pre_proc,
                                 );
                             }
 
                             let _ = Scalar::forward_dft_batch(
                                 &mut signal_chunk,
                                 signal_hat_chunk_c,
-                                &[nconv_pad, nconv_pad, nconv_pad],
+                                &shape_in,
                             );
 
                             // Re-order the temporary buffer into frequency order before flushing to main memory
                             let signal_hat_chunk_f_buffer =
                                 vec![
                                     Scalar::zero();
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc * 2
+                                    size_out * NSIBLINGS * chunk_size_pre_proc * 2
                                 ];
                             let signal_hat_chunk_f_c;
                             unsafe {
@@ -263,14 +258,14 @@ where
                                     as *mut <Scalar as AsComplex>::ComplexType;
                                 signal_hat_chunk_f_c = std::slice::from_raw_parts_mut(
                                     ptr,
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc,
+                                    size_out * NSIBLINGS * chunk_size_pre_proc,
                                 );
                             }
 
-                            for i in 0..fft_size_real {
+                            for i in 0..size_out {
                                 for j in 0..NSIBLINGS * chunk_size_pre_proc {
                                     signal_hat_chunk_f_c[NSIBLINGS * chunk_size_pre_proc * i + j] =
-                                        signal_hat_chunk_c[fft_size_real * j + i]
+                                        signal_hat_chunk_c[size_out * j + i]
                                 }
                             }
 
@@ -281,7 +276,7 @@ where
                                 // Pointer to storage buffer for frequency ordered FFT of signals
                                 let ptr = signals_hat_f_ptr;
 
-                                for i in 0..fft_size_real {
+                                for i in 0..size_out {
                                     let frequency_offset = i * (nsources + nzeros);
 
                                     // Head of buffer for each frequency
@@ -308,7 +303,7 @@ where
 
                 // 2. Compute the Hadamard product
                 {
-                    (0..fft_size_real)
+                    (0..size_out)
                         .into_par_iter()
                         .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
                         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
@@ -352,11 +347,11 @@ where
                 // 3. Post process to find local expansions at target boxes
                 {
                     check_potential_hat_c
-                        .par_chunks_exact_mut(fft_size_real)
+                        .par_chunks_exact_mut(size_out)
                         .enumerate()
                         .for_each(|(i, check_potential_hat_chunk)| {
                             // Lookup all frequencies for this target box
-                            for j in 0..fft_size_real {
+                            for j in 0..size_out {
                                 check_potential_hat_chunk[j] =
                                     check_potentials_hat_f[j * ntargets + i]
                             }
@@ -366,11 +361,11 @@ where
                     let _ = Scalar::backward_dft_batch_par(
                         check_potential_hat_c,
                         &mut check_potential,
-                        &[nconv_pad, nconv_pad, nconv_pad],
+                        &shape_in,
                     );
 
                     check_potential
-                        .par_chunks_exact(NSIBLINGS * fft_size)
+                        .par_chunks_exact(NSIBLINGS * size_in)
                         .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
                         .for_each(|(check_potential_chunk, local_ptrs)| {
                             // Map to surface grid
@@ -382,7 +377,7 @@ where
                                     self.source_to_target.conv_to_surf_map.iter().enumerate()
                                 {
                                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
-                                        check_potential_chunk[i * fft_size + conv_idx];
+                                        check_potential_chunk[i * size_in + conv_idx];
                                 }
                             }
 

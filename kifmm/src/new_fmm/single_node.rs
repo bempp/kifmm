@@ -6,10 +6,8 @@ use rlst::{RawAccess, RlstScalar, Shape};
 use crate::{
     new_fmm::types::{FmmEvalType, KiFmm},
     traits::{
-        fftw::Dft,
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{SourceToTargetTranslation, SourceTranslation, TargetTranslation},
-        general::AsComplex,
         tree::{FmmTree, Tree},
     },
     Fmm, SingleNodeFmmTree,

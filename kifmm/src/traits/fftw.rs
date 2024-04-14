@@ -221,6 +221,18 @@ pub trait Dft
 where
     Self: Sized + RlstScalar + DftType,
 {
+    /// Data shape
+    fn shape_in(expansion_order: usize) -> [usize; 3];
+
+    /// Size
+    fn size_in(expansion_order: usize) -> usize;
+
+    /// Transformed shape
+    fn shape_out(expansion_order: usize) -> [usize; 3];
+
+    /// Transform size
+    fn size_out(expansion_order: usize) -> usize;
+
     /// Forward transform, if real data is used as input computes R2C dft
     fn forward_dft(
         in_: &mut [<Self as DftType>::InputType],
@@ -265,6 +277,28 @@ where
 }
 
 impl Dft for f32 {
+    fn shape_in(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p]
+    }
+
+    fn size_in(expansion_order: usize) -> usize {
+        Self::shape_in(expansion_order).iter().product()
+    }
+
+    fn shape_out(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p / 2 + 1]
+    }
+
+    fn size_out(expansion_order: usize) -> usize {
+        Self::shape_out(expansion_order).iter().product()
+    }
+
     fn forward_dft(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
@@ -321,6 +355,28 @@ impl Dft for f32 {
 }
 
 impl Dft for f64 {
+    fn size_in(expansion_order: usize) -> usize {
+        Self::shape_in(expansion_order).iter().product()
+    }
+
+    fn shape_in(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p]
+    }
+
+    fn shape_out(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p / 2 + 1]
+    }
+
+    fn size_out(expansion_order: usize) -> usize {
+        Self::shape_out(expansion_order).iter().product()
+    }
+
     fn forward_dft(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
@@ -377,6 +433,28 @@ impl Dft for f64 {
 }
 
 impl Dft for c32 {
+    fn size_in(expansion_order: usize) -> usize {
+        Self::shape_in(expansion_order).iter().product()
+    }
+
+    fn shape_in(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p]
+    }
+
+    fn shape_out(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p]
+    }
+
+    fn size_out(expansion_order: usize) -> usize {
+        Self::shape_out(expansion_order).iter().product()
+    }
+
     fn forward_dft(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
@@ -433,6 +511,28 @@ impl Dft for c32 {
 }
 
 impl Dft for c64 {
+    fn size_in(expansion_order: usize) -> usize {
+        Self::shape_in(expansion_order).iter().product()
+    }
+
+    fn shape_in(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p]
+    }
+
+    fn shape_out(expansion_order: usize) -> [usize; 3] {
+        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        let pad_size = 1;
+        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        [p, p, p]
+    }
+
+    fn size_out(expansion_order: usize) -> usize {
+        Self::shape_out(expansion_order).iter().product()
+    }
+
     fn forward_dft(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],

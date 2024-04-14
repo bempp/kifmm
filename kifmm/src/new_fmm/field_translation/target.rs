@@ -9,7 +9,7 @@ use rlst::{
     RawAccessMut, RlstScalar,
 };
 
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     new_fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},

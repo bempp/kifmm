@@ -209,10 +209,13 @@ where
 
     fn operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        let size_real = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
+        // let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
+        // let pad_size = 1;
+        // let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
+        // let transform_size = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
+        let shape = <Self::Scalar as Dft>::shape_in(expansion_order);
+        let transform_shape = <Self::Scalar as Dft>::shape_out(expansion_order);
+        let transform_size = <Self::Scalar as Dft>::size_out(expansion_order);
 
         // Pick a point in the middle of the domain
         let two = Scalar::real(2.0);
@@ -320,25 +323,21 @@ where
                     ];
 
                     // Compute Green's fct evaluations
-                    let kernel = self.compute_kernel(expansion_order, &conv_grid, kernel_point);
-
-                    let mut kernel = flip3(&kernel);
+                    let mut kernel =
+                        flip3(&self.compute_kernel(expansion_order, &conv_grid, kernel_point));
 
                     // Compute FFT of padded kernel
                     let mut kernel_hat =
-                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, [p, p, p / 2 + 1]);
+                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
                     // TODO: is kernel_hat the transpose of what it used to be?
-                    let _ =
-                        Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[p, p, p]);
+                    let _ = Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
                     // Fill with zeros when interaction doesn't exist
-                    let n = 2 * expansion_order - 1;
-                    let p = n + 1;
                     let kernel_hat_zeros =
-                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, [p, p, p / 2 + 1]);
+                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
                     kernel_data_vec[i].push(kernel_hat_zeros);
                 }
             }
@@ -347,7 +346,7 @@ where
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
         let mut kernel_data =
             vec![
-                vec![<Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * size_real];
+                vec![<Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * transform_size];
                 halo_children.len()
             ];
 
@@ -355,8 +354,8 @@ where
         for i in 0..halo_children.len() {
             // For each unique interaction
             for j in 0..NSIBLINGS_SQUARED {
-                let offset = j * size_real;
-                kernel_data[i][offset..offset + size_real]
+                let offset = j * transform_size;
+                kernel_data[i][offset..offset + transform_size]
                     .copy_from_slice(kernel_data_vec[i][j].data())
             }
         }
@@ -369,12 +368,12 @@ where
         }
         for i in 0..halo_children.len() {
             let current_vector = &kernel_data[i];
-            for l in 0..size_real {
+            for l in 0..transform_size {
                 // halo child
                 for k in 0..NSIBLINGS {
                     // sibling
                     for j in 0..NSIBLINGS {
-                        let index = j * size_real * 8 + k * size_real + l;
+                        let index = j * transform_size * 8 + k * transform_size + l;
                         kernel_data_f[i].push(current_vector[index]);
                     }
                 }
@@ -383,7 +382,7 @@ where
 
         // Transpose results for better cache locality in application
         let mut kernel_data_ft = Vec::new();
-        for freq in 0..size_real {
+        for freq in 0..transform_size {
             let frequency_offset = NSIBLINGS_SQUARED * freq;
             for kernel_f in kernel_data_f.iter().take(NHALO) {
                 let k_f =
