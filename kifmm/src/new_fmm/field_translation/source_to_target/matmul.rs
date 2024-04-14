@@ -1,8 +1,5 @@
 //! Implementations of 8x8 matrix multiplication operation during Hadamard product in FFT based M2L operations.
-use num::Zero;
 use rlst::RlstScalar;
-
-use crate::traits::general::AsComplex;
 
 /// The 8x8 matmul operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
 ///
@@ -12,13 +9,9 @@ use crate::traits::general::AsComplex;
 /// * `save_locations` - Reference to where the check potential, in frequency space, is being stored for this frequency and set of siblings.
 /// * `scale` - The scaling factor of the M2L translation.
 #[inline(always)]
-pub fn matmul8x8<U>(
-    kernel: &[<U as AsComplex>::ComplexType],
-    signal: &[<U as AsComplex>::ComplexType],
-    save_locations: &mut [<U as AsComplex>::ComplexType],
-    scale: <U as AsComplex>::ComplexType,
-) where
-    U: RlstScalar + AsComplex,
+pub fn matmul8x8<U>(kernel: &[U], signal: &[U], save_locations: &mut [U], scale: U)
+where
+    U: RlstScalar,
 {
     let s1 = signal[0];
     let s2 = signal[1];
@@ -30,8 +23,8 @@ pub fn matmul8x8<U>(
     let s8 = signal[7];
 
     for i in 0..4 {
-        let mut sum1 = <U as AsComplex>::ComplexType::zero();
-        let mut sum2 = <U as AsComplex>::ComplexType::zero();
+        let mut sum1 = U::zero();
+        let mut sum2 = U::zero();
         let i1 = 2 * i;
         let i2 = 2 * i + 1;
 

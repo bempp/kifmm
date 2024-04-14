@@ -330,7 +330,7 @@ where
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
 
-                                            matmul8x8::<Scalar>(
+                                            matmul8x8::<<Scalar as AsComplex>::ComplexType>(
                                                 k_f,
                                                 s_f,
                                                 &mut save_locations
