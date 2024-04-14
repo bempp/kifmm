@@ -209,10 +209,6 @@ where
 
     fn operator_data(&mut self, expansion_order: usize, domain: Self::Domain) {
         // Parameters related to the FFT and Tree
-        // let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        // let pad_size = 1;
-        // let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        // let transform_size = p * p * (p / 2 + 1); // Number of Fourier coefficients when working with real data
         let shape = <Self::Scalar as Dft>::shape_in(expansion_order);
         let transform_shape = <Self::Scalar as Dft>::shape_out(expansion_order);
         let transform_size = <Self::Scalar as Dft>::size_out(expansion_order);
