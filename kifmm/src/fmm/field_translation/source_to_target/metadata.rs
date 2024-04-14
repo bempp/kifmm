@@ -999,8 +999,6 @@ mod test {
             &mut direct[..],
         );
 
-        println!("r {:?} \n d {:?}", result, direct);
-
         let abs_error: f64 = result
             .iter()
             .zip(direct.iter())

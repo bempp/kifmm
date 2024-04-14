@@ -53,7 +53,6 @@ fn validate_shape_c2r(
     let n: usize = in_shape.iter().product();
     let n_d = in_shape.last().unwrap();
     let n_sub = (n / n_d) * (n_d / 2 + 1);
-    println!("{:?} {:?} {:?}", in_len, out_len, 42);
 
     let valid = in_shape.len() == 3 && in_len % n_sub == 0 && out_len % n == 0;
     if valid {

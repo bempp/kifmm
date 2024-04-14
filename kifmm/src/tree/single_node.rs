@@ -852,8 +852,6 @@ mod test {
             )
             .0;
 
-        println!("HERE {:?}", leaves_to_points);
-
         // Test that a single octant contains all the points
         for (_, (l, r)) in leaves_to_points.iter() {
             // println!("HERE {:?} {:?}", r, l);

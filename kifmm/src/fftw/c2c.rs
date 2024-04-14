@@ -298,8 +298,6 @@ mod test {
         )
         .unwrap();
 
-        println!("a {:?}", a);
-
         for (i, &v) in a.iter().enumerate() {
             let expected = c64::new(i as f64, 0.);
             let dif = (v - expected).norm();
