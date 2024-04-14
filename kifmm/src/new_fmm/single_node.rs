@@ -1,5 +1,4 @@
 //! Single Node FMM
-
 use green_kernels::traits::Kernel as KernelTrait;
 use rlst::{RawAccess, RlstScalar, Shape};
 
@@ -212,6 +211,7 @@ where
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
     use green_kernels::{
@@ -221,7 +221,8 @@ mod test {
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, VectorContainer
+        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
+        RawAccessMut, RlstScalar, VectorContainer,
     };
 
     use crate::{
@@ -232,15 +233,18 @@ mod test {
 
     fn test_single_node_laplace_fmm_vector_helper<T: RlstScalar + Float + Default>(
         fmm: Box<
-        dyn Fmm<Scalar = T::Real, Kernel = Laplace3dKernel<T::Real>, Tree = SingleNodeFmmTree<T::Real>>
+            dyn Fmm<
+                Scalar = T::Real,
+                Kernel = Laplace3dKernel<T::Real>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         eval_type: EvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         threshold: T::Real,
-    )
-    where
-        T::Real: Default
+    ) where
+        T::Real: Default,
     {
         let eval_size = match eval_type {
             EvalType::Value => 1,
@@ -260,7 +264,6 @@ mod test {
             rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
         let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
         leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
 
         fmm.kernel().evaluate_st(
             eval_type,
@@ -533,7 +536,13 @@ mod test {
         fmm.evaluate();
 
         let fmm = Box::new(fmm);
-        test_single_node_laplace_fmm_vector_helper::<f64>(fmm, EvalType::Value, &sources, &charges, threshold_pot);
+        test_single_node_laplace_fmm_vector_helper::<f64>(
+            fmm,
+            EvalType::Value,
+            &sources,
+            &charges,
+            threshold_pot,
+        );
     }
 
     #[test]
