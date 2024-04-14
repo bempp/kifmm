@@ -228,8 +228,36 @@ where
         shape: &[usize],
     ) -> Result<(), FftError>;
 
+    /// Forward transform, if real data is used as input computes R2C dft
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Forward transform, if real data is used as input computes R2C dft
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
     /// Backward transform, if real data is used as input computes C2R dft
     fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft
+    fn backward_dft_batch_par(
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
@@ -246,12 +274,48 @@ impl Dft for f32 {
         Ok(())
     }
 
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f32::r2c_batch(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f32::r2c_batch_par(in_, out, shape)?;
+        Ok(())
+    }
+
     fn backward_dft(
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
     ) -> Result<(), FftError> {
         f32::c2r(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f32::c2r_batch(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch_par(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f32::c2r_batch_par(in_, out, shape)?;
         Ok(())
     }
 }
@@ -266,12 +330,48 @@ impl Dft for f64 {
         Ok(())
     }
 
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f64::r2c_batch(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f64::r2c_batch_par(in_, out, shape)?;
+        Ok(())
+    }
+
     fn backward_dft(
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
     ) -> Result<(), FftError> {
         f64::c2r(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f64::c2r_batch(in_, out, shape)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch_par(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        f64::c2r_batch_par(in_, out, shape)?;
         Ok(())
     }
 }
@@ -286,12 +386,48 @@ impl Dft for c32 {
         Ok(())
     }
 
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c32::c2c_batch(in_, out, shape, Sign::Forward)?;
+        Ok(())
+    }
+
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c32::c2c_batch_par(in_, out, shape, Sign::Forward)?;
+        Ok(())
+    }
+
     fn backward_dft(
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
     ) -> Result<(), FftError> {
         c32::c2c(in_, out, shape, Sign::Backward)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c32::c2c_batch(in_, out, shape, Sign::Backward)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch_par(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c32::c2c_batch_par(in_, out, shape, Sign::Backward)?;
         Ok(())
     }
 }
@@ -306,12 +442,48 @@ impl Dft for c64 {
         Ok(())
     }
 
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c64::c2c_batch(in_, out, shape, Sign::Forward)?;
+        Ok(())
+    }
+
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c64::c2c_batch_par(in_, out, shape, Sign::Forward)?;
+        Ok(())
+    }
+
     fn backward_dft(
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
     ) -> Result<(), FftError> {
         c64::c2c(in_, out, shape, Sign::Backward)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c64::c2c_batch(in_, out, shape, Sign::Backward)?;
+        Ok(())
+    }
+
+    fn backward_dft_batch_par(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError> {
+        c64::c2c_batch_par(in_, out, shape, Sign::Backward)?;
         Ok(())
     }
 }

@@ -6,8 +6,10 @@ use rlst::{RawAccess, RlstScalar, Shape};
 use crate::{
     new_fmm::types::{FmmEvalType, KiFmm},
     traits::{
+        fftw::Dft,
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::SourceTranslation,
+        fmm::{SourceToTargetTranslation, SourceTranslation, TargetTranslation},
+        general::AsComplex,
         tree::{FmmTree, Tree},
     },
     Fmm, SingleNodeFmmTree,
@@ -21,9 +23,10 @@ use super::{
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: SourceToTargetTranslation,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -126,9 +129,20 @@ where
         }
 
         // Downward pass
-        {}
+        {
+            for level in 2..=self.tree().target_tree().depth() {
+                if level > 2 {
+                    self.l2l(level);
+                }
+                self.m2l(level);
+                self.p2l(level);
+            }
 
-        // Leaf level computations
+            // Leaf level computation
+            self.m2p();
+            self.p2p();
+            self.l2p();
+        }
     }
 
     fn clear(&mut self, charges: &Charges<Self::Scalar>) {

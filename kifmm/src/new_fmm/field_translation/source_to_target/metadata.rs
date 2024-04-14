@@ -1,7 +1,7 @@
 //! Implementation of traits to compute metadata for field translation operations.
 use std::collections::HashSet;
 
-use green_kernels::{traits::Kernel, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
 use num::{Float, Zero};
 use rlst::{
@@ -41,11 +41,11 @@ fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(singular_values: &[T], thresho
     singular_values.len() - 1
 }
 
-impl<Scalar, Kern> FftFieldTranslation<Scalar, Kern>
+impl<Scalar, Kernel> FftFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar + AsComplex + Dft + Default,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    Kern: Kernel<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     /// Constructor for FFT based field translations
     pub fn new() -> Self {
@@ -177,27 +177,27 @@ where
     }
 }
 
-impl<Scalar, Kern> SourceToTargetData for FftFieldTranslation<Scalar, Kern>
+impl<Scalar, Kernel> SourceToTargetData for FftFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    Kern: Kernel<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
 }
 
-impl<Scalar, Kern> ConfigureSourceToTargetData for FftFieldTranslation<Scalar, Kern>
+impl<Scalar, Kernel> ConfigureSourceToTargetData for FftFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar
         + AsComplex
         + Default
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    Kern: Kernel<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     type Scalar = Scalar;
     type Domain = Domain<Scalar::Real>;
-    type Kernel = Kern;
+    type Kernel = Kernel;
 
     fn expansion_order(&mut self, expansion_order: usize) {
         self.expansion_order = expansion_order
@@ -406,15 +406,15 @@ where
 
         // Set required maps, TODO: Should be a part of operator data
         (self.surf_to_conv_map, self.conv_to_surf_map) =
-            FftFieldTranslation::<Scalar, Kern>::compute_surf_to_conv_map(self.expansion_order);
+            FftFieldTranslation::<Scalar, Kernel>::compute_surf_to_conv_map(self.expansion_order);
     }
 }
 
-impl<Scalar, Kern> BlasFieldTranslation<Scalar, Kern>
+impl<Scalar, Kernel> BlasFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar + Epsilon + Default,
     <Scalar as RlstScalar>::Real: Default,
-    Kern: Kernel<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default,
 {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
@@ -429,10 +429,10 @@ where
     }
 }
 
-impl<Scalar, Kern> SourceToTargetData for BlasFieldTranslation<Scalar, Kern>
+impl<Scalar, Kernel> SourceToTargetData for BlasFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar,
-    Kern: Kernel<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default,
 {
     type Metadata = BlasMetadata<Scalar>;
 }
@@ -440,7 +440,7 @@ where
 impl<Scalar, Kern> ConfigureSourceToTargetData for BlasFieldTranslation<Scalar, Kern>
 where
     Scalar: RlstScalar,
-    Kern: Kernel<T = Scalar> + Default,
+    Kern: KernelTrait<T = Scalar> + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
     type Scalar = Scalar;

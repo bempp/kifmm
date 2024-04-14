@@ -25,7 +25,7 @@ use crate::{
         tree::{FmmTree, Tree},
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslation,
+    BlasFieldTranslation, Fmm,
 };
 
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
@@ -96,14 +96,14 @@ impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {
-        let Some(sources) = self.tree.source_tree().keys(level) else {
+        let Some(sources) = self.tree().source_tree().keys(level) else {
             return;
         };
-        let Some(targets) = self.tree.target_tree().keys(level) else {
+        let Some(targets) = self.tree().target_tree().keys(level) else {
             return;
         };
 

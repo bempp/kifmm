@@ -535,7 +535,7 @@ pub struct FftFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
