@@ -214,380 +214,6 @@ where
         -> Result<(), FftError>;
 }
 
-use rlst::{c32, c64};
-
-/// Interface for DFT for use from FMM
-pub trait Dft
-where
-    Self: Sized + RlstScalar + DftType,
-{
-    /// Data shape
-    fn shape_in(expansion_order: usize) -> [usize; 3];
-
-    /// Size
-    fn size_in(expansion_order: usize) -> usize;
-
-    /// Transformed shape
-    fn shape_out(expansion_order: usize) -> [usize; 3];
-
-    /// Transform size
-    fn size_out(expansion_order: usize) -> usize;
-
-    /// Forward transform, if real data is used as input computes R2C dft
-    fn forward_dft(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError>;
-
-    /// Forward transform, if real data is used as input computes R2C dft
-    fn forward_dft_batch(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError>;
-
-    /// Forward transform, if real data is used as input computes R2C dft
-    fn forward_dft_batch_par(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError>;
-
-    /// Backward transform, if real data is used as input computes C2R dft
-    fn backward_dft(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError>;
-
-    /// Backward transform, if real data is used as input computes C2R dft
-    fn backward_dft_batch(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError>;
-
-    /// Backward transform, if real data is used as input computes C2R dft
-    fn backward_dft_batch_par(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError>;
-}
-
-impl Dft for f32 {
-    fn shape_in(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p]
-    }
-
-    fn size_in(expansion_order: usize) -> usize {
-        Self::shape_in(expansion_order).iter().product()
-    }
-
-    fn shape_out(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p / 2 + 1]
-    }
-
-    fn size_out(expansion_order: usize) -> usize {
-        Self::shape_out(expansion_order).iter().product()
-    }
-
-    fn forward_dft(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f32::r2c(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f32::r2c_batch(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch_par(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f32::r2c_batch_par(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn backward_dft(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f32::c2r(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f32::c2r_batch(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch_par(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f32::c2r_batch_par(in_, out, shape)?;
-        Ok(())
-    }
-}
-
-impl Dft for f64 {
-    fn size_in(expansion_order: usize) -> usize {
-        Self::shape_in(expansion_order).iter().product()
-    }
-
-    fn shape_in(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p]
-    }
-
-    fn shape_out(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p / 2 + 1]
-    }
-
-    fn size_out(expansion_order: usize) -> usize {
-        Self::shape_out(expansion_order).iter().product()
-    }
-
-    fn forward_dft(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f64::r2c(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f64::r2c_batch(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch_par(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f64::r2c_batch_par(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn backward_dft(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f64::c2r(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f64::c2r_batch(in_, out, shape)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch_par(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        f64::c2r_batch_par(in_, out, shape)?;
-        Ok(())
-    }
-}
-
-impl Dft for c32 {
-    fn size_in(expansion_order: usize) -> usize {
-        Self::shape_in(expansion_order).iter().product()
-    }
-
-    fn shape_in(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p]
-    }
-
-    fn shape_out(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p]
-    }
-
-    fn size_out(expansion_order: usize) -> usize {
-        Self::shape_out(expansion_order).iter().product()
-    }
-
-    fn forward_dft(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c32::c2c(in_, out, shape, Sign::Forward)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c32::c2c_batch(in_, out, shape, Sign::Forward)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch_par(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c32::c2c_batch_par(in_, out, shape, Sign::Forward)?;
-        Ok(())
-    }
-
-    fn backward_dft(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c32::c2c(in_, out, shape, Sign::Backward)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c32::c2c_batch(in_, out, shape, Sign::Backward)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch_par(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c32::c2c_batch_par(in_, out, shape, Sign::Backward)?;
-        Ok(())
-    }
-}
-
-impl Dft for c64 {
-    fn size_in(expansion_order: usize) -> usize {
-        Self::shape_in(expansion_order).iter().product()
-    }
-
-    fn shape_in(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p]
-    }
-
-    fn shape_out(expansion_order: usize) -> [usize; 3] {
-        let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
-        let pad_size = 1;
-        let p = m + pad_size; // Size of each dimension of padded 3D kernel/signal
-        [p, p, p]
-    }
-
-    fn size_out(expansion_order: usize) -> usize {
-        Self::shape_out(expansion_order).iter().product()
-    }
-
-    fn forward_dft(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c64::c2c(in_, out, shape, Sign::Forward)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c64::c2c_batch(in_, out, shape, Sign::Forward)?;
-        Ok(())
-    }
-
-    fn forward_dft_batch_par(
-        in_: &mut [<Self as DftType>::InputType],
-        out: &mut [<Self as DftType>::OutputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c64::c2c_batch_par(in_, out, shape, Sign::Forward)?;
-        Ok(())
-    }
-
-    fn backward_dft(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c64::c2c(in_, out, shape, Sign::Backward)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c64::c2c_batch(in_, out, shape, Sign::Backward)?;
-        Ok(())
-    }
-
-    fn backward_dft_batch_par(
-        in_: &mut [<Self as DftType>::OutputType],
-        out: &mut [<Self as DftType>::InputType],
-        shape: &[usize],
-    ) -> Result<(), FftError> {
-        c64::c2c_batch_par(in_, out, shape, Sign::Backward)?;
-        Ok(())
-    }
-}
-
 /// Input and output types for which DFT trait is defined
 pub trait DftType {
     /// Input type
@@ -597,22 +223,62 @@ pub trait DftType {
     type OutputType: RlstScalar + Default + Sized;
 }
 
-impl DftType for f64 {
-    type InputType = Self;
-    type OutputType = c64;
-}
+/// Interface for DFT for use from FMM
+pub trait Dft
+where
+    Self: Sized + RlstScalar + DftType,
+{
+    /// Input shape, shape of convolution grid
+    fn shape_in(expansion_order: usize) -> [usize; 3];
 
-impl DftType for f32 {
-    type InputType = Self;
-    type OutputType = c32;
-}
+    /// Input size, number of points on convolution grid
+    fn size_in(expansion_order: usize) -> usize;
 
-impl DftType for c32 {
-    type InputType = Self;
-    type OutputType = Self;
-}
+    /// Transformed shape in Fourier space, sequence shortened for real to complex transforms
+    fn shape_out(expansion_order: usize) -> [usize; 3];
 
-impl DftType for c64 {
-    type InputType = Self;
-    type OutputType = Self;
+    /// Transformed size in Fourier space, sequence shortened for real to complex transforms
+    fn size_out(expansion_order: usize) -> usize;
+
+    /// Forward transform, if real data is used as input computes R2C dft
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Forward transform, if real data is used as input computes R2C dft, batched over multiple datasets
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Forward transform, if real data is used as input computes R2C dft, batched in parallel over multiple datasets
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft, batched over multiple datasets
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft, batched in parallel over multiple datasets
+    fn backward_dft_batch_par(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
 }
