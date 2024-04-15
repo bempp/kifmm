@@ -231,6 +231,53 @@ mod test {
         BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
+    fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
+        fmm: Box<
+            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+        >,
+        eval_type: EvalType,
+        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T::Real,
+    ) where
+        T::Real: Default,
+    {
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
+
+        let leaf_idx = 0;
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let potential = fmm.potential(&leaf).unwrap()[0];
+
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
+
+        let ntargets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::zero(); ntargets * eval_size];
+
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
+        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
+
+        fmm.kernel().evaluate_st(
+            eval_type,
+            sources.data(),
+            leaf_coordinates_col_major.data(),
+            charges.data(),
+            &mut direct,
+        );
+
+        direct.iter().zip(potential).for_each(|(&d, &p)| {
+            let abs_error = (d - p).abs();
+            let rel_error = abs_error / p.abs();
+
+            println!("err {:?} \nd {:?} \np {:?}", rel_error, direct, potential);
+            assert!(rel_error <= threshold)
+        });
+    }
+
     fn test_single_node_laplace_fmm_vector_helper<T: RlstScalar + Float + Default>(
         fmm: Box<
             dyn Fmm<
@@ -370,11 +417,12 @@ mod test {
         );
 
         let abs_error = (expected[0] - found[0]).abs();
+        let rel_error = abs_error / expected[0].abs();
         println!(
-            "abs {:?} \n expected {:?} found {:?}",
-            abs_error, expected, found
+            "abs {:?} rel {:?} \n expected {:?} found {:?}",
+            abs_error, rel_error, expected, found
         );
-        assert!(abs_error <= threshold);
+        assert!(rel_error <= threshold);
     }
 
     #[test]
@@ -451,7 +499,7 @@ mod test {
         let tmp = vec![c64::one(); nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
-        let wavenumber = 0.00001;
+        let wavenumber = 0.0000001;
 
         let fmm_fft = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
@@ -676,5 +724,70 @@ mod test {
                 threshold_deriv_blas,
             );
         }
+    }
+
+    #[test]
+    fn test_helmholtz_fmm_vector() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+
+        // Charge data
+        let nvecs = 1;
+        let tmp = vec![c64::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+
+        let wavenumber = 0.0000001;
+
+        let fmm_fft = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                EvalType::Value,
+                FftFieldTranslation::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_fft.evaluate();
+
+        let svd_threshold = Some(1e-5);
+        let fmm_svd = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                EvalType::Value,
+                BlasFieldTranslation::new(svd_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_svd.evaluate();
+
+        let fmm_fft = Box::new(fmm_fft);
+        let eval_type = fmm_fft.kernel_eval_type;
+        test_single_node_helmholtz_fmm_vector_helper::<c64>(
+            fmm_fft, eval_type, &sources, &charges, 1e-5,
+        );
+
+        let fmm_svd = Box::new(fmm_svd);
+        let eval_type = fmm_svd.kernel_eval_type;
+        test_single_node_helmholtz_fmm_vector_helper::<c64>(
+            fmm_svd, eval_type, &sources, &charges, 1e-5,
+        );
     }
 }

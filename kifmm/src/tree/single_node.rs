@@ -854,7 +854,6 @@ mod test {
 
         // Test that a single octant contains all the points
         for (_, (l, r)) in leaves_to_points.iter() {
-            // println!("HERE {:?} {:?}", r, l);
             if (r - l) > 0 {
                 assert!((r - l) == n_points);
             }
