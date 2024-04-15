@@ -1,7 +1,9 @@
 //! Implementation of Moore-Penrose PseudoInverse
-use num::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, MatrixSvd, Shape, SvdMode, VectorContainer};
-use rlst::{RlstError, RlstResult, RlstScalar};
+use crate::traits::general::Epsilon;
+use rlst::{
+    rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RlstError, RlstResult, RlstScalar, Shape,
+    SvdMode, VectorContainer,
+};
 
 /// Matrix type
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -24,8 +26,7 @@ pub fn pinv<T>(
     rtol: Option<T::Real>,
 ) -> PinvReturnType<T>
 where
-    //DenseMatrixLinAlgBuilder<T>: Svd,
-    T: RlstScalar<Real = T> + Float,
+    T: RlstScalar + Epsilon,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
     let shape = mat.shape();
@@ -44,7 +45,7 @@ where
         // For matrices compute the full SVD
         let k = std::cmp::min(shape[0], shape[1]);
         let mut u = rlst_dynamic_array2!(T, [shape[0], k]);
-        let mut s = vec![T::zero(); k];
+        let mut s = vec![T::zero().re(); k];
         let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
 
         // TODO: work out why it fails without this copy and remove this copy
@@ -57,7 +58,7 @@ where
         let eps = T::real(T::epsilon());
         let max_dim = T::real(std::cmp::max(shape[0], shape[1]));
 
-        let atol = atol.unwrap_or(T::Real::zero());
+        let atol = atol.unwrap_or(T::zero().re());
         let rtol = rtol.unwrap_or(max_dim * eps);
 
         let max_s = s[0];

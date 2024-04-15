@@ -1,6 +1,6 @@
-//! # Multipole to Local (M2L) Translations
+//! # Multipole to local expansion field translation translations
 mod blas;
 mod fft;
-mod matmul;
+mod matvec;
 mod metadata;
-pub mod transfer_vector;
+mod transfer_vector;

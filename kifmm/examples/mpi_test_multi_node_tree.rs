@@ -8,14 +8,14 @@ use rlst::{RawAccess, RlstScalar};
 use kifmm::{traits::tree::Tree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
-use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
+use mpi::{environment::Universe, topology::UserCommunicator, traits::Equivalence, traits::*};
 
 #[cfg(feature = "mpi")]
 use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
 
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
-fn test_no_overlaps<T: Float + Default + RlstScalar<Real = T>>(
+fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
     world: &UserCommunicator,
     tree: &MultiNodeTree<T>,
 ) {
@@ -52,7 +52,7 @@ fn test_no_overlaps<T: Float + Default + RlstScalar<Real = T>>(
 
 /// Test that the globally defined domain contains all the points at a given node.
 #[cfg(feature = "mpi")]
-fn test_global_bounds<T: RlstScalar + Float + Default + Equivalence + SampleUniform>(
+fn test_global_bounds<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &UserCommunicator,
 ) {
     let n_points = 10000;
@@ -60,7 +60,7 @@ fn test_global_bounds<T: RlstScalar + Float + Default + Equivalence + SampleUnif
 
     let comm = world.duplicate();
 
-    let domain = Domain::from_global_points(points.data(), &comm);
+    let domain = Domain::<T>::from_global_points(points.data(), &comm);
 
     // Test that all local points are contained within the global domain
     for i in 0..n_points {
@@ -76,7 +76,7 @@ fn test_global_bounds<T: RlstScalar + Float + Default + Equivalence + SampleUnif
 
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
-fn test_n_leaves<T: RlstScalar<Real = T> + Float + Default + Equivalence + SampleUniform>(
+fn test_n_leaves<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &UserCommunicator,
     tree: &MultiNodeTree<T>,
 ) {
@@ -97,7 +97,7 @@ fn test_n_leaves<T: RlstScalar<Real = T> + Float + Default + Equivalence + Sampl
 
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
-fn test_n_points<T: RlstScalar<Real = T> + Float + Default + Equivalence + SampleUniform>(
+fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &UserCommunicator,
     tree: &MultiNodeTree<T>,
     points_per_proc: usize,

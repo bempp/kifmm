@@ -1,13 +1,17 @@
 //! Helper Functions
-use crate::fmm::types::{Charges, SendPtrMut};
-use crate::traits::tree::{FmmTreeNode, Tree};
-use crate::tree::types::{MortonKey, SingleNodeTree};
-use num::{Float, Num};
+use std::collections::HashMap;
+
+use num::traits::Float;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
     RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
-use std::collections::HashMap;
+
+use crate::{
+    fmm::types::{Charges, SendPtrMut},
+    traits::tree::{FmmTreeNode, Tree},
+    tree::types::{MortonKey, SingleNodeTree},
+};
 
 /// Number of coefficients for multipole and local expansions for the kernel independent FMM
 /// for a given expansion order. Coefficients correspond to points on the equivalent surface.
@@ -36,10 +40,10 @@ pub fn chunk_size(n: usize, max: usize) -> usize {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn homogenous_kernel_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
+pub fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> T {
     let numerator = T::from(1).unwrap();
     let denominator = T::from(2.).unwrap();
-    let power = T::from(level).unwrap();
+    let power = T::from(level).unwrap().re();
     let denominator = <T as RlstScalar>::powf(denominator, power);
     numerator / denominator
 }
@@ -48,7 +52,7 @@ pub fn homogenous_kernel_scale<T: RlstScalar<Real = T>>(level: u64) -> T {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Error> {
+pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
     if level < 2 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -60,7 +64,10 @@ pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Erro
         Ok(T::from(1. / 2.).unwrap())
     } else {
         let two = T::from(2.0).unwrap();
-        Ok(<T as RlstScalar>::powf(two, T::from(level - 3).unwrap()))
+        Ok(<T as RlstScalar>::powf(
+            two,
+            T::from(level - 3).unwrap().re(),
+        ))
     }
 }
 
@@ -69,9 +76,9 @@ pub fn m2l_scale<T: RlstScalar<Real = T>>(level: u64) -> Result<T, std::io::Erro
 /// # Arguments
 /// * `tree`- Single node tree
 /// * `ncoeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales<T>(tree: &SingleNodeTree<T>, ncoeffs: usize) -> Vec<T>
+pub fn leaf_scales<T>(tree: &SingleNodeTree<T::Real>, ncoeffs: usize) -> Vec<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar + Default,
 {
     let mut result = vec![T::default(); tree.n_leaves().unwrap() * ncoeffs];
 
@@ -99,7 +106,7 @@ pub fn leaf_surfaces<T>(
     expansion_order: usize,
 ) -> Vec<T>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar + Float + Default,
 {
     let dim = 3;
     let n_keys = tree.n_leaves().unwrap();
@@ -120,7 +127,7 @@ where
 /// between the local indices for each leaf and their associated charges
 pub fn coordinate_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar + Float,
 {
     let mut index_pointer = 0;
 
@@ -142,9 +149,9 @@ where
 }
 
 /// Create index pointers for each key at each level of an octree
-pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey, usize>>
+pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey<T>, usize>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar + Float,
 {
     let mut result = vec![HashMap::new(); (tree.depth() + 1).try_into().unwrap()];
 
@@ -159,13 +166,13 @@ where
 
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
 pub fn level_expansion_pointers<T>(
-    tree: &SingleNodeTree<T>,
+    tree: &SingleNodeTree<T::Real>,
     ncoeffs: usize,
     nmatvecs: usize,
     expansions: &[T],
 ) -> Vec<Vec<Vec<SendPtrMut<T>>>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar,
 {
     let mut result = vec![Vec::new(); (tree.depth() + 1).try_into().unwrap()];
 
@@ -196,14 +203,14 @@ where
 
 /// Create mutable pointers for leaf expansions in a tree
 pub fn leaf_expansion_pointers<T>(
-    tree: &SingleNodeTree<T>,
+    tree: &SingleNodeTree<T::Real>,
     ncoeffs: usize,
     nmatvecs: usize,
     n_leaves: usize,
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar,
 {
     let mut result = vec![Vec::new(); n_leaves];
 
@@ -227,7 +234,7 @@ where
 
 /// Create mutable pointers for potentials in a tree
 pub fn potential_pointers<T>(
-    tree: &SingleNodeTree<T>,
+    tree: &SingleNodeTree<T::Real>,
     nmatvecs: usize,
     n_leaves: usize,
     n_points: usize,
@@ -235,7 +242,7 @@ pub fn potential_pointers<T>(
     potentials: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
-    T: Float + Default + RlstScalar<Real = T>,
+    T: RlstScalar,
 {
     let mut result = vec![SendPtrMut::default(); n_leaves * nmatvecs];
     let dim = 3;
@@ -305,7 +312,7 @@ pub fn pad3<T: RlstScalar>(
     pad_index: (usize, usize, usize),
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
-    T: Clone + Copy + Num,
+    T: Clone + Copy + RlstScalar,
 {
     let [m, n, o] = arr.shape();
 
@@ -336,7 +343,7 @@ pub fn flip3<T: RlstScalar>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
-    T: Clone + Copy + Num,
+    T: Clone + Copy + RlstScalar,
 {
     let mut flipped = rlst_dynamic_array3!(T, arr.shape());
 

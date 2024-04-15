@@ -1,18 +1,10 @@
 //! Module wide constants.
 
-use crate::tree::types::MortonKey;
-
 /// Maximum possible level of octree recursion, by definition.
 pub const DEEPEST_LEVEL: u64 = 16;
 
 /// The 'size' of each level in terms of octants along each axis, at the maximum depth of recursion.
 pub const LEVEL_SIZE: u64 = 65536;
-
-/// The root node of any octree.
-pub const ROOT: MortonKey = MortonKey {
-    anchor: [0, 0, 0],
-    morton: 0,
-};
 
 /// Transfer vectors in component form to nearest octant neighbours, in Morton order.
 pub const DIRECTIONS: [[i64; 3]; 26] = [

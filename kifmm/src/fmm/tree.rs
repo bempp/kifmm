@@ -1,16 +1,17 @@
-//! Implementation of FmmTree Trait
-use super::types::SingleNodeFmmTree;
-use crate::traits::tree::{FmmTree, Tree};
-use crate::tree::types::{MortonKey, SingleNodeTree};
-use num::Float;
+//! Implementation of FMM compatible trees
+use num::traits::Float;
 use rlst::RlstScalar;
+
+use crate::{
+    fmm::types::SingleNodeFmmTree,
+    traits::tree::{FmmTree, Tree},
+    tree::types::SingleNodeTree,
+};
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
 where
-    T: RlstScalar<Real = T> + Float + Default,
+    T: RlstScalar + Float + Default,
 {
-    type Scalar = T;
-    type Node = MortonKey;
     type Tree = SingleNodeTree<T>;
 
     fn source_tree(&self) -> &Self::Tree {
@@ -25,7 +26,10 @@ where
         &self.domain
     }
 
-    fn near_field(&self, leaf: &Self::Node) -> Option<Vec<Self::Node>> {
+    fn near_field(
+        &self,
+        leaf: &<Self::Tree as Tree>::Node,
+    ) -> Option<Vec<<Self::Tree as Tree>::Node>> {
         let mut u_list = Vec::new();
         let neighbours = leaf.neighbors();
 
@@ -70,5 +74,5 @@ where
     }
 }
 
-unsafe impl<T: RlstScalar<Real = T> + Default + Float> Send for SingleNodeFmmTree<T> {}
-unsafe impl<T: RlstScalar<Real = T> + Default + Float> Sync for SingleNodeFmmTree<T> {}
+unsafe impl<T: RlstScalar + Float + Default> Send for SingleNodeFmmTree<T> {}
+unsafe impl<T: RlstScalar + Float + Default> Sync for SingleNodeFmmTree<T> {}

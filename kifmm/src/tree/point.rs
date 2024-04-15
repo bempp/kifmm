@@ -1,23 +1,24 @@
 //! Implementation of traits for handling, and sorting, containers of point data.
 use crate::tree::types::Point;
+use num::Float;
 use rlst::RlstScalar;
 use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 
 impl<T> PartialEq for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalar + Float,
 {
     fn eq(&self, other: &Self) -> bool {
         self.encoded_key == other.encoded_key
     }
 }
 
-impl<T> Eq for Point<T> where T: RlstScalar<Real = T> {}
+impl<T> Eq for Point<T> where T: RlstScalar + Float {}
 
 impl<T> Ord for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalar + Float,
 {
     fn cmp(&self, other: &Self) -> Ordering {
         self.encoded_key.cmp(&other.encoded_key)
@@ -26,7 +27,7 @@ where
 
 impl<T> PartialOrd for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalar + Float,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // less_than(&self.morton, &other.morton)
@@ -36,7 +37,7 @@ where
 
 impl<T> Hash for Point<T>
 where
-    T: RlstScalar<Real = T>,
+    T: RlstScalar + Float,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.encoded_key.hash(state);
@@ -45,19 +46,18 @@ where
 
 #[cfg(feature = "mpi")]
 mod mpi_point {
-    use super::{Point, RlstScalar};
-
+    use super::Point;
+    use super::{Float, RlstScalar};
     use crate::tree::types::MortonKey;
     use memoffset::offset_of;
     use mpi::{
         datatype::{Equivalence, UncommittedUserDatatype, UserDatatype},
         Address,
     };
-    use num::Float;
 
     unsafe impl<T> Equivalence for Point<T>
     where
-        T: RlstScalar<Real = T> + Float + Equivalence,
+        T: RlstScalar + Float + Equivalence,
     {
         type Out = UserDatatype;
         fn equivalent_datatype() -> Self::Out {
@@ -75,8 +75,8 @@ mod mpi_point {
                     UncommittedUserDatatype::structured(
                         &[1, 1],
                         &[
-                            offset_of!(MortonKey, anchor) as Address,
-                            offset_of!(MortonKey, morton) as Address,
+                            offset_of!(MortonKey<T>, anchor) as Address,
+                            offset_of!(MortonKey<T>, morton) as Address,
                         ],
                         &[
                             UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
@@ -89,8 +89,8 @@ mod mpi_point {
                     UncommittedUserDatatype::structured(
                         &[1, 1],
                         &[
-                            offset_of!(MortonKey, anchor) as Address,
-                            offset_of!(MortonKey, morton) as Address,
+                            offset_of!(MortonKey<T>, anchor) as Address,
+                            offset_of!(MortonKey<T>, morton) as Address,
                         ],
                         &[
                             UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
@@ -119,10 +119,7 @@ mod test {
 
     #[test]
     pub fn test_ordering() {
-        let domain = Domain {
-            origin: [0., 0., 0.],
-            side_length: [1., 1., 1.],
-        };
+        let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         let n_points = 1000;
         let coords = points_fixture(n_points, None, None, None);

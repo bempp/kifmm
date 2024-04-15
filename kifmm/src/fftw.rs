@@ -8,5 +8,8 @@
 //! * The `r2c` and `c2r` transforms implemented on buffers representing 3D data, expected in column major order.
 //! * Optionally parallel `r2c` and `c2r` which share a plan to compute batched transforms of multiple input data sets.
 //!
+mod c2c;
+mod dft;
+mod helpers;
 mod r2c;
 pub mod types;

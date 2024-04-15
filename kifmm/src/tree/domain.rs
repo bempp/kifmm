@@ -1,10 +1,15 @@
 //! Constructor for a single node Domain.
 use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain};
+#[allow(unused_imports)]
+#[cfg(feature = "mpi")]
+pub use mpi_domain::*;
 use num::Float;
 use rlst::RlstScalar;
-use std::fmt::Debug;
 
-impl<T: Float + Default + Debug> Domain<T> {
+impl<T> Domain<T>
+where
+    T: RlstScalar + Float,
+{
     /// Compute the domain defined by a set of points on a local node. When defined by a set of points
     /// The domain adds a small threshold such that no points lie on the actual edge of the domain to
     /// ensure correct Morton encoding.
@@ -27,9 +32,9 @@ impl<T: Float + Default + Debug> Domain<T> {
         let min_z = z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
         // Find maximum dimension, this will define the size of the boxes in the domain
-        let diameter_x = (*max_x - *min_x).abs();
-        let diameter_y = (*max_y - *min_y).abs();
-        let diameter_z = (*max_z - *min_z).abs();
+        let diameter_x = Float::abs(*max_x - *min_x);
+        let diameter_y = Float::abs(*max_y - *min_y);
+        let diameter_z = Float::abs(*max_z - *min_z);
 
         // Want a cubic box to place everything in
         let diameter = diameter_x.max(diameter_y).max(diameter_z);
@@ -84,22 +89,25 @@ impl<T: Float + Default + Debug> Domain<T> {
     /// # Arguments
     /// * `origin` - The point from which to construct a cuboid domain.
     /// * `diameter` - The diameter along each axis of the domain.
-    pub fn new(origin: &[T; 3], diameter: &[T; 3]) -> Self {
+    pub fn new(origin: &[T; 3], side_length: &[T; 3]) -> Self {
         Domain {
             origin: *origin,
-            side_length: *diameter,
+            side_length: *side_length,
         }
     }
 }
 
-impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
+impl<T> DomainTrait for Domain<T>
+where
+    T: RlstScalar + Float,
+{
     type Scalar = T;
 
-    fn diameter(&self) -> &[Self::Scalar; 3] {
+    fn diameter(&self) -> &[T; 3] {
         &self.side_length
     }
 
-    fn origin(&self) -> &[Self::Scalar; 3] {
+    fn origin(&self) -> &[T; 3] {
         &self.origin
     }
 }
@@ -107,7 +115,9 @@ impl<T: RlstScalar + Default + Float> DomainTrait for Domain<T> {
 #[cfg(feature = "mpi")]
 mod mpi_domain {
 
-    use super::{Debug, Domain, Float};
+    use super::{Float, RlstScalar};
+
+    use super::Domain;
     use memoffset::offset_of;
     use mpi::{
         datatype::{UncommittedUserDatatype, UserDatatype},
@@ -116,7 +126,10 @@ mod mpi_domain {
         Address,
     };
 
-    unsafe impl<T: Float + Equivalence + Default> Equivalence for Domain<T> {
+    unsafe impl<T> Equivalence for Domain<T>
+    where
+        T: RlstScalar + Float + Equivalence,
+    {
         type Out = UserDatatype;
         fn equivalent_datatype() -> Self::Out {
             UserDatatype::structured(
@@ -133,10 +146,11 @@ mod mpi_domain {
         }
     }
 
-    impl<T: Float + Default + Debug> Domain<T>
+    impl<T> Domain<T>
     where
         [Domain<T>]: BufferMut,
         Vec<Domain<T>>: Buffer,
+        T: RlstScalar + Float,
     {
         /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
         /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
@@ -149,7 +163,10 @@ mod mpi_domain {
 
             let local_domain = Domain::<T>::from_local_points(local_points);
             let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];
-            let mut buffer = vec![Domain::<T>::default(); size as usize];
+            let zero = T::zero();
+            let one = T::one();
+            let mut buffer =
+                vec![Domain::<T>::new(&[zero, zero, zero], &[one, one, one]); size as usize];
 
             comm.all_to_all_into(&local_bounds, &mut buffer[..]);
 
@@ -199,21 +216,17 @@ mod mpi_domain {
     }
 }
 
-#[allow(unused_imports)]
-#[cfg(feature = "mpi")]
-pub use mpi_domain::*;
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::tree::helpers::{points_fixture, points_fixture_col, PointsMat};
-    use rlst::{RawAccess, RlstScalar, Shape};
+    use rlst::{RawAccess, Shape};
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where
-        T: Float + Default + RlstScalar,
+        T: RlstScalar + Float,
     {
-        let domain = Domain::from_local_points(points.data());
+        let domain = Domain::<T>::from_local_points(points.data());
 
         // Test that the domain remains cubic
         assert!(domain
@@ -247,14 +260,14 @@ mod test {
 
         // Test points in positive octant only
         let points = points_fixture::<f64>(n_points, None, None, None);
-        test_compute_bounds(points);
+        test_compute_bounds::<f64>(points);
 
         // Test points in positive and negative octants
         let points = points_fixture::<f64>(n_points, Some(-1.), Some(1.), None);
-        test_compute_bounds(points);
+        test_compute_bounds::<f64>(points);
 
         // Test rectangular distributions of points
         let points = points_fixture_col::<f64>(n_points);
-        test_compute_bounds(points);
+        test_compute_bounds::<f64>(points);
     }
 }
