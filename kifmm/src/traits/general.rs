@@ -3,7 +3,7 @@ use num::Complex;
 use rlst::RlstScalar;
 use rlst::{c32, c64};
 
-/// A trait that provides the maximum machine precision corresponding to a type
+/// Returns the maximum machine precision corresponding to a type
 pub trait Epsilon
 where
     Self: RlstScalar,

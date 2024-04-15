@@ -1,1 +1,1 @@
-//! Implementation of Fmm Trait for Multi Node.
+//! Multi Node FMM

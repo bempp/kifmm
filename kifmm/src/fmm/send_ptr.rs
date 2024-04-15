@@ -1,10 +1,10 @@
-//! Send ptr
-
+//! Implementation of traits for threadsafe pointers
 use crate::fmm::types::{SendPtr, SendPtrMut};
 use num::Complex;
 
 unsafe impl<T> Sync for SendPtrMut<T> {}
 unsafe impl<T> Send for SendPtrMut<Complex<T>> {}
+unsafe impl<T> Sync for SendPtr<T> {}
 
 impl<T> Default for SendPtrMut<T> {
     fn default() -> Self {
@@ -13,8 +13,6 @@ impl<T> Default for SendPtrMut<T> {
         }
     }
 }
-
-unsafe impl<T> Sync for SendPtr<T> {}
 
 impl<T> Default for SendPtr<T> {
     fn default() -> Self {

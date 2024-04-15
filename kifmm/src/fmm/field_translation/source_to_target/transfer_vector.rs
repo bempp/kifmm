@@ -1,10 +1,14 @@
 //! Functions for handling transfer vectors
-use crate::fmm::types::TransferVector;
-use crate::tree::types::{Domain, MortonKey};
-use crate::Float;
-use itertools::Itertools;
-use rlst::RlstScalar;
 use std::collections::HashSet;
+
+use itertools::Itertools;
+use num::traits::Float;
+use rlst::RlstScalar;
+
+use crate::{
+    fmm::types::TransferVector,
+    tree::types::{Domain, MortonKey},
+};
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
 /// There are at most 316 such interactions, corresponding to unique `transfer vectors'. Here we compute all of them

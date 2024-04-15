@@ -1,38 +1,47 @@
-//! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-// use crate::field::types::BlasFieldTranslationKiFmm;
-use crate::fmm::helpers::{homogenous_kernel_scale, m2l_scale};
-use crate::fmm::types::{BlasFieldTranslation, FmmEvalType, KiFmm, SendPtrMut};
+//! Multipole to local field translation trait implementation using BLAS.
 
-use crate::traits::{
-    fmm::SourceToTargetTranslation,
-    tree::{FmmTree, Tree},
-};
-use crate::tree::{constants::NTRANSFER_VECTORS_KIFMM, types::SingleNodeTree};
-use crate::{Float, RlstScalarFloat};
-use green_kernels::traits::Kernel;
-use itertools::Itertools;
-
-use rayon::prelude::*;
-use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MatrixSvd,
-    MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer,
-};
 use std::{
     collections::{HashMap, HashSet},
     sync::Mutex,
 };
 
-impl<T, U, V, W> KiFmm<V, BlasFieldTranslation<U, W, T>, T, U>
+use itertools::Itertools;
+use rayon::prelude::*;
+use rlst::{
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
+    RawAccessMut, RlstScalar,
+};
+
+use green_kernels::traits::Kernel as KernelTrait;
+
+use crate::{
+    fmm::{
+        helpers::{homogenous_kernel_scale, m2l_scale},
+        types::{FmmEvalType, SendPtrMut},
+        KiFmm,
+    },
+    traits::{
+        fmm::SourceToTargetTranslation,
+        tree::{FmmTree, Tree},
+    },
+    tree::constants::NTRANSFER_VECTORS_KIFMM,
+    BlasFieldTranslation, Fmm,
+};
+
+impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
 where
-    T: Kernel<T = W> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalarFloat + Float,
-    W: RlstScalar,
-    <U as RlstScalar>::Real: RlstScalarFloat + Float,
-    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTree<U::Real>> + Send + Sync,
+    Scalar: RlstScalar + Default,
+    Kernel: KernelTrait<T = Scalar> + Default,
+    <Scalar as RlstScalar>::Real: Default,
 {
-    /// Displacements
-    pub fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
+    /// Map between each transfer vector for homogenous kernels, and the source boxes involved in that translation
+    /// at this octree level.
+    ///
+    /// Returns a vector of length 316, the maximum number of unique transfer vectors at a tree level for homogenous
+    /// kernels, where each item is a mutex locked vector of indices, of a length equal to the number of source boxes
+    /// at this tree level, where an index value of -1 indicates that the box isn't involved in the translation, and
+    /// an index values of `usize` gives the target box index that the source box density is being translated to.
+    fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
         let sources = self.tree.source_tree().keys(level).unwrap();
         let nsources = sources.len();
 
@@ -90,19 +99,18 @@ where
     }
 }
 
-impl<T, U, V, W> SourceToTargetTranslation for KiFmm<V, BlasFieldTranslation<U, W, T>, T, U>
+impl<Scalar, Kernel> SourceToTargetTranslation
+    for KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
 where
-    T: Kernel<T = W> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalarFloat<Real = U> + Float,
-    W: RlstScalar,
-    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
+    Scalar: RlstScalar + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {
-        let Some(sources) = self.tree.source_tree().keys(level) else {
+        let Some(sources) = self.tree().source_tree().keys(level) else {
             return;
         };
-        let Some(targets) = self.tree.target_tree().keys(level) else {
+        let Some(targets) = self.tree().target_tree().keys(level) else {
             return;
         };
 
@@ -156,7 +164,7 @@ where
 
                 // Allocate buffer to store compressed check potentials
                 let compressed_check_potentials =
-                    rlst_dynamic_array2!(U, [self.source_to_target.cutoff_rank, ntargets]);
+                    rlst_dynamic_array2!(Scalar, [self.source_to_target.cutoff_rank, ntargets]);
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
@@ -165,7 +173,7 @@ where
                             .data()
                             .as_ptr()
                             .add(i * self.source_to_target.cutoff_rank)
-                            as *mut U
+                            as *mut Scalar
                     };
                     let send_ptr = SendPtrMut { raw };
                     compressed_check_potentials_ptrs.push(send_ptr);
@@ -181,7 +189,7 @@ where
                 {
                     //TODO: Rework threading
                     //rlst::threading::enable_threading();
-                    compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
+                    compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.source_to_target.metadata.st.view(),
                         multipoles,
                     );
@@ -189,7 +197,8 @@ where
                     //rlst::threading::disable_threading();
 
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level).unwrap()
+                        *d *= homogenous_kernel_scale::<Scalar>(level)
+                            * m2l_scale::<Scalar>(level).unwrap()
                     });
                 }
 
@@ -204,7 +213,7 @@ where
                             let c_vt_sub = &self.source_to_target.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
-                                U,
+                                Scalar,
                                 [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
 
@@ -221,10 +230,10 @@ where
                                     );
                             }
 
-                            let compressed_check_potential = empty_array::<U, 2>()
+                            let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
-                                    empty_array::<U, 2>().simple_mult_into_resize(
+                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
                                         c_vt_sub.view(),
                                         compressed_multipoles_subset.view(),
                                     ),
@@ -255,11 +264,11 @@ where
                 {
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
-                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1.view(),
-                        empty_array::<U, 2>().simple_mult_into_resize(
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2.view(),
-                            empty_array::<U, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.source_to_target.metadata.u.view(),
                                 compressed_check_potentials,
                             ),
@@ -290,7 +299,7 @@ where
                 );
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
-                    U,
+                    Scalar,
                     [self.source_to_target.cutoff_rank, nsources * nmatvecs]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
@@ -307,7 +316,7 @@ where
                                 .data()
                                 .as_ptr()
                                 .add(key_displacement + charge_vec_displacement)
-                                as *mut U
+                                as *mut Scalar
                         };
                         let send_ptr = SendPtrMut { raw };
                         tmp.push(send_ptr)
@@ -325,15 +334,15 @@ where
                 {
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
-                    compressed_multipoles = empty_array::<U, 2>().simple_mult_into_resize(
+                    compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.source_to_target.metadata.st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::disable_threading();
-
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<U>(level) * m2l_scale::<U>(level).unwrap()
+                        *d *= homogenous_kernel_scale::<Scalar>(level)
+                            * m2l_scale::<Scalar>(level).unwrap()
                     });
                 }
 
@@ -348,7 +357,7 @@ where
                             let c_vt_sub = &self.source_to_target.metadata.c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
-                                U,
+                                Scalar,
                                 [
                                     self.source_to_target.cutoff_rank,
                                     multipole_idxs.len() * nmatvecs
@@ -385,10 +394,10 @@ where
                                 }
                             }
 
-                            let compressed_check_potential = empty_array::<U, 2>()
+                            let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
-                                    empty_array::<U, 2>().simple_mult_into_resize(
+                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
                                         c_vt_sub.view(),
                                         compressed_multipoles_subset.view(),
                                     ),
@@ -436,11 +445,11 @@ where
                 {
                     //TODO: Rework threading
                     //t_blis::interface::threading::enable_threading();
-                    let locals = empty_array::<U, 2>().simple_mult_into_resize(
+                    let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1.view(),
-                        empty_array::<U, 2>().simple_mult_into_resize(
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2.view(),
-                            empty_array::<U, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.source_to_target.metadata.u.view(),
                                 compressed_check_potentials,
                             ),
@@ -460,5 +469,6 @@ where
             }
         }
     }
+
     fn p2l(&self, _level: u64) {}
 }

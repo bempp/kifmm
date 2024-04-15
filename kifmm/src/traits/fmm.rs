@@ -1,5 +1,5 @@
 //! FMM traits
-use crate::{new_fmm::types::Charges, traits::tree::FmmTree};
+use crate::{fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 

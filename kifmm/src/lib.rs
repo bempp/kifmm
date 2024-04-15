@@ -80,23 +80,23 @@
 pub mod fftw;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
-pub mod new_fmm;
+pub mod fmm;
 pub mod traits;
 pub mod tree;
 
 // Public API
 #[doc(inline)]
-pub use new_fmm::types::BlasFieldTranslation;
+pub use fmm::types::BlasFieldTranslation;
 #[doc(inline)]
-pub use new_fmm::types::FftFieldTranslation;
+pub use fmm::types::FftFieldTranslation;
 #[doc(inline)]
-pub use new_fmm::types::SingleNodeBuilder;
+pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
-pub use new_fmm::types::SingleNodeFmmTree;
+pub use fmm::types::SingleNodeFmmTree;
 
 #[cfg(feature = "mpi")]
 #[doc(inline)]
-pub use new_fmm::types::MultiNodeFmmTree;
+pub use fmm::types::MultiNodeFmmTree;
 
 #[doc(inline)]
 pub use traits::fmm::Fmm;

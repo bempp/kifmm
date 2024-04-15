@@ -1,5 +1,5 @@
-//! A 3D Kernel Independent Fast Multipole Method
-mod builder;
+//! A three dimensional kernel-independent fast multipole method library.
+pub mod builder;
 pub mod constants;
 pub mod helpers;
 mod multi_node;
@@ -8,7 +8,10 @@ mod send_ptr;
 mod single_node;
 mod tree;
 pub mod types;
-pub mod field_translation;
+
+mod field_translation;
+
+pub use types::KiFmm;
 
 #[cfg(test)]
 mod test {
