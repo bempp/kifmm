@@ -1,8 +1,9 @@
 //! FFTW Traits
-use crate::fftw::types::{FftError, Sign};
 use num::Float;
 use num_complex::{Complex, ComplexFloat};
 use rlst::RlstScalar;
+
+use crate::fftw::types::{FftError, Sign};
 
 /// Interface for Real-to_Complex DFT computed with FFT library for 3D real data.
 ///
@@ -211,4 +212,73 @@ where
     /// * `sign` - Direction of transform
     fn c2c(in_: &mut [Self], out: &mut [Self], shape: &[usize], sign: Sign)
         -> Result<(), FftError>;
+}
+
+/// Input and output types for which DFT trait is defined
+pub trait DftType {
+    /// Input type
+    type InputType: RlstScalar + Default + Sized;
+
+    /// Output type
+    type OutputType: RlstScalar + Default + Sized;
+}
+
+/// Interface for DFT for use from FMM
+pub trait Dft
+where
+    Self: Sized + RlstScalar + DftType,
+{
+    /// Input shape, shape of convolution grid
+    fn shape_in(expansion_order: usize) -> [usize; 3];
+
+    /// Input size, number of points on convolution grid
+    fn size_in(expansion_order: usize) -> usize;
+
+    /// Transformed shape in Fourier space, sequence shortened for real to complex transforms
+    fn shape_out(expansion_order: usize) -> [usize; 3];
+
+    /// Transformed size in Fourier space, sequence shortened for real to complex transforms
+    fn size_out(expansion_order: usize) -> usize;
+
+    /// Forward transform, if real data is used as input computes R2C dft
+    fn forward_dft(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Forward transform, if real data is used as input computes R2C dft, batched over multiple datasets
+    fn forward_dft_batch(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Forward transform, if real data is used as input computes R2C dft, batched in parallel over multiple datasets
+    fn forward_dft_batch_par(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft
+    fn backward_dft(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft, batched over multiple datasets
+    fn backward_dft_batch(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
+
+    /// Backward transform, if real data is used as input computes C2R dft, batched in parallel over multiple datasets
+    fn backward_dft_batch_par(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+    ) -> Result<(), FftError>;
 }

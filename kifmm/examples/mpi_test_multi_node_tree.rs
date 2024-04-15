@@ -5,26 +5,21 @@ use rand::distributions::uniform::SampleUniform;
 
 use rlst::{RawAccess, RlstScalar};
 
-use kifmm::{traits::tree::Tree, tree::helpers::points_fixture, RlstScalarFloat};
+use kifmm::{traits::tree::Tree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
-use mpi::{environment::Universe, topology::UserCommunicator, traits::*};
-
-#[cfg(feature = "mpi")]
-use kifmm::RlstScalarFloatMpi;
+use mpi::{environment::Universe, topology::UserCommunicator, traits::Equivalence, traits::*};
 
 #[cfg(feature = "mpi")]
 use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
 
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
-fn test_no_overlaps<T: RlstScalarFloatMpi<Real = T>>(
+fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
     world: &UserCommunicator,
     tree: &MultiNodeTree<T>,
 ) {
     // Communicate bounds from each process
-
-    use kifmm::RlstScalarFloat;
     let max = tree.all_leaves_set().unwrap().iter().max().unwrap();
     let min = tree.all_leaves_set().unwrap().iter().min().unwrap();
 
@@ -57,7 +52,9 @@ fn test_no_overlaps<T: RlstScalarFloatMpi<Real = T>>(
 
 /// Test that the globally defined domain contains all the points at a given node.
 #[cfg(feature = "mpi")]
-fn test_global_bounds<T: RlstScalarFloatMpi<Real = T> + SampleUniform>(world: &UserCommunicator) {
+fn test_global_bounds<T: RlstScalar + Equivalence + Float + SampleUniform>(
+    world: &UserCommunicator,
+) {
     let n_points = 10000;
     let points = points_fixture::<T>(n_points, None, None, None);
 
@@ -79,12 +76,10 @@ fn test_global_bounds<T: RlstScalarFloatMpi<Real = T> + SampleUniform>(world: &U
 
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
-fn test_n_leaves<T: RlstScalarFloatMpi<Real = T> + SampleUniform>(
+fn test_n_leaves<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &UserCommunicator,
     tree: &MultiNodeTree<T>,
 ) {
-    use kifmm::RlstScalarFloatMpi;
-
     let n_leaves = tree.n_leaves().unwrap();
 
     let size = world.size() as usize;
@@ -102,7 +97,7 @@ fn test_n_leaves<T: RlstScalarFloatMpi<Real = T> + SampleUniform>(
 
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
-fn test_n_points<T: RlstScalarFloatMpi<Real = T> + SampleUniform>(
+fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &UserCommunicator,
     tree: &MultiNodeTree<T>,
     points_per_proc: usize,

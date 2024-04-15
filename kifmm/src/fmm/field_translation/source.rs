@@ -1,49 +1,50 @@
-//! Multipole Translations
-use crate::tree::{constants::NSIBLINGS, types::SingleNodeTree};
-use crate::{
-    traits::{
-        field::SourceToTargetData,
-        fmm::SourceTranslation,
-        tree::{FmmTree, Tree},
-    },
-    RlstScalarFloat,
-};
-use green_kernels::{traits::Kernel, types::EvalType};
-use itertools::Itertools;
-use rayon::prelude::*;
+//! Multipole expansion translations
 use std::collections::HashSet;
 
-use crate::fmm::helpers::chunk_size;
-use crate::fmm::{
-    constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
-    types::{FmmEvalType, KiFmm},
-};
+use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use itertools::Itertools;
+use rayon::prelude::*;
+
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar,
 };
 
-impl<T, U, V, W> SourceTranslation for KiFmm<T, U, V, W>
+use crate::{
+    fmm::{
+        constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
+        helpers::chunk_size,
+        types::{FmmEvalType, KiFmm},
+    },
+    traits::{
+        field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceTranslation,
+        tree::FmmTree, tree::Tree,
+    },
+    tree::constants::NSIBLINGS,
+};
+
+impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
+    for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
-    T: FmmTree<Tree = SingleNodeTree<W::Real>> + Send + Sync,
-    U: SourceToTargetData + Send + Sync,
-    V: Kernel<T = W>,
-    W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat,
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar>,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
 {
     fn p2m(&self) {
-        let Some(_leaves) = self.tree.source_tree().all_leaves() else {
+        let Some(_leaves) = self.tree.source_tree.all_leaves() else {
             return;
         };
 
-        let n_leaves = self.tree.source_tree().n_leaves().unwrap();
+        let n_leaves = self.tree.source_tree.n_leaves().unwrap();
         let surface_size = self.ncoeffs * self.dim;
-        let coordinates: &[W::Real] = self.tree.source_tree().all_coordinates().unwrap();
+        let coordinates = self.tree.source_tree.all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                let mut check_potentials = rlst_dynamic_array2!(W, [n_leaves * self.ncoeffs, 1]);
+                let mut check_potentials =
+                    rlst_dynamic_array2!(Scalar, [n_leaves * self.ncoeffs, 1]);
 
                 // Compute check potential for each box
                 check_potentials
@@ -58,6 +59,7 @@ where
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
                             let charges =
                                 &self.charges[charge_index_pointer.0..charge_index_pointer.1];
+
                             let coordinates_row_major = &coordinates[charge_index_pointer.0
                                 * self.dim
                                 ..charge_index_pointer.1 * self.dim];
@@ -70,7 +72,7 @@ where
                                     [self.dim, 1]
                                 );
                                 let mut coordinates_col_major =
-                                    rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
+                                    rlst_dynamic_array2!(Scalar::Real, [nsources, self.dim]);
                                 coordinates_col_major.fill_from(coordinates_row_major.view());
 
                                 self.kernel.evaluate_st(
@@ -99,12 +101,13 @@ where
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
                         let scale = rlst_array_from_slice2!(scale, [self.ncoeffs, chunk_size]);
 
-                        let mut cmp_prod = rlst_dynamic_array2!(W, [self.ncoeffs, chunk_size]);
+                        let mut cmp_prod = rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
+
                         cmp_prod.fill_from(check_potential * scale);
 
-                        let tmp = empty_array::<W, 2>().simple_mult_into_resize(
+                        let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.uc2e_inv_1.view(),
-                            empty_array::<W, 2>()
+                            empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(self.uc2e_inv_2.view(), cmp_prod),
                         );
 
@@ -123,7 +126,7 @@ where
 
             FmmEvalType::Matrix(nmatvecs) => {
                 let mut check_potentials =
-                    rlst_dynamic_array2!(W, [n_leaves * self.ncoeffs * nmatvecs, 1]);
+                    rlst_dynamic_array2!(Scalar, [n_leaves * self.ncoeffs * nmatvecs, 1]);
 
                 // Compute the check potential for each box for each charge vector
                 check_potentials
@@ -136,7 +139,7 @@ where
                     .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
-                            let coordinates_row_major: &[W::Real] = &coordinates
+                            let coordinates_row_major: &[Scalar::Real] = &coordinates
                                 [charge_index_pointer.0 * self.dim
                                     ..charge_index_pointer.1 * self.dim];
                             let nsources = coordinates_row_major.len() / self.dim;
@@ -147,6 +150,7 @@ where
                                     let charges_i = &self.charges[charge_vec_displacement
                                         + charge_index_pointer.0
                                         ..charge_vec_displacement + charge_index_pointer.1];
+
                                     let check_potential_i = &mut check_potential
                                         [i * self.ncoeffs..(i + 1) * self.ncoeffs];
 
@@ -156,7 +160,7 @@ where
                                         [self.dim, 1]
                                     );
                                     let mut coordinates_col_major =
-                                        rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
+                                        rlst_dynamic_array2!(Scalar::Real, [nsources, self.dim]);
                                     coordinates_col_major.fill_from(coordinates_mat.view());
 
                                     self.kernel.evaluate_st(
@@ -182,14 +186,14 @@ where
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
                         let mut scaled_check_potential =
-                            rlst_dynamic_array2!(W, [self.ncoeffs, nmatvecs]);
+                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
                         scaled_check_potential.fill_from(check_potential);
                         scaled_check_potential.scale_in_place(scale[0]);
 
-                        let tmp = empty_array::<W, 2>().simple_mult_into_resize(
+                        let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.uc2e_inv_1.view(),
-                            empty_array::<W, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_2.view(),
                                 scaled_check_potential.view(),
                             ),
@@ -210,15 +214,15 @@ where
     }
 
     fn m2m(&self, level: u64) {
-        let Some(child_sources) = self.tree.source_tree().keys(level) else {
+        let Some(child_sources) = self.tree.source_tree.keys(level) else {
             return;
         };
 
         let nchild_sources = self.tree.source_tree().n_keys(level).unwrap();
         let min = &child_sources[0];
         let max = &child_sources[nchild_sources - 1];
-        let min_idx = self.tree.source_tree().index(min).unwrap();
-        let max_idx = self.tree.source_tree().index(max).unwrap();
+        let min_idx = self.tree.source_tree.index(min).unwrap();
+        let max_idx = self.tree.source_tree.index(max).unwrap();
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -260,7 +264,7 @@ where
                                 [self.ncoeffs * NSIBLINGS, chunk_size]
                             );
 
-                            let parent_multipoles_chunk = empty_array::<W, 2>()
+                            let parent_multipoles_chunk = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     self.source.view(),
                                     child_multipoles_chunk_mat,
@@ -324,7 +328,7 @@ where
                                 [self.ncoeffs, nmatvecs]
                             );
 
-                            let result_i = empty_array::<W, 2>().simple_mult_into_resize(
+                            let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.source_vec[i].view(),
                                 child_multipoles_i,
                             );

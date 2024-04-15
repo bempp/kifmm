@@ -9,7 +9,6 @@ use crate::tree::{
     helpers::find_corners,
     types::{Domain, MortonKey, MortonKeys},
 };
-use crate::RlstScalarFloat;
 use itertools::{izip, Itertools};
 use num::{Float, ToPrimitive};
 use rlst::RlstScalar;
@@ -24,7 +23,7 @@ use std::{
 
 impl<T> MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Instantiate Morton Keys
     pub fn new() -> MortonKeys<T> {
@@ -187,7 +186,7 @@ where
 
 impl<T> Deref for MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     type Target = Vec<MortonKey<T>>;
 
@@ -198,7 +197,7 @@ where
 
 impl<T> DerefMut for MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.keys
@@ -207,7 +206,7 @@ where
 
 impl<T> Iterator for MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     type Item = MortonKey<T>;
 
@@ -223,7 +222,7 @@ where
 
 impl<T> FromIterator<MortonKey<T>> for MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     fn from_iter<I: IntoIterator<Item = MortonKey<T>>>(iter: I) -> Self {
         let mut c = MortonKeys::new();
@@ -235,13 +234,19 @@ where
     }
 }
 
-impl<T: RlstScalarFloat<Real = T>> From<Vec<MortonKey<T>>> for MortonKeys<T> {
+impl<T> From<Vec<MortonKey<T>>> for MortonKeys<T>
+where
+    T: RlstScalar + Float,
+{
     fn from(keys: Vec<MortonKey<T>>) -> Self {
         MortonKeys { keys, index: 0 }
     }
 }
 
-impl<T: RlstScalarFloat<Real = T>> From<HashSet<MortonKey<T>>> for MortonKeys<T> {
+impl<T> From<HashSet<MortonKey<T>>> for MortonKeys<T>
+where
+    T: RlstScalar + Float,
+{
     fn from(keys: HashSet<MortonKey<T>>) -> Self {
         MortonKeys {
             keys: keys.into_iter().collect_vec(),
@@ -250,26 +255,38 @@ impl<T: RlstScalarFloat<Real = T>> From<HashSet<MortonKey<T>>> for MortonKeys<T>
     }
 }
 
-impl<T: RlstScalarFloat<Real = T>> PartialEq for MortonKey<T> {
+impl<T> PartialEq for MortonKey<T>
+where
+    T: RlstScalar + Float,
+{
     fn eq(&self, other: &Self) -> bool {
         self.morton == other.morton
     }
 }
-impl<T: RlstScalarFloat<Real = T>> Eq for MortonKey<T> {}
+impl<T> Eq for MortonKey<T> where T: RlstScalar + Float {}
 
-impl<T: RlstScalarFloat<Real = T>> Ord for MortonKey<T> {
+impl<T> Ord for MortonKey<T>
+where
+    T: RlstScalar + Float,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         self.morton.cmp(&other.morton)
     }
 }
 
-impl<T: RlstScalarFloat<Real = T>> PartialOrd for MortonKey<T> {
+impl<T> PartialOrd for MortonKey<T>
+where
+    T: RlstScalar + Float,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.morton.cmp(&other.morton))
     }
 }
 
-impl<T: RlstScalarFloat<Real = T>> Hash for MortonKey<T> {
+impl<T> Hash for MortonKey<T>
+where
+    T: RlstScalar + Float,
+{
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.morton.hash(state);
     }
@@ -314,8 +331,8 @@ fn decode_key(morton: u64) -> [u64; 3] {
 /// * `point` - The (x, y, z) coordinates of the point to map.
 /// * `level` - The level of the tree at which the point will be mapped.
 /// * `domain` - The computational domain defined by the point set.
-fn point_to_anchor<T: RlstScalarFloat<Real = T> + ToPrimitive>(
-    point: &[T::Real; 3],
+fn point_to_anchor<T: RlstScalar + Float + ToPrimitive>(
+    point: &[T; 3],
     level: u64,
     domain: &Domain<T>,
 ) -> Result<[u64; 3], std::io::Error> {
@@ -334,7 +351,7 @@ fn point_to_anchor<T: RlstScalarFloat<Real = T> + ToPrimitive>(
             let side_length = domain
                 .side_length
                 .iter()
-                .map(|d| *d / T::from(1 << level).unwrap().re())
+                .map(|d| *d / T::from(1 << level).unwrap())
                 .collect_vec();
 
             let scaling_factor = 1 << (DEEPEST_LEVEL - level);
@@ -377,14 +394,14 @@ pub fn encode_anchor(anchor: &[u64; 3], level: u64) -> u64 {
 
 impl<T> MortonKey<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Constructor for Morton key
     pub fn new(anchor: &[u64; 3], morton: u64) -> Self {
         Self {
             anchor: *anchor,
             morton,
-            scalar: PhantomData::<T::Real>,
+            scalar: PhantomData::<T>,
         }
     }
 
@@ -411,7 +428,7 @@ where
     /// * `point` - Cartesian coordinate for a given point.
     /// * `domain` - Domain associated with a given tree encoding.
     /// * `level` - level of octree on which to find the encoding.
-    pub fn from_point(point: &[T::Real; 3], domain: &Domain<T>, level: u64) -> Self {
+    pub fn from_point(point: &[T; 3], domain: &Domain<T>, level: u64) -> Self {
         let anchor = point_to_anchor(point, level, domain).unwrap();
         MortonKey::from_anchor(&anchor, level)
     }
@@ -849,12 +866,14 @@ where
     }
 }
 
-impl<T> TreeNode<T> for MortonKey<T::Real>
+impl<T> TreeNode for MortonKey<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
-    type Nodes = MortonKeys<T::Real>;
-    type Domain = Domain<T::Real>;
+    type Scalar = T;
+
+    type Nodes = MortonKeys<T>;
+    type Domain = Domain<T>;
 
     fn children(&self) -> Self::Nodes {
         MortonKeys {
@@ -890,7 +909,7 @@ where
 ///
 /// # Arguments
 /// * `expansion_order` - the expansion order of the fmm
-pub fn surface_grid<T: RlstScalar + Float + Default>(expansion_order: usize) -> Vec<T> {
+pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
     let dim = 3;
     let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
 
@@ -932,15 +951,15 @@ pub fn surface_grid<T: RlstScalar + Float + Default>(expansion_order: usize) -> 
     surface
 }
 
-impl<T: RlstScalarFloat<Real = T>> FmmTreeNode<T> for MortonKey<T> {
+impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
     fn convolution_grid(
         &self,
         expansion_order: usize,
         domain: &Self::Domain,
-        alpha: T,
-        conv_point_corner: &[T],
+        alpha: Self::Scalar,
+        conv_point_corner: &[Self::Scalar],
         conv_point_corner_index: usize,
-    ) -> (Vec<T>, Vec<usize>) {
+    ) -> (Vec<Self::Scalar>, Vec<usize>) {
         // Number of convolution points along each axis
         let n = 2 * expansion_order - 1;
 
@@ -1004,33 +1023,43 @@ impl<T: RlstScalarFloat<Real = T>> FmmTreeNode<T> for MortonKey<T> {
         (grid, conv_idxs)
     }
 
-    fn scale_surface(&self, surface: Vec<T::Real>, domain: &Domain<T>, alpha: T) -> Vec<T::Real> {
+    fn scale_surface(
+        &self,
+        surface: Vec<Self::Scalar>,
+        domain: &Domain<Self::Scalar>,
+        alpha: Self::Scalar,
+    ) -> Vec<Self::Scalar> {
         let dim = 3;
         // Translate box to specified centre, and scale
         let scaled_diameter = self.diameter(domain);
         let dilated_diameter = scaled_diameter.map(|d| d * alpha);
 
-        let mut scaled_surface = vec![T::real(0.); surface.len()];
+        let mut scaled_surface = vec![T::zero(); surface.len()];
 
         let centre = self.centre(domain);
 
         let two = T::from(2.0).unwrap();
         let ncoeffs = surface.len() / 3;
         for i in 0..ncoeffs {
-            scaled_surface[i] =
-                (surface[i] * T::real(dilated_diameter[0] / two)) + T::real(centre[0]);
+            scaled_surface[i] = (surface[i] * T::from(dilated_diameter[0] / two).unwrap())
+                + T::from(centre[0]).unwrap();
             scaled_surface[(dim - 2) * ncoeffs + i] = (surface[(dim - 2) * ncoeffs + i]
-                * T::real(dilated_diameter[1] / two))
-                + T::real(centre[1]);
+                * T::from(dilated_diameter[1] / two).unwrap())
+                + T::from(centre[1]).unwrap();
             scaled_surface[(dim - 1) * ncoeffs + i] = (surface[(dim - 1) * ncoeffs + i]
-                * T::real(dilated_diameter[2] / two))
-                + T::real(centre[2]);
+                * T::from(dilated_diameter[2] / two).unwrap())
+                + T::from(centre[2]).unwrap();
         }
 
         scaled_surface
     }
 
-    fn surface_grid(&self, expansion_order: usize, domain: &Domain<T>, alpha: T) -> Vec<T::Real> {
+    fn surface_grid(
+        &self,
+        expansion_order: usize,
+        domain: &Domain<Self::Scalar>,
+        alpha: Self::Scalar,
+    ) -> Vec<Self::Scalar> {
         let surface: Vec<T> = surface_grid(expansion_order);
 
         self.scale_surface(surface, domain, alpha)
@@ -1047,7 +1076,7 @@ use mpi::{
 };
 
 #[cfg(feature = "mpi")]
-unsafe impl<T: RlstScalarFloat<Real = T>> Equivalence for MortonKey<T> {
+unsafe impl<T: RlstScalar + Float> Equivalence for MortonKey<T> {
     type Out = UserDatatype;
     fn equivalent_datatype() -> Self::Out {
         UserDatatype::structured(
@@ -1078,7 +1107,7 @@ mod test {
 
     /// Implementation of Algorithm 12 in [1]. to compare the ordering of two **Morton Keys**. If key
     /// `a` is less than key `b`, this function evaluates to true.
-    fn less_than<T: RlstScalarFloat<Real = T>>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
+    fn less_than<T: RlstScalar + Float>(a: &MortonKey<T>, b: &MortonKey<T>) -> Option<bool> {
         // If anchors match, the one at the coarser level has the lesser Morton id.
         let same_anchor = (a.anchor[0] == b.anchor[0])
             & (a.anchor[1] == b.anchor[1])

@@ -1,36 +1,53 @@
-//! Multipole to Local field translations for uniform and adaptive Kernel Indepenent FMMs
-use crate::fmm::field_translation::source_to_target::matmul::matmul8x8;
-use crate::fmm::helpers::{chunk_size, homogenous_kernel_scale, m2l_scale};
-use crate::fmm::types::{FftFieldTranslation, FmmEvalType, KiFmm, SendPtrMut};
-use crate::traits::tree::FmmTree;
-use crate::traits::{fftw::RealToComplexFft3D, fmm::SourceToTargetTranslation, tree::Tree};
-use crate::tree::{
-    constants::{NHALO, NSIBLINGS},
-    types::{MortonKey, SingleNodeTree},
-};
-use crate::{RlstScalarComplexFloat, RlstScalarFloat};
-
-use green_kernels::traits::Kernel;
-use itertools::Itertools;
-use num::Complex;
-use rayon::prelude::*;
-use rlst::Array;
-use rlst::BaseArray;
-use rlst::VectorContainer;
-use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess};
-use rlst::{MatrixSvd, RandomAccessMut};
+//! Multipole to local field translation trait implementation using FFT.
 use std::{collections::HashSet, sync::RwLock};
 
-impl<T, U, V> KiFmm<V, FftFieldTranslation<U, T>, T, U>
+use itertools::Itertools;
+use num::Zero;
+use rayon::prelude::*;
+use rlst::{
+    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
+};
+
+use green_kernels::traits::Kernel as KernelTrait;
+
+use crate::{
+    fmm::{
+        field_translation::source_to_target::matvec::matvec8x8,
+        helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
+        types::{FmmEvalType, SendPtrMut},
+        KiFmm,
+    },
+    traits::{
+        fftw::Dft,
+        fmm::SourceToTargetTranslation,
+        general::AsComplex,
+        tree::{FmmTree, Tree},
+    },
+    tree::{
+        constants::{NHALO, NSIBLINGS},
+        types::MortonKey,
+    },
+    FftFieldTranslation, Fmm,
+};
+
+impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar, Kernel>>
 where
-    T: Kernel<T = U> + std::marker::Send + std::marker::Sync + Default,
-    U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
-    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: RlstScalarComplexFloat,
+    Scalar: RlstScalar
+        + AsComplex
+        + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
+        + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
 {
+    /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
+    /// to target cluster.
+    ///
+    /// Returns a vector of read-write locked index vectors, of length 26 - i.e. the number of unique halo positions
+    /// between a target cluster and its source clusters for homogenous kernels. Each element consists of a vector
+    /// of indices containing the index of the source cluster multipole coefficients being translated for each target
+    /// cluster index respectively.
     fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
-        let targets = self.tree.target_tree().keys(level).unwrap();
+        let targets = self.tree().target_tree().keys(level).unwrap();
 
         let targets_parents: HashSet<MortonKey<_>> =
             targets.iter().map(|target| target.parent()).collect();
@@ -38,7 +55,7 @@ where
         targets_parents.sort();
         let ntargets_parents = targets_parents.len();
 
-        let sources = self.tree.source_tree().keys(level).unwrap();
+        let sources = self.tree().source_tree().keys(level).unwrap();
 
         let sources_parents: HashSet<MortonKey<_>> =
             sources.iter().map(|source| source.parent()).collect();
@@ -80,32 +97,29 @@ where
     }
 }
 
-impl<T, U, V> SourceToTargetTranslation for KiFmm<V, FftFieldTranslation<U, T>, T, U>
+impl<Scalar, Kernel> SourceToTargetTranslation
+    for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar, Kernel>>
 where
-    T: Kernel<T = U> + Default + Send + Sync,
-    U: RlstScalarFloat<Real = U> + RealToComplexFft3D,
-    Array<U, BaseArray<U, VectorContainer<U>, 2>, 2>: MatrixSvd<Item = U>,
-    V: FmmTree<Tree = SingleNodeTree<U>> + Send + Sync,
-    Complex<U>: RlstScalarComplexFloat,
+    Scalar: RlstScalar
+        + AsComplex
+        + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
+        + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                let Some(targets) = self.tree.target_tree().keys(level) else {
+                let Some(targets) = self.tree().target_tree().keys(level) else {
                     return;
                 };
-
-                let Some(sources) = self.tree.source_tree().keys(level) else {
+                let Some(sources) = self.tree().source_tree().keys(level) else {
                     return;
                 };
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
                 let nsources = sources.len();
-
-                // Size of convolution grid
-                let nconv = 2 * self.expansion_order - 1;
-                let nconv_pad = nconv + 1;
 
                 // Find parents of targets
                 let targets_parents: HashSet<MortonKey<_>> =
@@ -118,11 +132,12 @@ where
                     sources.iter().map(|source| source.parent()).collect();
                 let nsources_parents = sources_parents.len();
 
-                // Size of FFT sequence
-                let fft_size = nconv_pad * nconv_pad * nconv_pad;
+                // Size of input FFT sequence
+                let shape_in = <Scalar as Dft>::shape_in(self.expansion_order);
+                let size_in: usize = <Scalar as Dft>::size_in(self.expansion_order);
 
-                // Size of real FFT sequence
-                let fft_size_real = nconv_pad * nconv_pad * (nconv_pad / 2 + 1);
+                // Size of transformed FFT sequence
+                let size_out = <Scalar as Dft>::size_out(self.expansion_order);
 
                 // Calculate displacements of multipole data with respect to source tree
                 let all_displacements = self.displacements(level);
@@ -130,20 +145,21 @@ where
                 // Lookup multipole data from source tree
                 let min = &sources[0];
                 let max = &sources[nsources - 1];
-                let min_idx = self.tree.source_tree().index(min).unwrap();
-                let max_idx = self.tree.source_tree().index(max).unwrap();
+                let min_idx = self.tree().source_tree().index(min).unwrap();
+                let max_idx = self.tree().source_tree().index(max).unwrap();
                 let multipoles =
                     &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
                 let mut signals_hat_f_buffer =
-                    vec![U::zero(); fft_size_real * (nsources + nzeros) * 2];
-                let signals_hat_f: &mut [Complex<U>];
+                    vec![Scalar::zero(); size_out * (nsources + nzeros) * 2];
+                let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
-                    let ptr = signals_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
+                    let ptr = signals_hat_f_buffer.as_mut_ptr()
+                        as *mut <Scalar as AsComplex>::ComplexType;
                     signals_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, fft_size_real * (nsources + nzeros));
+                        std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
                 }
 
                 // A thread safe mutable pointer for saving to this vector
@@ -163,33 +179,33 @@ where
                 let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
-                // Allocate check potentials (implicitly in frequency order)
                 let mut check_potentials_hat_f_buffer =
-                    vec![U::zero(); 2 * fft_size_real * ntargets];
-                let check_potentials_hat_f: &mut [Complex<U>];
+                    vec![Scalar::zero(); 2 * size_out * ntargets];
+                let check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
-                    let ptr = check_potentials_hat_f_buffer.as_mut_ptr() as *mut Complex<U>;
+                    let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
+                        as *mut <Scalar as AsComplex>::ComplexType;
                     check_potentials_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, fft_size_real * ntargets);
+                        std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
                 }
 
                 // Amount to scale the application of the kernel by
-                let scale =
-                    Complex::from(m2l_scale::<U>(level).unwrap() * homogenous_kernel_scale(level));
+                let scale = m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
+                    * homogenous_kernel_scale(level);
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft = &self.source_to_target.metadata.kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
-                let mut check_potential_hat = vec![U::zero(); fft_size_real * ntargets * 2];
+                let mut check_potential_hat = vec![Scalar::zero(); size_out * ntargets * 2];
 
                 // Allocate buffer to store the check potentials in box order
-                let mut check_potential = vec![U::zero(); fft_size * ntargets];
+                let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
                 let check_potential_hat_c;
                 unsafe {
-                    let ptr = check_potential_hat.as_mut_ptr() as *mut Complex<U>;
-                    check_potential_hat_c =
-                        std::slice::from_raw_parts_mut(ptr, fft_size_real * ntargets)
+                    let ptr =
+                        check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
+                    check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
                 }
 
                 // 1. Compute FFT of all multipoles in source boxes at this level
@@ -200,12 +216,12 @@ where
                         .for_each(|(i, multipole_chunk)| {
                             // Place Signal on convolution grid
                             let mut signal_chunk =
-                                vec![U::zero(); fft_size * NSIBLINGS * chunk_size_pre_proc];
+                                vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
                                 let multipole =
                                     &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
-                                let signal = &mut signal_chunk[i * fft_size..(i + 1) * fft_size];
+                                let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
                                 for (surf_idx, &conv_idx) in
                                     self.source_to_target.surf_to_conv_map.iter().enumerate()
                                 {
@@ -214,45 +230,46 @@ where
                             }
 
                             // Temporary buffer to hold results of FFT
-                            let signal_hat_chunk_buffer =
-                                vec![
-                                    U::zero();
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc * 2
+                            let signal_hat_chunk_buffer = vec![
+                                    <Scalar as AsComplex>::ComplexType::zero();
+                                    size_out * NSIBLINGS * chunk_size_pre_proc * 2
                                 ];
                             let signal_hat_chunk_c;
                             unsafe {
-                                let ptr = signal_hat_chunk_buffer.as_ptr() as *mut Complex<U>;
+                                let ptr = signal_hat_chunk_buffer.as_ptr()
+                                    as *mut <Scalar as AsComplex>::ComplexType;
                                 signal_hat_chunk_c = std::slice::from_raw_parts_mut(
                                     ptr,
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc,
+                                    size_out * NSIBLINGS * chunk_size_pre_proc,
                                 );
                             }
 
-                            let _ = U::r2c_batch(
+                            let _ = Scalar::forward_dft_batch(
                                 &mut signal_chunk,
                                 signal_hat_chunk_c,
-                                &[nconv_pad, nconv_pad, nconv_pad],
+                                &shape_in,
                             );
 
                             // Re-order the temporary buffer into frequency order before flushing to main memory
                             let signal_hat_chunk_f_buffer =
                                 vec![
-                                    U::zero();
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc * 2
+                                    Scalar::zero();
+                                    size_out * NSIBLINGS * chunk_size_pre_proc * 2
                                 ];
                             let signal_hat_chunk_f_c;
                             unsafe {
-                                let ptr = signal_hat_chunk_f_buffer.as_ptr() as *mut Complex<U>;
+                                let ptr = signal_hat_chunk_f_buffer.as_ptr()
+                                    as *mut <Scalar as AsComplex>::ComplexType;
                                 signal_hat_chunk_f_c = std::slice::from_raw_parts_mut(
                                     ptr,
-                                    fft_size_real * NSIBLINGS * chunk_size_pre_proc,
+                                    size_out * NSIBLINGS * chunk_size_pre_proc,
                                 );
                             }
 
-                            for i in 0..fft_size_real {
+                            for i in 0..size_out {
                                 for j in 0..NSIBLINGS * chunk_size_pre_proc {
                                     signal_hat_chunk_f_c[NSIBLINGS * chunk_size_pre_proc * i + j] =
-                                        signal_hat_chunk_c[fft_size_real * j + i]
+                                        signal_hat_chunk_c[size_out * j + i]
                                 }
                             }
 
@@ -263,7 +280,7 @@ where
                                 // Pointer to storage buffer for frequency ordered FFT of signals
                                 let ptr = signals_hat_f_ptr;
 
-                                for i in 0..fft_size_real {
+                                for i in 0..size_out {
                                     let frequency_offset = i * (nsources + nzeros);
 
                                     // Head of buffer for each frequency
@@ -290,7 +307,7 @@ where
 
                 // 2. Compute the Hadamard product
                 {
-                    (0..fft_size_real)
+                    (0..size_out)
                         .into_par_iter()
                         .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
                         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
@@ -317,7 +334,7 @@ where
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
 
-                                            matmul8x8(
+                                            matvec8x8::<<Scalar as AsComplex>::ComplexType>(
                                                 k_f,
                                                 s_f,
                                                 &mut save_locations
@@ -334,44 +351,44 @@ where
                 // 3. Post process to find local expansions at target boxes
                 {
                     check_potential_hat_c
-                        .par_chunks_exact_mut(fft_size_real)
+                        .par_chunks_exact_mut(size_out)
                         .enumerate()
                         .for_each(|(i, check_potential_hat_chunk)| {
                             // Lookup all frequencies for this target box
-                            for j in 0..fft_size_real {
+                            for j in 0..size_out {
                                 check_potential_hat_chunk[j] =
                                     check_potentials_hat_f[j * ntargets + i]
                             }
                         });
 
                     // Compute inverse FFT
-                    let _ = U::c2r_batch_par(
+                    let _ = Scalar::backward_dft_batch_par(
                         check_potential_hat_c,
                         &mut check_potential,
-                        &[nconv_pad, nconv_pad, nconv_pad],
+                        &shape_in,
                     );
 
                     check_potential
-                        .par_chunks_exact(NSIBLINGS * fft_size)
+                        .par_chunks_exact(NSIBLINGS * size_in)
                         .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
                         .for_each(|(check_potential_chunk, local_ptrs)| {
                             // Map to surface grid
                             let mut potential_chunk =
-                                rlst_dynamic_array2!(U, [self.ncoeffs, NSIBLINGS]);
+                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, NSIBLINGS]);
 
                             for i in 0..NSIBLINGS {
                                 for (surf_idx, &conv_idx) in
                                     self.source_to_target.conv_to_surf_map.iter().enumerate()
                                 {
                                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
-                                        check_potential_chunk[i * fft_size + conv_idx];
+                                        check_potential_chunk[i * size_in + conv_idx];
                                 }
                             }
 
                             // Can now find local expansion coefficients
-                            let local_chunk = empty_array::<U, 2>().simple_mult_into_resize(
+                            let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.dc2e_inv_1.view(),
-                                empty_array::<U, 2>().simple_mult_into_resize(
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
                                     self.dc2e_inv_2.view(),
                                     potential_chunk,
                                 ),
@@ -390,9 +407,8 @@ where
                         });
                 }
             }
-
             FmmEvalType::Matrix(_nmatvecs) => {
-                panic!("unimplemented FFT M2L for Matrix input")
+                panic!("unimplemented for Matrix input")
             }
         }
     }

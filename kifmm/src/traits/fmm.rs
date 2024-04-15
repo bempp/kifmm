@@ -1,7 +1,9 @@
 //! FMM traits
-use crate::{fmm::types::Charges, traits::tree::FmmTree, RlstScalarFloat};
+use crate::{fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
+
+use super::tree::Tree;
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -62,34 +64,38 @@ pub trait SourceToTargetTranslation {
 /// potentials, and managing the underlying tree structure and kernel functions.
 pub trait Fmm
 where
-    <Self::Scalar as RlstScalar>::Real: RlstScalarFloat,
+    Self::Scalar: RlstScalar,
 {
     /// Data associated with FMM, must implement RlstScalar.
-    type Scalar: RlstScalarFloat;
-
-    /// Node index for accessing data in the tree.
-    type Node;
+    type Scalar;
 
     /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
-    type Tree: FmmTree<Scalar = Self::Scalar>;
+    type Tree: FmmTree;
 
     /// Kernel associated with this FMMl
-    type Kernel: Kernel;
+    type Kernel: Kernel<T = Self::Scalar>;
 
     /// Get the multipole expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The source node.
-    fn multipole(&self, key: &Self::Node) -> Option<&[Self::Scalar]>;
+    fn multipole(
+        &self,
+        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<&[Self::Scalar]>;
 
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
-    fn local(&self, key: &Self::Node) -> Option<&[Self::Scalar]>;
+    fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node)
+        -> Option<&[Self::Scalar]>;
 
     /// Get the potential data associated with the particles contained at a given node
     /// # Arguments
     /// * `key` - The target leaf node.
-    fn potential(&self, leaf: &Self::Node) -> Option<Vec<&[Self::Scalar]>>;
+    fn potential(
+        &self,
+        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get the expansion order associated with this FMM
     fn expansion_order(&self) -> usize;

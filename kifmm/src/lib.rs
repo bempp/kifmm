@@ -98,37 +98,5 @@ pub use fmm::types::SingleNodeFmmTree;
 #[doc(inline)]
 pub use fmm::types::MultiNodeFmmTree;
 
-#[cfg(feature = "mpi")]
-use mpi::traits::Equivalence;
-
-use num::Float;
-use num_complex::ComplexFloat;
-use rlst::RlstScalar;
-use rlst::{c32, c64};
 #[doc(inline)]
 pub use traits::fmm::Fmm;
-
-/// Super trait of RlstScalar and  Float trait
-pub trait RlstScalarFloat: RlstScalar + Float + Default {}
-
-/// Super trait of RlstScalar and Complex Float trait
-pub trait RlstScalarComplexFloat: RlstScalar + ComplexFloat + Default {}
-
-#[cfg(feature = "mpi")]
-/// Super trait of RlstScalar and Float trait, and MPI Equivalence trait
-pub trait RlstScalarFloatMpi: RlstScalarFloat + Equivalence {}
-
-#[cfg(feature = "mpi")]
-/// Super trait of RlstScalar and Complex Float trait, and MPI Equivalence trait
-pub trait RlstScalarComplexFloatMpi: RlstScalarFloatMpi + Equivalence {}
-
-impl RlstScalarFloat for f64 {}
-impl RlstScalarFloat for f32 {}
-
-#[cfg(feature = "mpi")]
-impl RlstScalarFloatMpi for f64 {}
-#[cfg(feature = "mpi")]
-impl RlstScalarFloatMpi for f32 {}
-
-impl RlstScalarComplexFloat for c64 {}
-impl RlstScalarComplexFloat for c32 {}

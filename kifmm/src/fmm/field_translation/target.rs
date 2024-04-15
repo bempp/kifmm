@@ -1,22 +1,7 @@
-//! # Local Translations
+//! Local expansion translations
+
 use std::collections::HashSet;
 
-use crate::fmm::helpers::chunk_size;
-use crate::fmm::{
-    constants::L2L_MAX_CHUNK_SIZE,
-    types::{FmmEvalType, KiFmm},
-};
-use crate::traits::{
-    field::SourceToTargetData,
-    fmm::TargetTranslation,
-    tree::{FmmTree, Tree},
-};
-use crate::tree::{
-    constants::NSIBLINGS,
-    types::{MortonKey, SingleNodeTree},
-};
-use crate::RlstScalarFloat;
-use green_kernels::traits::Kernel;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
@@ -24,13 +9,25 @@ use rlst::{
     RawAccessMut, RlstScalar,
 };
 
-impl<T, U, V, W> TargetTranslation for KiFmm<T, U, V, W>
+use green_kernels::traits::Kernel as KernelTrait;
+
+use crate::{
+    fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
+    traits::{
+        field::SourceToTargetData as SourceToTargetDataTrait,
+        fmm::TargetTranslation,
+        tree::{FmmTree, Tree},
+    },
+    tree::{constants::NSIBLINGS, types::MortonKey},
+};
+
+impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
+    for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
-    T: FmmTree<Tree = SingleNodeTree<W::Real>, Node = MortonKey<W::Real>> + Send + Sync,
-    U: SourceToTargetData + Send + Sync,
-    V: Kernel<T = W>,
-    W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat,
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar> + Send + Sync,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
 {
     fn l2l(&self, level: u64) {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
@@ -68,7 +65,8 @@ where
                     .par_chunks_exact(chunk_size)
                     .zip(child_locals.par_chunks_exact(NSIBLINGS * chunk_size))
                     .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-                        let mut parent_locals = rlst_dynamic_array2!(W, [self.ncoeffs, chunk_size]);
+                        let mut parent_locals =
+                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
                         for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
                             .iter()
                             .enumerate()
@@ -85,7 +83,7 @@ where
                         }
 
                         for i in 0..NSIBLINGS {
-                            let tmp = empty_array::<W, 2>().simple_mult_into_resize(
+                            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.target_vec[i].view(),
                                 parent_locals.view(),
                             );
@@ -127,7 +125,8 @@ where
                     .into_par_iter()
                     .zip(child_locals.par_chunks_exact(NSIBLINGS))
                     .for_each(|(parent_local_pointers, child_locals_pointers)| {
-                        let mut parent_locals = rlst_dynamic_array2!(W, [self.ncoeffs, nmatvecs]);
+                        let mut parent_locals =
+                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
                         for (charge_vec_idx, parent_local_pointer) in
                             parent_local_pointers.iter().enumerate().take(nmatvecs)
@@ -143,7 +142,7 @@ where
                         for (i, child_locals_i) in
                             child_locals_pointers.iter().enumerate().take(NSIBLINGS)
                         {
-                            let result_i = empty_array::<W, 2>().simple_mult_into_resize(
+                            let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.target_vec[i].view(),
                                 parent_locals.view(),
                             );
@@ -203,7 +202,7 @@ where
                                     [self.dim, 1]
                                 );
                                 let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
+                                    rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
                                 target_coordinates_col_major
                                     .fill_from(target_coordinates_row_major.view());
 
@@ -259,7 +258,7 @@ where
                                         [self.dim, 1]
                                     );
                                     let mut target_coordinates_col_major =
-                                        rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
+                                        rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
                                     target_coordinates_col_major
                                         .fill_from(target_coordinates_row_major.view());
 
@@ -292,8 +291,6 @@ where
         }
     }
 
-    fn m2p(&self) {}
-
     fn p2p(&self) {
         let Some(leaves) = self.tree.target_tree().all_leaves() else {
             return;
@@ -322,7 +319,7 @@ where
                                 [self.dim, 1]
                             );
                             let mut target_coordinates_col_major =
-                                rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
+                                rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
                             target_coordinates_col_major
                                 .fill_from(target_coordinates_row_major.view());
 
@@ -359,8 +356,10 @@ where
                                             [nsources, self.dim],
                                             [self.dim, 1]
                                         );
-                                        let mut source_coordinates_col_major =
-                                            rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
+                                        let mut source_coordinates_col_major = rlst_dynamic_array2!(
+                                            Scalar::Real,
+                                            [nsources, self.dim]
+                                        );
                                         source_coordinates_col_major
                                             .fill_from(source_coordinates_row_major.view());
 
@@ -406,7 +405,7 @@ where
                                     [self.dim, 1]
                                 );
                                 let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(W::Real, [ntargets, self.dim]);
+                                    rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
                                 target_coordinates_col_major
                                     .fill_from(target_coordinates_row_major.view());
 
@@ -446,8 +445,10 @@ where
                                             [nsources, self.dim],
                                             [self.dim, 1]
                                         );
-                                        let mut source_coordinates_col_major =
-                                            rlst_dynamic_array2!(W::Real, [nsources, self.dim]);
+                                        let mut source_coordinates_col_major = rlst_dynamic_array2!(
+                                            Scalar::Real,
+                                            [nsources, self.dim]
+                                        );
                                         source_coordinates_col_major
                                             .fill_from(source_coordinates_row_major.view());
 
@@ -475,4 +476,6 @@ where
             }
         }
     }
+
+    fn m2p(&self) {}
 }

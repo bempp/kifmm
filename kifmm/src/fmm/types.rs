@@ -1,16 +1,24 @@
 //! Data structures for kernel independent FMM
-use crate::traits::{field::SourceToTargetData, tree::FmmTree};
-use crate::tree::types::{Domain, MortonKey, SingleNodeTree};
-use crate::{RlstScalarComplexFloat, RlstScalarFloat};
-use green_kernels::{traits::Kernel, types::EvalType};
-use num::Complex;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 use std::collections::HashMap;
+
+use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use num::traits::Float;
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
+
+use crate::{
+    traits::{
+        fftw::Dft,
+        field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait},
+        general::AsComplex,
+    },
+    tree::types::{Domain, MortonKey, SingleNodeTree},
+};
 
 #[cfg(feature = "mpi")]
 use crate::tree::types::MultiNodeTree;
+
 #[cfg(feature = "mpi")]
-use crate::RlstScalarFloatMpi;
+use mpi::traits::Equivalence;
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in column-major order.
@@ -152,27 +160,24 @@ pub struct SendPtr<T> {
 ///
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
 /// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
-///
-///
-pub struct KiFmm<T, U, V, W>
+pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where
-    T: FmmTree<Tree = SingleNodeTree<W::Real>>,
-    U: SourceToTargetData,
-    V: Kernel,
-    W: RlstScalarFloat,
-    <W as RlstScalar>::Real: RlstScalarFloat,
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar>,
+    SourceToTargetData: SourceToTargetDataTrait,
+    <Scalar as RlstScalar>::Real: Default,
 {
     /// Dimension of the FMM
     pub dim: usize,
 
     /// A single node tree
-    pub tree: T,
+    pub tree: SingleNodeFmmTree<Scalar::Real>,
 
     /// The associated kernel function
-    pub kernel: V,
+    pub kernel: Kernel,
 
     /// The charge data at each target leaf box.
-    pub charges: Vec<W>,
+    pub charges: Vec<Scalar>,
 
     /// The expansion order of the FMM
     pub expansion_order: usize,
@@ -196,73 +201,122 @@ where
     pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_surfaces_sources: Vec<W::Real>,
+    pub leaf_upward_surfaces_sources: Vec<Scalar::Real>,
 
     /// Upward surfaces associated with target leaves
-    pub leaf_upward_surfaces_targets: Vec<W::Real>,
+    pub leaf_upward_surfaces_targets: Vec<Scalar::Real>,
 
     /// Scales of each source leaf box
-    pub leaf_scales_sources: Vec<W>,
+    pub leaf_scales_sources: Vec<Scalar>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_1: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+    pub uc2e_inv_1: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_2: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+    pub uc2e_inv_2: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_1: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+    pub dc2e_inv_1: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_2: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+    pub dc2e_inv_2: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
 
     /// Data and metadata for field translations
-    pub source_to_target: U,
+    pub source_to_target: SourceToTargetData,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub source: Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>,
+    pub source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
 
     /// The metadata required for source to source translation
-    pub source_vec: Vec<Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>>,
+    pub source_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_vec: Vec<Array<W, BaseArray<W, VectorContainer<W>, 2>, 2>>,
+    pub target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The multipole expansion data at each box.
-    pub multipoles: Vec<W>,
+    pub multipoles: Vec<Scalar>,
 
     /// The local expansion at each box
-    pub locals: Vec<W>,
+    pub locals: Vec<Scalar>,
 
     /// The evaluated potentials at each target leaf box.
-    pub potentials: Vec<W>,
+    pub potentials: Vec<Scalar>,
 
     /// Multipole expansions at leaf level
-    pub leaf_multipoles: Vec<Vec<SendPtrMut<W>>>,
+    pub leaf_multipoles: Vec<Vec<SendPtrMut<Scalar>>>,
 
     /// Multipole expansions at each level
-    pub level_multipoles: Vec<Vec<Vec<SendPtrMut<W>>>>,
+    pub level_multipoles: Vec<Vec<Vec<SendPtrMut<Scalar>>>>,
 
     /// Local expansions at the leaf level
-    pub leaf_locals: Vec<Vec<SendPtrMut<W>>>,
+    pub leaf_locals: Vec<Vec<SendPtrMut<Scalar>>>,
 
     /// The local expansion data at each level.
-    pub level_locals: Vec<Vec<Vec<SendPtrMut<W>>>>,
+    pub level_locals: Vec<Vec<Vec<SendPtrMut<Scalar>>>>,
 
     /// Index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_locals: Vec<HashMap<MortonKey<W::Real>, usize>>,
+    pub level_index_pointer_locals: Vec<HashMap<MortonKey<Scalar::Real>, usize>>,
 
     /// Index pointers to each key at a given level, indexed by level.
-    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<W::Real>, usize>>,
+    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<Scalar::Real>, usize>>,
 
     /// The evaluated potentials at each target leaf box.
-    pub potentials_send_pointers: Vec<SendPtrMut<W>>,
+    pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
 }
+impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar> + Default,
+    SourceToTargetData: SourceToTargetDataTrait + Default,
+    <Scalar as RlstScalar>::Real: Default,
+{
+    fn default() -> Self {
+        let uc2e_inv_1 = rlst_dynamic_array2!(Scalar, [1, 1]);
+        let uc2e_inv_2 = rlst_dynamic_array2!(Scalar, [1, 1]);
+        let dc2e_inv_1 = rlst_dynamic_array2!(Scalar, [1, 1]);
+        let dc2e_inv_2 = rlst_dynamic_array2!(Scalar, [1, 1]);
+        let source = rlst_dynamic_array2!(Scalar, [1, 1]);
 
+        KiFmm {
+            tree: SingleNodeFmmTree::default(),
+            source_to_target: SourceToTargetData::default(),
+            kernel: Kernel::default(),
+            expansion_order: 0,
+            fmm_eval_type: FmmEvalType::Vector,
+            kernel_eval_type: EvalType::Value,
+            kernel_eval_size: 0,
+            dim: 0,
+            ncoeffs: 0,
+            uc2e_inv_1,
+            uc2e_inv_2,
+            dc2e_inv_1,
+            dc2e_inv_2,
+            source,
+            source_vec: Vec::default(),
+            target_vec: Vec::default(),
+            multipoles: Vec::default(),
+            locals: Vec::default(),
+            leaf_multipoles: Vec::default(),
+            level_multipoles: Vec::default(),
+            leaf_locals: Vec::default(),
+            level_locals: Vec::default(),
+            level_index_pointer_locals: Vec::default(),
+            level_index_pointer_multipoles: Vec::default(),
+            potentials: Vec::default(),
+            potentials_send_pointers: Vec::default(),
+            leaf_upward_surfaces_sources: Vec::default(),
+            leaf_upward_surfaces_targets: Vec::default(),
+            charges: Vec::default(),
+            charge_index_pointer_sources: Vec::default(),
+            charge_index_pointer_targets: Vec::default(),
+            leaf_scales_sources: Vec::default(),
+        }
+    }
+}
 /// Specifies the format of the input data for Fast Multipole Method (FMM) calculations.
 ///
 /// This enum is used to indicate whether the input to the FMM algorithm consists
@@ -370,26 +424,27 @@ pub enum FmmEvalType {
 /// with source and target points, charge data, and specifying FMM parameters like the kernel
 /// and expansion order, before finally building the KiFMM object.
 #[derive(Default)]
-pub struct SingleNodeBuilder<T, U, V>
+pub struct SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
-    T: SourceToTargetData,
-    U: RlstScalarFloat<Real = U>,
-    V: Kernel,
+    Scalar: RlstScalar + Default,
+    Kernel: KernelTrait<T = Scalar> + Clone,
+    SourceToTargetData: ConfigureSourceToTargetData,
+    <Scalar as RlstScalar>::Real: Default,
 {
     /// Tree
-    pub tree: Option<SingleNodeFmmTree<U>>,
+    pub tree: Option<SingleNodeFmmTree<Scalar::Real>>,
 
     /// Kernel
-    pub kernel: Option<V>,
+    pub kernel: Option<Kernel>,
 
     /// Charges
-    pub charges: Option<Charges<U>>,
+    pub charges: Option<Charges<Scalar>>,
 
     /// Data and metadata for field translations
-    pub source_to_target: Option<T>,
+    pub source_to_target: Option<SourceToTargetData>,
 
     /// Domain
-    pub domain: Option<Domain<U>>,
+    pub domain: Option<Domain<Scalar::Real>>,
 
     /// Expansion order
     pub expansion_order: Option<usize>,
@@ -421,7 +476,7 @@ where
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[derive(Default)]
-pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T>> {
+pub struct SingleNodeFmmTree<T: RlstScalar + Float + Default> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
@@ -447,7 +502,7 @@ pub struct SingleNodeFmmTree<T: RlstScalarFloat<Real = T>> {
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[cfg(feature = "mpi")]
-pub struct MultiNodeFmmTree<T: RlstScalarFloatMpi<Real = T>> {
+pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: MultiNodeTree<T>,
     /// An octree structure containing the target points for the FMM calculation.
@@ -475,12 +530,11 @@ pub struct MultiNodeFmmTree<T: RlstScalarFloatMpi<Real = T>> {
 /// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
 ///   used to control the accuracy and computational complexity of the FMM.
 #[derive(Default)]
-pub struct FftFieldTranslation<T, U>
+pub struct FftFieldTranslation<Scalar, Kernel>
 where
-    T: RlstScalarFloat,
-    <T as RlstScalar>::Real: RlstScalarFloat,
-    U: Kernel<T = T> + Default,
-    Complex<T>: RlstScalarComplexFloat,
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
+    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
@@ -489,13 +543,13 @@ where
     pub conv_to_surf_map: Vec<usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
-    pub metadata: FftMetadata<Complex<T>>,
+    pub metadata: FftMetadata<<Scalar as AsComplex>::ComplexType>,
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
-    pub transfer_vectors: Vec<TransferVector<T::Real>>,
+    pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
     /// The associated kernel with this translation operator.
-    pub kernel: U,
+    pub kernel: Kernel,
 
     /// Expansion order
     pub expansion_order: usize,
@@ -524,23 +578,22 @@ where
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
 ///    matrices corresponding to unique transfer vectors.
 #[derive(Default)]
-pub struct BlasFieldTranslation<T, U>
+pub struct BlasFieldTranslation<Scalar, Kernel>
 where
-    T: RlstScalarFloat,
-    U: Kernel<T = T> + Default,
-    <T as RlstScalar>::Real: RlstScalarFloat,
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar> + Default,
 {
     /// Threshold
-    pub threshold: T::Real,
+    pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: BlasMetadata<T>,
+    pub metadata: BlasMetadata<Scalar>,
 
     /// Unique transfer vectors corresponding to each metadata
-    pub transfer_vectors: Vec<TransferVector<T::Real>>,
+    pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
     /// The associated kernel with this translation operator.
-    pub kernel: U,
+    pub kernel: Kernel,
 
     /// Expansion order
     pub expansion_order: usize,
@@ -568,7 +621,7 @@ where
 #[derive(Debug)]
 pub struct TransferVector<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Three vector of components.
     pub components: [i64; 3],
@@ -603,7 +656,7 @@ where
 #[derive(Default)]
 pub struct FftMetadata<T>
 where
-    T: RlstScalarComplexFloat,
+    T: RlstScalar,
 {
     /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster
     pub kernel_data: Vec<Vec<T>>,
@@ -663,7 +716,7 @@ where
 /// - `c_vt`- Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 pub struct BlasMetadata<T>
 where
-    T: RlstScalarFloat,
+    T: RlstScalar,
 {
     /// Left singular vectors from SVD of fat M2L matrix, truncated to a maximum cutoff rank
     pub u: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -680,7 +733,7 @@ where
 
 impl<T> Default for BlasMetadata<T>
 where
-    T: RlstScalarFloat,
+    T: RlstScalar,
 {
     fn default() -> Self {
         let u = rlst_dynamic_array2!(T, [1, 1]);

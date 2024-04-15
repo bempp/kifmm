@@ -1,16 +1,17 @@
 //! Data structures to create distributed octrees with MPI.
 
 #[cfg(feature = "mpi")]
-use crate::RlstScalarFloatMpi;
+use mpi::traits::Equivalence;
+
 #[cfg(feature = "mpi")]
 use mpi::topology::UserCommunicator;
+use num::Float;
+use rlst::RlstScalar;
 
 use std::{
     collections::{HashMap, HashSet},
     marker::PhantomData,
 };
-
-use crate::RlstScalarFloat;
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
@@ -24,7 +25,7 @@ use crate::RlstScalarFloat;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
     pub origin: [T; 3],
@@ -53,7 +54,7 @@ where
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MortonKey<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar,
 {
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
@@ -67,7 +68,7 @@ where
 #[derive(Clone, Debug, Default)]
 pub struct MortonKeys<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar,
 {
     /// A vector of Morton_keys
     pub keys: Vec<MortonKey<T>>,
@@ -125,7 +126,7 @@ where
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T>
 where
-    T: RlstScalarFloatMpi<Real = T>,
+    T: RlstScalar + Float + Equivalence,
 {
     /// Global communicator for this Tree
     pub world: UserCommunicator,
@@ -194,7 +195,7 @@ where
 #[derive(Clone, Debug, Default, Copy)]
 pub struct Point<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Physical coordinate in Cartesian space.
     pub coordinate: [T; 3],
@@ -256,7 +257,7 @@ pub type Points<T> = Vec<Point<T>>;
 #[derive(Default)]
 pub struct SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Depth of a tree.
     pub depth: u64,

@@ -1,19 +1,24 @@
 //! Implementation of constructors for single node trees.
-use crate::traits::tree::Tree;
-use crate::tree::{
-    constants::{DEEPEST_LEVEL, LEVEL_SIZE},
-    morton::encode_anchor,
-    types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
-};
-use crate::RlstScalarFloat;
-use itertools::Itertools;
-use rlst::RlstScalar;
 
 use std::collections::{HashMap, HashSet};
 
+use num::traits::Float;
+
+use itertools::Itertools;
+use rlst::RlstScalar;
+
+use crate::{
+    traits::tree::Tree,
+    tree::{
+        constants::{DEEPEST_LEVEL, LEVEL_SIZE},
+        morton::encode_anchor,
+        types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
+    },
+};
+
 impl<T> SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
@@ -630,7 +635,7 @@ where
 
 impl<T> Tree for SingleNodeTree<T>
 where
-    T: RlstScalarFloat<Real = T>,
+    T: RlstScalar + Float,
 {
     type Scalar = T;
     type Domain = Domain<T>;
@@ -699,7 +704,7 @@ where
         Some(&self.leaves)
     }
 
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[<Self::Scalar as RlstScalar>::Real]> {
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             Some(&self.coordinates[l * 3..r * 3])
         } else {
@@ -707,7 +712,7 @@ where
         }
     }
 
-    fn all_coordinates(&self) -> Option<&[<Self::Scalar as RlstScalar>::Real]> {
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
         Some(&self.coordinates)
     }
 
@@ -794,7 +799,7 @@ mod test {
 
     pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T>])
     where
-        T: RlstScalarFloat<Real = T>,
+        T: RlstScalar + Float,
     {
         let key_set: HashSet<MortonKey<_>> = nodes.iter().cloned().collect();
 
@@ -847,11 +852,8 @@ mod test {
             )
             .0;
 
-        println!("HERE {:?}", leaves_to_points);
-
         // Test that a single octant contains all the points
         for (_, (l, r)) in leaves_to_points.iter() {
-            // println!("HERE {:?} {:?}", r, l);
             if (r - l) > 0 {
                 assert!((r - l) == n_points);
             }
