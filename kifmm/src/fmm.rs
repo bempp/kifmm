@@ -1,5 +1,5 @@
 //! A three dimensional kernel-independent fast multipole method library.
-pub mod builder;
+mod builder;
 pub mod constants;
 pub mod helpers;
 mod multi_node;
