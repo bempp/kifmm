@@ -78,9 +78,9 @@
 #![warn(missing_docs)]
 
 pub mod fftw;
+pub mod fmm;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
-pub mod fmm;
 pub mod traits;
 pub mod tree;
 
