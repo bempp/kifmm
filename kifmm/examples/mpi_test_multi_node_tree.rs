@@ -8,7 +8,7 @@ use rlst::{RawAccess, RlstScalar};
 use kifmm::{traits::tree::Tree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
-use mpi::{environment::Universe, topology::UserCommunicator, traits::Equivalence, traits::*};
+use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};
 
 #[cfg(feature = "mpi")]
 use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
@@ -16,8 +16,8 @@ use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
 /// Test that the leaves on separate nodes do not overlap.
 #[cfg(feature = "mpi")]
 fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
-    world: &UserCommunicator,
-    tree: &MultiNodeTree<T>,
+    world: &SimpleCommunicator,
+    tree: &MultiNodeTree<T, SimpleCommunicator>,
 ) {
     // Communicate bounds from each process
     let max = tree.all_leaves_set().unwrap().iter().max().unwrap();
@@ -53,7 +53,7 @@ fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
 /// Test that the globally defined domain contains all the points at a given node.
 #[cfg(feature = "mpi")]
 fn test_global_bounds<T: RlstScalar + Equivalence + Float + SampleUniform>(
-    world: &UserCommunicator,
+    world: &SimpleCommunicator,
 ) {
     let n_points = 10000;
     let points = points_fixture::<T>(n_points, None, None, None);
@@ -77,8 +77,8 @@ fn test_global_bounds<T: RlstScalar + Equivalence + Float + SampleUniform>(
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
 fn test_n_leaves<T: RlstScalar + Equivalence + Float + SampleUniform>(
-    world: &UserCommunicator,
-    tree: &MultiNodeTree<T>,
+    world: &SimpleCommunicator,
+    tree: &MultiNodeTree<T, SimpleCommunicator>,
 ) {
     let n_leaves = tree.n_leaves().unwrap();
 
@@ -98,8 +98,8 @@ fn test_n_leaves<T: RlstScalar + Equivalence + Float + SampleUniform>(
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
 fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
-    world: &UserCommunicator,
-    tree: &MultiNodeTree<T>,
+    world: &SimpleCommunicator,
+    tree: &MultiNodeTree<T, SimpleCommunicator>,
     points_per_proc: usize,
 ) {
     let n_points = tree.n_coordinates_tot().unwrap();

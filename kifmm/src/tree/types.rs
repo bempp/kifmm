@@ -1,10 +1,8 @@
 //! Data structures to create distributed octrees with MPI.
 
 #[cfg(feature = "mpi")]
-use mpi::traits::Equivalence;
+use mpi::traits::{Communicator, Equivalence};
 
-#[cfg(feature = "mpi")]
-use mpi::topology::UserCommunicator;
 use num::Float;
 use rlst::RlstScalar;
 
@@ -124,12 +122,12 @@ where
 /// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
 ///   checks and deduplication.
 #[cfg(feature = "mpi")]
-pub struct MultiNodeTree<T>
+pub struct MultiNodeTree<T, C: Communicator>
 where
     T: RlstScalar + Float + Equivalence,
 {
     /// Global communicator for this Tree
-    pub world: UserCommunicator,
+    pub world: C,
 
     /// Range of leaf keys at this processor, and their current rank [rank, min, max]
     pub range: [u64; 3],

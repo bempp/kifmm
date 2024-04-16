@@ -9,8 +9,8 @@ use crate::{
 
 use crate::hyksort::hyksort;
 use itertools::Itertools;
+use mpi::topology::SimpleCommunicator;
 use mpi::{
-    topology::UserCommunicator,
     traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
     Rank,
 };
@@ -18,7 +18,7 @@ use num::Float;
 use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 
-impl<T> MultiNodeTree<T>
+impl<T, C: Communicator> MultiNodeTree<T, C>
 where
     T: RlstScalar + Float + Equivalence + Default,
 {
@@ -41,9 +41,9 @@ where
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
-        world: &UserCommunicator,
+        world: &C,
         hyksort_subcomm_size: i32,
-    ) -> Result<MultiNodeTree<T>, std::io::Error> {
+    ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         // Size of global communicator, and processor rank
         let size = world.size();
         let rank = world.rank();
@@ -229,9 +229,9 @@ where
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
-        world: &UserCommunicator,
+        world: &C,
         hyksort_subcomm_size: i32,
-    ) -> Result<MultiNodeTree<T>, std::io::Error> {
+    ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         // Size of global communicator, and processor rank
         let size = world.size();
         let rank = world.rank();
@@ -439,8 +439,8 @@ where
         depth: u64,
         prune_empty: bool,
         domain: Option<Domain<T>>,
-        world: &UserCommunicator,
-    ) -> Result<MultiNodeTree<T>, std::io::Error> {
+        world: &C,
+    ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         let dim = 3;
         let coords_len = coordinates_col_major.len();
 
@@ -485,7 +485,7 @@ where
         seeds: &mut MortonKeys<T>,
         rank: i32,
         size: i32,
-        world: &UserCommunicator,
+        world: &C,
     ) -> MortonKeys<T> {
         let root = MortonKey::root();
         // Define the tree's global domain with the finest first/last descendants
@@ -547,7 +547,7 @@ where
 
     // Transfer points based on the coarse distributed block_tree.
     fn transfer_points_to_blocktree(
-        world: &UserCommunicator,
+        world: &C,
         points: &[Point<T>],
         seeds: &[MortonKey<T>],
         &rank: &Rank,
@@ -601,7 +601,7 @@ where
 }
 
 /// Assign global indices to points owned by each process
-fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
+fn global_indices(n_points: usize, comm: &impl Communicator) -> Vec<usize> {
     // Gather counts of coordinates at each process
     let rank = comm.rank() as usize;
 
@@ -626,7 +626,7 @@ fn global_indices(n_points: usize, comm: &UserCommunicator) -> Vec<usize> {
     global_indices
 }
 
-impl<T> Tree for MultiNodeTree<T>
+impl<T, C: Communicator> Tree for MultiNodeTree<T, C>
 where
     T: RlstScalar + Float + Equivalence,
 {
@@ -634,7 +634,7 @@ where
     type Domain = Domain<T>;
     type Node = MortonKey<T>;
     type NodeSlice<'a> = &'a [MortonKey<T>]
-        where T: 'a;
+        where T: 'a, C: 'a;
     type Nodes = MortonKeys<T>;
 
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {

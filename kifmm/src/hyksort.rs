@@ -12,8 +12,7 @@ use rand::Rng;
 use mpi::collective::SystemOperation;
 use mpi::datatype::PartitionMut;
 use mpi::request::WaitGuard;
-use mpi::topology::Rank;
-use mpi::topology::UserCommunicator;
+use mpi::topology::{Rank, SimpleCommunicator};
 use mpi::traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Root, Source};
 use mpi::Count;
 use superslice::Ext;
@@ -25,7 +24,7 @@ pub fn modulo(a: i32, b: i32) -> i32 {
 
 /// Parallel selection algorithm to determine 'k' splitters from the global array currently being
 /// considered in the communicator.
-pub fn parallel_select<T>(arr: &Vec<T>, &k: &Rank, comm: UserCommunicator) -> Vec<T>
+pub fn parallel_select<T, C: Communicator>(arr: &Vec<T>, &k: &Rank, comm: C) -> Vec<T>
 where
     T: Default + Clone + Copy + Equivalence + Ord + std::fmt::Debug,
 {
@@ -152,7 +151,7 @@ fn power_of_two(n: Rank) -> bool {
 pub fn hyksort<T>(
     arr: &mut Vec<T>,
     mut k: Rank,
-    mut comm: UserCommunicator,
+    mut comm: SimpleCommunicator,
 ) -> Result<(), std::io::Error>
 where
     T: Default + Clone + Copy + Equivalence + Ord + std::fmt::Debug,
