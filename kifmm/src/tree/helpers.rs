@@ -159,7 +159,6 @@ pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
 mod mpi_helpers {
     //! Helper Routines for MPI functionality
     use mpi::{
-        topology::UserCommunicator,
         traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
         Count, Rank,
     };
@@ -174,8 +173,8 @@ mod mpi_helpers {
     /// This function expects these packets to be separated in a
     /// `Vec<Vec<T>>`, their destination ranks, as well as the number of
     /// packets this process expects to receive overall `recv_count`.
-    pub fn all_to_allv_sparse<T>(
-        comm: &UserCommunicator,
+    pub fn all_to_allv_sparse<T, C: Communicator>(
+        comm: &C,
         packets: &[Vec<T>],
         packet_destinations: &[Rank],
         &recv_count: &Count,

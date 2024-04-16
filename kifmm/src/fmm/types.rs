@@ -18,7 +18,7 @@ use crate::{
 use crate::tree::types::MultiNodeTree;
 
 #[cfg(feature = "mpi")]
-use mpi::traits::Equivalence;
+use mpi::traits::{Communicator, Equivalence};
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in column-major order.
@@ -502,11 +502,11 @@ pub struct SingleNodeFmmTree<T: RlstScalar + Float + Default> {
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[cfg(feature = "mpi")]
-pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence> {
+pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator> {
     /// An octree structure containing the source points for the FMM calculation.
-    pub source_tree: MultiNodeTree<T>,
+    pub source_tree: MultiNodeTree<T, C>,
     /// An octree structure containing the target points for the FMM calculation.
-    pub target_tree: MultiNodeTree<T>,
+    pub target_tree: MultiNodeTree<T, C>,
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T>,
 }
