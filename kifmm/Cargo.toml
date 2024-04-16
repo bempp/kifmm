@@ -1,0 +1,66 @@
+[features]
+# Treat warnings as a build error.
+strict = []
+mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
+
+[package]
+name = "kifmm"
+version = "0.1.0"
+edition = "2021"
+authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
+description = "Kernel-independent fast multipole method"
+license = "BSD-3-Clause"
+homepage = "https://github.com/bempp/kifmm"
+repository = "https://github.com/bempp/kifmm"
+readme = "README.md"
+keywords = ["numerics"]
+categories = ["mathematics", "science"]
+
+[lib]
+name = "kifmm"
+crate-type = ["lib", "cdylib"]
+
+[dependencies]
+itertools = "0.12.*"
+num = "0.4"
+approx = "0.5"
+rayon = "1.9"
+rand = "0.8.5"
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
+fftw-sys = {path = "../fftw-sys"}
+green-kernels = { git = "https://github.com/bempp/green-kernels" }
+lazy_static = "1.4.0"
+num-complex = "0.4.5"
+mpi = { version = "0.7.*", optional = true}
+memoffset = {version = "0.9.1", optional = true}
+superslice = {version = "1.0.0", optional = true}
+
+[dev-dependencies]
+criterion = { version = "0.5.*", features = ["html_reports"]}
+
+[[bench]]
+name = "single_node"
+harness = false
+
+[[example]]
+name = "single_node_laplace"
+path = "examples/single_node_laplace.rs"
+
+[[example]]
+name = "single_node_helmholtz"
+path = "examples/single_node_helmholtz.rs"
+
+[package.metadata.docs.rs]
+cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
+rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
+
+[target.aarch64-apple-darwin.dev-dependencies]
+blas-src = { version = "0.10", features = ["accelerate"]}
+lapack-src = { version = "0.10", features = ["accelerate"]}
+
+[target.x86_64-unknown-linux-gnu.dev-dependencies]
+blas-src = { version = "0.10", features = ["blis"]}
+lapack-src = { version = "0.10", features = ["netlib"]}
+
+[lints.clippy]
+wildcard_imports = "forbid"

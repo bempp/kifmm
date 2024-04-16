@@ -28,7 +28,7 @@ if raw_features is not None:
 root_dir = os.path.dirname(os.path.realpath(__file__))
 
 files = []
-example_dir = os.path.join(root_dir, "examples")
+example_dir = os.path.join(root_dir, "kifmm/examples")
 for file in os.listdir(example_dir):
     if (
         not file.startswith(".")
