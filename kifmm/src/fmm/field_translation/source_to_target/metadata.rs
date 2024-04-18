@@ -273,7 +273,7 @@ where
 
         let n_source_equivalent_surface = 6 * (expansion_order - 1).pow(2) + 2;
         let n_target_check_surface = n_source_equivalent_surface;
-        let alpha = Scalar::real(ALPHA_INNER);
+        let alpha = Self::Scalar::real(ALPHA_INNER);
 
         // Iterate over each set of convolutions in the halo (26)
         for i in 0..transfer_vectors.len() {
@@ -330,15 +330,15 @@ where
 
                     // Compute FFT of padded kernel
                     let mut kernel_hat =
-                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        rlst_dynamic_array3!(<Self::Scalar as DftType>::OutputType, transform_shape);
 
-                    let _ = Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                    let _ = Self::Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
                     // Fill with zeros when interaction doesn't exist
                     let kernel_hat_zeros =
-                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        rlst_dynamic_array3!(<Self::Scalar as DftType>::OutputType, transform_shape);
                     kernel_data_vec[i].push(kernel_hat_zeros);
                 }
             }
@@ -347,7 +347,7 @@ where
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
         let mut kernel_data =
             vec![
-                vec![<Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * transform_size];
+                vec![<Self::Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * transform_size];
                 halo_children.len()
             ];
 
@@ -390,7 +390,7 @@ where
                     &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft =
-                    rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
+                    rlst_dynamic_array2!(<Self::Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
@@ -406,7 +406,7 @@ where
 
         // Set required maps, TODO: Should be a part of operator data
         (self.surf_to_conv_map, self.conv_to_surf_map) =
-            FftFieldTranslation::<Scalar, Kernel>::compute_surf_to_conv_map(self.expansion_order);
+            FftFieldTranslation::<Self::Scalar, Kernel>::compute_surf_to_conv_map(self.expansion_order);
     }
 }
 
@@ -437,15 +437,15 @@ where
     type Metadata = BlasMetadata<Scalar>;
 }
 
-impl<Scalar, Kern> ConfigureSourceToTargetData for BlasFieldTranslation<Scalar, Kern>
+impl<Scalar, Kernel> ConfigureSourceToTargetData for BlasFieldTranslation<Scalar, Kernel>
 where
     Scalar: RlstScalar,
-    Kern: KernelTrait<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
     type Scalar = Scalar;
     type Domain = Domain<Scalar::Real>;
-    type Kernel = Kern;
+    type Kernel = Kernel;
 
     fn expansion_order(&mut self, expansion_order: usize) {
         self.expansion_order = expansion_order;
@@ -461,10 +461,10 @@ where
         let nrows = ncoeffs_kifmm(expansion_order);
         let ncols = ncoeffs_kifmm(expansion_order);
 
-        let mut se2tc_fat = rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
-        let mut se2tc_thin = rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        let mut se2tc_fat = rlst_dynamic_array2!(Self::Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin = rlst_dynamic_array2!(Self::Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
-        let alpha = Scalar::from(ALPHA_INNER).unwrap().re();
+        let alpha = Self::Scalar::from(ALPHA_INNER).unwrap().re();
 
         for (i, t) in self.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.surface_grid(expansion_order, &domain, alpha);
@@ -473,7 +473,7 @@ where
             let target_check_surface = t.target.surface_grid(expansion_order, &domain, alpha);
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
+            let mut tmp_gram_t = rlst_dynamic_array2!(Self::Scalar, [ntargets, nsources]);
 
             self.kernel.assemble_st(
                 EvalType::Value,
@@ -483,7 +483,7 @@ where
             );
 
             // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
+            let mut tmp_gram = rlst_dynamic_array2!(Self::Scalar, [nsources, ntargets]);
             tmp_gram.fill_from(tmp_gram_t.transpose());
 
             let mut block = se2tc_fat
@@ -501,9 +501,9 @@ where
         let nvt = se2tc_fat.shape()[1];
         let k = std::cmp::min(mu, nvt);
 
-        let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
-        let mut sigma = vec![Scalar::zero().re(); k];
-        let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+        let mut u_big = rlst_dynamic_array2!(Self::Scalar, [mu, k]);
+        let mut sigma = vec![Self::Scalar::zero().re(); k];
+        let mut vt_big = rlst_dynamic_array2!(Self::Scalar, [k, nvt]);
 
         se2tc_fat
             .into_svd_alloc(
@@ -514,15 +514,15 @@ where
             )
             .unwrap();
         let cutoff_rank = find_cutoff_rank(&sigma, self.threshold);
-        let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
-        let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-        let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+        let mut u = rlst_dynamic_array2!(Self::Scalar, [mu, cutoff_rank]);
+        let mut sigma_mat = rlst_dynamic_array2!(Self::Scalar, [cutoff_rank, cutoff_rank]);
+        let mut vt = rlst_dynamic_array2!(Self::Scalar, [cutoff_rank, nvt]);
 
         u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
         vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
         for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
             unsafe {
-                *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                *sigma_mat.get_unchecked_mut([j, j]) = Self::Scalar::from(*s).unwrap();
             }
         }
 
@@ -530,9 +530,9 @@ where
         let thin_nrows = se2tc_thin.shape()[0];
         let nst = se2tc_thin.shape()[1];
         let k = std::cmp::min(thin_nrows, nst);
-        let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
-        let mut _r = vec![Scalar::zero().re(); k];
-        let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
+        let mut _gamma = rlst_dynamic_array2!(Self::Scalar, [thin_nrows, k]);
+        let mut _r = vec![Self::Scalar::zero().re(); k];
+        let mut st = rlst_dynamic_array2!(Self::Scalar, [k, nst]);
 
         se2tc_thin
             .into_svd_alloc(
@@ -543,7 +543,7 @@ where
             )
             .unwrap();
 
-        let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
+        let mut s_trunc = rlst_dynamic_array2!(Self::Scalar, [nst, cutoff_rank]);
         for j in 0..cutoff_rank {
             for i in 0..nst {
                 unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
@@ -556,14 +556,14 @@ where
         for i in 0..self.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
-            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+            let tmp = empty_array::<Self::Scalar, 2>().simple_mult_into_resize(
                 sigma_mat.view(),
                 empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
             );
 
-            let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-            let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
-            let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+            let mut u_i = rlst_dynamic_array2!(Self::Scalar, [cutoff_rank, cutoff_rank]);
+            let mut sigma_i = vec![Self::Scalar::zero().re(); cutoff_rank];
+            let mut vt_i = rlst_dynamic_array2!(Self::Scalar, [cutoff_rank, cutoff_rank]);
 
             tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
@@ -571,12 +571,12 @@ where
             let directional_cutoff_rank = find_cutoff_rank(&sigma_i, self.threshold);
 
             let mut u_i_compressed =
-                rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
+                rlst_dynamic_array2!(Self::Scalar, [cutoff_rank, directional_cutoff_rank]);
             let mut vt_i_compressed_ =
-                rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
+                rlst_dynamic_array2!(Self::Scalar, [directional_cutoff_rank, cutoff_rank]);
 
             let mut sigma_mat_i_compressed =
-                rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, directional_cutoff_rank]);
+                rlst_dynamic_array2!(Self::Scalar, [directional_cutoff_rank, directional_cutoff_rank]);
 
             u_i_compressed
                 .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
@@ -585,18 +585,18 @@ where
 
             for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
                 unsafe {
-                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = Self::Scalar::from(*s).unwrap();
                 }
             }
 
-            let vt_i_compressed = empty_array::<Scalar, 2>()
+            let vt_i_compressed = empty_array::<Self::Scalar, 2>()
                 .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
 
             c_u.push(u_i_compressed);
             c_vt.push(vt_i_compressed);
         }
 
-        let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
+        let mut st_trunc = rlst_dynamic_array2!(Self::Scalar, [cutoff_rank, nst]);
         st_trunc.fill_from(s_trunc.transpose());
 
         let result = BlasMetadata {
