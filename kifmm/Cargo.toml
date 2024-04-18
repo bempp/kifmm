@@ -42,14 +42,6 @@ criterion = { version = "0.5.*", features = ["html_reports"]}
 name = "single_node"
 harness = false
 
-[[example]]
-name = "single_node_laplace"
-path = "examples/single_node_laplace.rs"
-
-[[example]]
-name = "single_node_helmholtz"
-path = "examples/single_node_helmholtz.rs"
-
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
