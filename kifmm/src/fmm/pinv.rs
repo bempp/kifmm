@@ -83,7 +83,6 @@ where
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
@@ -91,7 +90,7 @@ mod test {
     use approx::assert_relative_eq;
     use num::One;
     use rlst::{
-        c64, empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RawAccess,
+        c64, empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef,
     };
 
     #[test]
@@ -149,16 +148,18 @@ mod test {
             empty_array::<c64, 2>().simple_mult_into_resize(mat_s.view(), ut.view()),
         );
 
-        let actual = empty_array::<c64, 2>().simple_mult_into_resize(
-            mat.view(),
-            empty_array::<c64, 2>().simple_mult_into_resize(inv.view(), mat.view()),
-        );
+        let actual = empty_array::<c64, 2>().simple_mult_into_resize(inv.view(), mat.view());
+
+        let mut expected = rlst_dynamic_array2!(c64, actual.shape());
+        for i in 0..dim {
+            expected[[i, i]] = c64::one()
+        }
 
         for i in 0..actual.shape()[0] {
             for j in 0..actual.shape()[1] {
                 assert_relative_eq!(
                     *actual.get([i, j]).unwrap(),
-                    *mat.get([i, j]).unwrap(),
+                    *expected.get([i, j]).unwrap(),
                     epsilon = 1E-13
                 );
             }
