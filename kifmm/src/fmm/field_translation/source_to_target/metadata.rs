@@ -329,27 +329,34 @@ where
                     ));
 
                     // Compute FFT of padded kernel
-                    let mut kernel_hat =
-                        rlst_dynamic_array3!(<Self::Scalar as DftType>::OutputType, transform_shape);
+                    let mut kernel_hat = rlst_dynamic_array3!(
+                        <Self::Scalar as DftType>::OutputType,
+                        transform_shape
+                    );
 
-                    let _ = Self::Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                    let _ =
+                        Self::Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
                     // Fill with zeros when interaction doesn't exist
-                    let kernel_hat_zeros =
-                        rlst_dynamic_array3!(<Self::Scalar as DftType>::OutputType, transform_shape);
+                    let kernel_hat_zeros = rlst_dynamic_array3!(
+                        <Self::Scalar as DftType>::OutputType,
+                        transform_shape
+                    );
                     kernel_data_vec[i].push(kernel_hat_zeros);
                 }
             }
         }
 
         // Each element corresponds to all evaluations for each sibling (in order) at that halo position
-        let mut kernel_data =
+        let mut kernel_data = vec![
             vec![
-                vec![<Self::Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * transform_size];
-                halo_children.len()
+                <Self::Scalar as DftType>::OutputType::zero();
+                NSIBLINGS_SQUARED * transform_size
             ];
+            halo_children.len()
+        ];
 
         // For each halo position
         for i in 0..halo_children.len() {
@@ -389,8 +396,10 @@ where
                 let k_f =
                     &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-                let mut k_ft =
-                    rlst_dynamic_array2!(<Self::Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
+                let mut k_ft = rlst_dynamic_array2!(
+                    <Self::Scalar as DftType>::OutputType,
+                    [NSIBLINGS, NSIBLINGS]
+                );
                 k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
@@ -406,7 +415,9 @@ where
 
         // Set required maps, TODO: Should be a part of operator data
         (self.surf_to_conv_map, self.conv_to_surf_map) =
-            FftFieldTranslation::<Self::Scalar, Kernel>::compute_surf_to_conv_map(self.expansion_order);
+            FftFieldTranslation::<Self::Scalar, Kernel>::compute_surf_to_conv_map(
+                self.expansion_order,
+            );
     }
 }
 
@@ -461,8 +472,10 @@ where
         let nrows = ncoeffs_kifmm(expansion_order);
         let ncols = ncoeffs_kifmm(expansion_order);
 
-        let mut se2tc_fat = rlst_dynamic_array2!(Self::Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
-        let mut se2tc_thin = rlst_dynamic_array2!(Self::Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        let mut se2tc_fat =
+            rlst_dynamic_array2!(Self::Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin =
+            rlst_dynamic_array2!(Self::Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
         let alpha = Self::Scalar::from(ALPHA_INNER).unwrap().re();
 
@@ -575,8 +588,10 @@ where
             let mut vt_i_compressed_ =
                 rlst_dynamic_array2!(Self::Scalar, [directional_cutoff_rank, cutoff_rank]);
 
-            let mut sigma_mat_i_compressed =
-                rlst_dynamic_array2!(Self::Scalar, [directional_cutoff_rank, directional_cutoff_rank]);
+            let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
+                Self::Scalar,
+                [directional_cutoff_rank, directional_cutoff_rank]
+            );
 
             u_i_compressed
                 .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
@@ -585,7 +600,8 @@ where
 
             for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
                 unsafe {
-                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = Self::Scalar::from(*s).unwrap();
+                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
+                        Self::Scalar::from(*s).unwrap();
                 }
             }
 
