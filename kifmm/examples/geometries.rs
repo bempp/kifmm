@@ -1,31 +1,48 @@
+use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::field::types::{BlasFieldTranslationKiFmm, FftFieldTranslationKiFmm};
-use kifmm::fmm::types::KiFmmBuilderSingleNode;
+use kifmm::{BlasFieldTranslation, FftFieldTranslation};
+use kifmm::SingleNodeBuilder;
 use kifmm::traits::fmm::Fmm;
-use kifmm::tree::implementations::helpers::points_fixture;
+use kifmm::tree::helpers::points_fixture;
+use num::One;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RawAccessMut, Shape, VectorContainer};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RawAccessMut, RlstScalar, Shape, VectorContainer, c64};
 
 extern crate blas_src;
 extern crate lapack_src;
 
 use std::error::Error;
 use std::fs::File;
+use std::path::Path;
 use csv::Reader;
 
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
-struct Record {
+struct Coordinate {
     x: f64,
     y: f64,
     z: f64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Potential {
-    value: f64
+#[derive(Debug, Serialize)]
+struct Potential <T>
+where
+    T: RlstScalar + Serialize + for<'de> Deserialize<'de>, // Ensuring T also supports serialization
+{
+    value: T
+}
+
+impl <T> Potential<T>
+where
+    T: RlstScalar + Serialize + for<'de> Deserialize<'de>, // Ensuring T also supports serialization
+{
+    fn from(value: T) -> Self {
+        Self {
+            value
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -34,6 +51,7 @@ struct GlobalIndex {
 }
 
 fn read_csv_into_vectors(filepath: &str) -> Result<Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>, Box<dyn Error>> {
+
     let file = File::open(filepath)?;
     let mut rdr = Reader::from_reader(file);
 
@@ -42,7 +60,7 @@ fn read_csv_into_vectors(filepath: &str) -> Result<Array<f64, BaseArray<f64, Vec
     let mut zs = Vec::new();
 
     for result in rdr.deserialize() {
-        let record: Record = result?;
+        let record: Coordinate = result?;
         xs.push(record.x);
         ys.push(record.y);
         zs.push(record.z);
@@ -63,50 +81,53 @@ fn read_csv_into_vectors(filepath: &str) -> Result<Array<f64, BaseArray<f64, Vec
 
 fn main () {
 
-    let input_filepath = "king.csv";
-    let output_filepath = "output_king.csv";
-    let global_index_file = "global_indices_king.csv";
+    let name = "ball";
+    let input_filepath =  format!("{name}.csv");
+    let output_filepath = format!("output_{name}.csv");
+    let global_index_file = format!("global_indices_{name}.csv");
 
-
-    let sources = read_csv_into_vectors(input_filepath).unwrap();
-    let targets = read_csv_into_vectors(input_filepath).unwrap();
+    let sources = read_csv_into_vectors(&input_filepath).unwrap();
+    let targets = read_csv_into_vectors(&input_filepath).unwrap();
     let [nsources, _] = sources.shape();
 
-
-    let n_crit = Some(50);
-    let expansion_order = 7;
+    let n_crit = Some(200);
+    let expansion_order = 9;
     let sparse = true;
 
     let nvecs = 1;
     let tmp = vec![1.0; nsources * nvecs];
+    // let tmp = vec![c64::one(); nsources * nvecs];
 
     let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-    // let mut rng = StdRng::seed_from_u64(0);
-    // charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+    // let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let fmm_fft = KiFmmBuilderSingleNode::new()
+    let kernel = Laplace3dKernel::new();
+
+    let fmm = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
             &charges,
             expansion_order,
-            Laplace3dKernel::new(),
+            kernel,
             EvalType::Value,
-            FftFieldTranslationKiFmm::new(),
+            FftFieldTranslation::new(),
         )
         .unwrap()
         .build()
         .unwrap();
-    fmm_fft.evaluate();
+
+    let s = std::time::Instant::now();
+    fmm.evaluate();
+    println!("{:?} npoints {:?} time {:?}", fmm.tree().source_tree.depth, sources.shape(), s.elapsed());
 
     // Open a file in write mode
     let file = File::create(output_filepath).unwrap();
     let mut wtr = csv::Writer::from_writer(file);
 
-    for val in fmm_fft.potentials {
-        // let &val = &fmm_fft.potentials[global_idx];
-        wtr.serialize(Potential { value: val }).unwrap();
+    for val in fmm.potentials {
+        wtr.serialize(Potential::from(val.abs())).unwrap();
     }
 
     wtr.flush().unwrap();
@@ -115,11 +136,11 @@ fn main () {
     let file = File::create(global_index_file).unwrap();
     let mut wtr = csv::Writer::from_writer(file);
 
-    for (i, &global_idx) in fmm_fft.tree.target_tree.global_indices.iter().enumerate() {
+    for (_i, &global_idx) in fmm.tree.target_tree.global_indices.iter().enumerate() {
         wtr.serialize(GlobalIndex { value: global_idx }).unwrap();
     }
 
+    // Ensure all data is flushed to the file
     wtr.flush().unwrap();
 
-    // Ensure all data is flushed to the file
 }

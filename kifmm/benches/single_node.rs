@@ -7,7 +7,7 @@ use kifmm::fmm::types::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBui
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use num::{Complex, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccessMut};
+use rlst::{rlst_dynamic_array2, RawAccessMut, c32};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -127,15 +127,13 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(30));
 
-    group.bench_function(
-        format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_fft.evaluate()),
-    );
+    group.bench_function(format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"), |b| {
+        b.iter(|| fmm_fft.evaluate())
+    });
 
-    group.bench_function(
-        format!("M2L=BLAS,, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate()),
-    );
+    group.bench_function(format!("M2L=BLAS,, N={nsources}, wavenumber={wavenumber}"), |b| {
+        b.iter(|| fmm_blas.evaluate())
+    });
 }
 
 fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {

@@ -17,3 +17,5 @@ Cargo.lock
 
 # Download source files upon build
 fftw-src/fftw-*
+
+*.csv
