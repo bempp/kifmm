@@ -89,9 +89,7 @@ mod test {
     use super::*;
     use approx::assert_relative_eq;
     use num::One;
-    use rlst::{
-        c64, empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef,
-    };
+    use rlst::{c64, empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef};
 
     #[test]
     fn test_pinv_real() {
