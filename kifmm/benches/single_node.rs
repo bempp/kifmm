@@ -133,7 +133,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     );
 
     group.bench_function(
-        format!("M2L=BLAS,, N={nsources}, wavenumber={wavenumber}"),
+        format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
         |b| b.iter(|| fmm_blas.evaluate()),
     );
 }
@@ -192,13 +192,15 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(20));
 
-    group.bench_function(format!("M2L=FFT,, N={nsources}, "), |b| {
-        b.iter(|| fmm_fft.evaluate())
-    });
+    group.bench_function(
+        format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_fft.evaluate()),
+    );
 
-    group.bench_function(format!("M2L=BLAS,, N={nsources}"), |b| {
-        b.iter(|| fmm_blas.evaluate())
-    });
+    group.bench_function(
+        format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas.evaluate()),
+    );
 }
 
 fn laplace_potentials_gradients_f32(c: &mut Criterion) {
@@ -253,11 +255,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(20));
 
-    group.bench_function(format!("M2L=FFT,, N={nsources}"), |b| {
+    group.bench_function(format!("M2L=FFT, N={nsources}"), |b| {
         b.iter(|| fmm_fft.evaluate())
     });
 
-    group.bench_function(format!("M2L=BLAS,, N={nsources}"), |b| {
+    group.bench_function(format!("M2L=BLAS, N={nsources}"), |b| {
         b.iter(|| fmm_blas.evaluate())
     });
 }
