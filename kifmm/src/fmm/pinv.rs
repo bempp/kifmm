@@ -76,8 +76,8 @@ where
         // Return pseudo-inverse in component form
         let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
         let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
-        v.fill_from(vt.transpose());
-        ut.fill_from(u.transpose());
+        v.fill_from(vt.conj().transpose());
+        ut.fill_from(u.conj().transpose());
 
         Ok((s, ut, v))
     }
@@ -88,10 +88,10 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef};
+    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, c64};
 
     #[test]
-    fn test_pinv() {
+    fn test_pinv_real() {
         let dim: usize = 5;
         let mut mat = rlst_dynamic_array2!(f64, [dim, dim]);
         mat.fill_from_seed_equally_distributed(0);
@@ -114,6 +114,43 @@ mod test {
         let mut expected = rlst_dynamic_array2!(f64, actual.shape());
         for i in 0..dim {
             expected[[i, i]] = 1.0
+        }
+
+        for i in 0..actual.shape()[0] {
+            for j in 0..actual.shape()[1] {
+                assert_relative_eq!(
+                    *actual.get([i, j]).unwrap(),
+                    *expected.get([i, j]).unwrap(),
+                    epsilon = 1E-13
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_pinv_complex() {
+        let dim: usize = 5;
+        let mut mat = rlst_dynamic_array2!(c64, [dim, dim]);
+        mat.fill_from_seed_equally_distributed(0);
+
+        let (s, ut, v) = pinv::<c64>(&mat, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(c64, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = c64::from(s[i]);
+        }
+
+        let inv = empty_array::<c64, 2>().simple_mult_into_resize(
+            v.view(),
+            empty_array::<c64, 2>().simple_mult_into_resize(mat_s.view(), ut.view()),
+        );
+
+        let actual = empty_array::<c64, 2>().simple_mult_into_resize(inv.view(), mat.view());
+
+        // Expect the identity matrix
+        let mut expected = rlst_dynamic_array2!(c64, actual.shape());
+        for i in 0..dim {
+            expected[[i, i]] = c64::from(1.0)
         }
 
         for i in 0..actual.shape()[0] {
