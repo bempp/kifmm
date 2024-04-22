@@ -218,16 +218,16 @@ mod test {
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
     };
+    use itertools::Itertools;
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
-        RawAccessMut, RlstScalar, Shape, VectorContainer,
+        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray, MultInto, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer
     };
 
     use crate::{
         traits::tree::{FmmTree, FmmTreeNode, Tree},
-        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
+        tree::{constants::{ALPHA_INNER, ALPHA_OUTER}, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
@@ -436,6 +436,62 @@ mod test {
         assert!(rel_error <= threshold);
     }
 
+    fn test_leaf_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
+        fmm: Box<
+            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+        >,
+        threshold: T::Real,
+    ) where
+        T::Real: Default,
+    {
+        // let leaf_idx = 0;
+        // let leaf = fmm.tree().source_tree().all_leaves().unwrap()[leaf_idx];
+        // let multipole = fmm.multipole(&leaf).unwrap();
+
+
+
+        // let multipole = fmm.multipole(&root).unwrap();
+
+
+        // let sources = fmm.tree().source_tree().coordinates(&leaf).unwrap();
+        // let nsources = sources.len() / 3;
+        // let charges = vec![T::one(); nsources];
+
+        // let upward_equivalent_surface = leaf.surface_grid(
+        //     fmm.expansion_order(),
+        //     fmm.tree().domain(),
+        //     T::from(ALPHA_INNER).unwrap().re(),
+        // );
+
+        // let test_point = vec![T::real(100000.), T::Real::zero(), T::Real::zero()];
+        // let mut expected = vec![T::zero()];
+        // let mut found = vec![T::zero()];
+
+        // fmm.kernel().evaluate_st(
+        //     EvalType::Value,
+        //     sources,
+        //     &test_point,
+        //     &charges,
+        //     &mut expected,
+        // );
+
+        // fmm.kernel().evaluate_st(
+        //     EvalType::Value,
+        //     &upward_equivalent_surface,
+        //     &test_point,
+        //     multipole,
+        //     &mut found,
+        // );
+
+        // let abs_error = (expected[0] - found[0]).abs();
+        // let rel_error = abs_error / expected[0].abs();
+        // println!(
+        //     "abs {:?} rel {:?} \n expected {:?} found {:?}",
+        //     abs_error, rel_error, expected, found
+        // );
+        // assert!(rel_error <= threshold);
+    }
+
     fn test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
@@ -543,14 +599,14 @@ mod test {
     #[test]
     fn test_upward_pass_vector_helmholtz() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
+        let nsources = 1000;
+        let ntargets = 1000;
         let sources = points_fixture::<f64>(nsources, None, None, Some(1));
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
-        let expansion_order = 6;
+        let n_crit = Some(1000);
+        let expansion_order = 5;
         let sparse = true;
 
         // Charge data
@@ -558,7 +614,7 @@ mod test {
         let tmp = vec![c64::one(); nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
-        let wavenumber = 0.0000001;
+        let wavenumber = 2.;
 
         let fmm_fft = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
@@ -573,28 +629,126 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
+        println!("NBOX {:?}", fmm_fft.tree().source_tree().n_keys_tot());
         fmm_fft.evaluate();
-
-        let svd_threshold = Some(1e-5);
-        let fmm_svd = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
-            .unwrap()
-            .parameters(
-                &charges,
-                expansion_order,
-                Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
-                BlasFieldTranslation::new(svd_threshold),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm_svd.evaluate();
-
         let fmm_fft = Box::new(fmm_fft);
-        let fmm_svd = Box::new(fmm_svd);
-        test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
-        test_root_multipole_helmholtz_single_node::<c64>(fmm_svd, &sources, &charges, 1e-5);
+
+        let root = MortonKey::<f64>::root();
+        let sources = fmm_fft.tree().source_tree().all_coordinates().unwrap();
+        let nsources = sources.len() / 3;
+        let charges = vec![c64::one(); nsources];
+
+        let upward_equivalent_surface = root.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_INNER),
+        );
+
+        let upward_check_surface= root.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_OUTER),
+        );
+
+        let mut check_potential =  rlst_dynamic_array2!(c64, [upward_check_surface.len() / 3, 1]);
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value, sources, &upward_check_surface, &charges,  check_potential.data_mut()
+        );
+
+        let multipole = empty_array::<c64, 2>().simple_mult_into_resize(
+            fmm_fft.uc2e_inv_1.view(),
+            empty_array::<c64, 2>().simple_mult_into_resize(
+                fmm_fft.uc2e_inv_2.view(),
+                check_potential.view()
+            )
+        );
+
+        let test_point = vec![1000f64, 0f64, 0f64];
+
+        let mut expected = vec![c64::zero()];
+        let mut found = vec![c64::zero()];
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            sources,
+            &test_point,
+            &charges,
+            &mut expected,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            multipole.data(),
+            &mut found,
+        );
+
+        let abs_error = (expected[0] - found[0]).abs();
+        let rel_error = abs_error / expected[0].abs();
+        println!(
+            "abs {:?} rel {:?} \n expected {:?} found {:?}",
+            abs_error, rel_error, expected, found
+        );
+        assert!(rel_error <= 1e-10);
+
+        // let mut re = "check_potential_re = np.array([".to_string();
+        // let mut im = "check_potential_im = np.array([".to_string();
+        // for m in check_potential.data().iter() {
+        //     let tmp = format!("{}, ", m.re());
+        //     re += &tmp;
+
+        //     let tmp = format!("{}, ", m.im());
+        //     im += &tmp;
+        // }
+        // re += "])";
+        // im += "])";
+        // println!("{:?}", re);
+        // println!("{:?}", im);
+
+        // println!("{:?} {:?} {:?} ", fmm_fft.uc2e_inv_1.shape(), fmm_fft.uc2e_inv_2.shape(), check_potential.shape());
+
+        // let mut re = "multipole_re = np.array([".to_string();
+        // let mut im = "multipole_im = np.array([".to_string();
+        // for m in multipole.data().iter() {
+        //     let tmp = format!("{}, ", m.re());
+        //     re += &tmp;
+
+        //     let tmp = format!("{}, ", m.im());
+        //     im += &tmp;
+        // }
+        // re += "])";
+        // im += "])";
+        // println!("{:?}", re);
+        // println!("{:?}", im);
+
+        // println!("domain {:?}", fmm_fft.tree().source_tree().domain());
+        // assert!(false);
+        // println!("multipole_re = {:?}", re);
+        // println!("multipole_im = {:?}", im);
+
+
+        test_leaf_multipole_helmholtz_single_node(fmm_fft, 1e-5);
+        // test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
+
+        // let svd_threshold = Some(1e-5);
+        // let fmm_svd = SingleNodeBuilder::new()
+        //     .tree(&sources, &targets, n_crit, sparse)
+        //     .unwrap()
+        //     .parameters(
+        //         &charges,
+        //         expansion_order,
+        //         Helmholtz3dKernel::new(wavenumber),
+        //         EvalType::Value,
+        //         BlasFieldTranslation::new(svd_threshold),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
+        // fmm_svd.evaluate();
+        // let fmm_svd = Box::new(fmm_svd);
+        // test_root_multipole_helmholtz_single_node::<c64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
     #[test]

@@ -5,6 +5,8 @@ use rlst::{
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
+use num::{Zero, One};
+
 use crate::{
     fmm::{
         constants::DEFAULT_NCRIT,
@@ -225,6 +227,12 @@ where
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let domain = self.tree.domain;
+        let zero = Scalar::Real::zero();
+        let one = Scalar::Real::one();
+        let domain: Domain<_> = Domain {
+            origin: [zero, zero, zero],
+            side_length: [one, one, one]
+        };
 
         // Compute required surfaces
         let upward_equivalent_surface =
@@ -251,6 +259,7 @@ where
         let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
         uc2e.fill_from(uc2e_t.transpose());
 
+
         let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
         self.kernel.assemble_st(
             EvalType::Value,
@@ -263,25 +272,45 @@ where
         let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
         dc2e.fill_from(dc2e_t.transpose());
 
-        let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+        let (s, uh, v) = pinv::<Scalar>(&uc2e, None, None).unwrap();
+
 
         let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
         for i in 0..s.len() {
-            mat_s[[i, i]] = Scalar::from_real(s[i]);
+            mat_s[[i, i]] = Scalar::from(s[i]).unwrap();
         }
 
-        let uc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let uc2e_inv_2 = ut;
 
-        let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
+        // println!("uh {:?}", uh.data());
+
+        let uc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+        let uc2e_inv_2 = uh;
+
+        // let tst =
+        //     empty_array::<Scalar, 2>().simple_mult_into_resize(empty_array::<Scalar, 2>().simple_mult_into_resize(
+        //     uc2e_inv_1.view(), uc2e_inv_2.view()), uc2e.view());
+
+        // let debug = &tst;
+        // let [nrows, ncols] = debug.shape();
+        // for i in 0..nrows {
+        //     print!("[");
+        //     for j in 0..ncols {
+        //         print!("{}, ", debug[[i, j]]);
+        //     }
+        //     print!("] \n");
+        // }
+
+        // assert!(false);
+
+        let (s, uh, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
 
         let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
         for i in 0..s.len() {
-            mat_s[[i, i]] = Scalar::from_real(s[i]);
+            mat_s[[i, i]] = Scalar::from(s[i]).unwrap();
         }
 
         let dc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let dc2e_inv_2 = ut;
+        let dc2e_inv_2 = uh;
 
         // Calculate M2M and L2L operator matrices
         let children = root.children();

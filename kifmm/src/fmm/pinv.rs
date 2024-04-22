@@ -1,5 +1,6 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use crate::traits::general::Epsilon;
+use num::{Zero, One};
 use rlst::{
     rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RlstError, RlstResult, RlstScalar, Shape,
     SvdMode, VectorContainer,
@@ -45,14 +46,14 @@ where
         // For matrices compute the full SVD
         let k = std::cmp::min(shape[0], shape[1]);
         let mut u = rlst_dynamic_array2!(T, [shape[0], k]);
-        let mut s = vec![T::zero().re(); k];
-        let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
+        let mut s = vec![T::Real::zero(); k];
+        let mut vh = rlst_dynamic_array2!(T, [k, shape[1]]);
 
         // TODO: work out why it fails without this copy and remove this copy
         let mut mat_copy = rlst_dynamic_array2!(T, shape);
         mat_copy.fill_from(mat.view());
         mat_copy
-            .into_svd_alloc(u.view_mut(), vt.view_mut(), &mut s[..], SvdMode::Reduced)
+            .into_svd_alloc(u.view_mut(), vh.view_mut(), &mut s[..], SvdMode::Reduced)
             .unwrap();
 
         let eps = T::real(T::epsilon());
@@ -67,19 +68,19 @@ where
         // Filter singular values below this threshold
         for s in s.iter_mut() {
             if *s > threshold {
-                *s = T::real(1.0) / T::real(*s);
+                *s = T::Real::one() / T::real(*s);
             } else {
-                *s = T::real(0.)
+                *s = T::Real::zero()
             }
         }
 
         // Return pseudo-inverse in component form
-        let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
-        let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
-        v.fill_from(vt.conj().transpose());
-        ut.fill_from(u.conj().transpose());
+        let mut v = rlst_dynamic_array2!(T, [vh.shape()[1], vh.shape()[0]]);
+        let mut uh = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
+        v.fill_from(vh.transpose().conj());
+        uh.fill_from(u.transpose().conj());
 
-        Ok((s, ut, v))
+        Ok((s, uh, v))
     }
 }
 
