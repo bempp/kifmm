@@ -5,7 +5,7 @@ use rlst::{
     RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
-use num::{Zero, One};
+use num::{One, Zero};
 
 use crate::{
     fmm::{
@@ -255,7 +255,6 @@ where
         let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
         uc2e.fill_from(uc2e_t.transpose());
 
-
         let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
         self.kernel.assemble_st(
             EvalType::Value,
@@ -270,12 +269,10 @@ where
 
         let (s, uh, v) = pinv::<Scalar>(&uc2e, None, None).unwrap();
 
-
         let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = Scalar::from(s[i]).unwrap();
         }
-
 
         // println!("uh {:?}", uh.data());
 

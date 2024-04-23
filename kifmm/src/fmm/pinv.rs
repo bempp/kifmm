@@ -1,6 +1,6 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use crate::traits::general::Epsilon;
-use num::{Zero, One};
+use num::{One, Zero};
 use rlst::{
     rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RlstError, RlstResult, RlstScalar, Shape,
     SvdMode, VectorContainer,
@@ -89,7 +89,7 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, c64};
+    use rlst::{c64, empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef};
 
     #[test]
     fn test_pinv_real() {

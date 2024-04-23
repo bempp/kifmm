@@ -222,12 +222,19 @@ mod test {
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray, MultInto, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer
+        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array1, rlst_dynamic_array2, Array,
+        BaseArray, MultInto, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
+        VectorContainer,
     };
 
     use crate::{
+        fmm::{helpers::homogenous_kernel_scale, pinv::pinv},
         traits::tree::{FmmTree, FmmTreeNode, Tree},
-        tree::{constants::{ALPHA_INNER, ALPHA_OUTER}, helpers::points_fixture, types::MortonKey},
+        tree::{
+            constants::{ALPHA_INNER, ALPHA_OUTER},
+            helpers::points_fixture,
+            types::MortonKey,
+        },
         BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
@@ -448,10 +455,7 @@ mod test {
         // let leaf = fmm.tree().source_tree().all_leaves().unwrap()[leaf_idx];
         // let multipole = fmm.multipole(&leaf).unwrap();
 
-
-
         // let multipole = fmm.multipole(&root).unwrap();
-
 
         // let sources = fmm.tree().source_tree().coordinates(&leaf).unwrap();
         // let nsources = sources.len() / 3;
@@ -599,6 +603,196 @@ mod test {
     }
 
     #[test]
+    fn test_check_with_laplace() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 11000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(1000);
+        let expansion_order = 5;
+        let sparse = true;
+
+        // Charge data
+        let nvecs = 1;
+        let tmp = vec![f64::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+        let wavenumber = 3.;
+
+        let fmm_fft = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                FftFieldTranslation::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        println!("NBOX {:?}", fmm_fft.tree().source_tree().n_keys_tot());
+        fmm_fft.evaluate();
+        let fmm_fft = Box::new(fmm_fft);
+
+        // Test root multipole with all coordinates
+        let root = MortonKey::<f64>::root();
+        let nsources = sources.data().len() / 3;
+        let tmp = vec![f64::one(); nsources];
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, 1]);
+        charges.data_mut().copy_from_slice(&tmp);
+
+        let upward_equivalent_surface = root.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_INNER),
+        );
+
+        let upward_check_surface = root.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_OUTER),
+        );
+
+        let mut check_potential = rlst_dynamic_array2!(f64, [upward_check_surface.len() / 3, 1]);
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            &upward_check_surface,
+            charges.data(),
+            check_potential.data_mut(),
+        );
+
+        let multipole = empty_array::<f64, 2>().simple_mult_into_resize(
+            fmm_fft.uc2e_inv_1.view(),
+            empty_array::<f64, 2>()
+                .simple_mult_into_resize(fmm_fft.uc2e_inv_2.view(), check_potential.view()),
+        );
+
+        // println!("ROOOT MULTIPOLE CORRECT {:?}", multipole.data());
+        let test_point = vec![1000f64, 0f64, 0f64];
+
+        let mut expected = vec![f64::zero()];
+        let mut found = vec![f64::zero()];
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            sources.data(),
+            &test_point,
+            charges.data(),
+            &mut expected,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            multipole.data(),
+            &mut found,
+        );
+
+        let abs_error = (expected[0] - found[0]).abs();
+        let rel_error = abs_error / expected[0].abs();
+        println!(
+            "here abs {:?} rel {:?} \n expected {:?} found {:?}",
+            abs_error, rel_error, expected, found
+        );
+
+        // Test a leaf multipole, and the actual found multipole from p2m
+        let leaf_idx = 0;
+        let leaf = fmm_fft.tree().source_tree().all_leaves().unwrap()[leaf_idx];
+
+        let found_multipole = fmm_fft.multipole(&leaf).unwrap();
+
+        let upward_equivalent_surface = leaf.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_INNER),
+        );
+
+        let upward_check_surface = leaf.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_OUTER),
+        );
+        let &leaf_idx = fmm_fft.tree().source_tree().leaf_index(&leaf).unwrap();
+        let index_pointer = fmm_fft.charge_index_pointer_sources[leaf_idx];
+        let charges = &fmm_fft.charges[index_pointer.0..index_pointer.1];
+        let sources = &fmm_fft.tree().source_tree().all_coordinates().unwrap()
+            [index_pointer.0 * 3..index_pointer.1 * 3];
+
+        println!("charges {:?} {:?}", charges.len(), sources.len());
+
+        let scale = homogenous_kernel_scale::<f64>(leaf.level());
+
+        let mut check_potential = rlst_dynamic_array2!(f64, [upward_check_surface.len() / 3, 1]);
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            sources,
+            &upward_check_surface,
+            charges,
+            check_potential.data_mut(),
+        );
+
+        let mut cmp_prod = rlst_dynamic_array2!(f64, [fmm_fft.ncoeffs, 1]);
+        cmp_prod.fill_from(check_potential * scale);
+
+        let evaluated_multipole = empty_array::<f64, 2>().simple_mult_into_resize(
+            fmm_fft.uc2e_inv_1.view(),
+            empty_array::<f64, 2>()
+                .simple_mult_into_resize(fmm_fft.uc2e_inv_2.view(), cmp_prod.view()),
+        );
+
+        let test_point = vec![100f64, 0f64, 0f64];
+
+        let mut evaluated = vec![f64::zero()];
+        let mut found = vec![f64::zero()];
+        let mut direct = vec![f64::zero()];
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            &found_multipole,
+            &mut found,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            evaluated_multipole.data(),
+            &mut evaluated,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &sources,
+            &test_point,
+            &charges,
+            &mut direct,
+        );
+
+        let abs_error = (evaluated[0] - found[0]).abs();
+        let rel_error = abs_error / evaluated[0].abs();
+        println!(
+            "here 2 abs {:?} rel {:?} \n evaluated {:?} found {:?} direct {:?}",
+            abs_error, rel_error, evaluated, found, direct
+        );
+
+        // println!("FOUND  {:?}", &found_multipole[0..5]);
+        // println!("EVALUATED {:?}", &evaluated_multipole.data()[0..5]);
+
+        assert!(false);
+    }
+
+    #[test]
     fn test_upward_pass_vector_helmholtz() {
         // Setup random sources and targets
         let nsources = 10000;
@@ -635,6 +829,7 @@ mod test {
         fmm_fft.evaluate();
         let fmm_fft = Box::new(fmm_fft);
 
+        // Test root multipole with all coordinates
         let root = MortonKey::<f64>::root();
         let nsources = sources.data().len() / 3;
         let tmp = vec![c64::one(); nsources];
@@ -647,28 +842,29 @@ mod test {
             f64::from(ALPHA_INNER),
         );
 
-        let upward_check_surface= root.surface_grid(
+        let upward_check_surface = root.surface_grid(
             fmm_fft.expansion_order(),
             fmm_fft.tree().domain(),
             f64::from(ALPHA_OUTER),
         );
 
-        let mut check_potential =  rlst_dynamic_array2!(c64, [upward_check_surface.len() / 3, 1]);
+        let mut check_potential = rlst_dynamic_array2!(c64, [upward_check_surface.len() / 3, 1]);
 
         fmm_fft.kernel().evaluate_st(
-            EvalType::Value, sources.data(), &upward_check_surface, charges.data(),  check_potential.data_mut()
+            EvalType::Value,
+            sources.data(),
+            &upward_check_surface,
+            charges.data(),
+            check_potential.data_mut(),
         );
-
 
         let multipole = empty_array::<c64, 2>().simple_mult_into_resize(
             fmm_fft.uc2e_inv_1.view(),
-            empty_array::<c64, 2>().simple_mult_into_resize(
-                fmm_fft.uc2e_inv_2.view(),
-                check_potential.view()
-            )
+            empty_array::<c64, 2>()
+                .simple_mult_into_resize(fmm_fft.uc2e_inv_2.view(), check_potential.view()),
         );
-        // println!("ROOOT MULTIPOLE CORRECT {:?}", multipole.data());
 
+        // println!("ROOOT MULTIPOLE CORRECT {:?}", multipole.data());
         let test_point = vec![1000f64, 0f64, 0f64];
 
         let mut expected = vec![c64::zero()];
@@ -696,12 +892,132 @@ mod test {
             "here abs {:?} rel {:?} \n expected {:?} found {:?}",
             abs_error, rel_error, expected, found
         );
-        // assert!(rel_error <= 1e-10);
-        // test_leaf_multipole_helmholtz_single_node(fmm_fft, 1e-5);
 
+        // Test a leaf multipole, and the actual found multipole from p2m
+        let leaf_idx = 0;
+        let leaf = fmm_fft.tree().source_tree().all_leaves().unwrap()[leaf_idx];
+
+        let found_multipole = fmm_fft.multipole(&leaf).unwrap();
+
+        let upward_equivalent_surface = leaf.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_INNER),
+        );
+
+        let upward_check_surface = leaf.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_OUTER),
+        );
+
+        let nequiv_surface = upward_equivalent_surface.len() / fmm_fft.dim;
+        let ncheck_surface = upward_check_surface.len() / fmm_fft.dim;
+
+        let mut uc2e_t = rlst_dynamic_array2!(c64, [ncheck_surface, nequiv_surface]);
+        fmm_fft.kernel.assemble_st(
+            EvalType::Value,
+            &upward_equivalent_surface[..],
+            &upward_check_surface[..],
+            uc2e_t.data_mut(),
+        );
+
+        // println!("upward check {:?}", upward_check_surface);
+
+        // Need to transpose so that rows correspond to targets and columns to sources
+        let mut uc2e = rlst_dynamic_array2!(c64, [nequiv_surface, ncheck_surface]);
+        uc2e.fill_from(uc2e_t.transpose());
+
+        let (s, uh, v) = pinv::<c64>(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(c64, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = c64::from(s[i]);
+        }
+
+        // println!("uh {:?}", uh.data());
+
+        let uc2e_inv_1 = empty_array::<c64, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+        let uc2e_inv_2 = uh;
+
+
+        let &leaf_idx = fmm_fft.tree().source_tree().leaf_index(&leaf).unwrap();
+        let index_pointer = fmm_fft.charge_index_pointer_sources[leaf_idx];
+        let charges = &fmm_fft.charges[index_pointer.0..index_pointer.1];
+        let sources = &fmm_fft.tree().source_tree().all_coordinates().unwrap()
+            [index_pointer.0 * 3..index_pointer.1 * 3];
+
+        println!("charges {:?} {:?}", charges.len(), sources.len());
+
+        let scale = homogenous_kernel_scale::<c64>(leaf.level());
+
+        let mut check_potential = rlst_dynamic_array2!(c64, [upward_check_surface.len() / 3, 1]);
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            sources,
+            &upward_check_surface,
+            charges,
+            check_potential.data_mut(),
+        );
+
+        // let mut cmp_prod = rlst_dynamic_array2!(c64, [fmm_fft.ncoeffs, 1]);
+        // cmp_prod.fill_from(check_potential * scale);
+
+        let evaluated_multipole = empty_array::<c64, 2>().simple_mult_into_resize(
+            uc2e_inv_1.view(),
+            empty_array::<c64, 2>()
+                .simple_mult_into_resize(uc2e_inv_2.view(), check_potential.view()),
+        );
+
+        let test_point = vec![100f64, 0f64, 0f64];
+
+        let mut evaluated = vec![c64::zero()];
+        let mut found = vec![c64::zero()];
+        let mut direct = vec![c64::zero()];
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            &found_multipole,
+            &mut found,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            evaluated_multipole.data(),
+            &mut evaluated,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &sources,
+            &test_point,
+            &charges,
+            &mut direct,
+        );
+
+        let abs_error = (evaluated[0] - found[0]).abs();
+        let rel_error = abs_error / evaluated[0].abs();
+        println!(
+            "here 2 abs {:?} rel {:?} \n evaluated {:?} found {:?} direct {:?}",
+            abs_error, rel_error, evaluated, found, direct
+        );
+
+        // println!("FOUND  {:?}", &found_multipole[0..5]);
+        // println!("EVALUATED {:?}", &evaluated_multipole.data()[0..5]);
         // println!("sources: {:?}", sources);
         // println!("upward_check surface: {:?}", upward_check_surface);
         // println!("upward_equivalent surface: {:?}", upward_equivalent_surface);
+
+        assert!(false);
+
+        // assert!(rel_error <= 1e-10);
+        // test_leaf_multipole_helmholtz_single_node(fmm_fft, 1e-5);
+
 
         // println!("check potential : {:?}", check_potential.data());
         // let mut re = "multipole_re = np.array([".to_string();
@@ -752,8 +1068,7 @@ mod test {
         // println!("multipole_re = {:?}", re);
         // println!("multipole_im = {:?}", im);
 
-        test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
-
+        // test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
 
         // let svd_threshold = Some(1e-5);
         // let fmm_svd = SingleNodeBuilder::new()
