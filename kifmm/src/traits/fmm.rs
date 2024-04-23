@@ -1,6 +1,6 @@
 //! FMM traits
 use crate::{fmm::types::Charges, traits::tree::FmmTree};
-use green_kernels::traits::Kernel;
+use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
 use super::tree::Tree;
@@ -117,4 +117,9 @@ where
     /// # Arguments
     /// * `charges` - new charge data.
     fn clear(&mut self, charges: &Charges<Self::Scalar>);
+}
+
+pub trait FmmMetadata {
+    type Scalar: RlstScalar;
+    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
 }

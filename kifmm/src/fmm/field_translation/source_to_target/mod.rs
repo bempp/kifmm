@@ -3,4 +3,4 @@ mod blas;
 mod fft;
 mod matvec;
 mod metadata;
-mod transfer_vector;
+pub mod transfer_vector;

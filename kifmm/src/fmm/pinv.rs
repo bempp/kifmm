@@ -76,8 +76,8 @@ where
         // Return pseudo-inverse in component form
         let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
         let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
-        v.fill_from(vt.transpose());
-        ut.fill_from(u.transpose());
+        v.fill_from(vt.conj().transpose());
+        ut.fill_from(u.conj().transpose());
 
         Ok((s, ut, v))
     }

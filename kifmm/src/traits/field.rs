@@ -45,3 +45,17 @@ where
     /// * `kernel` - The kernel being used
     fn kernel(&mut self, kernel: Self::Kernel);
 }
+
+/// Set metadata associated with a kernel
+pub trait KernelMetadataSourceTarget {
+    // Source field translations
+    fn source(&mut self);
+
+    // Target field translations
+    fn target(&mut self);
+}
+
+/// Set metadata associated with a kernel
+pub trait KernelMetadataFieldTranslation {
+    fn field_translation(&mut self);
+}
