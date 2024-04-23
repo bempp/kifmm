@@ -191,7 +191,7 @@ where
 
                 // Amount to scale the application of the kernel by
                 let scale = m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
-                    * homogenous_kernel_scale(level);
+                    * homogenous_kernel_scale(level).unwrap();
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft = &self.source_to_target.metadata.kernel_data_f;

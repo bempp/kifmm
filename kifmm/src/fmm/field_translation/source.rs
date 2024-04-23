@@ -189,7 +189,7 @@ where
                             rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
                         scaled_check_potential.fill_from(check_potential);
-                        scaled_check_potential.scale_in_place(scale[0]);
+                        scaled_check_potential.scale_inplace(scale[0]);
 
                         let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.uc2e_inv_1.view(),

@@ -10,7 +10,10 @@ use rlst::{
 use crate::{
     fmm::types::{Charges, SendPtrMut},
     traits::tree::{FmmTreeNode, Tree},
-    tree::types::{MortonKey, SingleNodeTree},
+    tree::{
+        constants::DEEPEST_LEVEL,
+        types::{MortonKey, SingleNodeTree},
+    },
 };
 
 /// Number of coefficients for multipole and local expansions for the kernel independent FMM
@@ -40,12 +43,19 @@ pub fn chunk_size(n: usize, max: usize) -> usize {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> T {
-    let numerator = T::from(1).unwrap();
-    let denominator = T::from(2.).unwrap();
-    let power = T::from(level).unwrap().re();
-    let denominator = <T as RlstScalar>::powf(denominator, power);
-    numerator / denominator
+pub fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
+    if level > DEEPEST_LEVEL {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "M2L only perfomed on level 2 and below",
+        ));
+    } else {
+        let numerator = T::from(1).unwrap();
+        let denominator = T::from(2.).unwrap();
+        let power = T::from(level).unwrap().re();
+        let denominator = <T as RlstScalar>::powf(denominator, power);
+        Ok(numerator / denominator)
+    }
 }
 
 /// Scaling to apply to M2L operators calculated using homogenous scale invariant kernels at a given octree level.
@@ -86,8 +96,9 @@ where
         // Assign scales
         let l = i * ncoeffs;
         let r = l + ncoeffs;
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); ncoeffs].as_slice());
+        result[l..r].copy_from_slice(
+            vec![homogenous_kernel_scale(leaf.level()).unwrap(); ncoeffs].as_slice(),
+        );
     }
     result
 }

@@ -2,6 +2,8 @@
 use green_kernels::traits::Kernel;
 use rlst::RlstScalar;
 
+use crate::fmm::helpers::homogenous_kernel_scale;
+
 use super::tree::Domain;
 
 /// Marker trait for field translations
@@ -44,4 +46,26 @@ where
     /// # Arguments
     /// * `kernel` - The kernel being used
     fn kernel(&mut self, kernel: Self::Kernel);
+}
+
+/// Homogenous kernels, which can be scaled between tree levels
+pub trait HomogenousKernel
+where
+    Self: Kernel,
+{
+    /// Scale to apply to kernel matrix
+    fn scale<T: RlstScalar>(&self, level: u64) -> Result<T, std::io::Error> {
+        homogenous_kernel_scale::<T>(level)
+    }
+}
+
+/// Inhomogenous kernels, which can be scaled between tree levels
+pub trait InhomogenousKernel
+where
+    Self: Kernel,
+{
+    /// Scale to apply to wavenumber
+    fn scale_wavenumber<T: RlstScalar>(&self, level: u64) -> Result<T, std::io::Error> {
+        homogenous_kernel_scale::<T>(level)
+    }
 }

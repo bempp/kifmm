@@ -32,8 +32,11 @@ where
     Scalar: RlstScalar + Default + Epsilon,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + Clone + Default,
-    SourceToTargetData: ConfigureSourceToTargetData<Scalar = Scalar, Kernel = Kernel, Domain = Domain<Scalar::Real>>
-        + Default,
+    SourceToTargetData: ConfigureSourceToTargetData<
+        Scalar = Scalar,
+        Kernel = Kernel,
+        Domain = Domain<Scalar::Real>,
+    >,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
@@ -112,7 +115,17 @@ where
             Ok(self)
         }
     }
+}
 
+impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default + Epsilon,
+    <Scalar as RlstScalar>::Real: Default + Epsilon,
+    Kernel: KernelTrait<T = Scalar> + Clone + Default,
+    SourceToTargetData: ConfigureSourceToTargetData<Scalar = Scalar, Kernel = Kernel, Domain = Domain<Scalar::Real>>
+        + Default,
+    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
+{
     /// For an FMM builder with an associated FMM tree, specify simulation specific parameters
     ///
     /// # Arguments
@@ -207,6 +220,10 @@ where
             Ok(result)
         }
     }
+
+    fn source_and_target_operator_data() {}
+
+    fn fmm_metadata() {}
 }
 
 impl<Scalar, Kernel, SourceToTargetData> KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -336,7 +353,7 @@ where
             );
             tmp.data_mut()
                 .iter_mut()
-                .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+                .for_each(|d| *d *= homogenous_kernel_scale(child.level()).unwrap());
 
             l2l.push(tmp);
         }

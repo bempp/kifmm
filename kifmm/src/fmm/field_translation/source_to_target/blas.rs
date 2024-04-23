@@ -197,7 +197,7 @@ where
                     //rlst::threading::disable_threading();
 
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<Scalar>(level)
+                        *d *= homogenous_kernel_scale::<Scalar>(level).unwrap()
                             * m2l_scale::<Scalar>(level).unwrap()
                     });
                 }
@@ -341,7 +341,7 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::disable_threading();
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<Scalar>(level)
+                        *d *= homogenous_kernel_scale::<Scalar>(level).unwrap()
                             * m2l_scale::<Scalar>(level).unwrap()
                     });
                 }
