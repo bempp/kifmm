@@ -227,12 +227,6 @@ where
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let domain = self.tree.domain;
-        let zero = Scalar::Real::zero();
-        let one = Scalar::Real::one();
-        let domain: Domain<_> = Domain {
-            origin: [zero, zero, zero],
-            side_length: [one, one, one]
-        };
 
         // Compute required surfaces
         let upward_equivalent_surface =
@@ -254,6 +248,8 @@ where
             &upward_check_surface[..],
             uc2e_t.data_mut(),
         );
+
+        // println!("upward check {:?}", upward_check_surface);
 
         // Need to transpose so that rows correspond to targets and columns to sources
         let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
@@ -290,7 +286,7 @@ where
         //     empty_array::<Scalar, 2>().simple_mult_into_resize(empty_array::<Scalar, 2>().simple_mult_into_resize(
         //     uc2e_inv_1.view(), uc2e_inv_2.view()), uc2e.view());
 
-        // let debug = &tst;
+        // let debug = &uc2e;
         // let [nrows, ncols] = debug.shape();
         // for i in 0..nrows {
         //     print!("[");
