@@ -8,11 +8,16 @@ use green_kernels::{
 use itertools::Itertools;
 use num::{Float, Zero};
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
+    BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
+    SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer,
 };
 
 use crate::{
-    fmm::{field_translation::source_to_target::transfer_vector::compute_transfer_vectors, types::{FmmEvalType, KiFmm}},
+    fmm::{
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors,
+        types::{FmmEvalType, KiFmm},
+    },
     traits::{
         fftw::{Dft, DftType},
         field::{
@@ -24,7 +29,10 @@ use crate::{
         tree::{Domain, FmmTree, FmmTreeNode, Tree},
     },
     tree::{
-        constants::{ALPHA_INNER, ALPHA_OUTER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM},
+        constants::{
+            ALPHA_INNER, ALPHA_OUTER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
+            NTRANSFER_VECTORS_KIFMM,
+        },
         helpers::find_corners,
         types::MortonKey,
     },
@@ -33,7 +41,9 @@ use crate::{
 
 use super::{
     helpers::{
-        coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers, leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges, ncoeffs_kifmm, potential_pointers
+        coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
+        leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges,
+        ncoeffs_kifmm, potential_pointers,
     },
     pinv::pinv,
     types::{BlasMetadata, Charges, FftMetadata},
@@ -254,7 +264,6 @@ fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(singular_values: &[T], thresho
     singular_values.len() - 1
 }
 
-
 impl<Scalar> KernelMetadataFieldTranslation
     for KiFmm<
         Scalar,
@@ -267,24 +276,29 @@ where
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
     fn field_translation(&mut self) {
-
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let nrows = ncoeffs_kifmm(self.expansion_order);
         let ncols = ncoeffs_kifmm(self.expansion_order);
 
-        let mut se2tc_fat =
-            rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
-        let mut se2tc_thin =
-            rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        let mut se2tc_fat = rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin = rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
         let alpha = Scalar::from(ALPHA_INNER).unwrap().re();
 
         for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t.source.surface_grid(self.expansion_order, &self.tree.source_tree().domain(), alpha);
+            let source_equivalent_surface = t.source.surface_grid(
+                self.expansion_order,
+                &self.tree.source_tree().domain(),
+                alpha,
+            );
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
-            let target_check_surface = t.target.surface_grid(self.expansion_order, &self.tree.source_tree().domain(), alpha);
+            let target_check_surface = t.target.surface_grid(
+                self.expansion_order,
+                &self.tree.source_tree().domain(),
+                alpha,
+            );
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
             let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
@@ -382,17 +396,16 @@ where
             tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
 
-            let directional_cutoff_rank = find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
+            let directional_cutoff_rank =
+                find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
 
             let mut u_i_compressed =
                 rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
             let mut vt_i_compressed_ =
                 rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
 
-            let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
-                Scalar,
-                [directional_cutoff_rank, directional_cutoff_rank]
-            );
+            let mut sigma_mat_i_compressed =
+                rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, directional_cutoff_rank]);
 
             u_i_compressed
                 .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
@@ -401,8 +414,7 @@ where
 
             for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
                 unsafe {
-                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
-                        Scalar::from(*s).unwrap();
+                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
                 }
             }
 
@@ -424,7 +436,6 @@ where
         };
         self.source_to_target.metadata = result;
         self.source_to_target.cutoff_rank = cutoff_rank;
-
     }
 }
 
@@ -792,7 +803,6 @@ where
         self.source_to_target.transfer_vectors = compute_transfer_vectors();
     }
 }
-
 
 impl<Scalar, Kernel, SourceToTargetData> FmmMetadata for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
