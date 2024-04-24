@@ -42,7 +42,7 @@ where
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
         let depth = self.tree.source_tree().depth();
-        let operator_index = self.kernel.p2m_operator_index(depth);
+        let operator_index = self.kernel.c2e_operator_index(depth);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {

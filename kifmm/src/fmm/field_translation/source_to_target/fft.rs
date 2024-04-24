@@ -5,7 +5,8 @@ use itertools::Itertools;
 use num::{One, Zero};
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
+    empty_array, operator::ScalarTimesOperator, rlst_dynamic_array2, MultIntoResize,
+    RandomAccessMut, RawAccess, RlstScalar,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -117,7 +118,8 @@ where
                     return;
                 };
 
-                let operator_index = self.kernel.m2l_operator_index(level);
+                let m2l_operator_index = self.kernel.m2l_operator_index(level);
+                let c2e_operator_index = self.kernel.c2e_operator_index(level);
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -155,7 +157,7 @@ where
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
                 let mut signals_hat_f_buffer =
-                    vec![Scalar::zero(); size_out * (nsources + nzeros) * 2];
+                    vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
                 let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
                     let ptr = signals_hat_f_buffer.as_mut_ptr()
@@ -182,7 +184,7 @@ where
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
                 let mut check_potentials_hat_f_buffer =
-                    vec![Scalar::zero(); 2 * size_out * ntargets];
+                    vec![Scalar::Real::zero(); 2 * size_out * ntargets];
                 let check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
                     let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
@@ -200,10 +202,11 @@ where
                 };
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
-                let kernel_data_ft = &self.source_to_target.metadata[operator_index].kernel_data_f;
+                let kernel_data_ft =
+                    &self.source_to_target.metadata[m2l_operator_index].kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
-                let mut check_potential_hat = vec![Scalar::zero(); size_out * ntargets * 2];
+                let mut check_potential_hat = vec![Scalar::Real::zero(); size_out * ntargets * 2];
 
                 // Allocate buffer to store the check potentials in box order
                 let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
@@ -236,8 +239,9 @@ where
                             }
 
                             // Temporary buffer to hold results of FFT
-                            let signal_hat_chunk_buffer = vec![
-                                    <Scalar as AsComplex>::ComplexType::zero();
+                            let signal_hat_chunk_buffer =
+                                vec![
+                                    Scalar::Real::zero();
                                     size_out * NSIBLINGS * chunk_size_pre_proc * 2
                                 ];
                             let signal_hat_chunk_c;
@@ -259,7 +263,7 @@ where
                             // Re-order the temporary buffer into frequency order before flushing to main memory
                             let signal_hat_chunk_f_buffer =
                                 vec![
-                                    Scalar::zero();
+                                    Scalar::Real::zero();
                                     size_out * NSIBLINGS * chunk_size_pre_proc * 2
                                 ];
                             let signal_hat_chunk_f_c;
@@ -393,9 +397,9 @@ where
 
                             // Can now find local expansion coefficients
                             let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_1[0].view(),
+                                self.dc2e_inv_1[c2e_operator_index].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.dc2e_inv_2[0].view(),
+                                    self.dc2e_inv_2[c2e_operator_index].view(),
                                     potential_chunk,
                                 ),
                             );

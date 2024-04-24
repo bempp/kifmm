@@ -136,8 +136,8 @@ where
     /// Homogeneity check
     fn is_homogenous(&self) -> bool;
 
-    /// Lookup p2m operator
-    fn p2m_operator_index(&self, level: u64) -> usize;
+    /// Lookup c2e operator
+    fn c2e_operator_index(&self, level: u64) -> usize;
 
     /// Lookup m2m operator
     fn m2m_operator_index(&self, level: u64) -> usize;

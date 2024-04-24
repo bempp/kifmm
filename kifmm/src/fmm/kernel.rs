@@ -11,7 +11,7 @@ where
         true
     }
 
-    fn p2m_operator_index(&self, _level: u64) -> usize {
+    fn c2e_operator_index(&self, _level: u64) -> usize {
         0
     }
 
@@ -31,7 +31,7 @@ where
         false
     }
 
-    fn p2m_operator_index(&self, level: u64) -> usize {
+    fn c2e_operator_index(&self, level: u64) -> usize {
         level as usize
     }
     fn m2m_operator_index(&self, level: u64) -> usize {
