@@ -211,31 +211,31 @@ where
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// Data and metadata for field translations
     pub source_to_target: SourceToTargetData,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The metadata required for source to source translation
-    pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
+    pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
+    pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
 
     /// The multipole expansion data at each box.
     pub multipoles: Vec<Scalar>,
@@ -530,7 +530,7 @@ where
     pub conv_to_surf_map: Vec<usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
-    pub metadata: FftMetadata<<Scalar as AsComplex>::ComplexType>,
+    pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
@@ -562,7 +562,7 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: BlasMetadata<Scalar>,
+    pub metadata: Vec<BlasMetadata<Scalar>>, // index corresponds to level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,

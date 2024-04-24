@@ -194,7 +194,7 @@ where
                     * homogenous_kernel_scale(level);
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
-                let kernel_data_ft = &self.source_to_target.metadata.kernel_data_f;
+                let kernel_data_ft = &self.source_to_target.metadata[0].kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
                 let mut check_potential_hat = vec![Scalar::zero(); size_out * ntargets * 2];

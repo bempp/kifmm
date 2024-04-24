@@ -190,7 +190,7 @@ where
                     //TODO: Rework threading
                     //rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.source_to_target.metadata.st.view(),
+                        self.source_to_target.metadata[0].st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
@@ -209,8 +209,8 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let c_u_sub = &self.source_to_target.metadata.c_u[c_idx];
-                            let c_vt_sub = &self.source_to_target.metadata.c_vt[c_idx];
+                            let c_u_sub = &self.source_to_target.metadata[0].c_u[c_idx];
+                            let c_vt_sub = &self.source_to_target.metadata[0].c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
@@ -269,7 +269,7 @@ where
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2[0].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_to_target.metadata.u.view(),
+                                self.source_to_target.metadata[0].u.view(),
                                 compressed_check_potentials,
                             ),
                         ),
@@ -335,7 +335,7 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.source_to_target.metadata.st.view(),
+                        self.source_to_target.metadata[0].st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
@@ -353,8 +353,8 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let c_u_sub = &self.source_to_target.metadata.c_u[c_idx];
-                            let c_vt_sub = &self.source_to_target.metadata.c_vt[c_idx];
+                            let c_u_sub = &self.source_to_target.metadata[0].c_u[c_idx];
+                            let c_vt_sub = &self.source_to_target.metadata[0].c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
@@ -450,7 +450,7 @@ where
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2[0].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_to_target.metadata.u.view(),
+                                self.source_to_target.metadata[0].u.view(),
                                 compressed_check_potentials,
                             ),
                         ),
