@@ -5,10 +5,9 @@ use crate::traits::fmm::FmmKernel;
 
 use super::helpers::homogenous_kernel_scale;
 
-
-impl <T> FmmKernel for Laplace3dKernel<T>
+impl<T> FmmKernel for Laplace3dKernel<T>
 where
-    T: RlstScalar
+    T: RlstScalar,
 {
     fn p2m_operator_index(&self, level: u64) -> usize {
         0
@@ -23,10 +22,9 @@ where
     }
 }
 
-
-impl <T> FmmKernel for Helmholtz3dKernel<T>
+impl<T> FmmKernel for Helmholtz3dKernel<T>
 where
-    T: RlstScalar<Complex = T>
+    T: RlstScalar<Complex = T>,
 {
     fn p2m_operator_index(&self, level: u64) -> usize {
         level as usize

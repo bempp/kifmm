@@ -104,7 +104,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> +  FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {

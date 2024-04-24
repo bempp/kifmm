@@ -7,7 +7,10 @@ use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 
 use crate::{
     traits::{
-        fftw::Dft, field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait}, fmm::FmmKernel, general::AsComplex
+        fftw::Dft,
+        field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait},
+        fmm::FmmKernel,
+        general::AsComplex,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
 };
@@ -273,7 +276,6 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn default() -> Self {
-
         KiFmm {
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),

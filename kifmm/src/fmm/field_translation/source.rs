@@ -17,7 +17,8 @@ use crate::{
         types::{FmmEvalType, KiFmm},
     },
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait, fmm::{FmmKernel, SourceTranslation},
+        field::SourceToTargetData as SourceToTargetDataTrait,
+        fmm::{FmmKernel, SourceTranslation},
         tree::{FmmTree, Tree},
     },
     tree::constants::NSIBLINGS,
@@ -88,7 +89,6 @@ where
                         },
                     );
 
-
                 // Use check potentials to compute the multipole expansion
                 let chunk_size = chunk_size(n_leaves, P2M_MAX_CHUNK_SIZE);
                 check_potentials
@@ -115,8 +115,10 @@ where
 
                         let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.uc2e_inv_1[operator_index].view(),
-                            empty_array::<Scalar, 2>()
-                                .simple_mult_into_resize(self.uc2e_inv_2[operator_index].view(), scaled_check_potential),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_2[operator_index].view(),
+                                scaled_check_potential,
+                            ),
                         );
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)

@@ -126,7 +126,7 @@ pub trait FmmMetadata {
 
 pub trait FmmKernel
 where
-    Self: Kernel
+    Self: Kernel,
 {
     /// Amount to scale kernel matrices by
     fn scale<T: RlstScalar>(&self, level: u64) -> T;
@@ -135,5 +135,4 @@ where
     fn p2m_operator_index(&self, level: u64) -> usize;
 
     fn m2m_operator_index(&self, level: u64) -> usize;
-
 }

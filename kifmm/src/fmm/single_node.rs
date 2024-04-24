@@ -24,7 +24,9 @@ use crate::{
             KernelMetadataFieldTranslation, KernelMetadataSourceTarget,
             SourceToTargetData as SourceToTargetDataTrait,
         },
-        fmm::{FmmKernel, FmmMetadata, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
+        fmm::{
+            FmmKernel, FmmMetadata, SourceToTargetTranslation, SourceTranslation, TargetTranslation,
+        },
         general::{AsComplex, Epsilon},
         tree::{Domain, FmmTree, FmmTreeNode, Tree},
     },
@@ -95,12 +97,16 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let uc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let uc2e_inv_1 =
+            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
         let uc2e_inv_2 = vec![ut];
 
         // Calculate M2M operator matrices
         let children = root.children();
-        let mut m2m = vec![rlst_dynamic_array2!(Scalar, [nequiv_surface, 8 * nequiv_surface])];
+        let mut m2m = vec![rlst_dynamic_array2!(
+            Scalar,
+            [nequiv_surface, 8 * nequiv_surface]
+        )];
         let mut m2m_vec = vec![Vec::new()];
 
         for (i, child) in children.iter().enumerate() {
@@ -122,7 +128,8 @@ where
 
             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                 uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
+                empty_array::<Scalar, 2>()
+                    .simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
             );
             let l = i * nequiv_surface * nequiv_surface;
             let r = l + nequiv_surface * nequiv_surface;
@@ -174,7 +181,8 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let dc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let dc2e_inv_1 =
+            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
         let dc2e_inv_2 = vec![ut];
 
         // Calculate M2M and L2L operator matrices
@@ -199,7 +207,8 @@ where
             cc2pe.fill_from(cc2pe_t.transpose());
             let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                 dc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
+                empty_array::<Scalar, 2>()
+                    .simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
             );
             tmp.data_mut()
                 .iter_mut()
@@ -235,15 +244,15 @@ where
 
         let mut curr = root;
         let mut uc2e_inv_1 = Vec::new();
-        let mut uc2e_inv_2= Vec::new();
+        let mut uc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
         for _level in 0..=depth {
-
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(self.expansion_order, &domain, alpha_inner);
-            let upward_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let upward_check_surface =
+                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
 
             let nequiv_surface = upward_equivalent_surface.len() / self.dim;
             let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -269,23 +278,23 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            uc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            uc2e_inv_1
+                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
             uc2e_inv_2.push(ut);
 
             curr = curr.first_child();
         }
 
-
         let mut curr = root;
         let mut source = Vec::new();
         let mut source_vec = Vec::new();
 
-        for level in 0..=depth {
-
+        for level in 0..depth {
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(self.expansion_order, &domain, alpha_inner);
-            let upward_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let upward_check_surface =
+                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
 
             let nequiv_surface = upward_equivalent_surface.len() / self.dim;
             let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -314,7 +323,8 @@ where
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     uc2e_inv_1[level as usize].view(),
-                    empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[level as usize].view(), pc2ce.view()),
+                    empty_array::<Scalar, 2>()
+                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), pc2ce.view()),
                 );
                 let l = i * nequiv_surface * nequiv_surface;
                 let r = l + nequiv_surface * nequiv_surface;
@@ -346,14 +356,15 @@ where
 
         let mut curr = root;
         let mut dc2e_inv_1 = Vec::new();
-        let mut dc2e_inv_2= Vec::new();
+        let mut dc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
         for _level in 0..=depth {
             // Compute required surfaces
             let downward_equivalent_surface =
                 curr.surface_grid(self.expansion_order, &domain, alpha_outer);
-            let downward_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_inner);
+            let downward_check_surface =
+                curr.surface_grid(self.expansion_order, &domain, alpha_inner);
 
             let nequiv_surface = downward_equivalent_surface.len() / self.dim;
             let ncheck_surface = downward_check_surface.len() / self.dim;
@@ -379,7 +390,8 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            dc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            dc2e_inv_1
+                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
             dc2e_inv_2.push(ut);
             curr = curr.first_child();
         }
@@ -388,11 +400,11 @@ where
         let mut target = Vec::new();
 
         for level in 0..depth {
-
             // Compute required surfaces
             let downward_equivalent_surface =
                 curr.surface_grid(self.expansion_order, &domain, alpha_outer);
-            let downard_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_inner);
+            let downard_check_surface =
+                curr.surface_grid(self.expansion_order, &domain, alpha_inner);
 
             let nequiv_surface = downward_equivalent_surface.len() / self.dim;
             let ncheck_surface = downard_check_surface.len() / self.dim;
@@ -419,7 +431,10 @@ where
                 cc2pe.fill_from(cc2pe_t.transpose());
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     dc2e_inv_1[(level + 1) as usize].view(),
-                    empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[(level + 1) as usize].view(), cc2pe.view()),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                        dc2e_inv_2[(level + 1) as usize].view(),
+                        cc2pe.view(),
+                    ),
                 );
 
                 l2l.push(tmp);
@@ -1054,9 +1069,17 @@ where
 
         // Kernel scale at each target and source leaf
         // let source_leaf_scales = leaf_scales(&self.tree.source_tree, self.ncoeffs);
-        let mut source_leaf_scales = vec![Scalar::default(); self.tree.source_tree.n_leaves().unwrap() * self.ncoeffs];
+        let mut source_leaf_scales =
+            vec![Scalar::default(); self.tree.source_tree.n_leaves().unwrap() * self.ncoeffs];
 
-        for (i, leaf) in self.tree.source_tree.all_leaves().unwrap().iter().enumerate() {
+        for (i, leaf) in self
+            .tree
+            .source_tree
+            .all_leaves()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
             // Assign scales
             let l = i * self.ncoeffs;
             let r = l + self.ncoeffs;
@@ -1140,7 +1163,7 @@ where
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel +Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
@@ -1341,11 +1364,22 @@ mod test {
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer
+        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray,
+        MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
     };
 
     use crate::{
-        fmm, traits::{fmm::SourceTranslation, tree::{FmmTree, FmmTreeNode, Tree}}, tree::{constants::{ALPHA_INNER, ALPHA_OUTER}, helpers::points_fixture, types::MortonKey}, BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
+        fmm,
+        traits::{
+            fmm::SourceTranslation,
+            tree::{FmmTree, FmmTreeNode, Tree},
+        },
+        tree::{
+            constants::{ALPHA_INNER, ALPHA_OUTER},
+            helpers::points_fixture,
+            types::MortonKey,
+        },
+        BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar + Float + Default>(

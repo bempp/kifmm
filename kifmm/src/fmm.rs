@@ -2,13 +2,13 @@
 mod builder;
 pub mod constants;
 pub mod helpers;
+mod kernel;
 mod multi_node;
 pub mod pinv;
 mod send_ptr;
 mod single_node;
 mod tree;
 pub mod types;
-mod kernel;
 
 mod field_translation;
 
