@@ -30,7 +30,7 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar, Kernel>>
+impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar
         + AsComplex
@@ -98,7 +98,7 @@ where
 }
 
 impl<Scalar, Kernel> SourceToTargetTranslation
-    for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar, Kernel>>
+    for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar
         + AsComplex

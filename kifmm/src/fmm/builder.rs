@@ -1,34 +1,23 @@
 //! Builder objects to construct FMMs
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
-use rlst::{
-    empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar, Shape, VectorContainer,
-};
+use rlst::{Array, BaseArray, MatrixSvd, RawAccess, RlstScalar, Shape, VectorContainer};
 
 use crate::{
     fmm::{
         constants::DEFAULT_NCRIT,
-        helpers::{
-            coordinate_index_pointer, homogenous_kernel_scale, leaf_expansion_pointers,
-            leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer, map_charges,
-            ncoeffs_kifmm, potential_pointers,
-        },
-        pinv::pinv,
+        helpers::{map_charges, ncoeffs_kifmm},
         types::{Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
     traits::{
         field::{
-            ConfigureSourceToTargetData, KernelMetadataFieldTranslation,
-            KernelMetadataSourceTarget, SourceToTargetData as SourceToTargetDataTrait,
+            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
+            SourcetoTargetTranslationMetadata,
         },
         fmm::{FmmKernel, FmmMetadata},
         general::Epsilon,
-        tree::{FmmTreeNode, Tree},
+        tree::Tree,
     },
-    tree::{
-        constants::{ALPHA_INNER, ALPHA_OUTER},
-        types::{Domain, MortonKey, SingleNodeTree},
-    },
+    tree::{types::Domain, SingleNodeTree},
 };
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
@@ -38,8 +27,9 @@ where
     Kernel: KernelTrait<T = Scalar> + FmmKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
-    KiFmm<Scalar, Kernel, SourceToTargetData>:
-        KernelMetadataFieldTranslation + KernelMetadataSourceTarget + FmmMetadata<Scalar = Scalar>,
+    KiFmm<Scalar, Kernel, SourceToTargetData>: SourcetoTargetTranslationMetadata
+        + SourceAndTargetTranslationMetadata
+        + FmmMetadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {

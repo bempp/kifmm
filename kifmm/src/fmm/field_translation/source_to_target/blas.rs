@@ -28,7 +28,7 @@ use crate::{
     BlasFieldTranslation, Fmm,
 };
 
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
+impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + FmmKernel + Default,
@@ -100,7 +100,7 @@ where
 }
 
 impl<Scalar, Kernel> SourceToTargetTranslation
-    for KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
+    for KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,

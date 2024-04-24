@@ -7,9 +7,7 @@ use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 
 use crate::{
     traits::{
-        fftw::Dft,
-        field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait},
-        fmm::FmmKernel,
+        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::FmmKernel,
         general::AsComplex,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
@@ -519,17 +517,10 @@ pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator
 /// - `metadata`- Stores precomputed metadata required to apply this method.
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
-///
-/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
-///
-/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
-///   used to control the accuracy and computational complexity of the FMM.
 #[derive(Default)]
-pub struct FftFieldTranslation<Scalar, Kernel>
+pub struct FftFieldTranslation<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
-    <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
@@ -542,12 +533,6 @@ where
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: Kernel,
-
-    /// Expansion order
-    pub expansion_order: usize,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -565,18 +550,12 @@ where
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
 ///
-/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
-///
-/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
-///   used to control the accuracy and computational complexity of the FMM.
-///
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
 ///    matrices corresponding to unique transfer vectors.
 #[derive(Default)]
-pub struct BlasFieldTranslation<Scalar, Kernel>
+pub struct BlasFieldTranslation<Scalar>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + Default,
 {
     /// Threshold
     pub threshold: Scalar::Real,
@@ -586,12 +565,6 @@ where
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: Kernel,
-
-    /// Expansion order
-    pub expansion_order: usize,
 
     /// Cutoff rank
     pub cutoff_rank: usize,

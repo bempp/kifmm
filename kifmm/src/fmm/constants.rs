@@ -11,3 +11,5 @@ pub const L2L_MAX_CHUNK_SIZE: usize = 256;
 
 /// Default value chosen for maximum number of particles per leaf.
 pub const DEFAULT_NCRIT: u64 = 150;
+
+pub const DEFAULT_SVD_THRESHOLD: f64 = 1e-16;
