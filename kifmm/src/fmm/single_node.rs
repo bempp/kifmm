@@ -221,21 +221,16 @@ mod test {
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray,
-        MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
+        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
+        RawAccessMut, RlstScalar, Shape, VectorContainer,
     };
 
     use crate::{
-        fmm,
         traits::{
             fmm::SourceTranslation,
             tree::{FmmTree, FmmTreeNode, Tree},
         },
-        tree::{
-            constants::{ALPHA_INNER, ALPHA_OUTER},
-            helpers::points_fixture,
-            types::MortonKey,
-        },
+        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
@@ -298,7 +293,7 @@ mod test {
         }
     }
 
-    fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
+    fn _test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
