@@ -47,6 +47,8 @@ use crate::{
     },
 };
 
+use super::transfer_vector::compute_transfer_vectors_at_level;
+
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
 fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(singular_values: &[T], threshold: T) -> usize {
@@ -463,8 +465,192 @@ impl<Scalar> SourcetoTargetTranslationMetadata
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,
     <Scalar as RlstScalar>::Real: Default,
+    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
-    fn source_to_target(&mut self) {}
+    fn source_to_target(&mut self) {
+        // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
+        // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
+        let nrows = ncoeffs_kifmm(self.expansion_order);
+        let ncols = ncoeffs_kifmm(self.expansion_order);
+
+        let alpha = Scalar::real(ALPHA_INNER);
+        let depth = self.tree.source_tree().depth();
+
+        for level in 2..=depth {
+            let mut se2tc_fat =
+                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+            let mut se2tc_thin =
+                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+
+            for (i, t) in compute_transfer_vectors_at_level::<Scalar::Real>(level)
+                .iter()
+                .enumerate()
+            {
+                let source_equivalent_surface = t.source.surface_grid(
+                    self.expansion_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+                let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
+
+                let target_check_surface = t.target.surface_grid(
+                    self.expansion_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+                let ntargets = target_check_surface.len() / self.kernel.space_dimension();
+
+                let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
+
+                self.kernel.assemble_st(
+                    EvalType::Value,
+                    &source_equivalent_surface[..],
+                    &target_check_surface[..],
+                    tmp_gram_t.data_mut(),
+                );
+
+                // Need to transpose so that rows correspond to targets, and columns to sources
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
+                tmp_gram.fill_from(tmp_gram_t.transpose());
+
+                let mut block = se2tc_fat
+                    .view_mut()
+                    .into_subview([0, i * ncols], [nrows, ncols]);
+                block.fill_from(tmp_gram.view());
+
+                let mut block_column = se2tc_thin
+                    .view_mut()
+                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                block_column.fill_from(tmp_gram.view());
+            }
+
+            let mu = se2tc_fat.shape()[0];
+            let nvt = se2tc_fat.shape()[1];
+            let k = std::cmp::min(mu, nvt);
+
+            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut sigma = vec![Scalar::zero().re(); k];
+            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+
+            se2tc_fat
+                .into_svd_alloc(
+                    u_big.view_mut(),
+                    vt_big.view_mut(),
+                    &mut sigma[..],
+                    SvdMode::Reduced,
+                )
+                .unwrap();
+            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
+            let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
+            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+            let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+
+            u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
+            vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
+            for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
+                unsafe {
+                    *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                }
+            }
+
+            // Store compressed M2L operators
+            let thin_nrows = se2tc_thin.shape()[0];
+            let nst = se2tc_thin.shape()[1];
+            let k = std::cmp::min(thin_nrows, nst);
+            let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
+            let mut _r = vec![Scalar::zero().re(); k];
+            let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
+
+            se2tc_thin
+                .into_svd_alloc(
+                    _gamma.view_mut(),
+                    st.view_mut(),
+                    &mut _r[..],
+                    SvdMode::Reduced,
+                )
+                .unwrap();
+
+            let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
+            for j in 0..cutoff_rank {
+                for i in 0..nst {
+                    unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
+                }
+            }
+
+            let mut c_u = Vec::new();
+            let mut c_vt = Vec::new();
+
+            let n_transfer_vectors = if level == 2 {
+                189
+            } else {
+                316
+            };
+
+            for i in 0..n_transfer_vectors {
+                let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat.view(),
+                    empty_array::<Scalar, 2>()
+                        .simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+                );
+
+                let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+                let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
+                let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+
+                tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+                    .unwrap();
+
+                let directional_cutoff_rank =
+                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
+
+                let mut u_i_compressed =
+                    rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
+                let mut vt_i_compressed_ =
+                    rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
+
+                let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
+                    Scalar,
+                    [directional_cutoff_rank, directional_cutoff_rank]
+                );
+
+                u_i_compressed
+                    .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
+                vt_i_compressed_
+                    .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
+
+                for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+                    unsafe {
+                        *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
+                            Scalar::from(*s).unwrap();
+                    }
+                }
+
+                let vt_i_compressed = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat_i_compressed.view(),
+                    vt_i_compressed_.view(),
+                );
+                c_u.push(u_i_compressed);
+                c_vt.push(vt_i_compressed);
+            }
+
+            let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
+            st_trunc.fill_from(s_trunc.transpose());
+
+            self.source_to_target.metadata.push(
+                BlasMetadata {
+                    u,
+                    st: st_trunc,
+                    c_u,
+                    c_vt
+                }
+            );
+
+            self.source_to_target.cutoff_rank.push(cutoff_rank);
+        }
+
+    }
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
@@ -511,16 +697,10 @@ where
 
         let halo = parent.neighbors();
         let halo_children = halo.iter().map(|h| h.children()).collect_vec();
-        let mut transfer_vectors = vec![];
-        for _ in &halo_children {
-            transfer_vectors.push(vec![]);
-        }
 
-        let mut transfer_vector_index_map = HashMap::new();
         let mut transfer_vector_index = vec![vec![0usize; NSIBLINGS_SQUARED]; NHALO];
 
         for (i, halo_child_set) in halo_children.iter().enumerate() {
-            let mut tmp_transfer_vectors = vec![];
             let outer_displacement = i;
 
             for (j, sibling) in siblings.iter().enumerate() {
@@ -528,14 +708,9 @@ where
                     let tv = halo_child.find_transfer_vector(sibling).unwrap();
 
                     let inner_displacement = NSIBLINGS * j + k;
-                    // transfer_vector_index_map.insert(tv, (outer_displacement, inner_displacement));
-                    transfer_vector_index_map.insert((outer_displacement, inner_displacement), tv);
-                    tmp_transfer_vectors.push(tv);
                     transfer_vector_index[outer_displacement][inner_displacement] = tv;
                 }
             }
-
-            transfer_vectors[i] = tmp_transfer_vectors;
         }
 
         // Compute data for level 2 separately
@@ -589,6 +764,7 @@ where
                     self.tree.source_tree().domain(),
                     alpha,
                 );
+
                 let target_check_surface = target.surface_grid(
                     self.expansion_order,
                     self.tree.source_tree().domain(),
@@ -926,7 +1102,7 @@ where
         let mut se2tc_fat = rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
         let mut se2tc_thin = rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
 
-        let alpha = Scalar::from(ALPHA_INNER).unwrap().re();
+        let alpha = Scalar::real(ALPHA_INNER);
 
         for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.surface_grid(
@@ -1077,7 +1253,7 @@ where
             c_vt,
         };
         self.source_to_target.metadata = vec![result];
-        self.source_to_target.cutoff_rank = cutoff_rank;
+        self.source_to_target.cutoff_rank = vec![cutoff_rank];
     }
 }
 

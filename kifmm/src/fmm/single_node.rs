@@ -789,7 +789,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
-        let n_crit = Some(10);
+        let n_crit = Some(1000);
         let expansion_order = 6;
         let sparse = true;
 
@@ -800,7 +800,6 @@ mod test {
         charges.data_mut().copy_from_slice(&tmp);
 
         let wavenumber = 2.5;
-
         let fmm = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
@@ -809,12 +808,26 @@ mod test {
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                FftFieldTranslation::new(),
-            )
+                BlasFieldTranslation::new(None))
             .unwrap()
             .build()
             .unwrap();
         fmm.evaluate();
+
+        // let fmm = SingleNodeBuilder::new()
+        //     .tree(&sources, &targets, n_crit, sparse)
+        //     .unwrap()
+        //     .parameters(
+        //         &charges,
+        //         expansion_order,
+        //         Helmholtz3dKernel::new(wavenumber),
+        //         EvalType::Value,
+        //         FftFieldTranslation::new(),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
+        // fmm.evaluate();
 
         // Test M2L
         {
@@ -875,6 +888,7 @@ mod test {
                 .zip(evaluated_local.data())
                 .for_each(|(e, f)| assert!((e - f).abs() < 1e-5));
         }
+        assert!(false);
 
         // let fmm_fft = Box::new(fmm_fft);
         // let eval_type = fmm_fft.kernel_eval_type;

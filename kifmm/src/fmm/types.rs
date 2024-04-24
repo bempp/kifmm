@@ -567,8 +567,8 @@ where
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// Cutoff rank
-    pub cutoff_rank: usize,
+    /// Cutoff ranks
+    pub cutoff_rank: Vec<usize>, // index corresponds to level
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.

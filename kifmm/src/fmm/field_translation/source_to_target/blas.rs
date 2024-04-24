@@ -114,6 +114,9 @@ where
             return;
         };
 
+        let m2l_operator_index = self.kernel.m2l_operator_index(level);
+        let c2e_operator_index = self.kernel.c2e_operator_index(level);
+
         // Compute the displacements
         let all_displacements = self.displacements(level);
 
@@ -164,7 +167,7 @@ where
 
                 // Allocate buffer to store compressed check potentials
                 let compressed_check_potentials =
-                    rlst_dynamic_array2!(Scalar, [self.source_to_target.cutoff_rank, ntargets]);
+                    rlst_dynamic_array2!(Scalar, [self.source_to_target.cutoff_rank[m2l_operator_index], ntargets]);
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
@@ -172,7 +175,7 @@ where
                         compressed_check_potentials
                             .data()
                             .as_ptr()
-                            .add(i * self.source_to_target.cutoff_rank)
+                            .add(i * self.source_to_target.cutoff_rank[m2l_operator_index])
                             as *mut Scalar
                     };
                     let send_ptr = SendPtrMut { raw };
@@ -190,43 +193,51 @@ where
                     //TODO: Rework threading
                     //rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.source_to_target.metadata[0].st.view(),
+                        self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
                     //rlst::threading::disable_threading();
 
-                    compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<Scalar>(level)
-                            * m2l_scale::<Scalar>(level).unwrap()
-                    });
+                    if self.kernel.is_homogenous() {
+                        compressed_multipoles.data_mut().iter_mut().for_each(|d| {
+                            *d *= homogenous_kernel_scale::<Scalar>(level)
+                                * m2l_scale::<Scalar>(level).unwrap()
+                        });
+                    }
                 }
+
+                let n_transfer_vectors = if level == 2 {
+                    189
+                } else {
+                    NTRANSFER_VECTORS_KIFMM
+                };
 
                 // 2. Apply BLAS operation
                 {
-                    (0..NTRANSFER_VECTORS_KIFMM)
+                    (0..n_transfer_vectors)
                         .into_par_iter()
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let c_u_sub = &self.source_to_target.metadata[0].c_u[c_idx];
-                            let c_vt_sub = &self.source_to_target.metadata[0].c_vt[c_idx];
+                            let c_u_sub = &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
+                            let c_vt_sub = &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
-                                [self.source_to_target.cutoff_rank, multipole_idxs.len()]
+                                [self.source_to_target.cutoff_rank[m2l_operator_index], multipole_idxs.len()]
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
                                     .source_to_target
-                                    .cutoff_rank
-                                    ..(i + 1) * self.source_to_target.cutoff_rank]
+                                    .cutoff_rank[m2l_operator_index]
+                                    ..(i + 1) * self.source_to_target.cutoff_rank[m2l_operator_index]]
                                     .copy_from_slice(
                                         &compressed_multipoles.data()[multipole_idx
-                                            * self.source_to_target.cutoff_rank
+                                            * self.source_to_target.cutoff_rank[m2l_operator_index]
                                             ..(multipole_idx + 1)
-                                                * self.source_to_target.cutoff_rank],
+                                                * self.source_to_target.cutoff_rank[m2l_operator_index]],
                                     );
                             }
 
@@ -246,12 +257,12 @@ where
                                 let check_potential = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         check_potential_ptr,
-                                        self.source_to_target.cutoff_rank,
+                                        self.source_to_target.cutoff_rank[m2l_operator_index],
                                     )
                                 };
                                 let tmp = &compressed_check_potential.data()[multipole_idx
-                                    * self.source_to_target.cutoff_rank
-                                    ..(multipole_idx + 1) * self.source_to_target.cutoff_rank];
+                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    ..(multipole_idx + 1) * self.source_to_target.cutoff_rank[m2l_operator_index]];
                                 check_potential
                                     .iter_mut()
                                     .zip(tmp)
@@ -265,11 +276,11 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1[0].view(),
+                        self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2[0].view(),
+                            self.dc2e_inv_2[c2e_operator_index].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_to_target.metadata[0].u.view(),
+                                self.source_to_target.metadata[m2l_operator_index].u.view(),
                                 compressed_check_potentials,
                             ),
                         ),
@@ -300,16 +311,16 @@ where
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     Scalar,
-                    [self.source_to_target.cutoff_rank, nsources * nmatvecs]
+                    [self.source_to_target.cutoff_rank[m2l_operator_index], nsources * nmatvecs]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
-                    let key_displacement = i * self.source_to_target.cutoff_rank * nmatvecs;
+                    let key_displacement = i * self.source_to_target.cutoff_rank[m2l_operator_index] * nmatvecs;
                     let mut tmp = Vec::new();
                     for charge_vec_idx in 0..nmatvecs {
                         let charge_vec_displacement =
-                            charge_vec_idx * self.source_to_target.cutoff_rank;
+                            charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
 
                         let raw = unsafe {
                             compressed_check_potentials
@@ -335,31 +346,41 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.source_to_target.metadata[0].st.view(),
+                        self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::disable_threading();
-                    compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                        *d *= homogenous_kernel_scale::<Scalar>(level)
-                            * m2l_scale::<Scalar>(level).unwrap()
-                    });
+
+                    if self.kernel.is_homogenous() {
+                        compressed_multipoles.data_mut().iter_mut().for_each(|d| {
+                            *d *= homogenous_kernel_scale::<Scalar>(level)
+                                * m2l_scale::<Scalar>(level).unwrap()
+                        });
+
+                    }
                 }
+
+                let n_transfer_vectors = if level == 2 {
+                    189
+                } else {
+                    NTRANSFER_VECTORS_KIFMM
+                };
 
                 // 2. Apply the BLAS operation
                 {
-                    (0..NTRANSFER_VECTORS_KIFMM)
+                    (0..n_transfer_vectors)
                         .into_par_iter()
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let c_u_sub = &self.source_to_target.metadata[0].c_u[c_idx];
-                            let c_vt_sub = &self.source_to_target.metadata[0].c_vt[c_idx];
+                            let c_u_sub = &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
+                            let c_vt_sub = &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
                                 [
-                                    self.source_to_target.cutoff_rank,
+                                    self.source_to_target.cutoff_rank[m2l_operator_index],
                                     multipole_idxs.len() * nmatvecs
                                 ]
                             );
@@ -368,28 +389,28 @@ where
                                 multipole_idxs.iter().enumerate()
                             {
                                 let key_displacement_global = global_multipole_idx
-                                    * self.source_to_target.cutoff_rank
+                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
                                     * nmatvecs;
 
                                 let key_displacement_local = local_multipole_idx
-                                    * self.source_to_target.cutoff_rank
+                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
                                     * nmatvecs;
 
                                 for charge_vec_idx in 0..nmatvecs {
                                     let charge_vec_displacement =
-                                        charge_vec_idx * self.source_to_target.cutoff_rank;
+                                        charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
 
                                     compressed_multipoles_subset.data_mut()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank]
+                                            + self.source_to_target.cutoff_rank[m2l_operator_index]]
                                         .copy_from_slice(
                                             &compressed_multipoles.data()[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
-                                                    + self.source_to_target.cutoff_rank],
+                                                    + self.source_to_target.cutoff_rank[m2l_operator_index]],
                                         );
                                 }
                             }
@@ -417,21 +438,21 @@ where
                                     let check_potential = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             check_potential_ptr,
-                                            self.source_to_target.cutoff_rank,
+                                            self.source_to_target.cutoff_rank[m2l_operator_index],
                                         )
                                     };
 
                                     let key_displacement = local_multipole_idx
-                                        * self.source_to_target.cutoff_rank
+                                        * self.source_to_target.cutoff_rank[m2l_operator_index]
                                         * nmatvecs;
                                     let charge_vec_displacement =
-                                        charge_vec_idx * self.source_to_target.cutoff_rank;
+                                        charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
 
                                     let tmp = &compressed_check_potential.data()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank];
+                                            + self.source_to_target.cutoff_rank[m2l_operator_index]];
                                     check_potential
                                         .iter_mut()
                                         .zip(tmp)
@@ -446,11 +467,11 @@ where
                     //TODO: Rework threading
                     //t_blis::interface::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1[0].view(),
+                        self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2[0].view(),
+                            self.dc2e_inv_2[c2e_operator_index].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_to_target.metadata[0].u.view(),
+                                self.source_to_target.metadata[m2l_operator_index].u.view(),
                                 compressed_check_potentials,
                             ),
                         ),
