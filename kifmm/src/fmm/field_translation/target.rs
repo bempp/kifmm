@@ -15,7 +15,7 @@ use crate::{
     fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::TargetTranslation,
+        fmm::{FmmKernel, TargetTranslation},
         tree::{FmmTree, Tree},
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
@@ -25,7 +25,7 @@ impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {

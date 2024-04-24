@@ -17,8 +17,8 @@ use crate::{
         types::{FmmEvalType, KiFmm},
     },
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceTranslation,
-        tree::FmmTree, tree::Tree,
+        field::SourceToTargetData as SourceToTargetDataTrait, fmm::{FmmKernel, SourceTranslation},
+        tree::{FmmTree, Tree},
     },
     tree::constants::NSIBLINGS,
 };
@@ -27,7 +27,7 @@ impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar>,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -36,10 +36,12 @@ where
             return;
         };
 
-        let n_leaves = self.tree.source_tree.n_leaves().unwrap();
+        let n_leaves = self.tree.source_tree().n_leaves().unwrap();
         let surface_size = self.ncoeffs * self.dim;
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
+        let depth = self.tree.source_tree().depth();
+        let operator_index = self.kernel.operator_index(depth);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -86,6 +88,7 @@ where
                         },
                     );
 
+
                 // Use check potentials to compute the multipole expansion
                 let chunk_size = chunk_size(n_leaves, P2M_MAX_CHUNK_SIZE);
                 check_potentials
@@ -102,13 +105,12 @@ where
                         let scale = rlst_array_from_slice2!(scale, [self.ncoeffs, chunk_size]);
 
                         let mut cmp_prod = rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
-
                         cmp_prod.fill_from(check_potential * scale);
 
                         let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.uc2e_inv_1[0].view(),
+                            self.uc2e_inv_1[operator_index].view(),
                             empty_array::<Scalar, 2>()
-                                .simple_mult_into_resize(self.uc2e_inv_2[0].view(), cmp_prod),
+                                .simple_mult_into_resize(self.uc2e_inv_2[operator_index].view(), cmp_prod),
                         );
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
@@ -192,9 +194,9 @@ where
                         scaled_check_potential.scale_inplace(scale[0]);
 
                         let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.uc2e_inv_1[0].view(),
+                            self.uc2e_inv_1[operator_index].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_2[0].view(),
+                                self.uc2e_inv_2[operator_index].view(),
                                 scaled_check_potential.view(),
                             ),
                         );
@@ -223,6 +225,7 @@ where
         let max = &child_sources[nchild_sources - 1];
         let min_idx = self.tree.source_tree.index(min).unwrap();
         let max_idx = self.tree.source_tree.index(max).unwrap();
+        let operator_index = self.kernel.operator_index(level) - 1;
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -266,7 +269,7 @@ where
 
                             let parent_multipoles_chunk = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    self.source[0].view(),
+                                    self.source[operator_index].view(),
                                     child_multipoles_chunk_mat,
                                 );
 
@@ -329,7 +332,7 @@ where
                             );
 
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_vec[0][i].view(),
+                                self.source_vec[operator_index][i].view(),
                                 child_multipoles_i,
                             );
 

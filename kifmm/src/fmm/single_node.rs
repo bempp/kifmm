@@ -24,7 +24,7 @@ use crate::{
             KernelMetadataFieldTranslation, KernelMetadataSourceTarget,
             SourceToTargetData as SourceToTargetDataTrait,
         },
-        fmm::{FmmMetadata, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
+        fmm::{FmmKernel, FmmMetadata, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain, FmmTree, FmmTreeNode, Tree},
     },
@@ -652,7 +652,7 @@ where
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar, Kernel>>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Computes the unique Green's function evaluations and places them on a convolution grid on the source box wrt to a given
@@ -1017,7 +1017,7 @@ where
 impl<Scalar, Kernel, SourceToTargetData> FmmMetadata for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -1053,7 +1053,16 @@ where
         let potentials = vec![Scalar::default(); ntarget_points * eval_size * nmatvecs];
 
         // Kernel scale at each target and source leaf
-        let source_leaf_scales = leaf_scales(&self.tree.source_tree, self.ncoeffs);
+        // let source_leaf_scales = leaf_scales(&self.tree.source_tree, self.ncoeffs);
+        let mut source_leaf_scales = vec![Scalar::default(); self.tree.source_tree.n_leaves().unwrap() * self.ncoeffs];
+
+        for (i, leaf) in self.tree.source_tree.all_leaves().unwrap().iter().enumerate() {
+            // Assign scales
+            let l = i * self.ncoeffs;
+            let r = l + self.ncoeffs;
+            source_leaf_scales[l..r]
+                .copy_from_slice(vec![self.kernel.scale(leaf.level()); self.ncoeffs].as_slice());
+        }
 
         // Pre compute check surfaces
         let leaf_upward_surfaces_sources = leaf_surfaces(
@@ -1131,7 +1140,7 @@ where
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel +Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
@@ -1336,9 +1345,7 @@ mod test {
     };
 
     use crate::{
-        traits::tree::{FmmTree, FmmTreeNode, Tree},
-        tree::{constants::{ALPHA_INNER, ALPHA_OUTER}, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+        fmm, traits::{fmm::SourceTranslation, tree::{FmmTree, FmmTreeNode, Tree}}, tree::{constants::{ALPHA_INNER, ALPHA_OUTER}, helpers::points_fixture, types::MortonKey}, BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar + Float + Default>(
@@ -1896,7 +1903,7 @@ mod test {
     }
 
     #[test]
-    fn test_helmholtz_upward_pass() {
+    fn test_upward_pass_helmholtz() {
         // Setup random sources and targets
         let nsources = 10000;
         let ntargets = 10000;
@@ -1930,6 +1937,13 @@ mod test {
             .build()
             .unwrap();
 
+        // Manual upward pass
+        let depth = fmm_fft.tree.source_tree.depth;
+        fmm_fft.p2m();
+        for level in (1..=depth).rev() {
+            fmm_fft.m2m(level)
+        }
+
         // Test a random leaf expansion
         let leaf_idx = 0;
         let leaf = fmm_fft.tree().source_tree().all_leaves().unwrap()[leaf_idx];
@@ -1955,13 +1969,32 @@ mod test {
         let sources = &fmm_fft.tree().source_tree().all_coordinates().unwrap()
             [index_pointer.0 * 3..index_pointer.1 * 3];
 
+        let charge_index_pointer = fmm_fft.charge_index_pointer_sources[leaf_idx];
+        let charges =
+            &fmm_fft.charges[charge_index_pointer.0..charge_index_pointer.1];
+
+        let coordinates_row_major = &fmm_fft.tree().source_tree().all_coordinates().unwrap()[charge_index_pointer.0
+            * fmm_fft.dim
+            ..charge_index_pointer.1 * fmm_fft.dim];
+
+        let nsources = coordinates_row_major.len() / fmm_fft.dim;
+
+        let coordinates_row_major = rlst_array_from_slice2!(
+            coordinates_row_major,
+            [nsources, fmm_fft.dim],
+            [fmm_fft.dim, 1]
+        );
+        let mut coordinates_col_major =
+            rlst_dynamic_array2!(f64, [nsources, fmm_fft.dim]);
+        coordinates_col_major.fill_from(coordinates_row_major.view());
+
         println!("charges {:?} {:?}", charges.len(), sources.len());
 
         let mut check_potential = rlst_dynamic_array2!(c64, [upward_check_surface.len() / 3, 1]);
 
         fmm_fft.kernel().evaluate_st(
             EvalType::Value,
-            sources,
+            coordinates_col_major.data(),
             &upward_check_surface,
             charges,
             check_potential.data_mut(),
@@ -1997,7 +2030,7 @@ mod test {
 
         fmm_fft.kernel().evaluate_st(
             EvalType::Value,
-            &sources,
+            &coordinates_col_major.data(),
             &test_point,
             &charges,
             &mut direct,
@@ -2005,6 +2038,8 @@ mod test {
 
         let abs_error = (evaluated[0] - direct[0]).abs();
         let rel_error = abs_error / direct[0].abs();
+        // println!("found multipole {:?}", &found_multipole[0..5]);
+        // println!("evaluated multipole {:?}", &evaluated_multipole.data()[0..5]);
         println!(
             "here 2 abs {:?} rel {:?} \n evaluated {:?} found {:?} direct {:?}",
             abs_error, rel_error, evaluated, found, direct

@@ -21,7 +21,7 @@ use crate::{
         KiFmm,
     },
     traits::{
-        fmm::SourceToTargetTranslation,
+        fmm::{FmmKernel, SourceToTargetTranslation},
         tree::{FmmTree, Tree},
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
@@ -31,7 +31,7 @@ use crate::{
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Map between each transfer vector for homogenous kernels, and the source boxes involved in that translation
@@ -103,7 +103,7 @@ impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslation<Scalar, Kernel>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {

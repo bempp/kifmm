@@ -123,3 +123,14 @@ pub trait FmmMetadata {
     type Scalar: RlstScalar;
     fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
 }
+
+pub trait FmmKernel
+where
+    Self: Kernel
+{
+    /// Amount to scale kernel matrices by
+    fn scale<T: RlstScalar>(&self, level: u64) -> T;
+
+    /// Helper functions to lookup operators
+    fn operator_index(&self, level: u64) -> usize;
+}

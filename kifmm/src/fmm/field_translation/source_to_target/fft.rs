@@ -19,7 +19,7 @@ use crate::{
     },
     traits::{
         fftw::Dft,
-        fmm::SourceToTargetTranslation,
+        fmm::{FmmKernel, SourceToTargetTranslation},
         general::AsComplex,
         tree::{FmmTree, Tree},
     },
@@ -36,7 +36,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
@@ -104,7 +104,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> +  FmmKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {

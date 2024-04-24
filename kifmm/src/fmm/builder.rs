@@ -21,7 +21,7 @@ use crate::{
             ConfigureSourceToTargetData, KernelMetadataFieldTranslation,
             KernelMetadataSourceTarget, SourceToTargetData as SourceToTargetDataTrait,
         },
-        fmm::FmmMetadata,
+        fmm::{FmmKernel, FmmMetadata},
         general::Epsilon,
         tree::{FmmTreeNode, Tree},
     },
@@ -35,7 +35,7 @@ impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, Sourc
 where
     Scalar: RlstScalar + Default + Epsilon,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
-    Kernel: KernelTrait<T = Scalar> + Clone + Default,
+    Kernel: KernelTrait<T = Scalar> + FmmKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait
         + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
