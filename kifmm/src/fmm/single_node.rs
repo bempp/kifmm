@@ -226,10 +226,7 @@ mod test {
     };
 
     use crate::{
-        traits::{
-            fmm::SourceTranslation,
-            tree::{FmmTree, FmmTreeNode, Tree},
-        },
+        traits::tree::{FmmTree, FmmTreeNode, Tree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
@@ -543,63 +540,6 @@ mod test {
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
-    // #[test]
-    // fn test_upward_pass_vector_helmholtz() {
-    //     // Setup random sources and targets
-    //     let nsources = 10000;
-    //     let ntargets = 10000;
-    //     let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-    //     let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
-
-    //     // FMM parameters
-    //     let n_crit = Some(100);
-    //     let expansion_order = 6;
-    //     let sparse = true;
-
-    //     // Charge data
-    //     let nvecs = 1;
-    //     let tmp = vec![c64::one(); nsources * nvecs];
-    //     let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-    //     charges.data_mut().copy_from_slice(&tmp);
-    //     let wavenumber = 0.0000001;
-
-    //     let fmm_fft = SingleNodeBuilder::new()
-    //         .tree(&sources, &targets, n_crit, sparse)
-    //         .unwrap()
-    //         .parameters(
-    //             &charges,
-    //             expansion_order,
-    //             Helmholtz3dKernel::new(wavenumber),
-    //             EvalType::Value,
-    //             FftFieldTranslation::new(),
-    //         )
-    //         .unwrap()
-    //         .build()
-    //         .unwrap();
-    //     fmm_fft.evaluate();
-
-    //     let svd_threshold = Some(1e-5);
-    //     let fmm_svd = SingleNodeBuilder::new()
-    //         .tree(&sources, &targets, n_crit, sparse)
-    //         .unwrap()
-    //         .parameters(
-    //             &charges,
-    //             expansion_order,
-    //             Helmholtz3dKernel::new(wavenumber),
-    //             EvalType::Value,
-    //             BlasFieldTranslation::new(svd_threshold),
-    //         )
-    //         .unwrap()
-    //         .build()
-    //         .unwrap();
-    //     fmm_svd.evaluate();
-
-    //     let fmm_fft = Box::new(fmm_fft);
-    //     let fmm_svd = Box::new(fmm_svd);
-    //     test_root_multipole_helmholtz_single_node::<c64>(fmm_fft, &sources, &charges, 1e-5);
-    //     test_root_multipole_helmholtz_single_node::<c64>(fmm_svd, &sources, &charges, 1e-5);
-    // }
-
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
@@ -789,7 +729,7 @@ mod test {
     }
 
     #[test]
-    fn test_upward_pass_helmholtz() {
+    fn test_upward_pass_vector_helmholtz() {
         // Setup random sources and targets
         let nsources = 10000;
         let ntargets = 10000;
@@ -824,11 +764,12 @@ mod test {
             .unwrap();
 
         // Manual upward pass
-        let depth = fmm_fft.tree.source_tree.depth;
-        fmm_fft.p2m();
-        for level in (1..=depth).rev() {
-            fmm_fft.m2m(level)
-        }
+        // let depth = fmm_fft.tree.source_tree.depth;
+        // fmm_fft.p2m();
+        // for level in (1..=depth).rev() {
+        //     fmm_fft.m2m(level)
+        // }
+        fmm_fft.evaluate();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
     }

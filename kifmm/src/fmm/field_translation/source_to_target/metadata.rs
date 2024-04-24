@@ -38,10 +38,11 @@ use crate::{
     },
     tree::{
         constants::{
-            ALPHA_INNER, ALPHA_OUTER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
-            NTRANSFER_VECTORS_KIFMM,
+            ALPHA_INNER, ALPHA_OUTER, DEEPEST_LEVEL, DIRECTIONS, NCORNERS, NHALO, NSIBLINGS,
+            NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
+        morton::encode_anchor,
         types::MortonKey,
     },
 };
@@ -508,7 +509,33 @@ where
             let key = MortonKey::from_point(&point, domain, level);
             let siblings = key.siblings();
             let parent = key.parent();
-            let halo = parent.neighbors();
+
+            let halo = if level == 2 {
+                DIRECTIONS
+                    .iter()
+                    .map(|direction| {
+                        let level = parent.level();
+
+                        // let max_number_of_boxes: i64 = 1 << DEEPEST_LEVEL;
+                        let step_multiplier: i64 = (1 << (DEEPEST_LEVEL - level)) as i64;
+
+                        let x: i64 = parent.anchor[0] as i64;
+                        let y: i64 = parent.anchor[1] as i64;
+                        let z: i64 = parent.anchor[2] as i64;
+
+                        let x = x + step_multiplier * direction[0];
+                        let y = y + step_multiplier * direction[1];
+                        let z = z + step_multiplier * direction[2];
+                        // [x, y, z]
+                        let new_anchor: [u64; 3] = [x as u64, y as u64, z as u64];
+                        let new_morton = encode_anchor(&new_anchor, level);
+                        MortonKey::<Scalar::Real>::new(&new_anchor, new_morton)
+                    })
+                    .collect_vec()
+            } else {
+                parent.neighbors()
+            };
+
             let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
             // The child boxes in the halo of the sibling set
@@ -688,7 +715,7 @@ where
 
             metadata.push(FftMetadata {
                 kernel_data,
-                kernel_data_f,
+                kernel_data_f: kernel_data_ft,
             })
         }
 
@@ -1400,6 +1427,7 @@ mod test {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
+    use rlst::c64;
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
@@ -1707,6 +1735,149 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+
+        assert!(rel_error < 1e-15);
+    }
+
+    #[test]
+    fn test_fft_field_translation_helmholtz() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+        let wavenumber = 1.0;
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                EvalType::Value,
+                FftFieldTranslation::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
+
+        for i in 0..fmm.ncoeffs {
+            *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
+        }
+
+        // assert!(false);
+        // Pick a random source/target pair
+        let idx = 123;
+        let all_transfer_vectors = compute_transfer_vectors::<f64>();
+
+        let transfer_vector = &all_transfer_vectors[idx];
+
+        // Compute FFT of the representative signal
+        let mut signal = fmm.evaluate_charges_convolution_grid(expansion_order, multipole.data());
+        let [m, n, o] = signal.shape();
+        let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+
+        let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
+
+        let source_equivalent_surface = transfer_vector.source.surface_grid(
+            expansion_order,
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+        );
+        let target_check_surface = transfer_vector.target.surface_grid(
+            expansion_order,
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+        );
+        let ntargets = target_check_surface.len() / 3;
+
+        // Compute conv grid
+        let conv_point_corner_index = 7;
+        let corners = find_corners(&source_equivalent_surface[..]);
+        let conv_point_corner = [
+            corners[conv_point_corner_index],
+            corners[8 + conv_point_corner_index],
+            corners[16 + conv_point_corner_index],
+        ];
+
+        let (conv_grid, _) = transfer_vector.source.convolution_grid(
+            expansion_order,
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+            &conv_point_corner,
+            conv_point_corner_index,
+        );
+
+        let kernel_point_index = 0;
+        let kernel_point = [
+            target_check_surface[kernel_point_index],
+            target_check_surface[ntargets + kernel_point_index],
+            target_check_surface[2 * ntargets + kernel_point_index],
+        ];
+
+        // Compute kernel
+        let kernel =
+            fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
+        let [m, n, o] = kernel.shape();
+
+        let mut kernel = flip3(&kernel);
+
+        // Compute FFT of padded kernel
+        let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+        let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
+
+        let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+        for k in 0..o {
+            for j in 0..n {
+                for i in 0..m {
+                    *hadamard_product.get_mut([i, j, k]).unwrap() =
+                        kernel_hat.get([i, j, k]).unwrap() * signal_hat.get([i, j, k]).unwrap();
+                }
+            }
+        }
+        let mut potentials = rlst_dynamic_array3!(c64, [m, n, o]);
+
+        let _ = c64::backward_dft(
+            hadamard_product.data_mut(),
+            potentials.data_mut(),
+            &[m, n, o],
+        );
+
+        let mut result = vec![c64::zero(); ntargets];
+        for (i, &idx) in fmm.source_to_target.conv_to_surf_map.iter().enumerate() {
+            result[i] = potentials.data()[idx];
+        }
+
+        // Get direct evaluations for testing
+        let mut direct = vec![c64::zero(); fmm.ncoeffs];
+        fmm.kernel.evaluate_st(
+            EvalType::Value,
+            &source_equivalent_surface[..],
+            &target_check_surface[..],
+            multipole.data(),
+            &mut direct[..],
+        );
+
+        let abs_error: f64 = result
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
 
         assert!(rel_error < 1e-15);
     }
