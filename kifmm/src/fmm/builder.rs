@@ -122,7 +122,7 @@ where
         expansion_order: usize,
         kernel: Kernel,
         eval_type: EvalType,
-        mut source_to_target: SourceToTargetData,
+        source_to_target: SourceToTargetData,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -186,7 +186,7 @@ where
             // Calculate required metadata
             result.source();
             result.target();
-            result.field_translation();
+            result.source_to_target();
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
 
             Ok(result)

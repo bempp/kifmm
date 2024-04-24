@@ -119,20 +119,26 @@ where
     fn clear(&mut self, charges: &Charges<Self::Scalar>);
 }
 
+/// Set all metadata required for FMMs
 pub trait FmmMetadata {
+    /// Associated scalar
     type Scalar: RlstScalar;
+
+    /// TODO: Breakup into smaller pieces of functionality for clarity.
     fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
 }
 
+/// Kernels compatible with our implementation
 pub trait FmmKernel
 where
     Self: Kernel,
 {
-    /// Is this kernel homogenous?
+    /// Homogeneity check
     fn homogenous(&self) -> bool;
 
-    /// Helper functions to lookup operators
+    /// Lookup p2m operator
     fn p2m_operator_index(&self, level: u64) -> usize;
 
+    /// Lookup m2m operator
     fn m2m_operator_index(&self, level: u64) -> usize;
 }

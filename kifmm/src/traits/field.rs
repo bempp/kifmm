@@ -6,16 +6,17 @@ pub trait SourceToTargetData {
     type Metadata;
 }
 
-/// Set metadata associated with a kernel
+/// Set M2M and L2L metadata associated with a kernel
 pub trait SourceAndTargetTranslationMetadata {
-    // Source field translations
+    /// Source field translations
     fn source(&mut self);
 
-    // Target field translations
+    /// Target field translations
     fn target(&mut self);
 }
 
-/// Set metadata associated with a kernel
+/// Set M2L metadata associated with a kernel
 pub trait SourcetoTargetTranslationMetadata {
-    fn field_translation(&mut self);
+    /// Source to target field translation
+    fn source_to_target(&mut self);
 }

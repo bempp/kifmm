@@ -1,7 +1,6 @@
 //! Helper Functions
 use std::collections::HashMap;
 
-use green_kernels::traits::Kernel;
 use num::traits::Float;
 use rlst::{
     rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
@@ -10,10 +9,7 @@ use rlst::{
 
 use crate::{
     fmm::types::{Charges, SendPtrMut},
-    traits::{
-        fmm::FmmKernel,
-        tree::{FmmTreeNode, Tree},
-    },
+    traits::tree::{FmmTreeNode, Tree},
     tree::types::{MortonKey, SingleNodeTree},
 };
 

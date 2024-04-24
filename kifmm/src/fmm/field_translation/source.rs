@@ -103,29 +103,28 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
 
-                        let tmp;
-                        if self.kernel.homogenous() {
+                        let tmp = if self.kernel.homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
                             scaled_check_potential.fill_from(check_potential);
                             scaled_check_potential.scale_inplace(scale[0]);
 
-                            tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
                                     self.uc2e_inv_2[operator_index].view(),
                                     scaled_check_potential,
                                 ),
-                            );
+                            )
                         } else {
-                            tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
                                     self.uc2e_inv_2[operator_index].view(),
                                     check_potential.view(),
                                 ),
-                            );
-                        }
+                            )
+                        };
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
                         {
@@ -201,30 +200,29 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
-                        let tmp;
-                        if self.kernel.homogenous() {
+                        let tmp = if self.kernel.homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
                             scaled_check_potential.fill_from(check_potential);
                             scaled_check_potential.scale_inplace(scale[0]);
 
-                            tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
                                     self.uc2e_inv_2[operator_index].view(),
                                     scaled_check_potential.view(),
                                 ),
-                            );
+                            )
                         } else {
-                            tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
                                     self.uc2e_inv_2[operator_index].view(),
                                     check_potential.view(),
                                 ),
-                            );
-                        }
+                            )
+                        };
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(nmatvecs) {
                             let multipole = unsafe {

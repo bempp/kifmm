@@ -195,7 +195,7 @@ where
         let children = root.children();
         let mut l2l = vec![Vec::new()];
 
-        for (_i, child) in children.iter().enumerate() {
+        for child in children.iter() {
             let child_downward_check_surface =
                 child.surface_grid(self.expansion_order, &domain, alpha_inner);
             // Need to transpose so that rows correspond to targets, and columns to sources
@@ -419,7 +419,7 @@ where
             let children = curr.children();
             let mut l2l = Vec::new();
 
-            for (_i, child) in children.iter().enumerate() {
+            for child in children.iter() {
                 let child_downward_check_surface =
                     child.surface_grid(self.expansion_order, &domain, alpha_inner);
                 // Need to transpose so that rows correspond to targets, and columns to sources
@@ -463,7 +463,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn field_translation(&mut self) {}
+    fn source_to_target(&mut self) {}
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
@@ -472,7 +472,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + AsComplex + Dft,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn field_translation(&mut self) {}
+    fn source_to_target(&mut self) {}
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
@@ -482,7 +482,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
-    fn field_translation(&mut self) {
+    fn source_to_target(&mut self) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let nrows = ncoeffs_kifmm(self.expansion_order);
@@ -496,14 +496,14 @@ where
         for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
             let source_equivalent_surface = t.source.surface_grid(
                 self.expansion_order,
-                &self.tree.source_tree().domain(),
+                self.tree.source_tree().domain(),
                 alpha,
             );
             let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
             let target_check_surface = t.target.surface_grid(
                 self.expansion_order,
-                &self.tree.source_tree().domain(),
+                self.tree.source_tree().domain(),
                 alpha,
             );
             let ntargets = target_check_surface.len() / self.kernel.space_dimension();
@@ -784,7 +784,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn field_translation(&mut self) {
+    fn source_to_target(&mut self) {
         // Compute the field translation operators
         let shape = <Scalar as Dft>::shape_in(self.expansion_order);
         let transform_shape = <Scalar as Dft>::shape_out(self.expansion_order);
@@ -808,7 +808,7 @@ where
         let point = [point[0], point[1], point[2]];
 
         // Encode point in centre of domain and compute halo of parent, and their resp. children
-        let key = MortonKey::from_point(&point, &self.tree.source_tree().domain(), 3);
+        let key = MortonKey::from_point(&point, self.tree.source_tree().domain(), 3);
         let siblings = key.siblings();
         let parent = key.parent();
         let halo = parent.neighbors();
@@ -866,12 +866,12 @@ where
 
                 let source_equivalent_surface = source.surface_grid(
                     self.expansion_order,
-                    &self.tree.source_tree().domain(),
+                    self.tree.source_tree().domain(),
                     alpha,
                 );
                 let target_check_surface = target.surface_grid(
                     self.expansion_order,
-                    &&self.tree.source_tree().domain(),
+                    self.tree.source_tree().domain(),
                     alpha,
                 );
 
@@ -895,7 +895,7 @@ where
 
                     let (conv_grid, _) = source.convolution_grid(
                         self.expansion_order,
-                        &&self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain(),
                         alpha,
                         &conv_point_corner,
                         conv_point_corner_index,
