@@ -132,5 +132,8 @@ where
     fn scale<T: RlstScalar>(&self, level: u64) -> T;
 
     /// Helper functions to lookup operators
-    fn operator_index(&self, level: u64) -> usize;
+    fn p2m_operator_index(&self, level: u64) -> usize;
+
+    fn m2m_operator_index(&self, level: u64) -> usize;
+
 }
