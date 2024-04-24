@@ -7,7 +7,7 @@ impl<T> FmmKernel for Laplace3dKernel<T>
 where
     T: RlstScalar,
 {
-    fn homogenous(&self) -> bool {
+    fn is_homogenous(&self) -> bool {
         true
     }
 
@@ -18,13 +18,16 @@ where
     fn m2m_operator_index(&self, _level: u64) -> usize {
         0
     }
+    fn m2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
 }
 
 impl<T> FmmKernel for Helmholtz3dKernel<T>
 where
     T: RlstScalar<Complex = T>,
 {
-    fn homogenous(&self) -> bool {
+    fn is_homogenous(&self) -> bool {
         false
     }
 
@@ -33,5 +36,9 @@ where
     }
     fn m2m_operator_index(&self, level: u64) -> usize {
         (level - 1) as usize
+    }
+
+    fn m2l_operator_index(&self, level: u64) -> usize {
+        (level - 2) as usize
     }
 }

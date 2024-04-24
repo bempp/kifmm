@@ -1296,7 +1296,7 @@ where
         // Kernel scale at each target and source leaf
         let source_leaf_scales = leaf_scales::<Scalar>(
             &self.tree.source_tree,
-            self.kernel.homogenous(),
+            self.kernel.is_homogenous(),
             self.ncoeffs,
         );
 

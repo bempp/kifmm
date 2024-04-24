@@ -103,7 +103,7 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
 
-                        let tmp = if self.kernel.homogenous() {
+                        let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
                             scaled_check_potential.fill_from(check_potential);
@@ -200,7 +200,7 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
-                        let tmp = if self.kernel.homogenous() {
+                        let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 

@@ -2,7 +2,7 @@
 use std::{collections::HashSet, sync::RwLock};
 
 use itertools::Itertools;
-use num::Zero;
+use num::{One, Zero};
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
@@ -117,6 +117,8 @@ where
                     return;
                 };
 
+                let operator_index = self.kernel.m2l_operator_index(level);
+
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
                 let nsources = sources.len();
@@ -190,11 +192,15 @@ where
                 }
 
                 // Amount to scale the application of the kernel by
-                let scale = m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
-                    * homogenous_kernel_scale(level);
+                let scale = if self.kernel.is_homogenous() {
+                    m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
+                        * homogenous_kernel_scale(level)
+                } else {
+                    <<Scalar as AsComplex>::ComplexType>::one()
+                };
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
-                let kernel_data_ft = &self.source_to_target.metadata[0].kernel_data_f;
+                let kernel_data_ft = &self.source_to_target.metadata[operator_index].kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
                 let mut check_potential_hat = vec![Scalar::zero(); size_out * ntargets * 2];
