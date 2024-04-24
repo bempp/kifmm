@@ -128,8 +128,8 @@ pub trait FmmKernel
 where
     Self: Kernel,
 {
-    /// Amount to scale kernel matrices by
-    fn scale<T: RlstScalar>(&self, level: u64) -> T;
+    /// Is this kernel homogenous?
+    fn homogenous(&self) -> bool;
 
     /// Helper functions to lookup operators
     fn p2m_operator_index(&self, level: u64) -> usize;

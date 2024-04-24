@@ -1068,24 +1068,11 @@ where
         let potentials = vec![Scalar::default(); ntarget_points * eval_size * nmatvecs];
 
         // Kernel scale at each target and source leaf
-        // let source_leaf_scales = leaf_scales(&self.tree.source_tree, self.ncoeffs);
-        let mut source_leaf_scales =
-            vec![Scalar::default(); self.tree.source_tree.n_leaves().unwrap() * self.ncoeffs];
-
-        for (i, leaf) in self
-            .tree
-            .source_tree
-            .all_leaves()
-            .unwrap()
-            .iter()
-            .enumerate()
-        {
-            // Assign scales
-            let l = i * self.ncoeffs;
-            let r = l + self.ncoeffs;
-            source_leaf_scales[l..r]
-                .copy_from_slice(vec![self.kernel.scale(leaf.level()); self.ncoeffs].as_slice());
-        }
+        let source_leaf_scales = leaf_scales::<Scalar>(
+            &self.tree.source_tree,
+            self.kernel.homogenous(),
+            self.ncoeffs,
+        );
 
         // Pre compute check surfaces
         let leaf_upward_surfaces_sources = leaf_surfaces(
