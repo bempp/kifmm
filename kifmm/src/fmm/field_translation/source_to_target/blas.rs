@@ -265,9 +265,9 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1.view(),
+                        self.dc2e_inv_1[0].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2.view(),
+                            self.dc2e_inv_2[0].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.source_to_target.metadata.u.view(),
                                 compressed_check_potentials,
@@ -446,9 +446,9 @@ where
                     //TODO: Rework threading
                     //t_blis::interface::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1.view(),
+                        self.dc2e_inv_1[0].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2.view(),
+                            self.dc2e_inv_2[0].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.source_to_target.metadata.u.view(),
                                 compressed_check_potentials,

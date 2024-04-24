@@ -106,9 +106,9 @@ where
                         cmp_prod.fill_from(check_potential * scale);
 
                         let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.uc2e_inv_1.view(),
+                            self.uc2e_inv_1[0].view(),
                             empty_array::<Scalar, 2>()
-                                .simple_mult_into_resize(self.uc2e_inv_2.view(), cmp_prod),
+                                .simple_mult_into_resize(self.uc2e_inv_2[0].view(), cmp_prod),
                         );
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
@@ -192,9 +192,9 @@ where
                         scaled_check_potential.scale_inplace(scale[0]);
 
                         let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.uc2e_inv_1.view(),
+                            self.uc2e_inv_1[0].view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_2.view(),
+                                self.uc2e_inv_2[0].view(),
                                 scaled_check_potential.view(),
                             ),
                         );
@@ -266,7 +266,7 @@ where
 
                             let parent_multipoles_chunk = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    self.source.view(),
+                                    self.source[0].view(),
                                     child_multipoles_chunk_mat,
                                 );
 
@@ -329,7 +329,7 @@ where
                             );
 
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_vec[i].view(),
+                                self.source_vec[0][i].view(),
                                 child_multipoles_i,
                             );
 

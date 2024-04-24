@@ -95,13 +95,13 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let uc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let uc2e_inv_2 = ut;
+        let uc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let uc2e_inv_2 = vec![ut];
 
         // Calculate M2M operator matrices
         let children = root.children();
-        let mut m2m = rlst_dynamic_array2!(Scalar, [nequiv_surface, 8 * nequiv_surface]);
-        let mut m2m_vec = Vec::new();
+        let mut m2m = vec![rlst_dynamic_array2!(Scalar, [nequiv_surface, 8 * nequiv_surface])];
+        let mut m2m_vec = vec![Vec::new()];
 
         for (i, child) in children.iter().enumerate() {
             let child_upward_equivalent_surface =
@@ -121,14 +121,14 @@ where
             pc2ce.fill_from(pc2ce_t.transpose());
 
             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1.view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2.view(), pc2ce.view()),
+                uc2e_inv_1[0].view(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
             );
             let l = i * nequiv_surface * nequiv_surface;
             let r = l + nequiv_surface * nequiv_surface;
 
-            m2m.data_mut()[l..r].copy_from_slice(tmp.data());
-            m2m_vec.push(tmp);
+            m2m[0].data_mut()[l..r].copy_from_slice(tmp.data());
+            m2m_vec[0].push(tmp);
         }
 
         self.source = m2m;
@@ -174,12 +174,12 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let dc2e_inv_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
-        let dc2e_inv_2 = ut;
+        let dc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let dc2e_inv_2 = vec![ut];
 
         // Calculate M2M and L2L operator matrices
         let children = root.children();
-        let mut l2l = Vec::new();
+        let mut l2l = vec![Vec::new()];
 
         for (_i, child) in children.iter().enumerate() {
             let child_downward_check_surface =
@@ -198,15 +198,16 @@ where
             let mut cc2pe = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
             cc2pe.fill_from(cc2pe_t.transpose());
             let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                dc2e_inv_1.view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2.view(), cc2pe.view()),
+                dc2e_inv_1[0].view(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
             );
             tmp.data_mut()
                 .iter_mut()
                 .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
 
-            l2l.push(tmp);
+            l2l[0].push(tmp);
         }
+
         self.target_vec = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
@@ -234,15 +235,15 @@ where
 
         let mut curr = root;
         let mut uc2e_inv_1 = Vec::new();
-        let mut uc2e_inv_2 = Vec::new();
+        let mut uc2e_inv_2= Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
         for _level in 0..=depth {
+
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(self.expansion_order, &domain, alpha_inner);
-            let upward_check_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let upward_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_outer);
 
             let nequiv_surface = upward_equivalent_surface.len() / self.dim;
             let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -268,23 +269,23 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            uc2e_inv_1
-                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            uc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
             uc2e_inv_2.push(ut);
 
             curr = curr.first_child();
         }
 
+
         let mut curr = root;
-        let mut all_m2m = Vec::new();
-        let mut all_m2m_vec = Vec::new();
+        let mut source = Vec::new();
+        let mut source_vec = Vec::new();
 
         for level in 0..depth {
+
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(self.expansion_order, &domain, alpha_inner);
-            let upward_check_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let upward_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_outer);
 
             let nequiv_surface = upward_equivalent_surface.len() / self.dim;
             let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -313,8 +314,7 @@ where
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     uc2e_inv_1[level as usize].view(),
-                    empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), pc2ce.view()),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[level as usize].view(), pc2ce.view()),
                 );
                 let l = i * nequiv_surface * nequiv_surface;
                 let r = l + nequiv_surface * nequiv_surface;
@@ -323,13 +323,117 @@ where
                 m2m_vec.push(tmp);
             }
 
-            all_m2m.push(m2m);
-            all_m2m_vec.push(m2m_vec);
+            source.push(m2m);
+            source_vec.push(m2m_vec);
             curr = curr.first_child();
         }
+
+        self.uc2e_inv_1 = uc2e_inv_1;
+        self.uc2e_inv_2 = uc2e_inv_2;
+        self.source = source;
+        self.source_vec = source_vec;
     }
 
-    fn target(&mut self) {}
+    fn target(&mut self) {
+        let root = MortonKey::<Scalar::Real>::root();
+
+        // Cast surface parameters
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
+        let domain = self.tree.domain;
+
+        let depth = self.tree.source_tree().depth();
+
+        let mut curr = root;
+        let mut dc2e_inv_1 = Vec::new();
+        let mut dc2e_inv_2= Vec::new();
+
+        // Calculate inverse upward check to equivalent matrices on each level
+        for _level in 0..=depth {
+            // Compute required surfaces
+            let downward_equivalent_surface =
+                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let downward_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_inner);
+
+            let nequiv_surface = downward_equivalent_surface.len() / self.dim;
+            let ncheck_surface = downward_check_surface.len() / self.dim;
+
+            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+            // As well as estimating their inverses using SVD
+            let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &downward_equivalent_surface[..],
+                &downward_check_surface[..],
+                dc2e_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets and columns to sources
+            let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+            dc2e.fill_from(dc2e_t.transpose());
+
+            let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
+
+            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            for i in 0..s.len() {
+                mat_s[[i, i]] = Scalar::from_real(s[i]);
+            }
+
+            dc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            dc2e_inv_2.push(ut);
+            curr = curr.first_child();
+        }
+
+        let mut curr = root;
+        let mut target = Vec::new();
+
+        for level in 0..depth {
+
+            // Compute required surfaces
+            let downward_equivalent_surface =
+                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let downard_check_surface = curr.surface_grid(self.expansion_order, &domain, alpha_inner);
+
+            let nequiv_surface = downward_equivalent_surface.len() / self.dim;
+            let ncheck_surface = downard_check_surface.len() / self.dim;
+
+            // Calculate M2M operator matrices on each level
+            let children = curr.children();
+            let mut l2l = Vec::new();
+
+            for (_i, child) in children.iter().enumerate() {
+                let child_downward_check_surface =
+                    child.surface_grid(self.expansion_order, &domain, alpha_inner);
+                // Need to transpose so that rows correspond to targets, and columns to sources
+
+                let mut cc2pe_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+                self.kernel.assemble_st(
+                    EvalType::Value,
+                    &downward_equivalent_surface,
+                    &child_downward_check_surface,
+                    cc2pe_t.data_mut(),
+                );
+
+                // Need to transpose so that rows correspond to targets, and columns to sources
+                let mut cc2pe = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+                cc2pe.fill_from(cc2pe_t.transpose());
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    dc2e_inv_1[(level + 1) as usize].view(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[(level + 1) as usize].view(), cc2pe.view()),
+                );
+
+                l2l.push(tmp);
+            }
+
+            target.push(l2l);
+            curr = curr.first_child();
+        }
+
+        self.dc2e_inv_1 = dc2e_inv_1;
+        self.dc2e_inv_2 = dc2e_inv_2;
+
+        self.target_vec = target;
+    }
 }
 
 impl<Scalar> KernelMetadataFieldTranslation
@@ -1228,13 +1332,12 @@ mod test {
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
-        RawAccessMut, RlstScalar, Shape, VectorContainer,
+        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer
     };
 
     use crate::{
         traits::tree::{FmmTree, FmmTreeNode, Tree},
-        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
+        tree::{constants::{ALPHA_INNER, ALPHA_OUTER}, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
@@ -1790,6 +1893,128 @@ mod test {
                 threshold_deriv_blas,
             );
         }
+    }
+
+    #[test]
+    fn test_helmholtz_upward_pass() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+
+        // Charge data
+        let nvecs = 1;
+        let tmp = vec![c64::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+
+        let wavenumber = 5.0;
+
+        let fmm_fft = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                EvalType::Value,
+                FftFieldTranslation::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        // Test a random leaf expansion
+        let leaf_idx = 0;
+        let leaf = fmm_fft.tree().source_tree().all_leaves().unwrap()[leaf_idx];
+
+        let upward_check_surface= leaf.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_OUTER),
+        );
+
+        let upward_equivalent_surface = leaf.surface_grid(
+            fmm_fft.expansion_order(),
+            fmm_fft.tree().domain(),
+            f64::from(ALPHA_INNER),
+        );
+
+
+        let found_multipole = fmm_fft.multipole(&leaf).unwrap();
+
+        let &leaf_idx = fmm_fft.tree().source_tree().leaf_index(&leaf).unwrap();
+        let index_pointer = fmm_fft.charge_index_pointer_sources[leaf_idx];
+        let charges = &fmm_fft.charges[index_pointer.0..index_pointer.1];
+        let sources = &fmm_fft.tree().source_tree().all_coordinates().unwrap()
+            [index_pointer.0 * 3..index_pointer.1 * 3];
+
+        println!("charges {:?} {:?}", charges.len(), sources.len());
+
+        let mut check_potential = rlst_dynamic_array2!(c64, [upward_check_surface.len() / 3, 1]);
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            sources,
+            &upward_check_surface,
+            charges,
+            check_potential.data_mut(),
+        );
+
+        let evaluated_multipole = empty_array::<c64, 2>().simple_mult_into_resize(
+            fmm_fft.uc2e_inv_1[leaf.level() as usize].view(),
+            empty_array::<c64, 2>()
+                .simple_mult_into_resize(fmm_fft.uc2e_inv_2[leaf.level() as usize].view(), check_potential.view()),
+        );
+
+        let test_point = vec![100f64, 0f64, 0f64];
+
+        let mut evaluated = vec![c64::zero()];
+        let mut found = vec![c64::zero()];
+        let mut direct = vec![c64::zero()];
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            &found_multipole,
+            &mut found,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &upward_equivalent_surface,
+            &test_point,
+            evaluated_multipole.data(),
+            &mut evaluated,
+        );
+
+        fmm_fft.kernel().evaluate_st(
+            EvalType::Value,
+            &sources,
+            &test_point,
+            &charges,
+            &mut direct,
+        );
+
+        let abs_error = (evaluated[0] - direct[0]).abs();
+        let rel_error = abs_error / direct[0].abs();
+        println!(
+            "here 2 abs {:?} rel {:?} \n evaluated {:?} found {:?} direct {:?}",
+            abs_error, rel_error, evaluated, found, direct
+        );
+
+        assert!(false);
+
+        // fmm_fft.evaluate();
+
+
     }
 
     // #[test]

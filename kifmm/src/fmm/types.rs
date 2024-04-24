@@ -211,31 +211,31 @@ where
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_1: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_2: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_1: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_2: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// Data and metadata for field translations
     pub source_to_target: SourceToTargetData,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The metadata required for source to source translation
-    pub source_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// The multipole expansion data at each box.
     pub multipoles: Vec<Scalar>,
@@ -275,11 +275,6 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn default() -> Self {
-        let uc2e_inv_1 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let uc2e_inv_2 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let dc2e_inv_1 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let dc2e_inv_2 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let source = rlst_dynamic_array2!(Scalar, [1, 1]);
 
         KiFmm {
             tree: SingleNodeFmmTree::default(),
@@ -291,11 +286,11 @@ where
             kernel_eval_size: 0,
             dim: 0,
             ncoeffs: 0,
-            uc2e_inv_1,
-            uc2e_inv_2,
-            dc2e_inv_1,
-            dc2e_inv_2,
-            source,
+            uc2e_inv_1: Vec::default(),
+            uc2e_inv_2: Vec::default(),
+            dc2e_inv_1: Vec::default(),
+            dc2e_inv_2: Vec::default(),
+            source: Vec::default(),
             source_vec: Vec::default(),
             target_vec: Vec::default(),
             multipoles: Vec::default(),
@@ -428,7 +423,7 @@ pub struct SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + Clone,
-    SourceToTargetData: ConfigureSourceToTargetData,
+    SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Tree

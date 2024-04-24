@@ -36,7 +36,7 @@ where
     Scalar: RlstScalar + Default + Epsilon,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + Clone + Default,
-    SourceToTargetData: ConfigureSourceToTargetData<Scalar = Scalar, Kernel = Kernel, Domain = Domain<Scalar::Real>>
+    SourceToTargetData: SourceToTargetDataTrait
         + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
     KiFmm<Scalar, Kernel, SourceToTargetData>:

@@ -387,9 +387,9 @@ where
 
                             // Can now find local expansion coefficients
                             let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_1.view(),
+                                self.dc2e_inv_1[0].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.dc2e_inv_2.view(),
+                                    self.dc2e_inv_2[0].view(),
                                     potential_chunk,
                                 ),
                             );
