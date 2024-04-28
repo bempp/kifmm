@@ -1,4 +1,5 @@
 //! Implementation of traits to compute metadata for field translation operations.
+use core::panic;
 use std::collections::{HashMap, HashSet};
 
 use green_kernels::{
@@ -6,7 +7,7 @@ use green_kernels::{
     types::EvalType,
 };
 use itertools::Itertools;
-use num::{Float, Zero};
+use num::{Float, One, Zero};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
@@ -23,7 +24,7 @@ use crate::{
             ncoeffs_kifmm, potential_pointers,
         },
         pinv::pinv,
-        types::{BlasFieldTranslation, BlasMetadata, Charges, FftFieldTranslation, FftMetadata},
+        types::{BlasFieldTranslationRcmp, BlasFieldTranslationSa, BlasMetadataRcmp, BlasMetadataSa, Charges, FftFieldTranslation, FftMetadata},
         KiFmm,
     },
     traits::{
@@ -43,7 +44,7 @@ use crate::{
         },
         helpers::find_corners,
         morton::encode_anchor,
-        types::MortonKey,
+        types::{Domain, MortonKey},
     },
 };
 
@@ -461,7 +462,7 @@ where
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
-    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslation<Scalar>>
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationSa<Scalar>>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -470,22 +471,19 @@ where
     fn source_to_target(&mut self) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
-        let nrows = ncoeffs_kifmm(self.expansion_order);
-        let ncols = ncoeffs_kifmm(self.expansion_order);
-
         let alpha = Scalar::real(ALPHA_INNER);
         let depth = self.tree.source_tree().depth();
 
-        for level in 2..=depth {
-            let mut se2tc_fat =
-                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
-            let mut se2tc_thin =
-                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        let mut result = BlasFieldTranslationSa::<Scalar>::default();
 
-            for (i, t) in compute_transfer_vectors_at_level::<Scalar::Real>(level)
-                .iter()
-                .enumerate()
-            {
+        for level in 2..=depth {
+            let transfer_vectors = compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
+
+            let mut level_result = BlasMetadataSa::default();
+
+            let mut level_cutoff_rank = Vec::new();
+
+            for (i, t) in transfer_vectors.iter().enumerate() {
                 let source_equivalent_surface = t.source.surface_grid(
                     self.expansion_order,
                     self.tree.source_tree().domain(),
@@ -513,145 +511,81 @@ where
                 let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
                 tmp_gram.fill_from(tmp_gram_t.transpose());
 
-                let mut block = se2tc_fat
-                    .view_mut()
-                    .into_subview([0, i * ncols], [nrows, ncols]);
-                block.fill_from(tmp_gram.view());
+                let mu = tmp_gram.shape()[0];
+                let nvt = tmp_gram.shape()[1];
+                let k = std::cmp::min(mu, nvt);
 
-                let mut block_column = se2tc_thin
-                    .view_mut()
-                    .into_subview([i * nrows, 0], [nrows, ncols]);
-                block_column.fill_from(tmp_gram.view());
-            }
+                let mut u = rlst_dynamic_array2!(Scalar, [mu, k]);
+                let mut sigma = vec![Scalar::zero().re(); k];
+                let mut vt = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
-            let mu = se2tc_fat.shape()[0];
-            let nvt = se2tc_fat.shape()[1];
-            let k = std::cmp::min(mu, nvt);
+                tmp_gram
+                    .into_svd_alloc(
+                        u.view_mut(), vt.view_mut(),
+                        &mut sigma[..],
+                        SvdMode::Reduced
+                    ).unwrap();
 
-            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
-            let mut sigma = vec![Scalar::zero().re(); k];
-            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+                let mut sigma_mat = rlst_dynamic_array2!(Scalar, [k, k]);
 
-            se2tc_fat
-                .into_svd_alloc(
-                    u_big.view_mut(),
-                    vt_big.view_mut(),
-                    &mut sigma[..],
-                    SvdMode::Reduced,
-                )
-                .unwrap();
-            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
-            let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
-            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-            let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
-
-            u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
-            vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
-            for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
-                unsafe {
-                    *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
-                }
-            }
-
-            // Store compressed M2L operators
-            let thin_nrows = se2tc_thin.shape()[0];
-            let nst = se2tc_thin.shape()[1];
-            let k = std::cmp::min(thin_nrows, nst);
-            let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
-            let mut _r = vec![Scalar::zero().re(); k];
-            let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
-
-            se2tc_thin
-                .into_svd_alloc(
-                    _gamma.view_mut(),
-                    st.view_mut(),
-                    &mut _r[..],
-                    SvdMode::Reduced,
-                )
-                .unwrap();
-
-            let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
-            for j in 0..cutoff_rank {
-                for i in 0..nst {
-                    unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
-                }
-            }
-
-            let mut c_u = Vec::new();
-            let mut c_vt = Vec::new();
-
-            let n_transfer_vectors = if level == 2 {
-                189
-            } else {
-                316
-            };
-
-            for i in 0..n_transfer_vectors {
-                let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
-
-                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    sigma_mat.view(),
-                    empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(vt_block.view(), s_trunc.view()),
-                );
-
-                let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-                let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
-                let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-
-                tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
-                    .unwrap();
-
-                let directional_cutoff_rank =
-                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
-
-                let mut u_i_compressed =
-                    rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
-                let mut vt_i_compressed_ =
-                    rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
-
-                let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
-                    Scalar,
-                    [directional_cutoff_rank, directional_cutoff_rank]
-                );
-
-                u_i_compressed
-                    .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
-                vt_i_compressed_
-                    .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
-
-                for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+                for (j, s) in sigma.iter().enumerate().take(k) {
                     unsafe {
-                        *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
-                            Scalar::from(*s).unwrap();
+                        *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
                     }
                 }
 
-                let vt_i_compressed = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    sigma_mat_i_compressed.view(),
-                    vt_i_compressed_.view(),
+                let vt = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat.view(), vt.view()
                 );
-                c_u.push(u_i_compressed);
-                c_vt.push(vt_i_compressed);
+
+
+
+                let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
+                level_result.u.push(u);
+                level_result.vt.push(vt);
+                level_cutoff_rank.push(cutoff_rank);
+
             }
 
-            let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
-            st_trunc.fill_from(s_trunc.transpose());
+            result.metadata.push(level_result);
+            result.transfer_vectors.push(transfer_vectors);
+            // result.cutoff_rank.push(cutoff_rank);
+            result.cutoff_rank.push(1);
 
-            self.source_to_target.metadata.push(
-                BlasMetadata {
-                    u,
-                    st: st_trunc,
-                    c_u,
-                    c_vt
-                }
-            );
+            // let &cutoff_rank = level_cutoff_rank.iter().max().unwrap();
+            // let mut compressed_level_result = BlasMetadataSa::<Scalar>::default();
 
-            self.source_to_target.cutoff_rank.push(cutoff_rank);
+            // for i in 0..transfer_vectors.len() {
+            //     let u = &level_result.u[i];
+            //     let vt = &level_result.vt[i];
+            //     let mu = u.shape()[0];
+            //     let k = u.shape()[1];
+            //     let nvt = vt.shape()[1];
+            //     let mut u_clone = rlst_dynamic_array2!(Scalar, [mu, k]);
+            //     let mut vt_clone = rlst_dynamic_array2!(Scalar, [k, nvt]);
+            //     u_clone.fill_from(u.view());
+            //     vt_clone.fill_from(vt.view());
+
+            //     let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
+            //     let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+
+            //     u_compressed
+            //         .fill_from(u_clone.into_subview([0, 0], [mu, cutoff_rank]));
+            //     vt_compressed
+            //         .fill_from(vt_clone.into_subview([0, 0], [cutoff_rank, nvt]));
+
+            //     compressed_level_result.u.push(u_compressed);
+            //     compressed_level_result.vt.push(vt_compressed)
+            // }
+
+            // println!("level cutoff ranks {:?}", cutoff_rank);
+            // panic!("FOO");
         }
 
+        self.source_to_target = result;
     }
 }
+
 
 impl<Scalar> SourcetoTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FftFieldTranslation<Scalar>>
@@ -1087,7 +1021,7 @@ where
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
-    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslation<Scalar>>
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -1246,7 +1180,7 @@ where
         let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
         st_trunc.fill_from(s_trunc.transpose());
 
-        let result = BlasMetadata {
+        let result = BlasMetadataRcmp {
             u,
             st: st_trunc,
             c_u,
@@ -1751,7 +1685,7 @@ where
     type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
 }
 
-impl<Scalar> BlasFieldTranslation<Scalar>
+impl<Scalar> BlasFieldTranslationRcmp<Scalar>
 where
     Scalar: RlstScalar + Epsilon + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -1769,12 +1703,39 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslation<Scalar>
+impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
-    type Metadata = BlasMetadata<Scalar>;
+    type Metadata = BlasMetadataRcmp<Scalar>;
 }
+
+
+
+impl<Scalar> BlasFieldTranslationSa<Scalar>
+where
+    Scalar: RlstScalar + Epsilon + Default,
+    <Scalar as RlstScalar>::Real: Default,
+{
+    /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
+    /// TODO: More docs
+    pub fn new(threshold: Option<Scalar::Real>) -> Self {
+        let tmp = Scalar::real(DEFAULT_SVD_THRESHOLD) * Scalar::epsilon().re();
+
+        Self {
+            threshold: threshold.unwrap_or(tmp),
+            ..Default::default()
+        }
+    }
+}
+
+impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationSa<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    type Metadata = BlasFieldTranslationSa<Scalar>;
+}
+
 
 #[cfg(test)]
 mod test {
@@ -1787,6 +1748,7 @@ mod test {
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
+    use crate::fmm::field_translation::source_to_target::transfer_vector;
     use crate::fmm::helpers::flip3;
     use crate::tree::helpers::points_fixture;
     use crate::Fmm;
@@ -1821,7 +1783,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslation::new(Some(1e-5)),
+                BlasFieldTranslationRcmp::new(Some(1e-5)),
             )
             .unwrap()
             .build()
@@ -1890,6 +1852,103 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
+        assert!(rel_error < 1e-5);
+    }
+
+    #[test]
+    fn test_blas_field_translation_helmholtz() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let expansion_order = 6;
+        let sparse = true;
+        let wavenumber = 2.5;
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(&sources, &targets, n_crit, sparse)
+            .unwrap()
+            .parameters(
+                &charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                EvalType::Value,
+                BlasFieldTranslationSa::new(None),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let level = 2;
+        let idx = 123;
+        let transfer_vectors = compute_transfer_vectors_at_level::<f64>(level).unwrap();
+        let transfer_vector = &transfer_vectors[idx];
+
+        let m2l_operator_index = fmm.kernel.m2l_operator_index(level);
+
+        // Lookup correct components of SVD compressed M2L operator matrix
+        let c_idx = transfer_vectors
+            .iter()
+            .position(|x| x.hash == transfer_vector.hash)
+            .unwrap();
+        // println!("CIDX {:?} OP INDEX {:?} TV {:?}", c_idx, m2l_operator_index, transfer_vector.hash);
+
+        let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
+        let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
+
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
+        for i in 0..fmm.ncoeffs {
+            *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
+        }
+
+        let check_potential = empty_array::<c64, 2>().simple_mult_into_resize(
+            u.view(),
+            empty_array::<c64, 2>()
+                .simple_mult_into_resize(vt.view(), multipole.view()),
+        );
+
+        // let reconstructed_kernel_matrix = empty_array::<c64, 2>().simple_mult_into_resize(
+        //     u.view(),
+        //     vt.view()
+        // );
+
+        let alpha = ALPHA_INNER;
+
+        let sources = transfer_vector
+            .source
+            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let targets = transfer_vector
+            .target
+            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
+
+        let mut direct = vec![c64::zero(); fmm.ncoeffs];
+
+        fmm.kernel.evaluate_st(
+            EvalType::Value,
+            &sources[..],
+            &targets[..],
+            multipole.data(),
+            &mut direct[..],
+        );
+
+        let abs_error: f64 = check_potential
+            .data()
+            .iter()
+            .zip(direct.iter())
+            .map(|(a, b)| (a - b).abs())
+            .sum();
+        let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
+        println!("abs {:?} rel {:?}", abs_error, rel_error);
         assert!(rel_error < 1e-5);
     }
 

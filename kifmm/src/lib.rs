@@ -86,7 +86,7 @@ pub mod tree;
 
 // Public API
 #[doc(inline)]
-pub use fmm::types::BlasFieldTranslation;
+pub use fmm::types::BlasFieldTranslationRcmp;
 #[doc(inline)]
 pub use fmm::types::FftFieldTranslation;
 #[doc(inline)]

@@ -128,9 +128,9 @@ where
         // Downward pass
         {
             for level in 2..=self.tree().target_tree().depth() {
-                if level > 2 {
-                    self.l2l(level);
-                }
+                // if level > 2 {
+                // self.l2l(level);
+                // }
                 self.m2l(level);
                 self.p2l(level);
             }
@@ -229,12 +229,10 @@ mod test {
     };
 
     use crate::{
-        traits::{
+        fmm::types::BlasFieldTranslationSa, traits::{
             fmm::FmmKernel,
             tree::{FmmTree, FmmTreeNode, Tree},
-        },
-        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+        }, tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey}, BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar + Float + Default>(
@@ -533,7 +531,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslation::new(svd_threshold),
+                BlasFieldTranslationRcmp::new(svd_threshold),
             )
             .unwrap()
             .build()
@@ -692,7 +690,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslation::new(singular_value_threshold),
+                    BlasFieldTranslationRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -717,7 +715,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslation::new(singular_value_threshold),
+                    BlasFieldTranslationRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -799,7 +797,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let wavenumber = 2.5;
+        let wavenumber = 1.;
         let fmm = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
@@ -808,7 +806,8 @@ mod test {
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslation::new(None))
+                BlasFieldTranslationSa::new(None),
+            )
             .unwrap()
             .build()
             .unwrap();
@@ -849,7 +848,7 @@ mod test {
                 .iter()
                 .flat_map(|pn| pn.children())
                 .filter(|pnc| {
-                    !target.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(target)
+                    !target.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(pnc)
                 })
                 .collect();
 
@@ -958,7 +957,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslation::new(singular_value_threshold),
+                    BlasFieldTranslationRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -980,7 +979,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslation::new(singular_value_threshold),
+                    BlasFieldTranslationRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()

@@ -554,7 +554,7 @@ where
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
 ///    matrices corresponding to unique transfer vectors.
 #[derive(Default)]
-pub struct BlasFieldTranslation<Scalar>
+pub struct BlasFieldTranslationRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -562,10 +562,28 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadata<Scalar>>, // index corresponds to level
+    pub metadata: Vec<BlasMetadataRcmp<Scalar>>, // index corresponds to level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// Cutoff ranks
+    pub cutoff_rank: Vec<usize>, // index corresponds to level
+}
+
+#[derive(Default)]
+pub struct BlasFieldTranslationSa<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Threshold
+    pub threshold: Scalar::Real,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataSa<Scalar>>, // index corresponds to level
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>, // index corresponds to level
 
     /// Cutoff ranks
     pub cutoff_rank: Vec<usize>, // index corresponds to level
@@ -683,7 +701,7 @@ where
 /// - `c_u`-  Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 ///
 /// - `c_vt`- Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-pub struct BlasMetadata<T>
+pub struct BlasMetadataRcmp<T>
 where
     T: RlstScalar,
 {
@@ -700,7 +718,20 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
-impl<T> Default for BlasMetadata<T>
+
+#[derive(Default)]
+pub struct BlasMetadataSa<T>
+where
+    T: RlstScalar,
+{
+    /// Left singular vectors from SVD of compressed M2L matrix, truncated to a maximum cutoff rank
+    pub u: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+
+    /// Right singular vectors of compressed M2L matrix, truncated to a maximum cutoff rank
+    pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+}
+
+impl<T> Default for BlasMetadataRcmp<T>
 where
     T: RlstScalar,
 {
@@ -708,7 +739,7 @@ where
         let u = rlst_dynamic_array2!(T, [1, 1]);
         let st = rlst_dynamic_array2!(T, [1, 1]);
 
-        BlasMetadata {
+        BlasMetadataRcmp {
             u,
             st,
             c_u: Vec::default(),
