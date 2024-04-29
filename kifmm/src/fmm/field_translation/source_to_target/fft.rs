@@ -22,6 +22,7 @@ use crate::{
         fmm::{FmmOperator, SourceToTargetTranslation},
         general::AsComplex,
         tree::{FmmTree, Tree},
+        types::FmmError,
     },
     tree::{
         constants::{NHALO, NSIBLINGS},
@@ -107,14 +108,20 @@ where
     Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn m2l(&self, level: u64) {
+    fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let Some(targets) = self.tree().target_tree().keys(level) else {
-                    return;
+                    return Err(FmmError::Failed(format!(
+                        "M2L failed at level {:?}, no targets found",
+                        level
+                    )));
                 };
                 let Some(sources) = self.tree().source_tree().keys(level) else {
-                    return;
+                    return Err(FmmError::Failed(format!(
+                        "M2L failed at level {:?}, no sources found",
+                        level
+                    )));
                 };
 
                 let m2l_operator_index = self.kernel.m2l_operator_index(level);
@@ -415,12 +422,16 @@ where
                                 });
                         });
                 }
+
+                Ok(())
             }
-            FmmEvalType::Matrix(_nmatvecs) => {
-                panic!("unimplemented for Matrix input")
-            }
+            FmmEvalType::Matrix(_nmatvecs) => Err(FmmError::Unimplemented(
+                "M2L unimplemented for matrix input with FFT field translations".to_string(),
+            )),
         }
     }
 
-    fn p2l(&self, _level: u64) {}
+    fn p2l(&self, _level: u64) -> Result<(), FmmError> {
+        Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
+    }
 }

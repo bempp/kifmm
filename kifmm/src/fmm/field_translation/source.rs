@@ -20,6 +20,7 @@ use crate::{
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{FmmOperator, SourceTranslation},
         tree::{FmmTree, Tree},
+        types::FmmError,
     },
     tree::constants::NSIBLINGS,
 };
@@ -32,9 +33,11 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn p2m(&self) {
+    fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {
-            return;
+            return Err(FmmError::Failed(
+                "P2M failed, no leaves found in source tree".to_string(),
+            ));
         };
 
         let n_leaves = self.tree.source_tree().n_leaves().unwrap();
@@ -136,7 +139,9 @@ where
                                 .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
                                 .for_each(|(m, t)| *m += *t);
                         }
-                    })
+                    });
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -233,14 +238,18 @@ where
                                 .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
                                 .for_each(|(m, t)| *m += *t);
                         }
-                    })
+                    });
+                Ok(())
             }
         }
     }
 
-    fn m2m(&self, level: u64) {
+    fn m2m(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_sources) = self.tree.source_tree.keys(level) else {
-            return;
+            return Err(FmmError::Failed(format!(
+                "M2M failed at level {:?}, no sources found",
+                level
+            )));
         };
 
         let nchild_sources = self.tree.source_tree().n_keys(level).unwrap();
@@ -318,7 +327,9 @@ where
                                     .for_each(|(p, t)| *p += *t);
                             }
                         },
-                    )
+                    );
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -374,6 +385,7 @@ where
                             }
                         }
                     });
+                Ok(())
             }
         }
     }

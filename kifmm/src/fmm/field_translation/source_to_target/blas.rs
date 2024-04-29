@@ -23,6 +23,7 @@ use crate::{
     traits::{
         fmm::{FmmOperator, SourceToTargetTranslation},
         tree::{FmmTree, Tree},
+        types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
     BlasFieldTranslationSaRcmp, Fmm,
@@ -106,12 +107,16 @@ where
     Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn m2l(&self, level: u64) {
-        let Some(sources) = self.tree().source_tree().keys(level) else {
-            return;
-        };
+    fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
-            return;
+            return Err(FmmError::Failed(
+                "No target boxes at this level".to_string(),
+            ));
+        };
+        let Some(sources) = self.tree().source_tree().keys(level) else {
+            return Err(FmmError::Failed(
+                "No source boxes at this level".to_string(),
+            ));
         };
 
         let m2l_operator_index = self.kernel.m2l_operator_index(level);
@@ -303,6 +308,8 @@ where
                         .zip(locals.data().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
+
+                return Ok(());
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -498,9 +505,13 @@ where
                 }
             }
         }
+
+        Ok(())
     }
 
-    fn p2l(&self, _level: u64) {}
+    fn p2l(&self, _level: u64) -> Result<(), FmmError> {
+        Ok(())
+    }
 }
 
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
@@ -585,17 +596,25 @@ where
     Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn m2l(&self, level: u64) {
-        let Some(sources) = self.tree().source_tree().keys(level) else {
-            return;
-        };
+    fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
-            return;
+            return Err(FmmError::Failed(format!(
+                "M2L failed at level {:?}, no targets found",
+                level
+            )));
+        };
+        let Some(sources) = self.tree().source_tree().keys(level) else {
+            return Err(FmmError::Failed(format!(
+                "M2L failed at level {:?}, no sources found",
+                level
+            )));
         };
 
-        // TODO: Handle with result objects
         if self.kernel.is_kernel_homogenous() {
-            panic!("Only compatible with inhomogenous kernels")
+            return Err(FmmError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "IA based M2L only implemented for Inhomogenous kernels",
+            )));
         }
 
         let m2l_operator_index = self.kernel.m2l_operator_index(level);
@@ -741,6 +760,8 @@ where
                         .zip(locals.data().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
+
+                return Ok(());
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -892,7 +913,10 @@ where
                 }
             }
         }
+        Ok(())
     }
 
-    fn p2l(&self, _level: u64) {}
+    fn p2l(&self, _level: u64) -> Result<(), FmmError> {
+        Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
+    }
 }
