@@ -19,7 +19,7 @@
 //! # extern crate lapack_src;
 //!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-//! use kifmm::{Fmm, BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder};
+//! use kifmm::{Fmm, BlasFieldTranslationRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
 //! use rlst::{rlst_dynamic_array2, RawAccessMut};
 //!
@@ -85,6 +85,8 @@ pub mod traits;
 pub mod tree;
 
 // Public API
+#[doc(inline)]
+pub use fmm::types::BlasFieldTranslationIa;
 #[doc(inline)]
 pub use fmm::types::BlasFieldTranslationRcmp;
 #[doc(inline)]

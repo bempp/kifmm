@@ -297,6 +297,61 @@ mod test {
         }
     }
 
+    fn test_single_node_helmholtz_fmm_matrix_helper<T: RlstScalar<Complex = T> + Default>(
+        fmm: Box<
+            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+        >,
+        eval_type: EvalType,
+        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
+        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        threshold: T::Real,
+    ) where
+        T::Real: Default,
+    {
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
+
+        let leaf_idx = 0;
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
+
+        let ntargets = leaf_targets.len() / fmm.dim();
+
+        let leaf_coordinates_row_major =
+            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
+
+        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
+        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
+
+        let [nsources, nmatvecs] = charges.shape();
+
+        for i in 0..nmatvecs {
+            let potential_i = fmm.potential(&leaf).unwrap()[i];
+            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
+            let mut direct_i = vec![T::zero(); ntargets * eval_size];
+            fmm.kernel().evaluate_st(
+                eval_type,
+                sources.data(),
+                leaf_coordinates_col_major.data(),
+                charges_i,
+                &mut direct_i,
+            );
+
+            println!(
+                "i {:?} \n direct_i {:?}\n potential_i {:?}",
+                i, direct_i, potential_i
+            );
+            direct_i.iter().zip(potential_i).for_each(|(&d, &p)| {
+                let abs_error = (d - p).abs();
+                let rel_error = abs_error / p.abs();
+                assert!(rel_error <= threshold)
+            })
+        }
+    }
+
     fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
@@ -854,7 +909,7 @@ mod test {
         let n_crit = Some(100);
         let expansion_order = 6;
         let sparse = true;
-        let wavenumber = 1.;
+        let wavenumber = 2.5;
 
         // Charge data
         let nvecs = 1;
@@ -980,6 +1035,86 @@ mod test {
             fmm_blas.evaluate();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
+            );
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_fmm_matrix() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(10);
+        let expansion_order = 6;
+        let sparse = true;
+        let threshold = 1e-5;
+        let threshold_deriv = 1e-3;
+        let singular_value_threshold = Some(1e-2);
+        let wavenumber = 1.0;
+
+        // Charge data
+        let nvecs = 2;
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut rng = StdRng::seed_from_u64(0);
+        charges
+            .data_mut()
+            .chunks_exact_mut(nsources)
+            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
+
+        // fmm with blas based field translation
+        {
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    eval_type,
+                    BlasFieldTranslationIa::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_helmholtz_fmm_matrix_helper::<c64>(
+                fmm_blas, eval_type, &sources, &charges, threshold,
+            );
+
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    eval_type,
+                    BlasFieldTranslationIa::new(singular_value_threshold),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas,
                 eval_type,
                 &sources,
