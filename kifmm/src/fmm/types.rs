@@ -7,8 +7,7 @@ use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 
 use crate::{
     traits::{
-        fftw::Dft,
-        field::{ConfigureSourceToTargetData, SourceToTargetData as SourceToTargetDataTrait},
+        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::FmmOperator,
         general::AsComplex,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
@@ -160,10 +159,11 @@ pub struct SendPtr<T> {
 ///
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
 /// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
+#[allow(clippy::type_complexity)]
 pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar>,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator,
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -211,31 +211,31 @@ where
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_1: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_2: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_1: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_2: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// Data and metadata for field translations
     pub source_to_target: SourceToTargetData,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// The metadata required for source to source translation
-    pub source_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
 
     /// The multipole expansion data at each box.
     pub multipoles: Vec<Scalar>,
@@ -270,17 +270,11 @@ where
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + Default,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn default() -> Self {
-        let uc2e_inv_1 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let uc2e_inv_2 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let dc2e_inv_1 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let dc2e_inv_2 = rlst_dynamic_array2!(Scalar, [1, 1]);
-        let source = rlst_dynamic_array2!(Scalar, [1, 1]);
-
         KiFmm {
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
@@ -291,11 +285,11 @@ where
             kernel_eval_size: 0,
             dim: 0,
             ncoeffs: 0,
-            uc2e_inv_1,
-            uc2e_inv_2,
-            dc2e_inv_1,
-            dc2e_inv_2,
-            source,
+            uc2e_inv_1: Vec::default(),
+            uc2e_inv_2: Vec::default(),
+            dc2e_inv_1: Vec::default(),
+            dc2e_inv_2: Vec::default(),
+            source: Vec::default(),
             source_vec: Vec::default(),
             target_vec: Vec::default(),
             multipoles: Vec::default(),
@@ -378,7 +372,7 @@ pub enum FmmEvalType {
 /// ```
 /// # extern crate blas_src;
 /// # extern crate lapack_src;
-/// use kifmm::{SingleNodeBuilder, BlasFieldTranslation, FftFieldTranslation};
+/// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::helpers::points_fixture;
@@ -428,7 +422,7 @@ pub struct SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + Clone,
-    SourceToTargetData: ConfigureSourceToTargetData,
+    SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Tree
@@ -524,17 +518,10 @@ pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator
 /// - `metadata`- Stores precomputed metadata required to apply this method.
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
-///
-/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
-///
-/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
-///   used to control the accuracy and computational complexity of the FMM.
 #[derive(Default)]
-pub struct FftFieldTranslation<Scalar, Kernel>
+pub struct FftFieldTranslation<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
-    <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + Default + Send + Sync,
 {
     /// Map between indices of surface convolution grid points.
     pub surf_to_conv_map: Vec<usize>,
@@ -543,63 +530,75 @@ where
     pub conv_to_surf_map: Vec<usize>,
 
     /// Precomputed data required for FFT compressed M2L interaction.
-    pub metadata: FftMetadata<<Scalar as AsComplex>::ComplexType>,
+    pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
-
-    /// The associated kernel with this translation operator.
-    pub kernel: Kernel,
-
-    /// Expansion order
-    pub expansion_order: usize,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
-/// interaction matrices corresponding to all unique transfer vectors, and re-compress in a directional manner.
+/// interaction matrices corresponding to all unique transfer vectors, and re-compress in a directional manner. This is
+/// termed the Single Approximation Recompression (SaRcmp) by Messner et. al.
 /// This recompression is controlled via the `threshold` parameter, which filters singular vectors with corresponding
 /// singular values smaller than this.
 ///
 /// # Fields
 ///
-/// - `threshold`- A value used to filter singular vectors during recompression.
+/// - `threshold`- A value used to filter singular vectors during compression and recompression.
 ///
-/// - `metadata`- Stores precomputed metadata required to apply this method.
+/// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
-///
-/// - `kernel`- Specifies the kernel to be used for the FMM calculations.
-///
-/// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
-///   used to control the accuracy and computational complexity of the FMM.
+///  Indexed by tree level.
 ///
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
-///    matrices corresponding to unique transfer vectors.
+///    matrices corresponding to unique transfer vectors. Indexed by tree level.
 #[derive(Default)]
-pub struct BlasFieldTranslation<Scalar, Kernel>
+pub struct BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + Default,
 {
     /// Threshold
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: BlasMetadata<Scalar>,
+    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>,
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// The associated kernel with this translation operator.
-    pub kernel: Kernel,
+    /// Cutoff ranks
+    pub cutoff_rank: Vec<usize>,
+}
 
-    /// Expansion order
-    pub expansion_order: usize,
+/// Stores data and metadata for BLAS based acceleration scheme for field translation.
+///
+/// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
+/// each interaction matrix at each level, termed the individual approximation (IA) scheme by Messner et. al. This is
+/// particularly advantageous for oscillatory kernels where the ranks of each interaction matrix can be large.
+///
+/// # Fields
+///
+/// - `threshold`- A value used to filter singular vectors during compression.
+///
+/// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
+///
+/// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions. Indexed by tree level.
+#[derive(Default)]
+pub struct BlasFieldTranslationIa<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Threshold
+    pub threshold: Scalar::Real,
 
-    /// Cutoff rank
-    pub cutoff_rank: usize,
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataIa<Scalar>>,
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.
@@ -714,7 +713,7 @@ where
 /// - `c_u`-  Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 ///
 /// - `c_vt`- Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-pub struct BlasMetadata<T>
+pub struct BlasMetadataSaRcmp<T>
 where
     T: RlstScalar,
 {
@@ -731,7 +730,25 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
-impl<T> Default for BlasMetadata<T>
+/// Stores metadata for BLAS based acceleration scheme for field translation.
+///
+/// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
+///  a matrix $K_t$, where $T$ is the set of unique transfer vectors.
+///
+/// We individually compress each $K_t \sim U V^T$, with an SVD. Storing in a vector where each index corresponds to a unique $t$.
+#[derive(Default)]
+pub struct BlasMetadataIa<T>
+where
+    T: RlstScalar,
+{
+    /// Left singular vectors from SVD of compressed M2L matrix, truncated to a maximum cutoff rank
+    pub u: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+
+    /// Right singular vectors of compressed M2L matrix, truncated to a maximum cutoff rank
+    pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+}
+
+impl<T> Default for BlasMetadataSaRcmp<T>
 where
     T: RlstScalar,
 {
@@ -739,7 +756,7 @@ where
         let u = rlst_dynamic_array2!(T, [1, 1]);
         let st = rlst_dynamic_array2!(T, [1, 1]);
 
-        BlasMetadata {
+        BlasMetadataSaRcmp {
             u,
             st,
             c_u: Vec::default(),

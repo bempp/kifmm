@@ -44,17 +44,6 @@ serde = "1.0.197"
 name = "single_node"
 harness = false
 
-[[example]]
-name = "single_node_laplace"
-path = "examples/single_node_laplace.rs"
-
-[[example]]
-name = "single_node_helmholtz"
-path = "examples/single_node_helmholtz.rs"
-
-[[example]]
-name = "geometries"
-path = "examples/geometries.rs"
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]

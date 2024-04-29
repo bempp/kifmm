@@ -3,7 +3,7 @@
 //! A Kernel Independent Fast Multipole method designed for portability, and flexible algorithmic construction based on \[1\].
 //!
 //! Notable features of this library are:
-//! * Support for single and multinode simulations via MPI.
+//! * Highly optimised single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
 //! * Heterogenous acceleration for the the field translations (M2L) and direct summation (P2P) steps.
 //! * Flexible trait based interface for developing alternative operator implementations, or indeed related fast algorithms
 //!
@@ -19,7 +19,7 @@
 //! # extern crate lapack_src;
 //!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-//! use kifmm::{Fmm, BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder};
+//! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
 //! use rlst::{rlst_dynamic_array2, RawAccessMut};
 //!
@@ -86,7 +86,9 @@ pub mod tree;
 
 // Public API
 #[doc(inline)]
-pub use fmm::types::BlasFieldTranslation;
+pub use fmm::types::BlasFieldTranslationIa;
+#[doc(inline)]
+pub use fmm::types::BlasFieldTranslationSaRcmp;
 #[doc(inline)]
 pub use fmm::types::FftFieldTranslation;
 #[doc(inline)]

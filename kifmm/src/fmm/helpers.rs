@@ -76,18 +76,21 @@ pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
 /// # Arguments
 /// * `tree`- Single node tree
 /// * `ncoeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales<T>(tree: &SingleNodeTree<T::Real>, ncoeffs: usize) -> Vec<T>
+pub fn leaf_scales<T>(tree: &SingleNodeTree<T::Real>, homogenous: bool, ncoeffs: usize) -> Vec<T>
 where
     T: RlstScalar + Default,
 {
     let mut result = vec![T::default(); tree.n_leaves().unwrap() * ncoeffs];
 
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        // Assign scales
-        let l = i * ncoeffs;
-        let r = l + ncoeffs;
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); ncoeffs].as_slice());
+    if homogenous {
+        for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+            // Assign scales
+            let l = i * ncoeffs;
+            let r = l + ncoeffs;
+
+            result[l..r]
+                .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); ncoeffs].as_slice());
+        }
     }
     result
 }

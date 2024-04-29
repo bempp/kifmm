@@ -3,9 +3,10 @@ use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::fmm::types::{BlasFieldTranslation, FftFieldTranslation, SingleNodeBuilder};
+use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
+use kifmm::BlasFieldTranslationIa;
 use num::{Complex, One};
 use rlst::{rlst_dynamic_array2, RawAccessMut, c32};
 
@@ -53,7 +54,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslation::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold),
         )
         .unwrap()
         .build()
@@ -92,7 +93,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let wavenumber = 0.0000001;
+    let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
@@ -116,7 +117,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
             expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            BlasFieldTranslation::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold),
         )
         .unwrap()
         .build()
@@ -125,15 +126,16 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Helmholtz Potentials f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(30));
+        .measurement_time(Duration::from_secs(40));
 
     group.bench_function(format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"), |b| {
         b.iter(|| fmm_fft.evaluate())
     });
 
-    group.bench_function(format!("M2L=BLAS,, N={nsources}, wavenumber={wavenumber}"), |b| {
-        b.iter(|| fmm_blas.evaluate())
-    });
+    group.bench_function(
+        format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas.evaluate()),
+    );
 }
 
 fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
@@ -155,7 +157,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let wavenumber = 0.0000001;
+    let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
@@ -179,7 +181,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
             expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            BlasFieldTranslation::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold),
         )
         .unwrap()
         .build()
@@ -188,15 +190,17 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Helmholtz Gradients f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(20));
+        .measurement_time(Duration::from_secs(75));
 
-    group.bench_function(format!("M2L=FFT,, N={nsources}, "), |b| {
-        b.iter(|| fmm_fft.evaluate())
-    });
+    group.bench_function(
+        format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_fft.evaluate()),
+    );
 
-    group.bench_function(format!("M2L=BLAS,, N={nsources}"), |b| {
-        b.iter(|| fmm_blas.evaluate())
-    });
+    group.bench_function(
+        format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas.evaluate()),
+    );
 }
 
 fn laplace_potentials_gradients_f32(c: &mut Criterion) {
@@ -240,7 +244,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslation::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold),
         )
         .unwrap()
         .build()
@@ -251,11 +255,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(20));
 
-    group.bench_function(format!("M2L=FFT,, N={nsources}"), |b| {
+    group.bench_function(format!("M2L=FFT, N={nsources}"), |b| {
         b.iter(|| fmm_fft.evaluate())
     });
 
-    group.bench_function(format!("M2L=BLAS,, N={nsources}"), |b| {
+    group.bench_function(format!("M2L=BLAS, N={nsources}"), |b| {
         b.iter(|| fmm_blas.evaluate())
     });
 }
@@ -265,4 +269,9 @@ criterion_group!(laplace_g_f32, laplace_potentials_gradients_f32);
 criterion_group!(helmholtz_p_f32, helmholtz_potentials_f32);
 criterion_group!(helmholtz_g_f32, helmholtz_potentials_gradients_f32);
 
-criterion_main!(helmholtz_p_f32);
+criterion_main!(
+    laplace_p_f32,
+    laplace_g_f32,
+    helmholtz_p_f32,
+    helmholtz_g_f32
+);
