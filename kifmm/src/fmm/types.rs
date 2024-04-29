@@ -7,7 +7,7 @@ use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 
 use crate::{
     traits::{
-        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::FmmOperator,
+        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
@@ -163,7 +163,7 @@ pub struct SendPtr<T> {
 pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -270,7 +270,7 @@ where
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     <Scalar as RlstScalar>::Real: Default,
 {

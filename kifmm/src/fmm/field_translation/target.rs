@@ -15,7 +15,7 @@ use crate::{
     fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperator, TargetTranslation},
+        fmm::{FmmOperatorData, HomogenousKernel, TargetTranslation},
         tree::{FmmTree, Tree},
         types::FmmError,
     },
@@ -26,9 +26,10 @@ impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
     fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
@@ -43,7 +44,7 @@ where
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();
         let nparents = parent_sources.len();
-        let operator_index = self.kernel.l2l_operator_index(level);
+        let operator_index = self.l2l_operator_index(level);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
