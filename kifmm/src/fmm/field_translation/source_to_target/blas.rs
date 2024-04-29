@@ -73,7 +73,7 @@ where
 
                 let transfer_vectors = interaction_list
                     .iter()
-                    .map(|target| target.find_transfer_vector(source).unwrap())
+                    .map(|target| source.find_transfer_vector(target).unwrap())
                     .collect_vec();
 
                 let mut transfer_vectors_map = HashMap::new();
