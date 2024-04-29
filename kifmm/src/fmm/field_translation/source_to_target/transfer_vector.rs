@@ -206,6 +206,5 @@ mod test {
             assert!(c1.source == c2.source);
             assert!(c1.target == c2.target)
         })
-
     }
 }

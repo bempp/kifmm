@@ -18,6 +18,11 @@ where
     fn m2m_operator_index(&self, _level: u64) -> usize {
         0
     }
+
+    fn l2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
     fn m2l_operator_index(&self, _level: u64) -> usize {
         0
     }
@@ -34,7 +39,12 @@ where
     fn c2e_operator_index(&self, level: u64) -> usize {
         level as usize
     }
+
     fn m2m_operator_index(&self, level: u64) -> usize {
+        (level - 1) as usize
+    }
+
+    fn l2l_operator_index(&self, level: u64) -> usize {
         (level - 1) as usize
     }
 

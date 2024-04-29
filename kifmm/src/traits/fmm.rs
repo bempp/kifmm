@@ -144,4 +144,7 @@ where
 
     /// Lookup m2l operator
     fn m2l_operator_index(&self, level: u64) -> usize;
+
+    /// Lookup l2l operator
+    fn l2l_operator_index(&self, level: u64) -> usize;
 }

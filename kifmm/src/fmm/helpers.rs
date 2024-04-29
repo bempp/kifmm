@@ -364,23 +364,6 @@ where
     flipped
 }
 
-
-/// Used to test whether slices of numerical data are approximately equal.
-#[macro_export]
-macro_rules! assert_appx_eq {
-    ($left:expr, $right:expr, $tol:expr) => {
-        assert_eq!($left.len(), $right.len());
-
-        $left
-            .iter()
-            .zip($right.iter())
-            .for_each(|(e, f)| {
-                assert!((e - f).abs() < $tol, "values are not sufficiently close.");
-            });
-    };
-}
-
-
 #[cfg(test)]
 mod test {
 

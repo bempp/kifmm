@@ -562,7 +562,7 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataRcmp<Scalar>>, // index corresponds to level
+    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>, // index corresponds to level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
@@ -572,7 +572,7 @@ where
 }
 
 #[derive(Default)]
-pub struct BlasFieldTranslationSa<Scalar>
+pub struct BlasFieldTranslationIa<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -580,13 +580,13 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataSa<Scalar>>, // index corresponds to level
+    pub metadata: Vec<BlasMetadataIa<Scalar>>, // index corresponds to level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>, // index corresponds to level
 
-    /// Cutoff ranks
-    pub cutoff_rank: Vec<usize>, // index corresponds to level
+                                                                  // / Cutoff ranks
+                                                                  // pub cutoff_rank: Vec<usize>, // index corresponds to level
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.
@@ -701,7 +701,7 @@ where
 /// - `c_u`-  Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
 ///
 /// - `c_vt`- Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-pub struct BlasMetadataRcmp<T>
+pub struct BlasMetadataSaRcmp<T>
 where
     T: RlstScalar,
 {
@@ -719,7 +719,7 @@ where
 }
 
 #[derive(Default)]
-pub struct BlasMetadataSa<T>
+pub struct BlasMetadataIa<T>
 where
     T: RlstScalar,
 {
@@ -730,7 +730,7 @@ where
     pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
-impl<T> Default for BlasMetadataRcmp<T>
+impl<T> Default for BlasMetadataSaRcmp<T>
 where
     T: RlstScalar,
 {
@@ -738,7 +738,7 @@ where
         let u = rlst_dynamic_array2!(T, [1, 1]);
         let st = rlst_dynamic_array2!(T, [1, 1]);
 
-        BlasMetadataRcmp {
+        BlasMetadataSaRcmp {
             u,
             st,
             c_u: Vec::default(),

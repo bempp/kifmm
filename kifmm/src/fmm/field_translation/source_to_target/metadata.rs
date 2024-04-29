@@ -25,7 +25,7 @@ use crate::{
         },
         pinv::pinv,
         types::{
-            BlasFieldTranslationRcmp, BlasFieldTranslationSa, BlasMetadataRcmp, BlasMetadataSa,
+            BlasFieldTranslationIa, BlasFieldTranslationRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             Charges, FftFieldTranslation, FftMetadata,
         },
         KiFmm,
@@ -422,7 +422,7 @@ where
             let nequiv_surface = downward_equivalent_surface.len() / self.dim;
             let ncheck_surface = downard_check_surface.len() / self.dim;
 
-            // Calculate M2M operator matrices on each level
+            // Calculate l2l operator matrices on each level
             let children = curr.children();
             let mut l2l = Vec::new();
 
@@ -465,7 +465,7 @@ where
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
-    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationSa<Scalar>>
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -477,13 +477,13 @@ where
         let alpha = Scalar::real(ALPHA_INNER);
         let depth = self.tree.source_tree().depth();
 
-        let mut result = BlasFieldTranslationSa::<Scalar>::default();
+        let mut result = BlasFieldTranslationIa::<Scalar>::default();
 
         for level in 2..=depth {
             let transfer_vectors =
                 compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
 
-            let mut level_result = BlasMetadataSa::default();
+            let mut level_result = BlasMetadataIa::default();
 
             let mut level_cutoff_rank = Vec::new();
 
@@ -544,38 +544,21 @@ where
                     empty_array::<Scalar, 2>().simple_mult_into_resize(sigma_mat.view(), vt.view());
 
                 let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
-                level_result.u.push(u);
-                level_result.vt.push(vt);
-                level_cutoff_rank.push(cutoff_rank);
-            }
-
-            let &cutoff_rank = level_cutoff_rank.iter().max().unwrap();
-            let mut compressed_level_result = BlasMetadataSa::<Scalar>::default();
-
-            for i in 0..transfer_vectors.len() {
-                let u = &level_result.u[i];
-                let vt = &level_result.vt[i];
-                let mu = u.shape()[0];
-                let k = u.shape()[1];
-                let nvt = vt.shape()[1];
-                let mut u_clone = rlst_dynamic_array2!(Scalar, [mu, k]);
-                let mut vt_clone = rlst_dynamic_array2!(Scalar, [k, nvt]);
-                u_clone.fill_from(u.view());
-                vt_clone.fill_from(vt.view());
 
                 let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
                 let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
 
-                u_compressed.fill_from(u_clone.into_subview([0, 0], [mu, cutoff_rank]));
-                vt_compressed.fill_from(vt_clone.into_subview([0, 0], [cutoff_rank, nvt]));
+                u_compressed.fill_from(u.into_subview([0, 0], [mu, cutoff_rank]));
+                vt_compressed.fill_from(vt.into_subview([0, 0], [cutoff_rank, nvt]));
 
-                compressed_level_result.u.push(u_compressed);
-                compressed_level_result.vt.push(vt_compressed)
+                level_result.u.push(u_compressed);
+                level_result.vt.push(vt_compressed);
+
+                level_cutoff_rank.push(cutoff_rank);
             }
 
-            result.metadata.push(compressed_level_result);
+            result.metadata.push(level_result);
             result.transfer_vectors.push(transfer_vectors);
-            result.cutoff_rank.push(cutoff_rank);
         }
 
         self.source_to_target = result;
@@ -1175,7 +1158,7 @@ where
         let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
         st_trunc.fill_from(s_trunc.transpose());
 
-        let result = BlasMetadataRcmp {
+        let result = BlasMetadataSaRcmp {
             u,
             st: st_trunc,
             c_u,
@@ -1702,10 +1685,10 @@ impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
-    type Metadata = BlasMetadataRcmp<Scalar>;
+    type Metadata = BlasMetadataSaRcmp<Scalar>;
 }
 
-impl<Scalar> BlasFieldTranslationSa<Scalar>
+impl<Scalar> BlasFieldTranslationIa<Scalar>
 where
     Scalar: RlstScalar + Epsilon + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -1722,11 +1705,11 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationSa<Scalar>
+impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationIa<Scalar>
 where
     Scalar: RlstScalar,
 {
-    type Metadata = BlasFieldTranslationSa<Scalar>;
+    type Metadata = BlasFieldTranslationIa<Scalar>;
 }
 
 #[cfg(test)]
@@ -1740,7 +1723,6 @@ mod test {
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
-    use crate::fmm::field_translation::source_to_target::transfer_vector;
     use crate::fmm::helpers::flip3;
     use crate::tree::helpers::points_fixture;
     use crate::Fmm;
@@ -1875,7 +1857,7 @@ mod test {
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslationSa::new(None),
+                BlasFieldTranslationIa::new(None),
             )
             .unwrap()
             .build()
@@ -1885,19 +1867,14 @@ mod test {
 
         let target = fmm.tree.target_tree().keys(level).unwrap()[0];
 
-        let interaction_list =target
+        let interaction_list = target
             .parent()
             .neighbors()
             .iter()
             .flat_map(|pn| pn.children())
             .filter(|pnc| {
                 !target.is_adjacent(pnc)
-                    && fmm
-                        .tree
-                        .source_tree()
-                        .all_keys_set()
-                        .unwrap()
-                        .contains(pnc)
+                    && fmm.tree.source_tree().all_keys_set().unwrap().contains(pnc)
             })
             .collect_vec();
 
@@ -1929,10 +1906,8 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = source
-            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
-        let targets = target
-            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let sources = source.surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let targets = target.surface_grid(expansion_order, &fmm.tree.domain, alpha);
 
         let mut direct = vec![c64::zero(); fmm.ncoeffs];
 
@@ -2199,13 +2174,6 @@ mod test {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
-        // assert!(false);
-        // Pick a random source/target pair
-        // let idx = 123;
-        // let all_transfer_vectors = compute_transfer_vectors::<f64>();
-
-        // let transfer_vector = &all_transfer_vectors[idx];
-
         let level = 2;
         let source = fmm.tree().source_tree().keys(level).unwrap()[0];
 
@@ -2215,7 +2183,7 @@ mod test {
             .iter()
             .flat_map(|pn| pn.children())
             .filter(|pnc| {
-                !source.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(&source)
+                !source.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(&pnc)
             })
             .collect();
 

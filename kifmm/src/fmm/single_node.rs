@@ -229,10 +229,13 @@ mod test {
     };
 
     use crate::{
-        assert_appx_eq, fmm::types::BlasFieldTranslationSa, traits::{
+        fmm::types::BlasFieldTranslationIa,
+        traits::{
             fmm::FmmKernel,
             tree::{FmmTree, FmmTreeNode, Tree},
-        }, tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey}, BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
+        },
+        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
+        BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
@@ -294,7 +297,7 @@ mod test {
         }
     }
 
-    fn _test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
+    fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
@@ -766,9 +769,77 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
+
+        // Manual upward pass
+        // let depth = fmm_fft.tree.source_tree.depth;
+        // fmm_fft.p2m();
+        // for level in (1..=depth).rev() {
+        //     fmm_fft.m2m(level)
+        // }
         fmm_fft.evaluate();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
+    }
+
+    #[test]
+    fn test_helmholtz_m2l() {
+        // // Test M2L
+        // {
+        //     let level = 3;
+        //     let target_idx = 0;
+        //     let targets = fmm.tree().target_tree().keys(level).unwrap();
+        //     let target = &targets[target_idx];
+
+        //     let target_check_surface =
+        //         target.surface_grid(fmm.expansion_order, fmm.tree().domain(), ALPHA_INNER);
+
+        //     let found_local = fmm.local(target).unwrap();
+
+        //     // println!("HERE {:?}", found_local);
+
+        //     let v_list: HashSet<MortonKey<_>> = target
+        //         .parent()
+        //         .neighbors()
+        //         .iter()
+        //         .flat_map(|pn| pn.children())
+        //         .filter(|pnc| {
+        //             !target.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(pnc)
+        //         })
+        //         .collect();
+
+        //     let v_list = v_list.into_iter().collect_vec();
+
+        //     let mut check_potential = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
+
+        //     for source in v_list.iter() {
+        //         let source_equivalent_surface =
+        //             source.surface_grid(fmm.expansion_order, fmm.tree().domain(), ALPHA_INNER);
+        //         let multipole = fmm.multipole(source).unwrap();
+
+        //         fmm.kernel().evaluate_st(
+        //             EvalType::Value,
+        //             &source_equivalent_surface,
+        //             &target_check_surface,
+        //             multipole,
+        //             check_potential.data_mut(),
+        //         )
+        //     }
+
+        //     let operator_index = fmm.kernel.c2e_operator_index(level);
+
+        //     let evaluated_local = empty_array::<c64, 2>().simple_mult_into_resize(
+        //         fmm.dc2e_inv_1[operator_index].view(),
+        //         empty_array::<c64, 2>().simple_mult_into_resize(
+        //             fmm.dc2e_inv_2[operator_index].view(),
+        //             check_potential.view(),
+        //         ),
+        //     );
+
+        //     found_local
+        //         .iter()
+        //         .zip(evaluated_local.data())
+        //         .for_each(|(e, f)| assert!((e - f).abs() < 1e-5));
+        // }
     }
 
     #[test]
@@ -783,6 +854,7 @@ mod test {
         let n_crit = Some(100);
         let expansion_order = 6;
         let sparse = true;
+        let wavenumber = 1.;
 
         // Charge data
         let nvecs = 1;
@@ -790,119 +862,53 @@ mod test {
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let wavenumber = 1.;
-        let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
-            .unwrap()
-            .parameters(
-                &charges,
-                expansion_order,
-                Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
-                BlasFieldTranslationSa::new(None),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm.evaluate();
-
-        // let fmm = SingleNodeBuilder::new()
-        //     .tree(&sources, &targets, n_crit, sparse)
-        //     .unwrap()
-        //     .parameters(
-        //         &charges,
-        //         expansion_order,
-        //         Helmholtz3dKernel::new(wavenumber),
-        //         EvalType::Value,
-        //         FftFieldTranslation::new(),
-        //     )
-        //     .unwrap()
-        //     .build()
-        //     .unwrap();
-        // fmm.evaluate();
-
-        // Test M2L
+        // BLAS based field translation
         {
-            let level = 3;
-            let target_idx = 0;
-            let targets = fmm.tree().target_tree().keys(level).unwrap();
-            let target = &targets[target_idx];
-
-            let target_check_surface =
-                target.surface_grid(fmm.expansion_order, fmm.tree().domain(), ALPHA_INNER);
-
-            let found_local = fmm.local(target).unwrap();
-
-            // println!("HERE {:?}", found_local);
-
-            let v_list: HashSet<MortonKey<_>> = target
-                .parent()
-                .neighbors()
-                .iter()
-                .flat_map(|pn| pn.children())
-                .filter(|pnc| {
-                    !target.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(pnc)
-                })
-                .collect();
-
-            let v_list = v_list.into_iter().collect_vec();
-
-            let mut check_potential = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
-
-            for source in v_list.iter() {
-                let source_equivalent_surface =
-                    source.surface_grid(fmm.expansion_order, fmm.tree().domain(), ALPHA_INNER);
-                let multipole = fmm.multipole(source).unwrap();
-
-                fmm.kernel().evaluate_st(
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    &source_equivalent_surface,
-                    &target_check_surface,
-                    multipole,
-                    check_potential.data_mut(),
+                    BlasFieldTranslationIa::new(None),
                 )
-            }
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate();
 
-            let operator_index = fmm.kernel.c2e_operator_index(level);
-
-            let evaluated_local = empty_array::<c64, 2>().simple_mult_into_resize(
-                fmm.dc2e_inv_1[operator_index].view(),
-                empty_array::<c64, 2>().simple_mult_into_resize(
-                    fmm.dc2e_inv_2[operator_index].view(),
-                    check_potential.view(),
-                ),
+            let fmm: Box<_> = Box::new(fmm);
+            let eval_type = fmm.kernel_eval_type;
+            test_single_node_helmholtz_fmm_vector_helper::<c64>(
+                fmm, eval_type, &sources, &charges, 1e-5,
             );
-
-            assert_appx_eq!(&found_local, &evaluated_local.data(), 1e-5);
         }
 
-        // let fmm_fft = Box::new(fmm_fft);
-        // let eval_type = fmm_fft.kernel_eval_type;
-        // test_single_node_helmholtz_fmm_vector_helper::<c64>(
-        //     fmm_fft, eval_type, &sources, &charges, 1e-5,
-        // );
+        // FFT based field translation
+        {
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    EvalType::Value,
+                    FftFieldTranslation::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate();
 
-        // let svd_threshold = Some(1e-5);
-        // let fmm_svd = SingleNodeBuilder::new()
-        //     .tree(&sources, &targets, n_crit, sparse)
-        //     .unwrap()
-        //     .parameters(
-        //         &charges,
-        //         expansion_order,
-        //         Helmholtz3dKernel::new(wavenumber),
-        //         EvalType::Value,
-        //         BlasFieldTranslation::new(svd_threshold),
-        //     )
-        //     .unwrap()
-        //     .build()
-        //     .unwrap();
-        // fmm_svd.evaluate();
-
-        // let fmm_svd = Box::new(fmm_svd);
-        // let eval_type = fmm_svd.kernel_eval_type;
-        // test_single_node_helmholtz_fmm_vector_helper::<c64>(
-        //     fmm_svd, eval_type, &sources, &charges, 1e-5,
-        // );
+            let fmm: Box<_> = Box::new(fmm);
+            let eval_type = fmm.kernel_eval_type;
+            test_single_node_helmholtz_fmm_vector_helper::<c64>(
+                fmm, eval_type, &sources, &charges, 1e-5,
+            );
+        }
     }
 
     #[test]

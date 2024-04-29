@@ -39,6 +39,7 @@ where
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();
         let nparents = parent_sources.len();
+        let operator_index = self.kernel.l2l_operator_index(level);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -82,9 +83,10 @@ where
                                 });
                         }
 
+                        println!("HERE {:?} {:?}", self.target_vec.len(), operator_index);
                         for i in 0..NSIBLINGS {
                             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.target_vec[0][i].view(),
+                                self.target_vec[operator_index][i].view(),
                                 parent_locals.view(),
                             );
 
@@ -143,7 +145,7 @@ where
                             child_locals_pointers.iter().enumerate().take(NSIBLINGS)
                         {
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.target_vec[0][i].view(),
+                                self.target_vec[operator_index][i].view(),
                                 parent_locals.view(),
                             );
 

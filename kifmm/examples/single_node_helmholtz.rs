@@ -1,5 +1,5 @@
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
-use kifmm::fmm::types::BlasFieldTranslationSa;
+use kifmm::fmm::types::BlasFieldTranslationIa;
 use kifmm::{BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
