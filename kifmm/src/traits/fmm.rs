@@ -1,6 +1,6 @@
 //! FMM traits
 use crate::{fmm::types::Charges, traits::tree::FmmTree};
-use green_kernels::traits::Kernel;
+use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
 use super::tree::Tree;
@@ -117,4 +117,34 @@ where
     /// # Arguments
     /// * `charges` - new charge data.
     fn clear(&mut self, charges: &Charges<Self::Scalar>);
+}
+
+/// Set all metadata required for FMMs
+pub trait FmmMetadata {
+    /// Associated scalar
+    type Scalar: RlstScalar;
+
+    /// TODO: Breakup into smaller pieces of functionality for clarity.
+    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
+}
+
+/// Kernels compatible with our implementation
+pub trait FmmOperator
+where
+    Self: Kernel,
+{
+    /// Homogeneity check
+    fn is_kernel_homogenous(&self) -> bool;
+
+    /// Lookup c2e operator
+    fn c2e_operator_index(&self, level: u64) -> usize;
+
+    /// Lookup m2m operator
+    fn m2m_operator_index(&self, level: u64) -> usize;
+
+    /// Lookup m2l operator
+    fn m2l_operator_index(&self, level: u64) -> usize;
+
+    /// Lookup l2l operator
+    fn l2l_operator_index(&self, level: u64) -> usize;
 }
