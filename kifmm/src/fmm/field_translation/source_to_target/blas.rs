@@ -503,7 +503,6 @@ where
     fn p2l(&self, _level: u64) {}
 }
 
-
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationSa<Scalar>>
 where
     Scalar: RlstScalar + Default,
@@ -520,6 +519,7 @@ where
     fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
         let sources = self.tree.source_tree().keys(level).unwrap();
         let nsources = sources.len();
+        let m2l_operator_index = self.kernel.m2l_operator_index(level);
 
         let all_displacements = vec![vec![-1i64; nsources]; 316];
         let all_displacements = all_displacements.into_iter().map(Mutex::new).collect_vec();
@@ -547,7 +547,7 @@ where
 
                 let transfer_vectors = interaction_list
                     .iter()
-                    .map(|target| target.find_transfer_vector(source).unwrap())
+                    .map(|target| source.find_transfer_vector(target).unwrap())
                     .collect_vec();
 
                 let mut transfer_vectors_map = HashMap::new();
@@ -558,7 +558,10 @@ where
                 let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
 
                 // Mark items in interaction list for scattering
-                for (tv_idx, tv) in self.source_to_target.transfer_vectors[level as usize].iter().enumerate() {
+                for (tv_idx, tv) in self.source_to_target.transfer_vectors[m2l_operator_index]
+                    .iter()
+                    .enumerate()
+                {
                     let mut all_displacements_lock = all_displacements[tv_idx].lock().unwrap();
                     if transfer_vectors_set.contains(&tv.hash) {
                         // Look up scatter location in target tree
@@ -642,32 +645,19 @@ where
                 );
 
                 // Allocate buffer to store check potentials
-                let check_potentials = rlst_dynamic_array2!(
-                    Scalar,
-                    [
-                        self.ncoeffs,
-                        ntargets
-                    ]
-                );
+                let check_potentials = rlst_dynamic_array2!(Scalar, [self.ncoeffs, ntargets]);
                 let mut check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
                     let raw = unsafe {
-                        check_potentials
-                            .data()
-                            .as_ptr()
-                            .add(i * self.ncoeffs)
-                            as *mut Scalar
+                        check_potentials.data().as_ptr().add(i * self.ncoeffs) as *mut Scalar
                     };
                     let send_ptr = SendPtrMut { raw };
                     check_potentials_ptrs.push(send_ptr);
                 }
 
-                let level_check_potentials = check_potentials_ptrs
-                    .iter()
-                    .map(Mutex::new)
-                    .collect_vec();
-
+                let level_check_potentials =
+                    check_potentials_ptrs.iter().map(Mutex::new).collect_vec();
 
                 // 1. Apply BLAS operation
                 {
@@ -676,28 +666,17 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let u =
-                                &self.source_to_target.metadata[m2l_operator_index].u[c_idx];
-                            let vt =
-                                &self.source_to_target.metadata[m2l_operator_index].vt[c_idx];
+                            let u = &self.source_to_target.metadata[m2l_operator_index].u[c_idx];
+                            let vt = &self.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-                            let mut multipoles_subset = rlst_dynamic_array2!(
-                                Scalar,
-                                [
-                                    self.ncoeffs,
-                                    multipole_idxs.len()
-                                ]
-                            );
+                            let mut multipoles_subset =
+                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, multipole_idxs.len()]);
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                                multipoles_subset.data_mut()[i * self
-                                    .source_to_target
-                                    .cutoff_rank[m2l_operator_index]
-                                    ..(i + 1)
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]]
+                                multipoles_subset.data_mut()
+                                    [i * self.ncoeffs..(i + 1) * self.ncoeffs]
                                     .copy_from_slice(
-                                        &self.multipoles[multipole_idx
-                                            * self.ncoeffs
+                                        &multipoles.data()[multipole_idx * self.ncoeffs
                                             ..(multipole_idx + 1) * self.ncoeffs],
                                     );
                             }
@@ -712,10 +691,8 @@ where
                                 );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                                let tmp = &check_potential.data()[multipole_idx
-                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
-                                    ..(multipole_idx + 1)
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]];
+                                let tmp = &check_potential.data()[multipole_idx * self.ncoeffs
+                                    ..(multipole_idx + 1) * self.ncoeffs];
 
                                 let check_potential_lock =
                                     level_check_potentials[local_idx].lock().unwrap();
@@ -723,9 +700,10 @@ where
                                 let global_check_potential = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         check_potential_ptr,
-                                        self.ncoeffs
+                                        self.ncoeffs,
                                     )
                                 };
+
                                 global_check_potential
                                     .iter_mut()
                                     .zip(tmp)
@@ -742,7 +720,7 @@ where
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
                             self.dc2e_inv_2[c2e_operator_index].view(),
-                            check_potentials
+                            check_potentials,
                         ),
                     );
                     //TODO: Rework threading
@@ -758,197 +736,197 @@ where
                 }
             }
             FmmEvalType::Matrix(nmatvecs) => {
-        //         // Lookup multipole data from source tree
-        //         let multipoles = rlst_array_from_slice2!(
-        //             unsafe {
-        //                 std::slice::from_raw_parts(
-        //                     self.level_multipoles[level as usize][0][0].raw,
-        //                     self.ncoeffs * nsources * nmatvecs,
-        //                 )
-        //             },
-        //             [self.ncoeffs, nsources * nmatvecs]
-        //         );
+                //         // Lookup multipole data from source tree
+                //         let multipoles = rlst_array_from_slice2!(
+                //             unsafe {
+                //                 std::slice::from_raw_parts(
+                //                     self.level_multipoles[level as usize][0][0].raw,
+                //                     self.ncoeffs * nsources * nmatvecs,
+                //                 )
+                //             },
+                //             [self.ncoeffs, nsources * nmatvecs]
+                //         );
 
-        //         let compressed_check_potentials = rlst_dynamic_array2!(
-        //             Scalar,
-        //             [
-        //                 self.source_to_target.cutoff_rank[m2l_operator_index],
-        //                 nsources * nmatvecs
-        //             ]
-        //         );
-        //         let mut compressed_check_potentials_ptrs = Vec::new();
+                //         let compressed_check_potentials = rlst_dynamic_array2!(
+                //             Scalar,
+                //             [
+                //                 self.source_to_target.cutoff_rank[m2l_operator_index],
+                //                 nsources * nmatvecs
+                //             ]
+                //         );
+                //         let mut compressed_check_potentials_ptrs = Vec::new();
 
-        //         for i in 0..ntargets {
-        //             let key_displacement =
-        //                 i * self.source_to_target.cutoff_rank[m2l_operator_index] * nmatvecs;
-        //             let mut tmp = Vec::new();
-        //             for charge_vec_idx in 0..nmatvecs {
-        //                 let charge_vec_displacement =
-        //                     charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
+                //         for i in 0..ntargets {
+                //             let key_displacement =
+                //                 i * self.source_to_target.cutoff_rank[m2l_operator_index] * nmatvecs;
+                //             let mut tmp = Vec::new();
+                //             for charge_vec_idx in 0..nmatvecs {
+                //                 let charge_vec_displacement =
+                //                     charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
 
-        //                 let raw = unsafe {
-        //                     compressed_check_potentials
-        //                         .data()
-        //                         .as_ptr()
-        //                         .add(key_displacement + charge_vec_displacement)
-        //                         as *mut Scalar
-        //                 };
-        //                 let send_ptr = SendPtrMut { raw };
-        //                 tmp.push(send_ptr)
-        //             }
-        //             compressed_check_potentials_ptrs.push(tmp);
-        //         }
+                //                 let raw = unsafe {
+                //                     compressed_check_potentials
+                //                         .data()
+                //                         .as_ptr()
+                //                         .add(key_displacement + charge_vec_displacement)
+                //                         as *mut Scalar
+                //                 };
+                //                 let send_ptr = SendPtrMut { raw };
+                //                 tmp.push(send_ptr)
+                //             }
+                //             compressed_check_potentials_ptrs.push(tmp);
+                //         }
 
-        //         let compressed_level_check_potentials = compressed_check_potentials_ptrs
-        //             .iter()
-        //             .map(Mutex::new)
-        //             .collect_vec();
+                //         let compressed_level_check_potentials = compressed_check_potentials_ptrs
+                //             .iter()
+                //             .map(Mutex::new)
+                //             .collect_vec();
 
-        //         // 1. Compute the SVD compressed multipole expansions at this level
-        //         let mut compressed_multipoles;
-        //         {
-        //             //TODO: Rework threading
-        //             //rlst_blis::interface::threading::enable_threading();
-        //             compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //                 self.source_to_target.metadata[m2l_operator_index].st.view(),
-        //                 multipoles,
-        //             );
-        //             //TODO: Rework threading
-        //             //rlst_blis::interface::threading::disable_threading();
+                //         // 1. Compute the SVD compressed multipole expansions at this level
+                //         let mut compressed_multipoles;
+                //         {
+                //             //TODO: Rework threading
+                //             //rlst_blis::interface::threading::enable_threading();
+                //             compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                 self.source_to_target.metadata[m2l_operator_index].st.view(),
+                //                 multipoles,
+                //             );
+                //             //TODO: Rework threading
+                //             //rlst_blis::interface::threading::disable_threading();
 
-        //             if self.kernel.is_homogenous() {
-        //                 compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-        //                     *d *= homogenous_kernel_scale::<Scalar>(level)
-        //                         * m2l_scale::<Scalar>(level).unwrap()
-        //                 });
-        //             }
-        //         }
+                //             if self.kernel.is_homogenous() {
+                //                 compressed_multipoles.data_mut().iter_mut().for_each(|d| {
+                //                     *d *= homogenous_kernel_scale::<Scalar>(level)
+                //                         * m2l_scale::<Scalar>(level).unwrap()
+                //                 });
+                //             }
+                //         }
 
-        //         // 2. Apply the BLAS operation
-        //         {
-        //             (0..NTRANSFER_VECTORS_KIFMM)
-        //                 .into_par_iter()
-        //                 .zip(multipole_idxs)
-        //                 .zip(local_idxs)
-        //                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-        //                     let c_u_sub =
-        //                         &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
-        //                     let c_vt_sub =
-        //                         &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
+                //         // 2. Apply the BLAS operation
+                //         {
+                //             (0..NTRANSFER_VECTORS_KIFMM)
+                //                 .into_par_iter()
+                //                 .zip(multipole_idxs)
+                //                 .zip(local_idxs)
+                //                 .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                //                     let c_u_sub =
+                //                         &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
+                //                     let c_vt_sub =
+                //                         &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
-        //                     let mut compressed_multipoles_subset = rlst_dynamic_array2!(
-        //                         Scalar,
-        //                         [
-        //                             self.source_to_target.cutoff_rank[m2l_operator_index],
-        //                             multipole_idxs.len() * nmatvecs
-        //                         ]
-        //                     );
+                //                     let mut compressed_multipoles_subset = rlst_dynamic_array2!(
+                //                         Scalar,
+                //                         [
+                //                             self.source_to_target.cutoff_rank[m2l_operator_index],
+                //                             multipole_idxs.len() * nmatvecs
+                //                         ]
+                //                     );
 
-        //                     for (local_multipole_idx, &global_multipole_idx) in
-        //                         multipole_idxs.iter().enumerate()
-        //                     {
-        //                         let key_displacement_global = global_multipole_idx
-        //                             * self.source_to_target.cutoff_rank[m2l_operator_index]
-        //                             * nmatvecs;
+                //                     for (local_multipole_idx, &global_multipole_idx) in
+                //                         multipole_idxs.iter().enumerate()
+                //                     {
+                //                         let key_displacement_global = global_multipole_idx
+                //                             * self.source_to_target.cutoff_rank[m2l_operator_index]
+                //                             * nmatvecs;
 
-        //                         let key_displacement_local = local_multipole_idx
-        //                             * self.source_to_target.cutoff_rank[m2l_operator_index]
-        //                             * nmatvecs;
+                //                         let key_displacement_local = local_multipole_idx
+                //                             * self.source_to_target.cutoff_rank[m2l_operator_index]
+                //                             * nmatvecs;
 
-        //                         for charge_vec_idx in 0..nmatvecs {
-        //                             let charge_vec_displacement = charge_vec_idx
-        //                                 * self.source_to_target.cutoff_rank[m2l_operator_index];
+                //                         for charge_vec_idx in 0..nmatvecs {
+                //                             let charge_vec_displacement = charge_vec_idx
+                //                                 * self.source_to_target.cutoff_rank[m2l_operator_index];
 
-        //                             compressed_multipoles_subset.data_mut()[key_displacement_local
-        //                                 + charge_vec_displacement
-        //                                 ..key_displacement_local
-        //                                     + charge_vec_displacement
-        //                                     + self.source_to_target.cutoff_rank
-        //                                         [m2l_operator_index]]
-        //                                 .copy_from_slice(
-        //                                     &compressed_multipoles.data()[key_displacement_global
-        //                                         + charge_vec_displacement
-        //                                         ..key_displacement_global
-        //                                             + charge_vec_displacement
-        //                                             + self.source_to_target.cutoff_rank
-        //                                                 [m2l_operator_index]],
-        //                                 );
-        //                         }
-        //                     }
+                //                             compressed_multipoles_subset.data_mut()[key_displacement_local
+                //                                 + charge_vec_displacement
+                //                                 ..key_displacement_local
+                //                                     + charge_vec_displacement
+                //                                     + self.source_to_target.cutoff_rank
+                //                                         [m2l_operator_index]]
+                //                                 .copy_from_slice(
+                //                                     &compressed_multipoles.data()[key_displacement_global
+                //                                         + charge_vec_displacement
+                //                                         ..key_displacement_global
+                //                                             + charge_vec_displacement
+                //                                             + self.source_to_target.cutoff_rank
+                //                                                 [m2l_operator_index]],
+                //                                 );
+                //                         }
+                //                     }
 
-        //                     let compressed_check_potential = empty_array::<Scalar, 2>()
-        //                         .simple_mult_into_resize(
-        //                             c_u_sub.view(),
-        //                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //                                 c_vt_sub.view(),
-        //                                 compressed_multipoles_subset.view(),
-        //                             ),
-        //                         );
+                //                     let compressed_check_potential = empty_array::<Scalar, 2>()
+                //                         .simple_mult_into_resize(
+                //                             c_u_sub.view(),
+                //                             empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                                 c_vt_sub.view(),
+                //                                 compressed_multipoles_subset.view(),
+                //                             ),
+                //                         );
 
-        //                     for (local_multipole_idx, &global_local_idx) in
-        //                         local_idxs.iter().enumerate()
-        //                     {
-        //                         let check_potential_lock = compressed_level_check_potentials
-        //                             [global_local_idx]
-        //                             .lock()
-        //                             .unwrap();
+                //                     for (local_multipole_idx, &global_local_idx) in
+                //                         local_idxs.iter().enumerate()
+                //                     {
+                //                         let check_potential_lock = compressed_level_check_potentials
+                //                             [global_local_idx]
+                //                             .lock()
+                //                             .unwrap();
 
-        //                         for charge_vec_idx in 0..nmatvecs {
-        //                             let check_potential_ptr =
-        //                                 check_potential_lock[charge_vec_idx].raw;
-        //                             let check_potential = unsafe {
-        //                                 std::slice::from_raw_parts_mut(
-        //                                     check_potential_ptr,
-        //                                     self.source_to_target.cutoff_rank[m2l_operator_index],
-        //                                 )
-        //                             };
+                //                         for charge_vec_idx in 0..nmatvecs {
+                //                             let check_potential_ptr =
+                //                                 check_potential_lock[charge_vec_idx].raw;
+                //                             let check_potential = unsafe {
+                //                                 std::slice::from_raw_parts_mut(
+                //                                     check_potential_ptr,
+                //                                     self.source_to_target.cutoff_rank[m2l_operator_index],
+                //                                 )
+                //                             };
 
-        //                             let key_displacement = local_multipole_idx
-        //                                 * self.source_to_target.cutoff_rank[m2l_operator_index]
-        //                                 * nmatvecs;
-        //                             let charge_vec_displacement = charge_vec_idx
-        //                                 * self.source_to_target.cutoff_rank[m2l_operator_index];
+                //                             let key_displacement = local_multipole_idx
+                //                                 * self.source_to_target.cutoff_rank[m2l_operator_index]
+                //                                 * nmatvecs;
+                //                             let charge_vec_displacement = charge_vec_idx
+                //                                 * self.source_to_target.cutoff_rank[m2l_operator_index];
 
-        //                             let tmp = &compressed_check_potential.data()[key_displacement
-        //                                 + charge_vec_displacement
-        //                                 ..key_displacement
-        //                                     + charge_vec_displacement
-        //                                     + self.source_to_target.cutoff_rank
-        //                                         [m2l_operator_index]];
-        //                             check_potential
-        //                                 .iter_mut()
-        //                                 .zip(tmp)
-        //                                 .for_each(|(l, r)| *l += *r);
-        //                         }
-        //                     }
-        //                 });
-        //         }
+                //                             let tmp = &compressed_check_potential.data()[key_displacement
+                //                                 + charge_vec_displacement
+                //                                 ..key_displacement
+                //                                     + charge_vec_displacement
+                //                                     + self.source_to_target.cutoff_rank
+                //                                         [m2l_operator_index]];
+                //                             check_potential
+                //                                 .iter_mut()
+                //                                 .zip(tmp)
+                //                                 .for_each(|(l, r)| *l += *r);
+                //                         }
+                //                     }
+                //                 });
+                //         }
 
-        //         // 3. Compute local expansions from compressed check potentials
-        //         {
-        //             //TODO: Rework threading
-        //             //t_blis::interface::threading::enable_threading();
-        //             let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //                 self.dc2e_inv_1[c2e_operator_index].view(),
-        //                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //                     self.dc2e_inv_2[c2e_operator_index].view(),
-        //                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //                         self.source_to_target.metadata[m2l_operator_index].u.view(),
-        //                         compressed_check_potentials,
-        //                     ),
-        //                 ),
-        //             );
-        //             //TODO: Rework threading
-        //             //rlst_blis::interface::threading::disable_threading();
-        //             let ptr = self.level_locals[level as usize][0][0].raw;
-        //             let all_locals = unsafe {
-        //                 std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)
-        //             };
-        //             all_locals
-        //                 .iter_mut()
-        //                 .zip(locals.data().iter())
-        //                 .for_each(|(l, r)| *l += *r);
-        //         }
+                //         // 3. Compute local expansions from compressed check potentials
+                //         {
+                //             //TODO: Rework threading
+                //             //t_blis::interface::threading::enable_threading();
+                //             let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                 self.dc2e_inv_1[c2e_operator_index].view(),
+                //                 empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                     self.dc2e_inv_2[c2e_operator_index].view(),
+                //                     empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                         self.source_to_target.metadata[m2l_operator_index].u.view(),
+                //                         compressed_check_potentials,
+                //                     ),
+                //                 ),
+                //             );
+                //             //TODO: Rework threading
+                //             //rlst_blis::interface::threading::disable_threading();
+                //             let ptr = self.level_locals[level as usize][0][0].raw;
+                //             let all_locals = unsafe {
+                //                 std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)
+                //             };
+                //             all_locals
+                //                 .iter_mut()
+                //                 .zip(locals.data().iter())
+                //                 .for_each(|(l, r)| *l += *r);
+                //         }
             }
         }
     }

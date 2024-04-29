@@ -128,9 +128,9 @@ where
         // Downward pass
         {
             for level in 2..=self.tree().target_tree().depth() {
-                // if level > 2 {
-                // self.l2l(level);
-                // }
+                if level > 2 {
+                    self.l2l(level);
+                }
                 self.m2l(level);
                 self.p2l(level);
             }
@@ -229,13 +229,13 @@ mod test {
     };
 
     use crate::{
-        fmm::types::BlasFieldTranslationSa, traits::{
+        assert_appx_eq, fmm::types::BlasFieldTranslationSa, traits::{
             fmm::FmmKernel,
             tree::{FmmTree, FmmTreeNode, Tree},
         }, tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey}, BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
     };
 
-    fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar + Float + Default>(
+    fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
             dyn Fmm<
                 Scalar = T::Real,
@@ -766,13 +766,6 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-
-        // Manual upward pass
-        // let depth = fmm_fft.tree.source_tree.depth;
-        // fmm_fft.p2m();
-        // for level in (1..=depth).rev() {
-        //     fmm_fft.m2m(level)
-        // }
         fmm_fft.evaluate();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
@@ -787,7 +780,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
-        let n_crit = Some(1000);
+        let n_crit = Some(100);
         let expansion_order = 6;
         let sparse = true;
 
@@ -830,7 +823,7 @@ mod test {
 
         // Test M2L
         {
-            let level = 2;
+            let level = 3;
             let target_idx = 0;
             let targets = fmm.tree().target_tree().keys(level).unwrap();
             let target = &targets[target_idx];
@@ -880,14 +873,8 @@ mod test {
                 ),
             );
 
-            println!("evaluated local {:?}", &evaluated_local.data()[0..5]);
-            println!("found local {:?}", &found_local[0..5]);
-            found_local
-                .iter()
-                .zip(evaluated_local.data())
-                .for_each(|(e, f)| assert!((e - f).abs() < 1e-5));
+            assert_appx_eq!(&found_local, &evaluated_local.data(), 1e-5);
         }
-        assert!(false);
 
         // let fmm_fft = Box::new(fmm_fft);
         // let eval_type = fmm_fft.kernel_eval_type;

@@ -195,13 +195,17 @@ mod test {
             assert!(tvs_2_hashes.contains(&tv.hash))
         }
 
+        assert!(tvs_2_hashes.len() == 316);
 
         let call_1 = compute_transfer_vectors_at_level::<f64>(2).unwrap();
         let call_2 = compute_transfer_vectors_at_level::<f64>(2).unwrap();
 
         call_1.iter().zip(call_2).for_each(|(c1, c2)| {
             println!("c1 {:?} c2 {:?}", c1, c2);
-            assert!(c1.hash == c2.hash)
+            assert!(c1.hash == c2.hash);
+            assert!(c1.source == c2.source);
+            assert!(c1.target == c2.target)
         })
+
     }
 }

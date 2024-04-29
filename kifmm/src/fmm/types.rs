@@ -718,7 +718,6 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
-
 #[derive(Default)]
 pub struct BlasMetadataSa<T>
 where
