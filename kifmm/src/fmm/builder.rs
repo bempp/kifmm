@@ -13,7 +13,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourcetoTargetTranslationMetadata,
         },
-        fmm::{FmmOperator, FmmMetadata},
+        fmm::{FmmMetadata, FmmOperator},
         general::Epsilon,
         tree::Tree,
     },

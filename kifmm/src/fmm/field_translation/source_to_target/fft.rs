@@ -5,7 +5,7 @@ use itertools::Itertools;
 use num::{One, Zero};
 use rayon::prelude::*;
 use rlst::{
-    empty_array, operator::ScalarTimesOperator, rlst_dynamic_array2, MultIntoResize,
+    empty_array, rlst_dynamic_array2, MultIntoResize,
     RandomAccessMut, RawAccess, RlstScalar,
 };
 

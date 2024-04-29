@@ -1,5 +1,4 @@
 //! Implementation of traits to compute metadata for field translation operations.
-use core::panic;
 use std::collections::{HashMap, HashSet};
 
 use green_kernels::{
@@ -7,7 +6,7 @@ use green_kernels::{
     types::EvalType,
 };
 use itertools::Itertools;
-use num::{Float, One, Zero};
+use num::{Float, Zero};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
@@ -36,18 +35,17 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourcetoTargetTranslationMetadata,
         },
-        fmm::{FmmOperator, FmmMetadata, SourceToTargetTranslation},
+        fmm::{FmmMetadata, FmmOperator, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
     },
     tree::{
         constants::{
-            ALPHA_INNER, ALPHA_OUTER, DEEPEST_LEVEL, DIRECTIONS, NCORNERS, NHALO, NSIBLINGS,
-            NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
+            ALPHA_INNER, ALPHA_OUTER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
+            NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
-        morton::encode_anchor,
-        types::{Domain, MortonKey},
+        types::MortonKey,
     },
 };
 
@@ -487,7 +485,7 @@ where
 
             let mut level_cutoff_rank = Vec::new();
 
-            for (_i, t) in transfer_vectors.iter().enumerate() {
+            for t in transfer_vectors.iter() {
                 let source_equivalent_surface = t.source.surface_grid(
                     self.expansion_order,
                     self.tree.source_tree().domain(),

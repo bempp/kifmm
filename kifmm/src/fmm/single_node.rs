@@ -1,5 +1,6 @@
 //! Single Node FMM
-use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
+use green_kernels::traits::Kernel as KernelTrait;
+
 use rlst::{RawAccess, RlstScalar, Shape};
 
 use crate::{
@@ -214,26 +215,20 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
-
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
     };
-    use itertools::Itertools;
     use num::{Float, One, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, empty_array, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, MultInto,
-        MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
+        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
+        RawAccessMut, RlstScalar, Shape, VectorContainer,
     };
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::{
-            fmm::FmmOperator,
-            tree::{FmmTree, FmmTreeNode, Tree},
-        },
+        traits::tree::{FmmTree, FmmTreeNode, Tree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };

@@ -7,10 +7,7 @@ use rlst::RlstScalar;
 
 use crate::{
     fmm::types::TransferVector,
-    tree::{
-        constants::{NHALO, NSIBLINGS_SQUARED},
-        types::{Domain, MortonKey},
-    },
+    tree::types::{Domain, MortonKey},
 };
 
 /// Unique M2L interactions for homogenous, translationally invariant kernel functions (e.g. Laplace/Helmholtz).
@@ -135,8 +132,8 @@ pub fn compute_transfer_vectors_at_level<T: RlstScalar + Float>(
         for (j, target_cluster) in child_clusters.iter().enumerate() {
             if i != j {
                 // calculate transfer vectors between different clusters
-                for (_, source) in source_cluster.iter().enumerate() {
-                    for (_, target) in target_cluster.iter().enumerate() {
+                for source in source_cluster.iter() {
+                    for target in target_cluster.iter() {
                         let tv = source.find_transfer_vector(target).unwrap();
                         let tv_components = source.find_transfer_vector_components(target).unwrap();
                         if !source.is_adjacent(target) && !seen.keys().contains(&tv) {
