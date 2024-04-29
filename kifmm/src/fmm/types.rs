@@ -570,7 +570,7 @@ where
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
     /// Cutoff ranks
-    pub cutoff_rank: Vec<usize>
+    pub cutoff_rank: Vec<usize>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
