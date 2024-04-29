@@ -16,7 +16,6 @@ use rlst::{
 use crate::{
     fmm::{
         constants::DEFAULT_SVD_THRESHOLD,
-        field_translation::source_to_target::transfer_vector::compute_transfer_vectors,
         helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
@@ -1647,7 +1646,7 @@ where
     /// Constructor for FFT based field translations
     pub fn new() -> Self {
         Self {
-            transfer_vectors: compute_transfer_vectors(),
+            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
             ..Default::default()
         }
     }
@@ -1673,7 +1672,7 @@ where
 
         Self {
             threshold: threshold.unwrap_or(tmp),
-            transfer_vectors: compute_transfer_vectors(),
+            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
             ..Default::default()
         }
     }
@@ -1763,7 +1762,7 @@ mod test {
 
         let idx = 123;
 
-        let transfer_vectors = compute_transfer_vectors::<f64>();
+        let transfer_vectors = compute_transfer_vectors_at_level::<f64>(3).unwrap();
         let transfer_vector = &transfer_vectors[idx];
 
         // Lookup correct components of SVD compressed M2L operator matrix
@@ -2032,7 +2031,7 @@ mod test {
         // Compute all M2L operators
         // Pick a random source/target pair
         let idx = 123;
-        let all_transfer_vectors = compute_transfer_vectors::<f64>();
+        let all_transfer_vectors = compute_transfer_vectors_at_level::<f64>(3).unwrap();
 
         let transfer_vector = &all_transfer_vectors[idx];
 
