@@ -3,7 +3,7 @@
 //! A Kernel Independent Fast Multipole method designed for portability, and flexible algorithmic construction based on \[1\].
 //!
 //! Notable features of this library are:
-//! * Support for single and multinode simulations via MPI.
+//! * Highly optimised single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
 //! * Heterogenous acceleration for the the field translations (M2L) and direct summation (P2P) steps.
 //! * Flexible trait based interface for developing alternative operator implementations, or indeed related fast algorithms
 //!

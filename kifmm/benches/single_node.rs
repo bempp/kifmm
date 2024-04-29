@@ -126,7 +126,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Helmholtz Potentials f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(30));
+        .measurement_time(Duration::from_secs(40));
 
     group.bench_function(
         format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
@@ -191,7 +191,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Helmholtz Gradients f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(20));
+        .measurement_time(Duration::from_secs(75));
 
     group.bench_function(
         format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),

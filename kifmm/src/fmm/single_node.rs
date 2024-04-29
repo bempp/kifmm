@@ -678,7 +678,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        // fmm with fft based field translation
+        // FFT based field translation
         {
             // Evaluate potentials
             let fmm_fft = SingleNodeBuilder::new()
@@ -731,7 +731,7 @@ mod test {
             );
         }
 
-        // fmm with BLAS based field translation
+        // BLAS based field translation
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
@@ -820,76 +820,9 @@ mod test {
             .build()
             .unwrap();
 
-        // Manual upward pass
-        // let depth = fmm_fft.tree.source_tree.depth;
-        // fmm_fft.p2m();
-        // for level in (1..=depth).rev() {
-        //     fmm_fft.m2m(level)
-        // }
         fmm_fft.evaluate();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
-    }
-
-    #[test]
-    fn test_helmholtz_m2l() {
-        // // Test M2L
-        // {
-        //     let level = 3;
-        //     let target_idx = 0;
-        //     let targets = fmm.tree().target_tree().keys(level).unwrap();
-        //     let target = &targets[target_idx];
-
-        //     let target_check_surface =
-        //         target.surface_grid(fmm.expansion_order, fmm.tree().domain(), ALPHA_INNER);
-
-        //     let found_local = fmm.local(target).unwrap();
-
-        //     // println!("HERE {:?}", found_local);
-
-        //     let v_list: HashSet<MortonKey<_>> = target
-        //         .parent()
-        //         .neighbors()
-        //         .iter()
-        //         .flat_map(|pn| pn.children())
-        //         .filter(|pnc| {
-        //             !target.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(pnc)
-        //         })
-        //         .collect();
-
-        //     let v_list = v_list.into_iter().collect_vec();
-
-        //     let mut check_potential = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
-
-        //     for source in v_list.iter() {
-        //         let source_equivalent_surface =
-        //             source.surface_grid(fmm.expansion_order, fmm.tree().domain(), ALPHA_INNER);
-        //         let multipole = fmm.multipole(source).unwrap();
-
-        //         fmm.kernel().evaluate_st(
-        //             EvalType::Value,
-        //             &source_equivalent_surface,
-        //             &target_check_surface,
-        //             multipole,
-        //             check_potential.data_mut(),
-        //         )
-        //     }
-
-        //     let operator_index = fmm.kernel.c2e_operator_index(level);
-
-        //     let evaluated_local = empty_array::<c64, 2>().simple_mult_into_resize(
-        //         fmm.dc2e_inv_1[operator_index].view(),
-        //         empty_array::<c64, 2>().simple_mult_into_resize(
-        //             fmm.dc2e_inv_2[operator_index].view(),
-        //             check_potential.view(),
-        //         ),
-        //     );
-
-        //     found_local
-        //         .iter()
-        //         .zip(evaluated_local.data())
-        //         .for_each(|(e, f)| assert!((e - f).abs() < 1e-5));
-        // }
     }
 
     #[test]
@@ -899,6 +832,8 @@ mod test {
         let ntargets = 10000;
         let sources = points_fixture::<f64>(nsources, None, None, Some(1));
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let threshold = 1e-5;
+        let threshold_deriv = 1e-3;
 
         // FMM parameters
         let n_crit = Some(100);
@@ -914,6 +849,7 @@ mod test {
 
         // BLAS based field translation
         {
+            // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
@@ -932,12 +868,38 @@ mod test {
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
-                fmm, eval_type, &sources, &charges, 1e-5,
+                fmm, eval_type, &sources, &charges, threshold,
+            );
+
+            // Evaluate potentials + derivatives
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    EvalType::ValueDeriv,
+                    BlasFieldTranslationIa::new(None),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate();
+            let eval_type = fmm.kernel_eval_type;
+            let fmm = Box::new(fmm);
+            test_single_node_helmholtz_fmm_vector_helper::<c64>(
+                fmm,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
             );
         }
 
         // FFT based field translation
         {
+            // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
@@ -957,6 +919,31 @@ mod test {
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, 1e-5,
+            );
+
+            // Evaluate potentials + derivatives
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    EvalType::ValueDeriv,
+                    FftFieldTranslation::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate();
+            let eval_type = fmm.kernel_eval_type;
+            let fmm = Box::new(fmm);
+            test_single_node_helmholtz_fmm_vector_helper::<c64>(
+                fmm,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
             );
         }
     }
