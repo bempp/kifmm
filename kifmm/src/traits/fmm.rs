@@ -124,18 +124,17 @@ pub trait FmmMetadata {
     /// Associated scalar
     type Scalar: RlstScalar;
 
+    /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
     fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
 }
 
-/// Kernels compatible with our implementation
-pub trait FmmOperator
+/// Defines how metadata associated with field translations is looked up at runtime.
+/// Defined by kernel type, as well as field translation method.
+pub trait FmmOperatorData
 where
-    Self: Kernel,
+    Self: FmmMetadata,
 {
-    /// Homogeneity check
-    fn is_kernel_homogenous(&self) -> bool;
-
     /// Lookup c2e operator
     fn c2e_operator_index(&self, level: u64) -> usize;
 
@@ -147,4 +146,13 @@ where
 
     /// Lookup l2l operator
     fn l2l_operator_index(&self, level: u64) -> usize;
+}
+
+/// Marker trait for homogenous kernels
+pub trait HomogenousKernel
+where
+    Self: Kernel,
+{
+    /// Homogeneity check
+    fn is_homogenous(&self) -> bool;
 }

@@ -7,7 +7,10 @@ use crate::{
     fmm::types::{FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperator, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
+        fmm::{
+            FmmOperatorData, HomogenousKernel, SourceToTargetTranslation, SourceTranslation,
+            TargetTranslation,
+        },
         tree::{FmmTree, Tree},
         types::FmmError,
     },
@@ -22,10 +25,10 @@ use super::{
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation,
+    Self: SourceToTargetTranslation + FmmOperatorData,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;

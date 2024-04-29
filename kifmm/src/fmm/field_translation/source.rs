@@ -18,7 +18,7 @@ use crate::{
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperator, SourceTranslation},
+        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation},
         tree::{FmmTree, Tree},
         types::FmmError,
     },
@@ -29,9 +29,10 @@ impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
     fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {
@@ -45,7 +46,7 @@ where
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
         let depth = self.tree.source_tree().depth();
-        let operator_index = self.kernel.c2e_operator_index(depth);
+        let operator_index = self.c2e_operator_index(depth);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -106,7 +107,7 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
 
-                        let tmp = if self.kernel.is_kernel_homogenous() {
+                        let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
                             scaled_check_potential.fill_from(check_potential);
@@ -205,7 +206,7 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
-                        let tmp = if self.kernel.is_kernel_homogenous() {
+                        let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
@@ -257,7 +258,7 @@ where
         let max = &child_sources[nchild_sources - 1];
         let min_idx = self.tree.source_tree.index(min).unwrap();
         let max_idx = self.tree.source_tree.index(max).unwrap();
-        let operator_index = self.kernel.m2m_operator_index(level);
+        let operator_index = self.m2m_operator_index(level);
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();

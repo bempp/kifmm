@@ -19,7 +19,7 @@ use crate::{
     },
     traits::{
         fftw::Dft,
-        fmm::{FmmOperator, SourceToTargetTranslation},
+        fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::AsComplex,
         tree::{FmmTree, Tree},
         types::FmmError,
@@ -37,8 +37,9 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
     /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
     /// to target cluster.
@@ -105,8 +106,9 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
@@ -124,8 +126,8 @@ where
                     )));
                 };
 
-                let m2l_operator_index = self.kernel.m2l_operator_index(level);
-                let c2e_operator_index = self.kernel.c2e_operator_index(level);
+                let m2l_operator_index = self.m2l_operator_index(level);
+                let c2e_operator_index = self.c2e_operator_index(level);
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -200,7 +202,7 @@ where
                 }
 
                 // Amount to scale the application of the kernel by
-                let scale = if self.kernel.is_kernel_homogenous() {
+                let scale = if self.kernel.is_homogenous() {
                     m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
                         * homogenous_kernel_scale(level)
                 } else {
