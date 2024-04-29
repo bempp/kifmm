@@ -25,10 +25,10 @@ use crate::{
         tree::{FmmTree, Tree},
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationRcmp, Fmm,
+    BlasFieldTranslationSaRcmp, Fmm,
 };
 
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationRcmp<Scalar>>
+impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + FmmOperator + Default,
@@ -100,7 +100,7 @@ where
 }
 
 impl<Scalar, Kernel> SourceToTargetTranslation
-    for KiFmm<Scalar, Kernel, BlasFieldTranslationRcmp<Scalar>>
+    for KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,

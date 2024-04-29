@@ -230,7 +230,7 @@ mod test {
         fmm::types::BlasFieldTranslationIa,
         traits::tree::{FmmTree, FmmTreeNode, Tree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+        BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
@@ -584,7 +584,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationRcmp::new(svd_threshold),
+                BlasFieldTranslationSaRcmp::new(svd_threshold),
             )
             .unwrap()
             .build()
@@ -743,7 +743,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -768,7 +768,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -1000,7 +1000,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
@@ -1022,7 +1022,7 @@ mod test {
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()

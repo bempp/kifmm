@@ -1,5 +1,5 @@
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::{BlasFieldTranslationRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder};
+use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
@@ -63,7 +63,7 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationRcmp::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
             )
             .unwrap()
             .build()
@@ -88,7 +88,7 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationRcmp::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
             )
             .unwrap()
             .build()

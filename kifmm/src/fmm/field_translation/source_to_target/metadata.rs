@@ -24,7 +24,7 @@ use crate::{
         },
         pinv::pinv,
         types::{
-            BlasFieldTranslationIa, BlasFieldTranslationRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
+            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             Charges, FftFieldTranslation, FftMetadata,
         },
         KiFmm,
@@ -997,7 +997,7 @@ where
 }
 
 impl<Scalar> SourcetoTargetTranslationMetadata
-    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationRcmp<Scalar>>
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -1661,7 +1661,7 @@ where
     type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
 }
 
-impl<Scalar> BlasFieldTranslationRcmp<Scalar>
+impl<Scalar> BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar + Epsilon + Default,
     <Scalar as RlstScalar>::Real: Default,
@@ -1679,7 +1679,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationRcmp<Scalar>
+impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -1755,7 +1755,7 @@ mod test {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationRcmp::new(Some(1e-5)),
+                BlasFieldTranslationSaRcmp::new(Some(1e-5)),
             )
             .unwrap()
             .build()
@@ -2181,7 +2181,7 @@ mod test {
             .iter()
             .flat_map(|pn| pn.children())
             .filter(|pnc| {
-                !source.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(&pnc)
+                !source.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(pnc)
             })
             .collect();
 

@@ -372,7 +372,7 @@ pub enum FmmEvalType {
 /// ```
 /// # extern crate blas_src;
 /// # extern crate lapack_src;
-/// use kifmm::{SingleNodeBuilder, BlasFieldTranslationRcmp, FftFieldTranslation};
+/// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::helpers::points_fixture;
@@ -539,22 +539,24 @@ where
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
-/// interaction matrices corresponding to all unique transfer vectors, and re-compress in a directional manner.
+/// interaction matrices corresponding to all unique transfer vectors, and re-compress in a directional manner. This is
+/// termed the Single Approximation Recompression (SaRcmp) by Messner et. al.
 /// This recompression is controlled via the `threshold` parameter, which filters singular vectors with corresponding
 /// singular values smaller than this.
 ///
 /// # Fields
 ///
-/// - `threshold`- A value used to filter singular vectors during recompression.
+/// - `threshold`- A value used to filter singular vectors during compression and recompression.
 ///
-/// - `metadata`- Stores precomputed metadata required to apply this method.
+/// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
+///  Indexed by tree level.
 ///
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
-///    matrices corresponding to unique transfer vectors.
+///    matrices corresponding to unique transfer vectors. Indexed by tree level.
 #[derive(Default)]
-pub struct BlasFieldTranslationRcmp<Scalar>
+pub struct BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -562,15 +564,28 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>, // index corresponds to level
+    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>,
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
     /// Cutoff ranks
-    pub cutoff_rank: Vec<usize>, // index corresponds to level
+    pub cutoff_rank: Vec<usize>
 }
 
+/// Stores data and metadata for BLAS based acceleration scheme for field translation.
+///
+/// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
+/// each interaction matrix at each level, termed the individual approximation (IA) scheme by Messner et. al. This is
+/// particularly advantageous for oscillatory kernels where the ranks of each interaction matrix can be large.
+///
+/// # Fields
+///
+/// - `threshold`- A value used to filter singular vectors during compression.
+///
+/// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
+///
+/// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions. Indexed by tree level.
 #[derive(Default)]
 pub struct BlasFieldTranslationIa<Scalar>
 where
@@ -580,13 +595,10 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataIa<Scalar>>, // index corresponds to level
+    pub metadata: Vec<BlasMetadataIa<Scalar>>,
 
     /// Unique transfer vectors corresponding to each metadata
-    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>, // index corresponds to level
-
-                                                                  // / Cutoff ranks
-                                                                  // pub cutoff_rank: Vec<usize>, // index corresponds to level
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.
@@ -718,6 +730,12 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
+/// Stores metadata for BLAS based acceleration scheme for field translation.
+///
+/// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
+///  a matrix $K_t$, where $T$ is the set of unique transfer vectors.
+///
+/// We individually compress each $K_t \sim U V^T$, with an SVD. Storing in a vector where each index corresponds to a unique $t$.
 #[derive(Default)]
 pub struct BlasMetadataIa<T>
 where

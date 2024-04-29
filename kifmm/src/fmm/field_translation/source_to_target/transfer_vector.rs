@@ -164,13 +164,13 @@ pub fn compute_transfer_vectors_at_level<T: RlstScalar + Float>(
 mod test {
     use std::collections::HashSet;
 
-    use super::{compute_transfer_vectors, compute_transfer_vectors_at_level};
+    use super::compute_transfer_vectors_at_level;
 
     #[test]
     fn test_compute_transfer_vectors_at_level() {
+        // Test that there are 316 transfer vectors (for trans. inv. kernels) at each level
         for level in 2..4 {
             let tvs = compute_transfer_vectors_at_level::<f64>(level).unwrap();
-            println!("len {:?}", tvs.len());
             assert!(tvs.len() == 316);
 
             for tv in tvs.iter() {
@@ -179,6 +179,7 @@ mod test {
             }
         }
 
+        // Test that transfer vectors found at each level are equivalent.
         let tvs_2 = compute_transfer_vectors_at_level::<f64>(2).unwrap();
         let tvs_2_hashes: HashSet<_> = tvs_2.iter().map(|t| t.hash).collect();
         let tvs_3 = compute_transfer_vectors_at_level::<f64>(3).unwrap();
@@ -194,6 +195,7 @@ mod test {
 
         assert!(tvs_2_hashes.len() == 316);
 
+        // Test that the ordering is consistent between calls.
         let call_1 = compute_transfer_vectors_at_level::<f64>(2).unwrap();
         let call_2 = compute_transfer_vectors_at_level::<f64>(2).unwrap();
 

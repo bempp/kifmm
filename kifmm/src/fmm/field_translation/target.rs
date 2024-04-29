@@ -83,7 +83,6 @@ where
                                 });
                         }
 
-                        println!("HERE {:?} {:?}", self.target_vec.len(), operator_index);
                         for i in 0..NSIBLINGS {
                             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.target_vec[operator_index][i].view(),
