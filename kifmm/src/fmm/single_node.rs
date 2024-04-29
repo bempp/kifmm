@@ -1,12 +1,12 @@
 //! Single Node FMM
-use green_kernels::traits::Kernel as KernelTrait;
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
 use rlst::{RawAccess, RlstScalar, Shape};
 
 use crate::{
     fmm::types::{FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmKernel, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
+        fmm::{FmmOperator, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
         tree::{FmmTree, Tree},
     },
     Fmm, SingleNodeFmmTree,
@@ -20,7 +20,7 @@ use super::{
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
@@ -231,7 +231,7 @@ mod test {
     use crate::{
         fmm::types::BlasFieldTranslationIa,
         traits::{
-            fmm::FmmKernel,
+            fmm::FmmOperator,
             tree::{FmmTree, FmmTreeNode, Tree},
         },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},

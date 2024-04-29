@@ -129,12 +129,12 @@ pub trait FmmMetadata {
 }
 
 /// Kernels compatible with our implementation
-pub trait FmmKernel
+pub trait FmmOperator
 where
     Self: Kernel,
 {
     /// Homogeneity check
-    fn is_homogenous(&self) -> bool;
+    fn is_kernel_homogenous(&self) -> bool;
 
     /// Lookup c2e operator
     fn c2e_operator_index(&self, level: u64) -> usize;

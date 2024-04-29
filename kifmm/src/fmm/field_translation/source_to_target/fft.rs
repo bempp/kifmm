@@ -20,7 +20,7 @@ use crate::{
     },
     traits::{
         fftw::Dft,
-        fmm::{FmmKernel, SourceToTargetTranslation},
+        fmm::{FmmOperator, SourceToTargetTranslation},
         general::AsComplex,
         tree::{FmmTree, Tree},
     },
@@ -37,7 +37,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
@@ -105,7 +105,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {
@@ -194,7 +194,7 @@ where
                 }
 
                 // Amount to scale the application of the kernel by
-                let scale = if self.kernel.is_homogenous() {
+                let scale = if self.kernel.is_kernel_homogenous() {
                     m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
                         * homogenous_kernel_scale(level)
                 } else {

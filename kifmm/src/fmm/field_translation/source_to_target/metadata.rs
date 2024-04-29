@@ -36,7 +36,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourcetoTargetTranslationMetadata,
         },
-        fmm::{FmmKernel, FmmMetadata, SourceToTargetTranslation},
+        fmm::{FmmOperator, FmmMetadata, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
     },
@@ -1172,7 +1172,7 @@ where
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Computes the unique Green's function evaluations and places them on a convolution grid on the source box wrt to a given
@@ -1526,7 +1526,7 @@ where
 impl<Scalar, Kernel, SourceToTargetData> FmmMetadata for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -1564,7 +1564,7 @@ where
         // Kernel scale at each target and source leaf
         let source_leaf_scales = leaf_scales::<Scalar>(
             &self.tree.source_tree,
-            self.kernel.is_homogenous(),
+            self.kernel.is_kernel_homogenous(),
             self.ncoeffs,
         );
 

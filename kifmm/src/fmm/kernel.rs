@@ -1,13 +1,13 @@
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 use rlst::RlstScalar;
 
-use crate::traits::fmm::FmmKernel;
+use crate::traits::fmm::FmmOperator;
 
-impl<T> FmmKernel for Laplace3dKernel<T>
+impl<T> FmmOperator for Laplace3dKernel<T>
 where
     T: RlstScalar,
 {
-    fn is_homogenous(&self) -> bool {
+    fn is_kernel_homogenous(&self) -> bool {
         true
     }
 
@@ -28,11 +28,11 @@ where
     }
 }
 
-impl<T> FmmKernel for Helmholtz3dKernel<T>
+impl<T> FmmOperator for Helmholtz3dKernel<T>
 where
     T: RlstScalar<Complex = T>,
 {
-    fn is_homogenous(&self) -> bool {
+    fn is_kernel_homogenous(&self) -> bool {
         false
     }
 

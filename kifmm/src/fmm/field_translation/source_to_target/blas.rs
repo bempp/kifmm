@@ -21,7 +21,7 @@ use crate::{
         KiFmm,
     },
     traits::{
-        fmm::{FmmKernel, SourceToTargetTranslation},
+        fmm::{FmmOperator, SourceToTargetTranslation},
         tree::{FmmTree, Tree},
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
@@ -31,7 +31,7 @@ use crate::{
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Map between each transfer vector for homogenous kernels, and the source boxes involved in that translation
@@ -103,7 +103,7 @@ impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {
@@ -204,7 +204,7 @@ where
                     //TODO: Rework threading
                     //rlst::threading::disable_threading();
 
-                    if self.kernel.is_homogenous() {
+                    if self.kernel.is_kernel_homogenous() {
                         compressed_multipoles.data_mut().iter_mut().for_each(|d| {
                             *d *= homogenous_kernel_scale::<Scalar>(level)
                                 * m2l_scale::<Scalar>(level).unwrap()
@@ -363,7 +363,7 @@ where
                     //TODO: Rework threading
                     //rlst_blis::interface::threading::disable_threading();
 
-                    if self.kernel.is_homogenous() {
+                    if self.kernel.is_kernel_homogenous() {
                         compressed_multipoles.data_mut().iter_mut().for_each(|d| {
                             *d *= homogenous_kernel_scale::<Scalar>(level)
                                 * m2l_scale::<Scalar>(level).unwrap()
@@ -506,7 +506,7 @@ where
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Map between each transfer vector for homogenous kernels, and the source boxes involved in that translation
@@ -582,7 +582,7 @@ impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmKernel + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn m2l(&self, level: u64) {
@@ -594,7 +594,7 @@ where
         };
 
         // TODO: Handle with result objects
-        if self.kernel.is_homogenous() {
+        if self.kernel.is_kernel_homogenous() {
             panic!("Only compatible with inhomogenous kernels")
         }
 
