@@ -223,7 +223,7 @@ mod test {
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
     };
-    use num::{Float, One, Zero};
+    use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
         c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
