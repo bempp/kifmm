@@ -1,0 +1,22 @@
+
+
+[build-system]
+requires = ["maturin>=1,<2"]
+build-backend = "maturin"
+
+[project]
+name = "kifmm-py"
+version = "0.1.0"
+description = ""
+requires-python = ">=3.12"
+authors = [
+    {name = "Srinath Kailasa", email = "srinathkailasa@gmail.com"},
+]
+dynamic = ["dependencies"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "kifmm_py._kifmm"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
