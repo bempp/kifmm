@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use green_kernels::{types::EvalType, helmholtz_3d::Helmholtz3dKernel};
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
 use kifmm::fmm::types::{FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
@@ -145,7 +145,4 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
 criterion_group!(helmholtz_p_f32, helmholtz_potentials_f32);
 criterion_group!(helmholtz_g_f32, helmholtz_potentials_gradients_f32);
 
-criterion_main!(
-    helmholtz_p_f32,
-    helmholtz_g_f32
-);
+criterion_main!(helmholtz_p_f32, helmholtz_g_f32);
