@@ -226,7 +226,6 @@ mod python_api {
         };
         let source_to_target = FftFieldTranslation::new();
 
-
         let fmm = SingleNodeBuilder::new()
             .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
             .unwrap()
