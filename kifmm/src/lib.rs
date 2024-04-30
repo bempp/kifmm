@@ -110,10 +110,10 @@ mod python_api {
 
     use super::*;
 
-    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
     use green_kernels::types::EvalType;
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
     use pyo3::prelude::*;
-    use rlst::{rlst_array_from_slice2, rlst_dynamic_array2, c32};
+    use rlst::{c32, rlst_array_from_slice2, rlst_dynamic_array2};
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -128,13 +128,12 @@ mod python_api {
 
     /// Constructor interface for Python
     pub mod constructors {
+        use super::*;
         use green_kernels::helmholtz_3d::Helmholtz3dKernel;
         use num_complex::Complex64;
-        use super::*;
-        use pyo3::{buffer::PyBuffer, conversion::FromPyObjectBound};
         use pyo3::types::{PyAny, PyComplex};
+        use pyo3::{buffer::PyBuffer, conversion::FromPyObjectBound};
         use rlst::{c32, c64, Shape};
-
 
         /// Helmholtz BLAS constructor
         #[pyfunction]
@@ -148,7 +147,7 @@ mod python_api {
             targets: Bound<'_, PyAny>,
             charges: Bound<'_, PyAny>,
             svd_threshold: f32,
-            wavenumber: f32
+            wavenumber: f32,
         ) -> PyResult<usize> {
             let dim = 3;
             let sources_buf = PyBuffer::<f32>::get_bound(&sources)?;
@@ -235,9 +234,8 @@ mod python_api {
             sources: Bound<'_, PyAny>,
             targets: Bound<'_, PyAny>,
             charges: Bound<'_, PyAny>,
-            wavenumber: f32
+            wavenumber: f32,
         ) -> PyResult<usize> {
-
             let dim = 3;
             let sources_buf = PyBuffer::<f32>::get_bound(&sources)?;
             let tmp = sources_buf.as_slice(py).unwrap();
@@ -498,7 +496,7 @@ mod python_api {
     //     }
     // }
 
-    use constructors::{f32_laplace_blas, f32_laplace_fft, f32_helmholtz_blas, f32_helmholtz_fft};
+    use constructors::{f32_helmholtz_blas, f32_helmholtz_fft, f32_laplace_blas, f32_laplace_fft};
 
     /// Functions exposed at the module level
     #[pymodule]
