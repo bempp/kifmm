@@ -192,7 +192,7 @@ where
             FmmEvalType::Vector => {
                 self.leaf_upward_surfaces_targets
                     .par_chunks_exact(surface_size)
-                    .zip(self.leaf_locals.into_par_iter())
+                    .zip(self.leaf_locals.par_iter())
                     .zip(&self.charge_index_pointer_targets)
                     .zip(&self.potentials_send_pointers)
                     .for_each(
