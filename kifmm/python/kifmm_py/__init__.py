@@ -1,9 +1,13 @@
 import numpy as np
-from kifmm import f32_laplace_fft, f32_laplace_blas
-
+from kifmm import (
+    f32_laplace_fft,
+    f32_laplace_blas,
+    f32_helmholtz_blas,
+    f32_helmholtz_fft,
+)
 
 CONSTRUCTORS_F32 = {"laplace": {"fft": f32_laplace_fft, "blas": f32_laplace_blas}}
-CONSTRUCTORS_F64 = {"laplace": {"fft": f32_laplace_fft, "blas": f32_laplace_fft}}
+CONSTRUCTORS_F64 = {"laplace": {"fft": f32_helmholtz_fft, "blas": f32_helmholtz_blas}}
 
 CONSTRUCTORS = {
     np.dtypes.Float32DType: CONSTRUCTORS_F32,
@@ -28,6 +32,7 @@ class KiFmm:
         kernel,
         field_translation,
         svd_threshold=None,
+        wavenumber=None
     ):
         """
         Parameters
@@ -37,6 +42,10 @@ class KiFmm:
         Returns:
         --------
         """
+
+        # Check validity of each input type
+
+
         try:
 
             assert (

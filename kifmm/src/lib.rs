@@ -110,10 +110,10 @@ mod python_api {
 
     use super::*;
 
-    use green_kernels::laplace_3d::Laplace3dKernel;
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
     use green_kernels::types::EvalType;
     use pyo3::prelude::*;
-    use rlst::{rlst_array_from_slice2, rlst_dynamic_array2};
+    use rlst::{rlst_array_from_slice2, rlst_dynamic_array2, c32};
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -121,137 +121,392 @@ mod python_api {
     lazy_static::lazy_static! {
         static ref STORE_LAPLACE_FFT_F32: Mutex<HashMap<usize, KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>> = Mutex::new(HashMap::new());
         static ref STORE_LAPLACE_BLAS_F32: Mutex<HashMap<usize, KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>>> = Mutex::new(HashMap::new());
+        static ref STORE_HELMHOLTZ_BLAS_F32: Mutex<HashMap<usize, KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>>> = Mutex::new(HashMap::new());
+        static ref STORE_HELMHOLTZ_FFT_F32: Mutex<HashMap<usize, KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>>> = Mutex::new(HashMap::new());
         static ref NEXT_ID: Mutex<usize> = Mutex::new(0);
     }
 
-    /// Formats the sum of two numbers as string.
-    #[pyfunction]
-    fn f32_laplace_blas(
-        expansion_order: usize,
-        n_crit: u64,
-        sparse: bool,
-        eval_type: usize,
-        sources: Vec<f32>,
-        targets: Vec<f32>,
-        charges: Vec<f32>,
-        svd_threshold: f32,
-    ) -> PyResult<usize> {
-        let mut next_id = NEXT_ID.lock().unwrap();
-        let mut store = STORE_LAPLACE_BLAS_F32.lock().unwrap();
-        let struct_id = *next_id;
+    /// Constructor interface for Python
+    pub mod constructors {
+        use green_kernels::helmholtz_3d::Helmholtz3dKernel;
+        use num_complex::Complex64;
+        use super::*;
+        use pyo3::{buffer::PyBuffer, conversion::FromPyObjectBound};
+        use pyo3::types::{PyAny, PyComplex};
+        use rlst::{c32, c64, Shape};
 
-        // Copy source/target/charge data
-        let dim = 3;
-        let n_sources = sources.len() / dim;
-        let n_targets = targets.len() / dim;
 
-        let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
-        let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
-        let mut charges_arr = rlst_dynamic_array2!(f32, [n_sources, 1]);
-        let sources_slice = rlst_array_from_slice2!(sources.as_slice(), [n_sources, dim]);
-        let targets_slice = rlst_array_from_slice2!(targets.as_slice(), [n_targets, dim]);
-        let charges_slice = rlst_array_from_slice2!(charges.as_slice(), [n_sources, 1]);
-        sources_arr.view_mut().fill_from(sources_slice.view());
-        targets_arr.view_mut().fill_from(targets_slice.view());
-        charges_arr.view_mut().fill_from(charges_slice.view());
+        /// Helmholtz BLAS constructor
+        #[pyfunction]
+        pub fn f32_helmholtz_blas(
+            py: Python,
+            expansion_order: usize,
+            n_crit: u64,
+            sparse: bool,
+            eval_type: usize,
+            sources: Bound<'_, PyAny>,
+            targets: Bound<'_, PyAny>,
+            charges: Bound<'_, PyAny>,
+            svd_threshold: f32,
+            wavenumber: f32
+        ) -> PyResult<usize> {
+            let dim = 3;
+            let sources_buf = PyBuffer::<f32>::get_bound(&sources)?;
+            let tmp = sources_buf.as_slice(py).unwrap();
 
-        // Set FMM parameters
-        let kernel = Laplace3dKernel::new();
-        let eval_type = if eval_type == 0 {
-            EvalType::Value
-        } else if eval_type == 1 {
-            EvalType::ValueDeriv
-        } else {
-            EvalType::Value
-        };
-        let source_to_target = BlasFieldTranslationSaRcmp::new(Some(svd_threshold));
+            let n_tmp = tmp.len() / dim;
+            let sources_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
 
-        let fmm = SingleNodeBuilder::new()
-            .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
-            .unwrap()
-            .parameters(
-                &charges_arr,
-                expansion_order,
-                kernel,
-                eval_type,
-                source_to_target,
-            )
-            .unwrap()
-            .build()
-            .unwrap();
+            let targets_buf = PyBuffer::<f32>::get_bound(&targets)?;
+            let tmp = targets_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len() / dim;
+            let targets_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
 
-        store.insert(struct_id, fmm);
-        *next_id += 1;
-        Ok(struct_id)
+            let charges_buf = PyBuffer::<f32>::get_bound(&charges)?;
+            let tmp = charges_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len() * 2;
+            let charges_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const c32, n_tmp);
+                rlst_array_from_slice2!(_slice, [n_tmp, 1])
+            };
+
+            let mut next_id = NEXT_ID.lock().unwrap();
+            let mut store = STORE_HELMHOLTZ_BLAS_F32.lock().unwrap();
+            let struct_id = *next_id;
+
+            // Copy source/target/charge data
+            let n_sources = sources_slice.shape()[0];
+            let n_targets = targets_slice.shape()[0];
+            let n_charges = charges_slice.shape()[0];
+
+            let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
+            let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
+            let mut charges_arr = rlst_dynamic_array2!(c32, [n_charges, 1]);
+
+            sources_arr.view_mut().fill_from(sources_slice.view());
+            targets_arr.view_mut().fill_from(targets_slice.view());
+            charges_arr.view_mut().fill_from(charges_slice.view());
+
+            // Set FMM parameters
+            let kernel = Helmholtz3dKernel::new(wavenumber);
+
+            let eval_type = if eval_type == 0 {
+                EvalType::Value
+            } else if eval_type == 1 {
+                EvalType::ValueDeriv
+            } else {
+                EvalType::Value
+            };
+            let source_to_target = BlasFieldTranslationIa::new(Some(svd_threshold));
+
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                .unwrap()
+                .parameters(
+                    &charges_arr,
+                    expansion_order,
+                    kernel,
+                    eval_type,
+                    source_to_target,
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            store.insert(struct_id, fmm);
+            *next_id += 1;
+            Ok(struct_id)
+        }
+
+        /// Formats the sum of two numbers as string.
+        #[pyfunction]
+        pub fn f32_helmholtz_fft(
+            py: Python,
+            expansion_order: usize,
+            n_crit: u64,
+            sparse: bool,
+            eval_type: usize,
+            sources: Bound<'_, PyAny>,
+            targets: Bound<'_, PyAny>,
+            charges: Bound<'_, PyAny>,
+            wavenumber: f32
+        ) -> PyResult<usize> {
+
+            let dim = 3;
+            let sources_buf = PyBuffer::<f32>::get_bound(&sources)?;
+            let tmp = sources_buf.as_slice(py).unwrap();
+
+            let n_tmp = tmp.len() / dim;
+            let sources_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
+
+            let targets_buf = PyBuffer::<f32>::get_bound(&targets)?;
+            let tmp = targets_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len() / dim;
+            let targets_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
+
+            let charges_buf = PyBuffer::<f32>::get_bound(&charges)?;
+            let tmp = charges_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len() * 2;
+            let charges_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const c32, n_tmp);
+                rlst_array_from_slice2!(_slice, [n_tmp, 1])
+            };
+
+            let mut next_id = NEXT_ID.lock().unwrap();
+            let mut store = STORE_HELMHOLTZ_FFT_F32.lock().unwrap();
+            let struct_id = *next_id;
+
+            // Copy source/target/charge data
+            let n_sources = sources_slice.shape()[0];
+            let n_targets = targets_slice.shape()[0];
+            let n_charges = charges_slice.shape()[0];
+
+            let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
+            let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
+            let mut charges_arr = rlst_dynamic_array2!(c32, [n_charges, 1]);
+
+            sources_arr.view_mut().fill_from(sources_slice.view());
+            targets_arr.view_mut().fill_from(targets_slice.view());
+            charges_arr.view_mut().fill_from(charges_slice.view());
+
+            // Set FMM parameters
+            let kernel = Helmholtz3dKernel::new(wavenumber);
+            let eval_type = if eval_type == 0 {
+                EvalType::Value
+            } else if eval_type == 1 {
+                EvalType::ValueDeriv
+            } else {
+                EvalType::Value
+            };
+            let source_to_target = FftFieldTranslation::new();
+
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                .unwrap()
+                .parameters(
+                    &charges_arr,
+                    expansion_order,
+                    kernel,
+                    eval_type,
+                    source_to_target,
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            store.insert(struct_id, fmm);
+            *next_id += 1;
+            Ok(struct_id)
+        }
+
+        /// Formats the sum of two numbers as string.
+        #[pyfunction]
+        pub fn f32_laplace_blas(
+            py: Python,
+            expansion_order: usize,
+            n_crit: u64,
+            sparse: bool,
+            eval_type: usize,
+            sources: Bound<'_, PyAny>,
+            targets: Bound<'_, PyAny>,
+            charges: Bound<'_, PyAny>,
+            svd_threshold: f32,
+        ) -> PyResult<usize> {
+            let dim = 3;
+            let sources_buf = PyBuffer::<f32>::get_bound(&sources)?;
+            let tmp = sources_buf.as_slice(py).unwrap();
+
+            let n_tmp = tmp.len() / dim;
+            let sources_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
+
+            let targets_buf = PyBuffer::<f32>::get_bound(&targets)?;
+            let tmp = targets_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len() / dim;
+            let targets_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
+
+            let charges_buf = PyBuffer::<f32>::get_bound(&charges)?;
+            let tmp = charges_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len();
+            let charges_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp);
+                rlst_array_from_slice2!(_slice, [n_tmp, 1])
+            };
+
+            let mut next_id = NEXT_ID.lock().unwrap();
+            let mut store = STORE_LAPLACE_BLAS_F32.lock().unwrap();
+            let struct_id = *next_id;
+
+            // Copy source/target/charge data
+            let n_sources = sources_slice.shape()[0];
+            let n_targets = targets_slice.shape()[0];
+            let n_charges = charges_slice.shape()[0];
+
+            let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
+            let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
+            let mut charges_arr = rlst_dynamic_array2!(f32, [n_charges, 1]);
+
+            sources_arr.view_mut().fill_from(sources_slice.view());
+            targets_arr.view_mut().fill_from(targets_slice.view());
+            charges_arr.view_mut().fill_from(charges_slice.view());
+
+            // Set FMM parameters
+            let kernel = Laplace3dKernel::new();
+            let eval_type = if eval_type == 0 {
+                EvalType::Value
+            } else if eval_type == 1 {
+                EvalType::ValueDeriv
+            } else {
+                EvalType::Value
+            };
+            let source_to_target = BlasFieldTranslationSaRcmp::new(Some(svd_threshold));
+
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                .unwrap()
+                .parameters(
+                    &charges_arr,
+                    expansion_order,
+                    kernel,
+                    eval_type,
+                    source_to_target,
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            store.insert(struct_id, fmm);
+            *next_id += 1;
+            Ok(struct_id)
+        }
+
+        /// Formats the sum of two numbers as string.
+        #[pyfunction]
+        pub fn f32_laplace_fft(
+            py: Python,
+            expansion_order: usize,
+            n_crit: u64,
+            sparse: bool,
+            eval_type: usize,
+            sources: Bound<'_, PyAny>,
+            targets: Bound<'_, PyAny>,
+            charges: Bound<'_, PyAny>,
+        ) -> PyResult<usize> {
+            let dim = 3;
+            let sources_buf = PyBuffer::<f32>::get_bound(&sources)?;
+            let tmp = sources_buf.as_slice(py).unwrap();
+
+            let n_tmp = tmp.len() / dim;
+            let sources_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
+
+            let targets_buf = PyBuffer::<f32>::get_bound(&targets)?;
+            let tmp = targets_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len() / dim;
+            let targets_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp * dim);
+                rlst_array_from_slice2!(_slice, [n_tmp, 3])
+            };
+
+            let charges_buf = PyBuffer::<f32>::get_bound(&charges)?;
+            let tmp = charges_buf.as_slice(py).unwrap();
+            let n_tmp = tmp.len();
+            let charges_slice = unsafe {
+                let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp);
+                rlst_array_from_slice2!(_slice, [n_tmp, 1])
+            };
+
+            let mut next_id = NEXT_ID.lock().unwrap();
+            let mut store = STORE_LAPLACE_FFT_F32.lock().unwrap();
+            let struct_id = *next_id;
+
+            // Copy source/target/charge data
+            let n_sources = sources_slice.shape()[0];
+            let n_targets = targets_slice.shape()[0];
+            let n_charges = charges_slice.shape()[0];
+
+            let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
+            let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
+            let mut charges_arr = rlst_dynamic_array2!(f32, [n_charges, 1]);
+
+            sources_arr.view_mut().fill_from(sources_slice.view());
+            targets_arr.view_mut().fill_from(targets_slice.view());
+            charges_arr.view_mut().fill_from(charges_slice.view());
+
+            // Set FMM parameters
+            let kernel = Laplace3dKernel::new();
+            let eval_type = if eval_type == 0 {
+                EvalType::Value
+            } else if eval_type == 1 {
+                EvalType::ValueDeriv
+            } else {
+                EvalType::Value
+            };
+            let source_to_target = FftFieldTranslation::new();
+
+            let fmm = SingleNodeBuilder::new()
+                .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                .unwrap()
+                .parameters(
+                    &charges_arr,
+                    expansion_order,
+                    kernel,
+                    eval_type,
+                    source_to_target,
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            store.insert(struct_id, fmm);
+            *next_id += 1;
+            Ok(struct_id)
+        }
     }
 
-    /// Formats the sum of two numbers as string.
-    #[pyfunction]
-    fn f32_laplace_fft(
-        expansion_order: usize,
-        n_crit: u64,
-        sparse: bool,
-        eval_type: usize,
-        sources: Vec<f32>,
-        targets: Vec<f32>,
-        charges: Vec<f32>,
-    ) -> PyResult<usize> {
-        let mut next_id = NEXT_ID.lock().unwrap();
-        let mut store = STORE_LAPLACE_FFT_F32.lock().unwrap();
-        let struct_id = *next_id;
+    // pub mod data {
+    //     use pyo3::{PyResult, PyErr};
 
-        // Copy source/target/charge data
-        let dim = 3;
-        let n_sources = sources.len() / dim;
-        let n_targets = targets.len() / dim;
+    //     use super::STORE_LAPLACE_FFT_F32;
 
-        let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
-        let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
-        let mut charges_arr = rlst_dynamic_array2!(f32, [n_sources, 1]);
-        let sources_slice = rlst_array_from_slice2!(sources.as_slice(), [n_sources, dim]);
-        let targets_slice = rlst_array_from_slice2!(targets.as_slice(), [n_targets, dim]);
-        let charges_slice = rlst_array_from_slice2!(charges.as_slice(), [n_sources, 1]);
-        sources_arr.view_mut().fill_from(sources_slice.view());
-        targets_arr.view_mut().fill_from(targets_slice.view());
-        charges_arr.view_mut().fill_from(charges_slice.view());
+    //     fn potentials(struct_id: usize) -> PyResult<*mut f32> {
+    //         let mut store =  STORE_LAPLACE_FFT_F32.lock().unwrap();
+    //         if let Some(fmm) = store.get_mut(&struct_id) {
+    //             Ok(fmm.potentials.as_mut_ptr())
+    //         } else {
+    //             Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("FMM not constructed"))
+    //         }
+    //     }
+    // }
 
-        // Set FMM parameters
-        let kernel = Laplace3dKernel::new();
-        let eval_type = if eval_type == 0 {
-            EvalType::Value
-        } else if eval_type == 1 {
-            EvalType::ValueDeriv
-        } else {
-            EvalType::Value
-        };
-        let source_to_target = FftFieldTranslation::new();
+    use constructors::{f32_laplace_blas, f32_laplace_fft, f32_helmholtz_blas, f32_helmholtz_fft};
 
-        let fmm = SingleNodeBuilder::new()
-            .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
-            .unwrap()
-            .parameters(
-                &charges_arr,
-                expansion_order,
-                kernel,
-                eval_type,
-                source_to_target,
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-
-        store.insert(struct_id, fmm);
-        *next_id += 1;
-        Ok(struct_id)
-    }
-
-    /// A Python module implemented in Rust. The name of this function must match
-    /// the `lib.name` setting in the `Cargo.toml`, else Python will not be able to
-    /// import the module.
+    /// Functions exposed at the module level
     #[pymodule]
     fn kifmm(m: &Bound<'_, PyModule>) -> PyResult<()> {
         m.add_function(wrap_pyfunction!(f32_laplace_fft, m)?)?;
         m.add_function(wrap_pyfunction!(f32_laplace_blas, m)?)?;
+        m.add_function(wrap_pyfunction!(f32_helmholtz_fft, m)?)?;
+        m.add_function(wrap_pyfunction!(f32_helmholtz_blas, m)?)?;
         Ok(())
     }
 }
