@@ -103,16 +103,147 @@ pub use fmm::types::MultiNodeFmmTree;
 #[doc(inline)]
 pub use traits::fmm::Fmm;
 
-
 /// Python API
 mod python_api {
 
+    use self::fmm::KiFmm;
+
+    use super::*;
+
+    use green_kernels::laplace_3d::Laplace3dKernel;
+    use green_kernels::types::EvalType;
     use pyo3::prelude::*;
+    use rlst::{rlst_array_from_slice2, rlst_dynamic_array2};
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    // Global store for MyStruct instances
+    lazy_static::lazy_static! {
+        static ref STORE_LAPLACE_FFT_F32: Mutex<HashMap<usize, KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>> = Mutex::new(HashMap::new());
+        static ref STORE_LAPLACE_BLAS_F32: Mutex<HashMap<usize, KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>>> = Mutex::new(HashMap::new());
+        static ref NEXT_ID: Mutex<usize> = Mutex::new(0);
+    }
 
     /// Formats the sum of two numbers as string.
     #[pyfunction]
-    fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-        Ok((a + b).to_string())
+    fn f32_laplace_blas(
+        expansion_order: usize,
+        n_crit: u64,
+        sparse: bool,
+        eval_type: usize,
+        sources: Vec<f32>,
+        targets: Vec<f32>,
+        charges: Vec<f32>,
+        svd_threshold: f32,
+    ) -> PyResult<usize> {
+        let mut next_id = NEXT_ID.lock().unwrap();
+        let mut store = STORE_LAPLACE_BLAS_F32.lock().unwrap();
+        let struct_id = *next_id;
+
+        // Copy source/target/charge data
+        let dim = 3;
+        let n_sources = sources.len() / dim;
+        let n_targets = targets.len() / dim;
+
+        let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
+        let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
+        let mut charges_arr = rlst_dynamic_array2!(f32, [n_sources, 1]);
+        let sources_slice = rlst_array_from_slice2!(sources.as_slice(), [n_sources, dim]);
+        let targets_slice = rlst_array_from_slice2!(targets.as_slice(), [n_targets, dim]);
+        let charges_slice = rlst_array_from_slice2!(charges.as_slice(), [n_sources, 1]);
+        sources_arr.view_mut().fill_from(sources_slice.view());
+        targets_arr.view_mut().fill_from(targets_slice.view());
+        charges_arr.view_mut().fill_from(charges_slice.view());
+
+        // Set FMM parameters
+        let kernel = Laplace3dKernel::new();
+        let eval_type = if eval_type == 0 {
+            EvalType::Value
+        } else if eval_type == 1 {
+            EvalType::ValueDeriv
+        } else {
+            EvalType::Value
+        };
+        let source_to_target = BlasFieldTranslationSaRcmp::new(Some(svd_threshold));
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+            .unwrap()
+            .parameters(
+                &charges_arr,
+                expansion_order,
+                kernel,
+                eval_type,
+                source_to_target,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        store.insert(struct_id, fmm);
+        *next_id += 1;
+        Ok(struct_id)
+    }
+
+    /// Formats the sum of two numbers as string.
+    #[pyfunction]
+    fn f32_laplace_fft(
+        expansion_order: usize,
+        n_crit: u64,
+        sparse: bool,
+        eval_type: usize,
+        sources: Vec<f32>,
+        targets: Vec<f32>,
+        charges: Vec<f32>,
+    ) -> PyResult<usize> {
+        let mut next_id = NEXT_ID.lock().unwrap();
+        let mut store = STORE_LAPLACE_FFT_F32.lock().unwrap();
+        let struct_id = *next_id;
+
+        // Copy source/target/charge data
+        let dim = 3;
+        let n_sources = sources.len() / dim;
+        let n_targets = targets.len() / dim;
+
+        let mut sources_arr = rlst_dynamic_array2!(f32, [n_sources, dim]);
+        let mut targets_arr = rlst_dynamic_array2!(f32, [n_targets, dim]);
+        let mut charges_arr = rlst_dynamic_array2!(f32, [n_sources, 1]);
+        let sources_slice = rlst_array_from_slice2!(sources.as_slice(), [n_sources, dim]);
+        let targets_slice = rlst_array_from_slice2!(targets.as_slice(), [n_targets, dim]);
+        let charges_slice = rlst_array_from_slice2!(charges.as_slice(), [n_sources, 1]);
+        sources_arr.view_mut().fill_from(sources_slice.view());
+        targets_arr.view_mut().fill_from(targets_slice.view());
+        charges_arr.view_mut().fill_from(charges_slice.view());
+
+        // Set FMM parameters
+        let kernel = Laplace3dKernel::new();
+        let eval_type = if eval_type == 0 {
+            EvalType::Value
+        } else if eval_type == 1 {
+            EvalType::ValueDeriv
+        } else {
+            EvalType::Value
+        };
+        let source_to_target = FftFieldTranslation::new();
+
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+            .unwrap()
+            .parameters(
+                &charges_arr,
+                expansion_order,
+                kernel,
+                eval_type,
+                source_to_target,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        store.insert(struct_id, fmm);
+        *next_id += 1;
+        Ok(struct_id)
     }
 
     /// A Python module implemented in Rust. The name of this function must match
@@ -120,9 +251,12 @@ mod python_api {
     /// import the module.
     #[pymodule]
     fn kifmm(m: &Bound<'_, PyModule>) -> PyResult<()> {
-        m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+        m.add_function(wrap_pyfunction!(f32_laplace_fft, m)?)?;
+        m.add_function(wrap_pyfunction!(f32_laplace_blas, m)?)?;
         Ok(())
     }
 }
 
+#[doc(inline)]
+#[allow(unused_imports)]
 pub use python_api::*;

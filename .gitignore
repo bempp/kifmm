@@ -23,3 +23,5 @@ fftw-src/fftw-*
 
 # Python
 *.pyc
+*.ipynb
+*.ipynb_checkpoints/*
