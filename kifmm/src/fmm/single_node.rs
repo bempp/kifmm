@@ -223,7 +223,7 @@ mod test {
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
     };
-    use num::{Float, One, Zero};
+    use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
         c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
@@ -804,9 +804,9 @@ mod test {
 
         // Charge data
         let nvecs = 1;
-        let tmp = vec![c64::one(); nsources * nvecs];
+        let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let wavenumber = 2.5;
 
@@ -832,7 +832,7 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 10000;
+        let nsources = 9000;
         let ntargets = 10000;
         let sources = points_fixture::<f64>(nsources, None, None, Some(1));
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
@@ -847,9 +847,9 @@ mod test {
 
         // Charge data
         let nvecs = 1;
-        let tmp = vec![c64::one(); nsources * nvecs];
+        let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
         {
@@ -972,8 +972,8 @@ mod test {
 
         // Charge data
         let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(nsources)
@@ -1052,12 +1052,12 @@ mod test {
 
         // Charge data
         let nvecs = 2;
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(nsources)
-            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
+            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
 
         // fmm with blas based field translation
         {
