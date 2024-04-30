@@ -200,7 +200,7 @@ where
                 check_potentials
                     .data()
                     .par_chunks_exact(self.ncoeffs * nmatvecs)
-                    .zip(self.leaf_multipoles.into_par_iter())
+                    .zip(self.leaf_multipoles.par_iter())
                     .zip(self.leaf_scales_sources.par_chunks_exact(self.ncoeffs))
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
