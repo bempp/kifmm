@@ -105,6 +105,7 @@ use green_kernels::laplace_3d::Laplace3dKernel;
 use rlst::rlst_dynamic_array2;
 #[doc(inline)]
 pub use traits::fmm::Fmm;
+use tree::helpers::points_fixture;
 
 /// Python API
 #[no_mangle]
@@ -116,16 +117,15 @@ pub extern "C" fn sayhello() {
 #[no_mangle]
 pub extern "C" fn constructor_laplace_f32() {
 
-    let sources = rlst_dynamic_array2!(f32, [1000, 3]);
-    let targets = rlst_dynamic_array2!(f32, [1000, 3]);
+    let sources = points_fixture(1000, None, None, None);
+    let targets = points_fixture(1000, None, None, None);
     let charges = rlst_dynamic_array2!(f32, [1000, 1]);
     let n_crit = Some(150);
     let sparse = true;
-    let expansion_order = 1;
+    let expansion_order = 2;
     let kernel = Laplace3dKernel::<f32>::new();
     let eval_type = green_kernels::types::EvalType::Value;
     let source_to_target = FftFieldTranslation::<f32>::new();
-
 
     let fmm = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
@@ -134,6 +134,8 @@ pub extern "C" fn constructor_laplace_f32() {
         .unwrap()
         .build()
         .unwrap();
+
+    println!("HERE {:?} {:?}", fmm.tree.source_tree.depth, fmm.expansion_order);
 
     // Box::into_raw(Box::new(fmm))
 }
