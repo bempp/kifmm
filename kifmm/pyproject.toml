@@ -1,6 +1,7 @@
 [project]
 name = "kifmm_py"
 dependencies = [
+    "pip==24.0",
     "maturin==1.5.1",
     "cffi==1.16.0",
     "numpy==1.26.2",
