@@ -25,12 +25,13 @@ cargo test
 
 ## Build Python Bindings
 
+
 1. Setup a new environment, install maturin
 
 Example using UV package manager.
 
 ```bash
-uv venv  && source .venv/bin/activate && uv pip install maturin
+uv venv  && source .venv/bin/activate && uv pip install .
 ```
 
 2. Build Python bindings with maturin, and install in virtual environment in editable mode.
