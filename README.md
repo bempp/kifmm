@@ -23,6 +23,25 @@ The functionality of the library can be tested by running:
 cargo test
 ```
 
+## Build Python Bindings
+
+1. Setup a new environment, install maturin
+
+Example using UV package manager.
+
+```bash
+uv venv  && source .venv/bin/activate && uv pip install maturin
+```
+
+2. Build Python bindings with maturin, and install in virtual environment in editable mode.
+
+MacOS
+
+```bash
+RUSTFLAGS="-C link-arg=-framework -C link-arg=Accelerate" maturin develop
+```
+
+
 ## Getting help
 Errors in the library should be added to the [GitHub issue tracker](https://github.com/bempp/kifmm/issues).
 
@@ -30,3 +49,4 @@ Questions about the library and its use can be asked on the [Bempp Discourse](ht
 
 ## Licence
 KiFMM is licensed under a BSD 3-Clause licence. Full text of the licence can be found [here](LICENSE.md).
+

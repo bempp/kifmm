@@ -1,0 +1,18 @@
+[project]
+name = "kifmm_py"
+dependencies = [
+    "cffi==1.16.0",
+    "numpy==1.26.2",
+    "jupyter== 1.0.0",
+    "matplotlib==3.8.4"
+]
+
+[build-system]
+requires = ["maturin>=1.5.1"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "cffi"
+compatibility = "linux"
+python-source="python"
+module-name="kifmm_py._kifmm_py"

@@ -13,4 +13,4 @@ pub const L2L_MAX_CHUNK_SIZE: usize = 256;
 pub const DEFAULT_NCRIT: u64 = 150;
 
 /// Default threshold for SVD singular value cutoff in SVD compressed field translations
-pub const DEFAULT_SVD_THRESHOLD: f64 = 1e-16;
+pub(crate) const DEFAULT_SVD_THRESHOLD: f64 = 1e-16;

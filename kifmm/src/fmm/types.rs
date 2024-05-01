@@ -160,6 +160,7 @@ pub struct SendPtr<T> {
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
 /// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
 #[allow(clippy::type_complexity)]
+#[repr(C)]
 pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
@@ -267,6 +268,8 @@ where
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
 }
+
+
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
@@ -418,6 +421,7 @@ pub enum FmmEvalType {
 /// with source and target points, charge data, and specifying FMM parameters like the kernel
 /// and expansion order, before finally building the KiFMM object.
 #[derive(Default)]
+#[repr(C)]
 pub struct SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
@@ -470,6 +474,7 @@ where
 ///   defines the spatial extent within which the sources and targets are located and
 ///   interacts.
 #[derive(Default)]
+#[repr(C)]
 pub struct SingleNodeFmmTree<T: RlstScalar + Float + Default> {
     /// An octree structure containing the source points for the FMM calculation.
     pub source_tree: SingleNodeTree<T>,
