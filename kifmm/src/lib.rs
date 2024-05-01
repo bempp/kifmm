@@ -130,9 +130,8 @@ mod python_api {
     pub mod constructors {
         use super::*;
         use green_kernels::helmholtz_3d::Helmholtz3dKernel;
-        use num_complex::Complex64;
-        use pyo3::types::{PyAny, PyComplex};
-        use pyo3::{buffer::PyBuffer, conversion::FromPyObjectBound};
+        use pyo3::types::PyAny;
+        use pyo3::buffer::PyBuffer;
         use rlst::{c32, c64, Shape};
 
         /// Helmholtz BLAS constructor
@@ -481,22 +480,29 @@ mod python_api {
         }
     }
 
-    // pub mod data {
-    //     use pyo3::{PyResult, PyErr};
+    pub mod accessors {
+        use numpy::{PyArray1, IntoPyArray};
+        use pyo3::{PyResult, PyErr, pyfunction, Py, Python, Bound};
 
-    //     use super::STORE_LAPLACE_FFT_F32;
+        use crate::fmm::types::SendPtr;
 
-    //     fn potentials(struct_id: usize) -> PyResult<*mut f32> {
-    //         let mut store =  STORE_LAPLACE_FFT_F32.lock().unwrap();
-    //         if let Some(fmm) = store.get_mut(&struct_id) {
-    //             Ok(fmm.potentials.as_mut_ptr())
-    //         } else {
-    //             Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("FMM not constructed"))
-    //         }
-    //     }
-    // }
+        use super::STORE_LAPLACE_FFT_F32;
+
+        #[pyfunction]
+        pub fn potentials_laplace_fft_f32(py: Python, struct_id: usize) -> PyResult<Bound<PyArray1<f32>>> {
+            let mut store =  STORE_LAPLACE_FFT_F32.lock().unwrap();
+            if let Some(fmm) = store.get_mut(&struct_id) {
+                let numpy_array = fmm.potentials.clone().into_pyarray_bound(py).to_owned();
+                Ok(numpy_array)
+
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("FMM not constructed"))
+            }
+        }
+    }
 
     use constructors::{f32_helmholtz_blas, f32_helmholtz_fft, f32_laplace_blas, f32_laplace_fft};
+    use accessors::potentials_laplace_fft_f32;
 
     /// Functions exposed at the module level
     #[pymodule]
@@ -505,6 +511,7 @@ mod python_api {
         m.add_function(wrap_pyfunction!(f32_laplace_blas, m)?)?;
         m.add_function(wrap_pyfunction!(f32_helmholtz_fft, m)?)?;
         m.add_function(wrap_pyfunction!(f32_helmholtz_blas, m)?)?;
+        m.add_function(wrap_pyfunction!(potentials_laplace_fft_f32, m)?)?;
         Ok(())
     }
 }
@@ -512,3 +519,12 @@ mod python_api {
 #[doc(inline)]
 #[allow(unused_imports)]
 pub use python_api::*;
+
+
+use std::os::raw::{c_char, c_int};
+use std::ffi::CString;
+
+#[no_mangle]
+pub extern "C" fn add_two_ints(a: c_int, b: c_int) -> c_int {
+    a + b
+}

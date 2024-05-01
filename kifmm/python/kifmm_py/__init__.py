@@ -32,7 +32,7 @@ class KiFmm:
         kernel,
         field_translation,
         svd_threshold=None,
-        wavenumber=None
+        wavenumber=None,
     ):
         """
         Parameters
@@ -45,6 +45,29 @@ class KiFmm:
 
         # Check validity of each input type
 
+        try:
+            assert isinstance(expansion_order, int)
+        except:
+            raise TypeError(
+                f"expansion order of type {type(expansion_order)}, expected 'int'"
+            )
+
+        try:
+            assert isinstance(n_crit, int)
+        except:
+            raise TypeError(f"n_crit of type {type(n_crit)}, expected 'int'")
+
+        try:
+            assert isinstance(sparse, bool)
+        except:
+            raise TypeError(f"sparse of type {type(sparse)}, expected 'bool'")
+
+        try:
+            assert isinstance(eval_type, bool) & (eval_type == 0 | eval_type == 1)
+        except:
+            raise TypeError(
+                f"eval_type={eval_type} of type {type(eval_type)}, expected 'int' of value either '0' or '1'"
+            )
 
         try:
 
@@ -63,50 +86,75 @@ class KiFmm:
                 f"Sources of type {sources.dtype}, targets of type {targets.dtype}, charges of type {charges.dtype}"
             )
 
-        _type = type(sources.dtype)
+        try:
+            assert field_translation == "fft" | field_translation == "blas"
+        except:
+            raise TypeError(
+                f"Unsupported field translation type '{field_translation}', must choose one of {CONSTRUCTORS_F32["laplace"].keys()}"
+            )
 
-        constructors = CONSTRUCTORS[_type]
-
-        # Call Rust constructor based on type
-        if kernel in constructors.keys():
-            constructor = constructors[kernel]
-            if field_translation in constructor.keys():
-                constructor = constructor[field_translation]
-                if field_translation == "fft":
-                    self.fmm = constructor(
-                        expansion_order,
-                        n_crit,
-                        sparse,
-                        eval_type,
-                        sources,
-                        targets,
-                        charges,
-                    )
-                else:
-                    if isinstance(svd_threshold, None):
-                        raise TypeError(
-                            "SVD threshold must be set for BLAS field translations"
-                        )
-                    else:
-                        self.fmm = constructor(
-                            expansion_order,
-                            n_crit,
-                            sparse,
-                            eval_type,
-                            sources,
-                            targets,
-                            charges,
-                            svd_threshold,
-                        )
-            else:
-                raise TypeError(
-                    f"Unsupported field translation type '{field_translation}', must choose one of {CONSTRUCTORS_F32["laplace"].keys()}"
-                )
-
-        else:
+        try:
+            assert kernel == "fft" | kernel == "blas"
+        except:
             raise TypeError(
                 f"Unsupported kernel type '{kernel}', must choose one of {CONSTRUCTORS_F32.keys()}"
             )
+
+        # Floating point type
+        _type = type(sources.dtype)
+
+        # Set constructor
+        constructor = CONSTRUCTORS[_type][kernel]
+
+        if field_translation == "fft":
+            if wavenumber is None:
+                self._fmm = constructor(
+                    expansion_order,
+                    n_crit,
+                    sparse,
+                    eval_type,
+                    sources,
+                    targets,
+                    charges,
+                )
+            else:
+                self._fmm = constructor(
+                    expansion_order,
+                    n_crit,
+                    sparse,
+                    eval_type,
+                    sources,
+                    targets,
+                    charges,
+                    wavenumber,
+                )
+
+        if field_translation == "blas":
+            if svd_threshold is None:
+                raise TypeError("SVD threshold must be set for BLAS field translations")
+            if wavenumber is None:
+                self._fmm = constructor(
+                    expansion_order,
+                    n_crit,
+                    sparse,
+                    eval_type,
+                    sources,
+                    targets,
+                    svd_threshold,
+                    charges,
+                )
+            else:
+                self._fmm = constructor(
+                    expansion_order,
+                    n_crit,
+                    sparse,
+                    eval_type,
+                    sources,
+                    targets,
+                    charges,
+                    svd_threshold,
+                    wavenumber,
+                )
 
     def evaluate(self):
         """
