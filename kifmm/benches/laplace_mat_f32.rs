@@ -29,7 +29,26 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let fmm_blas = SingleNodeBuilder::new()
+    let fmm_blas_5 = SingleNodeBuilder::new()
+        .tree(&sources, &targets, n_crit, sparse)
+        .unwrap()
+        .parameters(
+            &charges,
+            expansion_order,
+            Laplace3dKernel::new(),
+            EvalType::Value,
+            BlasFieldTranslationSaRcmp::new(svd_threshold),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let nvecs = 10;
+    let tmp = vec![1.0; nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let fmm_blas_10 = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -46,10 +65,14 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Laplace Potentials f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(15));
+        .measurement_time(Duration::from_secs(100));
 
     group.bench_function(format!("M2L=BLAS, N={nsources} NVecs={nvecs}"), |b| {
-        b.iter(|| fmm_blas.evaluate().unwrap())
+        b.iter(|| fmm_blas_5.evaluate().unwrap())
+    });
+
+    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs={nvecs}"), |b| {
+        b.iter(|| fmm_blas_10.evaluate().unwrap())
     });
 }
 
@@ -72,7 +95,26 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let fmm_blas = SingleNodeBuilder::new()
+    let fmm_blas_5 = SingleNodeBuilder::new()
+        .tree(&sources, &targets, n_crit, sparse)
+        .unwrap()
+        .parameters(
+            &charges,
+            expansion_order,
+            Laplace3dKernel::new(),
+            EvalType::ValueDeriv,
+            BlasFieldTranslationSaRcmp::new(svd_threshold),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    let nvecs = 10;
+    let tmp = vec![1.0; nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let fmm_blas_10 = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -89,10 +131,14 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Laplace Gradients f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(20));
+        .measurement_time(Duration::from_secs(150));
 
-    group.bench_function(format!("M2L=BLAS, N={nsources}, NVecs={nvecs}"), |b| {
-        b.iter(|| fmm_blas.evaluate().unwrap())
+    group.bench_function(format!("M2L=BLAS, N={nsources}, NVecs=5"), |b| {
+        b.iter(|| fmm_blas_5.evaluate().unwrap())
+    });
+
+    group.bench_function(format!("M2L=BLAS, N={nsources}, NVecs=10"), |b| {
+        b.iter(|| fmm_blas_10.evaluate().unwrap())
     });
 }
 

@@ -24,6 +24,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let expansion_order = 5;
     let sparse = true;
     let svd_threshold = Some(1e-2);
+    let wavenumber = 1.0;
 
     // FFT based M2L for a vector of charges
     let nvecs = 5;
@@ -31,9 +32,26 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let wavenumber = 1.0;
+    let fmm_blas_5 = SingleNodeBuilder::new()
+        .tree(&sources, &targets, n_crit, sparse)
+        .unwrap()
+        .parameters(
+            &charges,
+            expansion_order,
+            Helmholtz3dKernel::new(wavenumber),
+            EvalType::Value,
+            BlasFieldTranslationIa::new(svd_threshold),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
 
-    let fmm_blas = SingleNodeBuilder::new()
+    let nvecs = 10;
+    let tmp = vec![c32::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let fmm_blas_10 = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -50,11 +68,16 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Helmholtz Potentials f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(40));
+        .measurement_time(Duration::from_secs(200));
 
     group.bench_function(
-        format!("M2L=BLAS, N={nsources}, NVecs={nvecs}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate().unwrap()),
+        format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas_5.evaluate().unwrap()),
+    );
+
+    group.bench_function(
+        format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas_10.evaluate().unwrap()),
     );
 }
 
@@ -70,6 +93,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let expansion_order = 5;
     let sparse = true;
     let svd_threshold = Some(1e-2);
+    let wavenumber = 1.0;
 
     // FFT based M2L for a vector of charges
     let nvecs = 5;
@@ -77,9 +101,26 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
-    let wavenumber = 1.0;
+    let fmm_blas_5 = SingleNodeBuilder::new()
+        .tree(&sources, &targets, n_crit, sparse)
+        .unwrap()
+        .parameters(
+            &charges,
+            expansion_order,
+            Helmholtz3dKernel::new(wavenumber),
+            EvalType::ValueDeriv,
+            BlasFieldTranslationIa::new(svd_threshold),
+        )
+        .unwrap()
+        .build()
+        .unwrap();
 
-    let fmm_blas = SingleNodeBuilder::new()
+    let nvecs = 10;
+    let tmp = vec![Complex::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let fmm_blas_10 = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, sparse)
         .unwrap()
         .parameters(
@@ -96,11 +137,16 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Helmholtz Gradients f32");
     group
         .sample_size(10)
-        .measurement_time(Duration::from_secs(75));
+        .measurement_time(Duration::from_secs(300));
 
     group.bench_function(
-        format!("M2L=BLAS, N={nsources}, NVecs={nvecs}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate().unwrap()),
+        format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas_5.evaluate().unwrap()),
+    );
+
+    group.bench_function(
+        format!("M2L=BLAS, N={nsources}, NVecs=10, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas_10.evaluate().unwrap()),
     );
 }
 
