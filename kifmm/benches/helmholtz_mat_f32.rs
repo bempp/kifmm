@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
-use kifmm::fmm::types::{FftFieldTranslation, SingleNodeBuilder};
+use kifmm::fmm::types::SingleNodeBuilder;
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use kifmm::BlasFieldTranslationIa;
