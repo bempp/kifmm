@@ -67,11 +67,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(100));
 
-    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs={nvecs}"), |b| {
+    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs=5"), |b| {
         b.iter(|| fmm_blas_5.evaluate().unwrap())
     });
 
-    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs={nvecs}"), |b| {
+    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs=10"), |b| {
         b.iter(|| fmm_blas_10.evaluate().unwrap())
     });
 }
