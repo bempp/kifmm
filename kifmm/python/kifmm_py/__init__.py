@@ -1,25 +1,11 @@
-from kifmm_py import kifmm_rust
+"""
+Python bindings for KiFMM
 
+These bindings are ...
 
-class KiFmm:
-    """
-    Build and interact with Single Node Kernel Independent FMMs
-    """
-    def __init__(self):
-        pass
+Usage ...
+"""
 
-    def evaluate(&self):
-        pass
+from .api import KiFmm
 
-    def clear(&self):
-        pass
-
-    def evaluate_kernel_st(self):
-        pass
-
-    def evaluate_kernel_mt(self):
-        pass
-
-    def __repr__(self):
-        return "KiFmm<>"
-
+# from kifmm_py.api import KiFmm

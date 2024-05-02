@@ -1,4 +1,4 @@
-//! Python API
+//! Python bindings for constructors and basic methods
 use std::collections::HashMap;
 
 use crate::fmm::KiFmm;
@@ -12,8 +12,7 @@ use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use numpy::{
-    ndarray::Dim, PyArray, PyArrayMethods, PyReadonlyArrayDyn, PyReadwriteArrayDyn,
-    PyUntypedArrayMethods, ToPyArray,
+    ndarray::Dim, PyArray, PyArrayMethods, PyReadonlyArrayDyn, PyUntypedArrayMethods, ToPyArray,
 };
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
