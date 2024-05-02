@@ -4,6 +4,8 @@ from kifmm import (
     f32_laplace_blas,
     f32_helmholtz_blas,
     f32_helmholtz_fft,
+    evaluate_laplace_fft_f32,
+    clear_laplace_fft_f32
 )
 
 CONSTRUCTORS_F32 = {"laplace": {"fft": f32_laplace_fft, "blas": f32_laplace_blas}}
@@ -12,6 +14,27 @@ CONSTRUCTORS_F64 = {"laplace": {"fft": f32_helmholtz_fft, "blas": f32_helmholtz_
 CONSTRUCTORS = {
     np.dtypes.Float32DType: CONSTRUCTORS_F32,
     np.dtypes.Float64DType: CONSTRUCTORS_F32,
+}
+
+CLEAR_F32 = {"laplace": {"fft": clear_laplace_fft_f32, "blas": clear_laplace_fft_f32}}
+EVAL_F32 = {"laplace": {"fft": evaluate_laplace_fft_f32, "blas": evaluate_laplace_fft_f32}}
+
+CLEAR_F64 = {"laplace": {"fft": clear_laplace_fft_f32, "blas": clear_laplace_fft_f32}}
+EVAL_F64 = {"laplace": {"fft": evaluate_laplace_fft_f32, "blas": evaluate_laplace_fft_f32}}
+
+CONSTRUCTORS = {
+    np.dtypes.Float32DType: CONSTRUCTORS_F32,
+    np.dtypes.Float64DType: CONSTRUCTORS_F32,
+}
+
+EVAL = {
+    np.dtypes.Float32DType: EVAL_F32,
+    np.dtypes.Float64DType: EVAL_F64,
+}
+
+CLEAR = {
+    np.dtypes.Float32DType: CLEAR_F32,
+    np.dtypes.Float64DType: CLEAR_F64,
 }
 
 
@@ -63,7 +86,7 @@ class KiFmm:
             raise TypeError(f"sparse of type {type(sparse)}, expected 'bool'")
 
         try:
-            assert isinstance(eval_type, bool) & (eval_type == 0 | eval_type == 1)
+            assert isinstance(eval_type, int) and (eval_type == 0 or eval_type == 1)
         except:
             raise TypeError(
                 f"eval_type={eval_type} of type {type(eval_type)}, expected 'int' of value either '0' or '1'"
@@ -87,14 +110,14 @@ class KiFmm:
             )
 
         try:
-            assert field_translation == "fft" | field_translation == "blas"
+            assert field_translation == "fft" or field_translation == "blas"
         except:
             raise TypeError(
                 f"Unsupported field translation type '{field_translation}', must choose one of {CONSTRUCTORS_F32["laplace"].keys()}"
             )
 
         try:
-            assert kernel == "fft" | kernel == "blas"
+            assert kernel == "laplace" or kernel == "helmholtz"
         except:
             raise TypeError(
                 f"Unsupported kernel type '{kernel}', must choose one of {CONSTRUCTORS_F32.keys()}"
@@ -104,11 +127,15 @@ class KiFmm:
         _type = type(sources.dtype)
 
         # Set constructor
-        constructor = CONSTRUCTORS[_type][kernel]
+        self.constructor = CONSTRUCTORS[_type][kernel][field_translation]
+
+        # Set API
+        self.clear = CLEAR[_type][kernel][field_translation]
+        self.eval = EVAL[_type][kernel][field_translation]
 
         if field_translation == "fft":
             if wavenumber is None:
-                self._fmm = constructor(
+                self._fmm = self.constructor(
                     expansion_order,
                     n_crit,
                     sparse,
@@ -118,7 +145,7 @@ class KiFmm:
                     charges,
                 )
             else:
-                self._fmm = constructor(
+                self._fmm = self.constructor(
                     expansion_order,
                     n_crit,
                     sparse,
@@ -133,7 +160,7 @@ class KiFmm:
             if svd_threshold is None:
                 raise TypeError("SVD threshold must be set for BLAS field translations")
             if wavenumber is None:
-                self._fmm = constructor(
+                self._fmm = self.constructor(
                     expansion_order,
                     n_crit,
                     sparse,
@@ -144,7 +171,7 @@ class KiFmm:
                     charges,
                 )
             else:
-                self._fmm = constructor(
+                self._fmm = self.constructor(
                     expansion_order,
                     n_crit,
                     sparse,
@@ -160,7 +187,13 @@ class KiFmm:
         """
         Evaluate potentials due to source charges at targets.
         """
-        pass
+        evaluate_laplace_fft_f32(self._fmm)
+
+    def clear(self):
+        """
+        Clear potentials
+        """
+        clear_laplace_fft_f32(self._fmm)
 
     def data(self, key):
         """

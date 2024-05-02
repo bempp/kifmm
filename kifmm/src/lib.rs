@@ -130,8 +130,8 @@ mod python_api {
     pub mod constructors {
         use super::*;
         use green_kernels::helmholtz_3d::Helmholtz3dKernel;
-        use pyo3::types::PyAny;
         use pyo3::buffer::PyBuffer;
+        use pyo3::types::PyAny;
         use rlst::{c32, c64, Shape};
 
         /// Helmholtz BLAS constructor
@@ -481,28 +481,58 @@ mod python_api {
     }
 
     pub mod accessors {
-        use numpy::{PyArray1, IntoPyArray};
-        use pyo3::{PyResult, PyErr, pyfunction, Py, Python, Bound};
+        use numpy::{IntoPyArray, PyArray1};
+        use pyo3::{buffer::PyBuffer, pyfunction, Bound, Py, PyAny, PyErr, PyResult, Python};
+        use rlst::{c32, rlst_array_from_slice2, rlst_dynamic_array2, Shape};
 
-        use crate::fmm::types::SendPtr;
+        use crate::{fmm::types::SendPtr, Fmm};
 
         use super::STORE_LAPLACE_FFT_F32;
 
         #[pyfunction]
-        pub fn potentials_laplace_fft_f32(py: Python, struct_id: usize) -> PyResult<Bound<PyArray1<f32>>> {
-            let mut store =  STORE_LAPLACE_FFT_F32.lock().unwrap();
+        pub fn evaluate_laplace_fft_f32(py: Python, struct_id: usize) -> PyResult<()> {
+            let mut store = STORE_LAPLACE_FFT_F32.lock().unwrap();
             if let Some(fmm) = store.get_mut(&struct_id) {
-                let numpy_array = fmm.potentials.clone().into_pyarray_bound(py).to_owned();
-                Ok(numpy_array)
-
+                fmm.evaluate().unwrap();
+                Ok(())
             } else {
-                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>("FMM not constructed"))
+                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    "FMM not constructed",
+                ))
+            }
+        }
+
+        #[pyfunction]
+        pub fn clear_laplace_fft_f32(
+            py: Python,
+            struct_id: usize,
+            charges: Bound<'_, PyAny>,
+        ) -> PyResult<()> {
+            let mut store = STORE_LAPLACE_FFT_F32.lock().unwrap();
+            if let Some(fmm) = store.get_mut(&struct_id) {
+                let charges_buf = PyBuffer::<f32>::get_bound(&charges)?;
+                let tmp = charges_buf.as_slice(py).unwrap();
+                let n_tmp = tmp.len();
+                let charges_slice = unsafe {
+                    let _slice = std::slice::from_raw_parts(tmp.as_ptr() as *const f32, n_tmp);
+                    rlst_array_from_slice2!(_slice, [n_tmp, 1])
+                };
+                let n_charges = charges_slice.shape()[0];
+                let mut charges_arr = rlst_dynamic_array2!(f32, [n_charges, 1]);
+                charges_arr.view_mut().fill_from(charges_slice.view());
+
+                fmm.clear(&charges_arr);
+                Ok(())
+            } else {
+                Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
+                    "FMM not constructed",
+                ))
             }
         }
     }
 
+    use accessors::{evaluate_laplace_fft_f32, clear_laplace_fft_f32};
     use constructors::{f32_helmholtz_blas, f32_helmholtz_fft, f32_laplace_blas, f32_laplace_fft};
-    use accessors::potentials_laplace_fft_f32;
 
     /// Functions exposed at the module level
     #[pymodule]
@@ -511,7 +541,8 @@ mod python_api {
         m.add_function(wrap_pyfunction!(f32_laplace_blas, m)?)?;
         m.add_function(wrap_pyfunction!(f32_helmholtz_fft, m)?)?;
         m.add_function(wrap_pyfunction!(f32_helmholtz_blas, m)?)?;
-        m.add_function(wrap_pyfunction!(potentials_laplace_fft_f32, m)?)?;
+        m.add_function(wrap_pyfunction!(evaluate_laplace_fft_f32, m)?)?;
+        m.add_function(wrap_pyfunction!(clear_laplace_fft_f32, m)?)?;
         Ok(())
     }
 }
@@ -520,9 +551,8 @@ mod python_api {
 #[allow(unused_imports)]
 pub use python_api::*;
 
-
-use std::os::raw::{c_char, c_int};
 use std::ffi::CString;
+use std::os::raw::{c_char, c_int};
 
 #[no_mangle]
 pub extern "C" fn add_two_ints(a: c_int, b: c_int) -> c_int {
