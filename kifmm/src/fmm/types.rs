@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
     traits::{
@@ -26,6 +26,10 @@ pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
 /// stored in column-major order.
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+
+/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
+/// stored in column-major order.
+pub type CoordinatesSlice<'slc, T> = Array<T, BaseArray<T, SliceContainer<'slc, T>, 2>, 2>;
 
 /// Represents a threadsafe mutable raw pointer to`T`.
 ///
