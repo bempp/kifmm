@@ -742,7 +742,7 @@ define_class_methods!(
 
 /// Python bindings to KiFMM-RS
 #[pymodule]
-pub fn kifmm(m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn kifmm_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<LaplaceFft32>()?;
     m.add_class::<LaplaceFft64>()?;
     m.add_class::<LaplaceBlas32>()?;

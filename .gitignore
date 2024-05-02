@@ -25,3 +25,4 @@ fftw-src/fftw-*
 *.ipynb_checkpoints/*
 *.pyc
 *.ipynb
+*.so
