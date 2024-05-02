@@ -15,6 +15,7 @@ use numpy::{
     ndarray::Dim, PyArray, PyArrayMethods, PyReadonlyArrayDyn, PyReadwriteArrayDyn,
     PyUntypedArrayMethods, ToPyArray,
 };
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 
 use rlst::{
@@ -69,13 +70,6 @@ define_pyclass!(
     BlasFieldTranslationIa
 );
 
-#[pyclass]
-#[derive(Clone, Copy)]
-pub enum PyKernelEvalType {
-    Value = 0,
-    ValueDeriv = 1,
-}
-
 macro_rules! laplace_fft_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
@@ -90,11 +84,16 @@ macro_rules! laplace_fft_constructors {
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
                 sparse: bool,
-                kernel_eval_type: PyKernelEvalType,
+                kernel_eval_type: usize,
             ) -> PyResult<Self> {
-                let kernel_eval_type = match kernel_eval_type {
-                    PyKernelEvalType::Value => EvalType::Value,
-                    PyKernelEvalType::ValueDeriv => EvalType::ValueDeriv,
+                let kernel_eval_type = if kernel_eval_type == 0 {
+                    EvalType::Value
+                } else if kernel_eval_type == 1 {
+                    EvalType::ValueDeriv
+                } else {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Invalid Kernel Evaluation Mode",
+                    ));
                 };
 
                 let shape = sources.shape();
@@ -200,13 +199,19 @@ macro_rules! laplace_blas_constructors {
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
                 sparse: bool,
-                kernel_eval_type: PyKernelEvalType,
+                kernel_eval_type: usize,
                 svd_threshold: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
-                let kernel_eval_type = match kernel_eval_type {
-                    PyKernelEvalType::Value => EvalType::Value,
-                    PyKernelEvalType::ValueDeriv => EvalType::ValueDeriv,
+                let kernel_eval_type = if kernel_eval_type == 0 {
+                    EvalType::Value
+                } else if kernel_eval_type == 1 {
+                    EvalType::ValueDeriv
+                } else {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Invalid Kernel Evaluation Mode",
+                    ));
                 };
+
                 let shape = sources.shape();
                 let sources_slice =
                     rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
@@ -310,12 +315,17 @@ macro_rules! helmholtz_fft_constructors {
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
                 sparse: bool,
-                kernel_eval_type: PyKernelEvalType,
+                kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
-                let kernel_eval_type = match kernel_eval_type {
-                    PyKernelEvalType::Value => EvalType::Value,
-                    PyKernelEvalType::ValueDeriv => EvalType::ValueDeriv,
+                let kernel_eval_type = if kernel_eval_type == 0 {
+                    EvalType::Value
+                } else if kernel_eval_type == 1 {
+                    EvalType::ValueDeriv
+                } else {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Invalid Kernel Evaluation Mode",
+                    ));
                 };
 
                 let shape = sources.shape();
@@ -421,13 +431,18 @@ macro_rules! helmholtz_blas_constructors {
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
                 sparse: bool,
-                kernel_eval_type: PyKernelEvalType,
+                kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
                 svd_threshold: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
-                let kernel_eval_type = match kernel_eval_type {
-                    PyKernelEvalType::Value => EvalType::Value,
-                    PyKernelEvalType::ValueDeriv => EvalType::ValueDeriv,
+                let kernel_eval_type = if kernel_eval_type == 0 {
+                    EvalType::Value
+                } else if kernel_eval_type == 1 {
+                    EvalType::ValueDeriv
+                } else {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Invalid Kernel Evaluation Mode",
+                    ));
                 };
 
                 let shape = sources.shape();
@@ -543,6 +558,20 @@ macro_rules! define_class_methods {
 
             fn evaluate(&self) -> PyResult<()> {
                 self.fmm.evaluate().unwrap();
+                Ok(())
+            }
+
+            fn clear<'py>(&mut self, charges: PyReadonlyArrayDyn<'py, $type>) -> PyResult<()> {
+                let shape = charges.shape();
+                let charges_slice =
+                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
+                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
+                let p1 = charges_slice.data().as_ptr();
+                let p2 = charges_arr.data_mut().as_mut_ptr();
+                unsafe {
+                    std::ptr::copy_nonoverlapping(p1, p2, charges_slice.data().len());
+                }
+                self.fmm.clear(&charges_arr);
                 Ok(())
             }
 
