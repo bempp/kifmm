@@ -1,5 +1,5 @@
 """
-Shallow Python API for KiFMM
+Python API
 """
 
 import re
@@ -37,7 +37,7 @@ CONSTRUCTORS = {
 
 class KiFmm:
     """
-    Build and interact with Single Node Kernel Independent FMMs
+    Wraps around the low level Rust interface.
     """
 
     def __init__(
@@ -54,6 +54,21 @@ class KiFmm:
         svd_threshold=None,
         wavenumber=None,
     ):
+        """Constructor for Single Node FMMss.
+
+        Args:
+            expansion_order (int): The expansion order of the FMM
+            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
+            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
+            n_crit (int):  Maximum number of particles per leaf box, must be less than number of particles in domain.
+            sparse (bool): Optionally drop empty leaf boxes for performance in FMM.
+            kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
+            kernel (str): Either 'laplace' or 'helmholtz' supported.
+            field_translation (str): Either 'fft' or 'blas'
+            svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
+            wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
+        """
         # Check valid expansion order
         try:
             assert expansion_order >= 2 and isinstance(expansion_order, int)
@@ -225,16 +240,24 @@ class KiFmm:
         self.target_keys = self.fmm.target_keys
         self.target_keys_set = set(self.target_keys)
         self.source_leaves = self.fmm.source_leaves
+        self.source_leaves_set = set(self.source_leaves)
         self.target_leaves = self.fmm.target_leaves
+        self.target_leaves_set = set(self.target_leaves)
         self.source_tree_depth = self.fmm.source_tree_depth
         self.target_tree_depth = self.fmm.target_tree_depth
         self.source_global_indices = self.fmm.source_global_indices
         self.target_global_indices = self.fmm.target_global_indices
 
     def evaluate(self):
+        """Run the FMM."""
         self.fmm.evaluate()
 
     def clear(self, charges):
+        """Clear currently assigned charges, assign new charges
+
+        Args:
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
+        """
         try:
             assert isinstance(charges, np.ndarray)
         except:
@@ -251,30 +274,89 @@ class KiFmm:
         self.fmm.clear(charges)
 
     def source_key_to_anchor(self, key):
+        """Convert a Morton key to its respective anchor representation for source tree keys.
+
+        Args:
+            key (int): Morton Key
+
+        Returns:
+            np.array([int; 4]): Anchor of origin of each box, as well as octree level in the form [anchor[0], anchor[1], anchor[1], level]
+        """
         try:
             assert key in self.source_keys_set
         except:
-            raise ValueError(f"key {key} isn't in source leaves")
+            raise ValueError(f"key {key} isn't in source keys")
 
         return self.fmm.source_key_to_anchor(key)
 
     def target_key_to_anchor(self, key):
+        """Convert a Morton key to its respective anchor representation for target tree keys.
+
+        Args:
+            key (int): Morton Key
+
+        Returns:
+            np.array([int; 4]): Anchor of origin of each box, as well as octree level in the form [anchor[0], anchor[1], anchor[1], level]
+        """
         try:
             assert key in self.target_keys_set
         except:
-            raise ValueError(f"key {key} isn't in target leaves")
+            raise ValueError(f"key {key} isn't in target keys")
         return self.fmm.target_key_to_anchor(key)
 
     def potentials(self, leaf):
+        """Lookup potential data associated with a leaf, specified by its Morton key.
+
+        Args:
+            leaf (int): Morton key
+
+        Returns:
+            np.ndarray: Potential data, returned as a list where the length corresponds to the number of evaluations/charge vectors,
+            and is stored in an order defined by 'global_indices'
+        """
         return self.fmm.potentials(leaf)
 
     def source_coordinates(self, leaf):
+        """Lookup coordinate data associated with a leaf in the source tree
+
+        Args:
+            leaf (int): Morton key.
+
+        Returns:
+            np.ndarray: Coordinates in Fortran order associated with this leaf.
+        """
+        try:
+            assert leaf in self.source_leaves_set
+        except:
+            raise ValueError(f"key {key} isn't in source leaves")
         return self.fmm.source_coordinates(leaf)
 
     def target_coordinates(self, leaf):
+        """Lookup coordinate data associated with a leaf in the target tree
+
+        Args:
+            leaf (int): Morton key.
+
+        Returns:
+            np.ndarray: Coordinates in Fortran order associated with this leaf.
+        """
+        try:
+            assert leaf in self.target_leaves_set
+        except:
+            raise ValueError(f"key {key} isn't in target leaves")
         return self.fmm.target_coordinates(leaf)
 
     def evaluate_kernel(self, sources, targets, charges):
+        """Evaluate the kernel function associated with this FMM, evaluation mode set by FMM.
+
+        Args:
+            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
+            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
+
+        Returns:
+            np.ndarray: Potentials/potential gradients associated with target coordinates.
+        """
         # Check that inputs are numpy arrays
         try:
             assert (
