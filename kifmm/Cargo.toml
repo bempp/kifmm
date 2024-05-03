@@ -2,6 +2,7 @@
 # Treat warnings as a build error.
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
+python = ["dep:pyo3", "dep:numpy"]
 
 [package]
 name = "kifmm"
@@ -18,7 +19,7 @@ categories = ["mathematics", "science"]
 
 [lib]
 name = "kifmm"
-crate-type = ["lib", "cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 itertools = "0.12.*"
@@ -31,9 +32,11 @@ fftw-sys = {path = "../fftw-sys"}
 green-kernels = { git = "https://github.com/bempp/green-kernels" }
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
-mpi = { version = "0.7.*", optional = true}
+mpi = { version = "0.8.*", optional = true}
 memoffset = {version = "0.9.1", optional = true}
 superslice = {version = "1.0.0", optional = true}
+pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethods"] , optional = true }
+numpy = { version = "0.21", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}
