@@ -7,5 +7,3 @@ Usage ...
 """
 
 from .api import KiFmm
-
-# from kifmm_py.api import KiFmm

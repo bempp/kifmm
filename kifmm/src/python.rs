@@ -74,9 +74,10 @@ macro_rules! laplace_fft_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
         impl $name {
-            #[new]
 
             /// Constructor
+            #[new]
+            #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
                 expansion_order: usize,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
@@ -196,9 +197,9 @@ macro_rules! laplace_blas_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
         impl $name {
-            #[new]
-
             /// Constructor
+            #[new]
+            #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
                 expansion_order: usize,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
@@ -312,9 +313,10 @@ macro_rules! helmholtz_fft_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
         impl $name {
-            #[new]
 
             /// Constructor for Helmholtz KiFmm with FFT Field translation
+            #[new]
+            #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
                 expansion_order: usize,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
@@ -435,9 +437,9 @@ macro_rules! helmholtz_blas_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
         impl $name {
-            #[new]
-
             /// Constructor
+            #[new]
+            #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
                 expansion_order: usize,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
@@ -567,7 +569,7 @@ macro_rules! define_class_methods {
                 Ok(())
             }
 
-            fn clear<'py>(&mut self, charges: PyReadonlyArrayDyn<'py, $type>) -> PyResult<()> {
+            fn clear(&mut self, charges: PyReadonlyArrayDyn<'_, $type>) -> PyResult<()> {
                 let shape = charges.shape();
                 let charges_slice =
                     rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
