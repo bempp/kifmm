@@ -547,13 +547,6 @@ macro_rules! define_class_methods {
         /// Python interface
         #[pymethods]
         impl $name {
-            fn source_tree_depth(&self) -> PyResult<u64> {
-                Ok(self.fmm.tree.source_tree.depth())
-            }
-
-            fn target_tree_depth(&self) -> PyResult<u64> {
-                Ok(self.fmm.tree.source_tree.depth())
-            }
 
             fn evaluate(&self) -> PyResult<()> {
                 self.fmm.evaluate().unwrap();
@@ -573,6 +566,7 @@ macro_rules! define_class_methods {
                 self.fmm.clear(&charges_arr);
                 Ok(())
             }
+
 
             fn evaluate_kernel_st<'py>(
                 &self,
@@ -668,6 +662,17 @@ macro_rules! define_class_methods {
                 let ncoords = coords.len() / 3;
                 let coords = coords.reshape([ncoords, self.fmm.dim]).unwrap();
                 Ok(coords)
+            }
+
+
+            #[getter]
+            fn source_tree_depth(&self) -> PyResult<u64> {
+                Ok(self.fmm.tree.source_tree.depth())
+            }
+
+            #[getter]
+            fn target_tree_depth(&self) -> PyResult<u64> {
+                Ok(self.fmm.tree.source_tree.depth())
             }
 
             #[getter]

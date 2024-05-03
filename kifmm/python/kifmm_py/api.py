@@ -221,14 +221,59 @@ class KiFmm:
     def evaluate(self):
         self.fmm.evaluate()
 
-    def clear(self):
-        pass
+    def clear(self, charges):
+        try:
+            assert isinstance(charges, np.ndarray)
+        except:
+            raise TypeError(
+                f"charges of type {type(charges)}"
+            )
+
+        expected_dtypes = KERNEL_DTYPE[kernel]
+        try:
+            assert type(charges[0].dtype) in expected_dtypes
+        except:
+            raise TypeError(
+                f"charges of the wrong type '{type(charges[0].dtype)}' for this kernel"
+            )
+
+        self.fmm.clear(charges)
+
+    def source_coordinates(leaf):
+        return self.fmm.source_coordinates(leaf)
+
+    def target_coordinates(leaf):
+        return self.fmm.target_coordinates(leaf)
 
     def evaluate_kernel_st(self):
         pass
 
     def evaluate_kernel_mt(self):
         pass
+
+    @property
+    def source_tree_depth(self):
+        return self.fmm.source_tree_depth
+
+    @property
+    def target_tree_depth(self):
+        return self.fmm.target_tree_depth
+
+    @property
+    def source_keys(self):
+        return self.fmm.source_keys
+
+    @property
+    def target_keys(self):
+        return self.fmm.target_keys
+
+    @property
+    def source_leaves(self):
+        return self.fmm.source_leaves
+
+    @property
+    def target_leaves(self):
+        return self.fmm.target_leaves
 
     def __repr__(self):
         _type = match = re.search(r"'builtins\.([^']+)'", str(self.constructor)).group(
