@@ -547,7 +547,6 @@ macro_rules! define_class_methods {
         /// Python interface
         #[pymethods]
         impl $name {
-
             fn evaluate(&self) -> PyResult<()> {
                 self.fmm.evaluate().unwrap();
                 Ok(())
@@ -566,7 +565,6 @@ macro_rules! define_class_methods {
                 self.fmm.clear(&charges_arr);
                 Ok(())
             }
-
 
             fn evaluate_kernel_st<'py>(
                 &self,
@@ -663,7 +661,6 @@ macro_rules! define_class_methods {
                 let coords = coords.reshape([ncoords, self.fmm.dim]).unwrap();
                 Ok(coords)
             }
-
 
             #[getter]
             fn source_tree_depth(&self) -> PyResult<u64> {
