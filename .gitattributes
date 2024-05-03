@@ -1,2 +1,3 @@
 fftw-src/fftw-*/**/* linguist-generated=true
 *.ipynb linguist-vendored
+*.stl linguist-vendored
