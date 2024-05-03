@@ -13,7 +13,13 @@ uv venv && source .venv/bin/activate && uv pip install maturin pip
 Note that Maturin must be run from the `kifmm` crate root, not the workspace root.
 
 ```bash
-cd /path/to/kifmm/crate && maturin develop --release # Building bindings in release mode
+# Building bindings in release mode, enable Python binding
+cd /path/to/kifmm/crate && maturin develop --release --features python
 ```
 
 We provide example usage of the Python API in the `python/examples` directory.
+
+## Note
+
+You must deactivate your virtual environment before building/testing the Rust library with `cargo` commands
+as maturin wraps Cargo, and on MacOS and certain other platforms leads to [linker errors](https://pyo3.rs/v0.14.4/faq.html#i-cant-run-cargo-test-im-having-linker-issues-like-symbol-not-found-or-undefined-reference-to-_pyexc_systemerror).
