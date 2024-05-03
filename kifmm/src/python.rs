@@ -74,7 +74,6 @@ macro_rules! laplace_fft_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
         impl $name {
-
             /// Constructor
             #[new]
             #[allow(clippy::too_many_arguments)]
@@ -313,7 +312,6 @@ macro_rules! helmholtz_fft_constructors {
     ($name: ident, $type: ident) => {
         #[pymethods]
         impl $name {
-
             /// Constructor for Helmholtz KiFmm with FFT Field translation
             #[new]
             #[allow(clippy::too_many_arguments)]
@@ -627,6 +625,30 @@ macro_rules! define_class_methods {
                 Ok(result_arr)
             }
 
+            fn source_key_to_anchor<'py>(
+                &self,
+                py: Python<'py>,
+                key: u64,
+            ) -> PyResult<Bound<'py, PyArray<u64, Dim<[usize; 1]>>>> {
+                let key = self.source_key_map.get(&key).unwrap();
+                let anchor = key.anchor;
+                let level = key.level();
+                let result = [anchor[0], anchor[1], anchor[2], level].to_pyarray_bound(py);
+                Ok(result)
+            }
+
+            fn target_key_to_anchor<'py>(
+                &self,
+                py: Python<'py>,
+                key: u64,
+            ) -> PyResult<Bound<'py, PyArray<u64, Dim<[usize; 1]>>>> {
+                let key = self.target_key_map.get(&key).unwrap();
+                let anchor = key.anchor;
+                let level = key.level();
+                let result = [anchor[0], anchor[1], anchor[2], level].to_pyarray_bound(py);
+                Ok(result)
+            }
+
             fn source_coordinates<'py>(
                 &self,
                 py: Python<'py>,
@@ -737,6 +759,36 @@ macro_rules! define_class_methods {
                 py: Python<'py>,
             ) -> PyResult<Bound<'py, PyArray<u64, Dim<[usize; 1]>>>> {
                 let array = self.target_leaves.as_slice().to_pyarray_bound(py);
+                Ok(array)
+            }
+
+            #[getter]
+            fn source_global_indices<'py>(
+                &self,
+                py: Python<'py>,
+            ) -> PyResult<Bound<'py, PyArray<usize, Dim<[usize; 1]>>>> {
+                let array = self
+                    .fmm
+                    .tree
+                    .source_tree
+                    .global_indices
+                    .as_slice()
+                    .to_pyarray_bound(py);
+                Ok(array)
+            }
+
+            #[getter]
+            fn target_global_indices<'py>(
+                &self,
+                py: Python<'py>,
+            ) -> PyResult<Bound<'py, PyArray<usize, Dim<[usize; 1]>>>> {
+                let array = self
+                    .fmm
+                    .tree
+                    .source_tree
+                    .global_indices
+                    .as_slice()
+                    .to_pyarray_bound(py);
                 Ok(array)
             }
         }

@@ -220,6 +220,17 @@ class KiFmm:
                     self.svd_threshold,
                 )
 
+        self.source_keys = self.fmm.source_keys
+        self.source_keys_set = set(self.source_keys)
+        self.target_keys = self.fmm.target_keys
+        self.target_keys_set = set(self.target_keys)
+        self.source_leaves = self.fmm.source_leaves
+        self.target_leaves = self.fmm.target_leaves
+        self.source_tree_depth = self.fmm.source_tree_depth
+        self.target_tree_depth = self.fmm.target_tree_depth
+        self.source_global_indices = self.fmm.source_global_indices
+        self.target_global_indices = self.fmm.target_global_indices
+
     def evaluate(self):
         self.fmm.evaluate()
 
@@ -238,6 +249,21 @@ class KiFmm:
             )
 
         self.fmm.clear(charges)
+
+    def source_key_to_anchor(self, key):
+        try:
+            assert key in self.source_keys_set
+        except:
+            raise ValueError(f"key {key} isn't in source leaves")
+
+        return self.fmm.source_key_to_anchor(key)
+
+    def target_key_to_anchor(self, key):
+        try:
+            assert key in self.target_keys_set
+        except:
+            raise ValueError(f"key {key} isn't in target leaves")
+        return self.fmm.target_key_to_anchor(key)
 
     def potentials(self, leaf):
         return self.fmm.potentials(leaf)
@@ -293,30 +319,6 @@ class KiFmm:
             )
 
         return self.fmm.evaluate_kernel_st(sources, targets, charges)
-
-    @property
-    def source_tree_depth(self):
-        return self.fmm.source_tree_depth
-
-    @property
-    def target_tree_depth(self):
-        return self.fmm.target_tree_depth
-
-    @property
-    def source_keys(self):
-        return self.fmm.source_keys
-
-    @property
-    def target_keys(self):
-        return self.fmm.target_keys
-
-    @property
-    def source_leaves(self):
-        return self.fmm.source_leaves
-
-    @property
-    def target_leaves(self):
-        return self.fmm.target_leaves
 
     def __repr__(self):
         _type = match = re.search(r"'builtins\.([^']+)'", str(self.constructor)).group(
