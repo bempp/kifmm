@@ -785,7 +785,7 @@ macro_rules! define_class_methods {
                 let array = self
                     .fmm
                     .tree
-                    .source_tree
+                    .target_tree
                     .global_indices
                     .as_slice()
                     .to_pyarray_bound(py);
