@@ -22,7 +22,6 @@ fftw-src/fftw-*
 *.csv
 
 # Python
-*.ipynb_checkpoints/*
+*.ipynb_checkpoints/
 *.pyc
-*.ipynb
 *.so

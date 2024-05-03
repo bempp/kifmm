@@ -12,7 +12,8 @@ use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use numpy::{
-    ndarray::Dim, PyArray, PyArrayMethods, PyReadonlyArrayDyn, PyUntypedArrayMethods, ToPyArray,
+    ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArrayMethods, PyReadonlyArrayDyn,
+    PyUntypedArrayMethods, ToPyArray,
 };
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -118,6 +119,13 @@ macro_rules! laplace_fft_constructors {
                 }
 
                 let shape = charges.shape();
+
+                if shape[1] > 1 {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Multipole charge vectors not supported with FFT field translation",
+                    ));
+                }
+
                 let charges_slice =
                     rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
                 let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
@@ -235,8 +243,8 @@ macro_rules! laplace_blas_constructors {
 
                 let shape = charges.shape();
                 let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
+                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], shape[1]]);
+                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], shape[1]]);
                 let p1 = charges_slice.data().as_ptr();
                 let p2 = charges_arr.data_mut().as_mut_ptr();
                 unsafe {
@@ -350,6 +358,13 @@ macro_rules! helmholtz_fft_constructors {
                 }
 
                 let shape = charges.shape();
+
+                if shape[1] > 1 {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Multipole charge vectors not supported with FFT field translation",
+                    ));
+                }
+
                 let charges_slice =
                     rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
                 let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
@@ -468,8 +483,8 @@ macro_rules! helmholtz_blas_constructors {
 
                 let shape = charges.shape();
                 let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
+                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], shape[1]]);
+                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], shape[1]]);
                 let p1 = charges_slice.data().as_ptr();
                 let p2 = charges_arr.data_mut().as_mut_ptr();
                 unsafe {
@@ -572,7 +587,7 @@ macro_rules! define_class_methods {
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-            ) -> PyResult<Bound<'py, PyArray<$type, Dim<[usize; 1]>>>> {
+            ) -> PyResult<Bound<'py, PyArray<$type, Dim<[usize; 2]>>>> {
                 let shape = sources.shape();
                 let sources_slice =
                     rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
@@ -586,7 +601,9 @@ macro_rules! define_class_methods {
                     rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
 
                 let shape = targets.shape();
-                let mut result_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
+                let ntargets = shape[0];
+                let mut result_arr =
+                    rlst_dynamic_array2!($type, [shape[0] * self.fmm.kernel_eval_size, 1]);
 
                 self.fmm.kernel.evaluate_st(
                     self.fmm.kernel_eval_type,
@@ -596,42 +613,14 @@ macro_rules! define_class_methods {
                     result_arr.data_mut(),
                 );
 
-                let result_arr = result_arr.data().to_pyarray_bound(py);
-
-                Ok(result_arr)
-            }
-
-            fn evaluate_kernel_mt<'py>(
-                &self,
-                py: Python<'py>,
-                sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
-                targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
-                charges: PyReadonlyArrayDyn<'py, $type>,
-            ) -> PyResult<Bound<'py, PyArray<$type, Dim<[usize; 1]>>>> {
-                let shape = sources.shape();
-                let sources_slice =
-                    rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
-
-                let shape = targets.shape();
-                let targets_slice =
-                    rlst_array_from_slice2!(targets.as_slice().unwrap(), [shape[0], shape[1]]);
-
-                let shape = charges.shape();
-                let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-
-                let shape = targets.shape();
-                let mut result_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
-
-                self.fmm.kernel.evaluate_mt(
-                    self.fmm.kernel_eval_type,
-                    sources_slice.data(),
-                    targets_slice.data(),
-                    charges_slice.data(),
-                    result_arr.data_mut(),
-                );
-
-                let result_arr = result_arr.data().to_pyarray_bound(py);
+                let result_arr = result_arr
+                    .data()
+                    .to_pyarray_bound(py)
+                    .reshape_with_order(
+                        [ntargets, self.fmm.kernel_eval_size],
+                        NPY_ORDER::NPY_FORTRANORDER,
+                    )
+                    .unwrap();
 
                 Ok(result_arr)
             }
@@ -642,10 +631,18 @@ macro_rules! define_class_methods {
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
                 let key = self.source_key_map.get(&leaf).unwrap();
-                let coords = self.fmm.tree.source_tree.coordinates(&key).unwrap();
-                let coords = coords.to_pyarray_bound(py);
-                let ncoords = coords.len() / 3;
-                let coords = coords.reshape([ncoords, self.fmm.dim]).unwrap();
+                let slice = self.fmm.tree.source_tree.coordinates(&key).unwrap();
+                let ncoords = slice.len() / self.fmm.dim();
+                let coords_row_major =
+                    rlst_array_from_slice2!(slice, [ncoords, self.fmm.dim()], [self.fmm.dim(), 1]);
+                let mut coords_col_major =
+                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [ncoords, self.fmm.dim()]);
+                coords_col_major.fill_from(coords_row_major.view());
+                let coords = coords_col_major
+                    .data()
+                    .to_pyarray_bound(py)
+                    .reshape_with_order([ncoords, self.fmm.dim()], NPY_ORDER::NPY_FORTRANORDER)
+                    .unwrap();
                 Ok(coords)
             }
 
@@ -655,11 +652,44 @@ macro_rules! define_class_methods {
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
                 let key = self.target_key_map.get(&leaf).unwrap();
-                let coords = self.fmm.tree.target_tree.coordinates(&key).unwrap();
-                let coords = coords.to_pyarray_bound(py);
-                let ncoords = coords.len() / 3;
-                let coords = coords.reshape([ncoords, self.fmm.dim]).unwrap();
+                let slice = self.fmm.tree.target_tree.coordinates(&key).unwrap();
+                let ncoords = slice.len() / self.fmm.dim();
+                let coords_row_major =
+                    rlst_array_from_slice2!(slice, [ncoords, self.fmm.dim()], [self.fmm.dim(), 1]);
+                let mut coords_col_major =
+                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [ncoords, self.fmm.dim()]);
+                coords_col_major.fill_from(coords_row_major.view());
+                let coords = coords_col_major
+                    .data()
+                    .to_pyarray_bound(py)
+                    .reshape_with_order([ncoords, self.fmm.dim()], NPY_ORDER::NPY_FORTRANORDER)
+                    .unwrap();
                 Ok(coords)
+            }
+
+            fn potentials<'py>(
+                &self,
+                py: Python<'py>,
+                leaf: u64,
+            ) -> PyResult<Vec<Bound<'py, PyArray<$type, Dim<[usize; 2]>>>>> {
+                let key = self.target_key_map.get(&leaf).unwrap();
+                let potentials = self.fmm.potential(&key).unwrap();
+                let n_matvec = potentials.len();
+                let mut result = Vec::new();
+
+                for i in 0..n_matvec {
+                    let n_potentials = potentials[i].len() / self.fmm.kernel_eval_size;
+                    let potentials_i = potentials[i].to_pyarray_bound(py);
+
+                    let potentials_i = potentials_i
+                        .reshape_with_order(
+                            [n_potentials, self.fmm.kernel_eval_size],
+                            NPY_ORDER::NPY_FORTRANORDER,
+                        )
+                        .unwrap();
+                    result.push(potentials_i)
+                }
+                Ok(result)
             }
 
             #[getter]

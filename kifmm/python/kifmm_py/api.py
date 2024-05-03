@@ -10,6 +10,7 @@ import numpy as np
 
 KERNELS = ["laplace", "helmholtz"]
 KERNEL_EVAL_TYPES = {"eval": 0, "eval_deriv": 1}
+KERNEL_EVAL_SIZE = {"eval": 1, "eval_deriv": 4}
 FIELD_TRANSLATION_TYPES = ["fft", "blas"]
 KERNEL_DTYPE = {
     "laplace": [np.dtypes.Float32DType, np.dtypes.Float64DType],
@@ -146,6 +147,7 @@ class KiFmm:
         self.n_crit = n_crit
         self.sparse = sparse
         self.kernel_eval_type = KERNEL_EVAL_TYPES[kernel_eval_type]
+        self.kernel_eval_size = KERNEL_EVAL_SIZE[kernel_eval_type]
         self.kernel = kernel
         self.field_translation = field_translation
         self.constructor = CONSTRUCTORS[self.dtype][self.kernel][self.field_translation]
@@ -225,9 +227,7 @@ class KiFmm:
         try:
             assert isinstance(charges, np.ndarray)
         except:
-            raise TypeError(
-                f"charges of type {type(charges)}"
-            )
+            raise TypeError(f"charges of type {type(charges)}")
 
         expected_dtypes = KERNEL_DTYPE[kernel]
         try:
@@ -239,17 +239,60 @@ class KiFmm:
 
         self.fmm.clear(charges)
 
-    def source_coordinates(leaf):
+    def potentials(self, leaf):
+        return self.fmm.potentials(leaf)
+
+    def source_coordinates(self, leaf):
         return self.fmm.source_coordinates(leaf)
 
-    def target_coordinates(leaf):
+    def target_coordinates(self, leaf):
         return self.fmm.target_coordinates(leaf)
 
-    def evaluate_kernel_st(self):
-        pass
+    def evaluate_kernel(self, sources, targets, charges):
+        # Check that inputs are numpy arrays
+        try:
+            assert (
+                isinstance(sources, np.ndarray)
+                and isinstance(targets, np.ndarray)
+                and isinstance(charges, np.ndarray)
+            )
+        except:
+            raise TypeError(
+                f"sources of type {type(sources)}, targets of type {type(targets)}, charges of type {type(charges)}"
+            )
 
-    def evaluate_kernel_mt(self):
-        pass
+        try:
+            assert (
+                np.isreal(sources[0][0])
+                and np.isreal(targets[0][0])
+                and sources.shape[1] == 3
+                and targets.shape[1] == 3
+            )
+        except:
+            raise TypeError("sources and targets must be reals, and of shape [N, 3]")
+
+        try:
+            assert type(sources[0].dtype) == type(targets[0].dtype)
+        except:
+            raise TypeError(
+                f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
+            )
+
+        # Check that arrays are in Fortran order
+        try:
+            assert np.isfortran(sources) and np.isfortran(targets)
+        except:
+            raise TypeError(f"sources, targets expected in Fortran order")
+
+        expected_dtypes = KERNEL_DTYPE[self.kernel]
+        try:
+            assert type(charges[0].dtype) in expected_dtypes
+        except:
+            raise TypeError(
+                f"charges of the wrong type '{type(charges[0].dtype)}' for this kernel"
+            )
+
+        return self.fmm.evaluate_kernel_st(sources, targets, charges)
 
     @property
     def source_tree_depth(self):
