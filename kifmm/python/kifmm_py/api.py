@@ -316,6 +316,15 @@ class KiFmm:
         """
         return self.fmm.potentials(leaf)
 
+    def all_potentials(self):
+        """Lookup all potential data associated with FMM.
+
+        Returns:
+            np.ndarray: Potential data, returned as a list where the length corresponds to the number of evaluations/charge vectors,
+            and is stored in an order defined by 'global_indices'
+        """
+        return self.fmm.all_potentials()
+
     def source_coordinates(self, leaf):
         """Lookup coordinate data associated with a leaf in the source tree
 

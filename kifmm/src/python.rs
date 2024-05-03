@@ -716,6 +716,25 @@ macro_rules! define_class_methods {
                 Ok(result)
             }
 
+            fn all_potentials<'py>(
+                &self,
+                py: Python<'py>,
+            ) -> PyResult<Bound<'py, PyArray<$type, Dim<[usize; 2]>>>> {
+                let n_potentials = &self.fmm.potentials.len() / self.fmm.kernel_eval_size;
+
+                let potentials = self
+                    .fmm
+                    .potentials
+                    .to_pyarray_bound(py)
+                    .reshape_with_order(
+                        [n_potentials, self.fmm.kernel_eval_size],
+                        NPY_ORDER::NPY_FORTRANORDER,
+                    )
+                    .unwrap();
+
+                Ok(potentials)
+            }
+
             #[getter]
             fn source_tree_depth(&self) -> PyResult<u64> {
                 Ok(self.fmm.tree.source_tree.depth())
