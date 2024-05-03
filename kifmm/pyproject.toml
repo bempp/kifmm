@@ -4,14 +4,14 @@ build-backend = "maturin"
 
 [project]
 name = "kifmm_py"
-requires-python = ">=3.7"
+requires-python = "==3.10.*"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
-dependencies = ["numpy>=1.26.4"]
+dependencies = ["numpy==1.26.2", "mayavi==4.8.1", "vtk==9.3.0", "pyqt5==5.15.10", "numpy-stl==3.1.1", "jupyter"]
 
 [tool.maturin]
 python-source = "python"
