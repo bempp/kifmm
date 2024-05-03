@@ -18,8 +18,9 @@ use crate::{
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperator, SourceTranslation},
+        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation},
         tree::{FmmTree, Tree},
+        types::FmmError,
     },
     tree::constants::NSIBLINGS,
 };
@@ -28,13 +29,16 @@ impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
-    fn p2m(&self) {
+    fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {
-            return;
+            return Err(FmmError::Failed(
+                "P2M failed, no leaves found in source tree".to_string(),
+            ));
         };
 
         let n_leaves = self.tree.source_tree().n_leaves().unwrap();
@@ -42,7 +46,7 @@ where
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
         let depth = self.tree.source_tree().depth();
-        let operator_index = self.kernel.c2e_operator_index(depth);
+        let operator_index = self.c2e_operator_index(depth);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -103,7 +107,7 @@ where
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
 
-                        let tmp = if self.kernel.is_kernel_homogenous() {
+                        let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
                             scaled_check_potential.fill_from(check_potential);
@@ -136,7 +140,9 @@ where
                                 .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
                                 .for_each(|(m, t)| *m += *t);
                         }
-                    })
+                    });
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -194,13 +200,13 @@ where
                 check_potentials
                     .data()
                     .par_chunks_exact(self.ncoeffs * nmatvecs)
-                    .zip(self.leaf_multipoles.into_par_iter())
+                    .zip(self.leaf_multipoles.par_iter())
                     .zip(self.leaf_scales_sources.par_chunks_exact(self.ncoeffs))
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
-                        let tmp = if self.kernel.is_kernel_homogenous() {
+                        let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
@@ -233,14 +239,18 @@ where
                                 .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
                                 .for_each(|(m, t)| *m += *t);
                         }
-                    })
+                    });
+                Ok(())
             }
         }
     }
 
-    fn m2m(&self, level: u64) {
+    fn m2m(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_sources) = self.tree.source_tree.keys(level) else {
-            return;
+            return Err(FmmError::Failed(format!(
+                "M2M failed at level {:?}, no sources found",
+                level
+            )));
         };
 
         let nchild_sources = self.tree.source_tree().n_keys(level).unwrap();
@@ -248,7 +258,7 @@ where
         let max = &child_sources[nchild_sources - 1];
         let min_idx = self.tree.source_tree.index(min).unwrap();
         let max_idx = self.tree.source_tree.index(max).unwrap();
-        let operator_index = self.kernel.m2m_operator_index(level);
+        let operator_index = self.m2m_operator_index(level);
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -318,7 +328,9 @@ where
                                     .for_each(|(p, t)| *p += *t);
                             }
                         },
-                    )
+                    );
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -374,6 +386,7 @@ where
                             }
                         }
                     });
+                Ok(())
             }
         }
     }

@@ -3,18 +3,18 @@ use crate::{fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::tree::Tree;
+use super::{tree::Tree, types::FmmError};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
     /// Particle to multipole translations, applied at leaf level over all source boxes.
-    fn p2m(&self);
+    fn p2m(&self) -> Result<(), FmmError>;
 
     /// Multipole to multipole translations, applied during upward pass. Defined over each level of a tree.
     ///
     /// # Arguments
     /// * `level` - The child level at which this translation is being applied.
-    fn m2m(&self, level: u64);
+    fn m2m(&self, level: u64) -> Result<(), FmmError>;
 }
 
 /// Interface for target field translations.
@@ -23,20 +23,20 @@ pub trait TargetTranslation {
     ///
     /// # Arguments
     /// * `level` - The child level at which this translation is being applied.
-    fn l2l(&self, level: u64);
+    fn l2l(&self, level: u64) -> Result<(), FmmError>;
 
     /// Multipole to particle translations, applies to leaf boxes when a source box is within
     /// the near field of a target box, but is small enough that a multipole expansion converges
     /// at the target box. Defined over all leaf target boxes.
-    fn m2p(&self);
+    fn m2p(&self) -> Result<(), FmmError>;
 
     /// Local to particle translations, applies the local expansion accumulated at each leaf box to the
     /// target particles it contains. Defined over all leaf target boxes.
-    fn l2p(&self);
+    fn l2p(&self) -> Result<(), FmmError>;
 
     /// Near field particle to particle (direct) potential contributions to particles in a given leaf box's
     /// near field where the `p2l` and `m2p` do not apply. Defined over all leaf target boxes.
-    fn p2p(&self);
+    fn p2p(&self) -> Result<(), FmmError>;
 }
 
 /// Interface for the source to target (multipole to local / M2L) field translations.
@@ -45,7 +45,7 @@ pub trait SourceToTargetTranslation {
     ///
     /// # Arguments
     /// * `level` - The level of the tree at which this translation is being applied.
-    fn m2l(&self, level: u64);
+    fn m2l(&self, level: u64) -> Result<(), FmmError>;
 
     /// Particle to local translations, applies to leaf boxes when a source box is within
     /// the far field of a target box, but is too large for the multipole expansion to converge
@@ -53,7 +53,7 @@ pub trait SourceToTargetTranslation {
     ///
     /// # Arguments
     /// * `level` - The level of the tree at which this translation is being applied.
-    fn p2l(&self, level: u64);
+    fn p2l(&self, level: u64) -> Result<(), FmmError>;
 }
 
 /// Interface for a Kernel-Independent Fast Multipole Method (FMM).
@@ -110,7 +110,7 @@ where
     fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&self);
+    fn evaluate(&self) -> Result<(), FmmError>;
 
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///
@@ -124,18 +124,17 @@ pub trait FmmMetadata {
     /// Associated scalar
     type Scalar: RlstScalar;
 
+    /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
     fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
 }
 
-/// Kernels compatible with our implementation
-pub trait FmmOperator
+/// Defines how metadata associated with field translations is looked up at runtime.
+/// Defined by kernel type, as well as field translation method.
+pub trait FmmOperatorData
 where
-    Self: Kernel,
+    Self: FmmMetadata,
 {
-    /// Homogeneity check
-    fn is_kernel_homogenous(&self) -> bool;
-
     /// Lookup c2e operator
     fn c2e_operator_index(&self, level: u64) -> usize;
 
@@ -147,4 +146,13 @@ where
 
     /// Lookup l2l operator
     fn l2l_operator_index(&self, level: u64) -> usize;
+}
+
+/// Marker trait for homogenous kernels
+pub trait HomogenousKernel
+where
+    Self: Kernel,
+{
+    /// Homogeneity check
+    fn is_homogenous(&self) -> bool;
 }

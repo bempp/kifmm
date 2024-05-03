@@ -7,8 +7,12 @@ use crate::{
     fmm::types::{FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperator, SourceToTargetTranslation, SourceTranslation, TargetTranslation},
+        fmm::{
+            FmmOperatorData, HomogenousKernel, SourceToTargetTranslation, SourceTranslation,
+            TargetTranslation,
+        },
         tree::{FmmTree, Tree},
+        types::FmmError,
     },
     Fmm, SingleNodeFmmTree,
 };
@@ -21,10 +25,10 @@ use super::{
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation,
+    Self: SourceToTargetTranslation + FmmOperatorData,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -117,12 +121,12 @@ where
         }
     }
 
-    fn evaluate(&self) {
+    fn evaluate(&self) -> Result<(), FmmError> {
         // Upward pass
         {
-            self.p2m();
+            self.p2m()?;
             for level in (1..=self.tree().source_tree().depth()).rev() {
-                self.m2m(level)
+                self.m2m(level)?;
             }
         }
 
@@ -130,17 +134,17 @@ where
         {
             for level in 2..=self.tree().target_tree().depth() {
                 if level > 2 {
-                    self.l2l(level);
+                    self.l2l(level)?;
                 }
-                self.m2l(level);
-                self.p2l(level);
+                self.m2l(level)?;
             }
 
             // Leaf level computation
-            self.m2p();
-            self.p2p();
-            self.l2p();
+            self.p2p()?;
+            self.l2p()?;
         }
+
+        Ok(())
     }
 
     fn clear(&mut self, charges: &Charges<Self::Scalar>) {
@@ -219,7 +223,7 @@ mod test {
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
     };
-    use num::{Float, One, Zero};
+    use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
         c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
@@ -573,7 +577,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate();
+        fmm_fft.evaluate().unwrap();
 
         let svd_threshold = Some(1e-5);
         let fmm_svd = SingleNodeBuilder::new()
@@ -589,7 +593,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate();
+        fmm_svd.evaluate().unwrap();
 
         let fmm_fft = Box::new(fmm_fft);
         let fmm_svd = Box::new(fmm_svd);
@@ -633,14 +637,14 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm.evaluate();
+        fmm.evaluate().unwrap();
 
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         fmm.clear(&charges);
-        fmm.evaluate();
+        fmm.evaluate().unwrap();
 
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -694,7 +698,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_fft.evaluate();
+            fmm_fft.evaluate().unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -719,7 +723,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_fft.evaluate();
+            fmm_fft.evaluate().unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -748,7 +752,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -773,7 +777,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -800,9 +804,9 @@ mod test {
 
         // Charge data
         let nvecs = 1;
-        let tmp = vec![c64::one(); nsources * nvecs];
+        let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let wavenumber = 2.5;
 
@@ -820,7 +824,7 @@ mod test {
             .build()
             .unwrap();
 
-        fmm_fft.evaluate();
+        fmm_fft.evaluate().unwrap();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
     }
@@ -828,7 +832,7 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 10000;
+        let nsources = 9000;
         let ntargets = 10000;
         let sources = points_fixture::<f64>(nsources, None, None, Some(1));
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
@@ -843,9 +847,9 @@ mod test {
 
         // Charge data
         let nvecs = 1;
-        let tmp = vec![c64::one(); nsources * nvecs];
+        let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
         {
@@ -863,7 +867,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -885,7 +889,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -913,7 +917,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -935,7 +939,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -968,8 +972,8 @@ mod test {
 
         // Charge data
         let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(nsources)
@@ -992,7 +996,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate();
+            fmm_blas.evaluate().unwrap();
 
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
@@ -1014,7 +1018,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
@@ -1048,12 +1052,12 @@ mod test {
 
         // Charge data
         let nvecs = 2;
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(nsources)
-            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
+            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
 
         // fmm with blas based field translation
         {
@@ -1072,7 +1076,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate();
+            fmm_blas.evaluate().unwrap();
 
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
@@ -1094,7 +1098,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas,

@@ -13,7 +13,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourcetoTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, FmmOperator},
+        fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
         tree::Tree,
     },
@@ -24,7 +24,7 @@ impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, Sourc
 where
     Scalar: RlstScalar + Default + Epsilon,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Clone + Default,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
     KiFmm<Scalar, Kernel, SourceToTargetData>: SourcetoTargetTranslationMetadata
@@ -111,7 +111,7 @@ where
     /// For an FMM builder with an associated FMM tree, specify simulation specific parameters
     ///
     /// # Arguments
-    /// * `charges` - 2D RLST array, of dimensions `[ncharges, nvecs]` where each of `nvecs` is associated with `ncharges`
+    /// * `charges` - 2D RLST array, of dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`
     /// * `expansion_order` - The expansion order of the FMM
     /// * `kernel` - The kernel associated with this FMM
     /// * `eval_type` - Either `ValueDeriv` - to evaluate potentials and gradients, or `Value` to evaluate potentials alone

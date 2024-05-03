@@ -44,7 +44,7 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate();
+        fmm_fft.evaluate().unwrap();
     }
 
     // BLAS based M2L
@@ -78,7 +78,7 @@ fn main() {
             .build()
             .unwrap();
 
-        fmm_vec.evaluate();
+        fmm_vec.evaluate().unwrap();
 
         // Matrix of charges
         let nvecs = 5;
@@ -106,6 +106,6 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_mat.evaluate();
+        fmm_mat.evaluate().unwrap();
     }
 }

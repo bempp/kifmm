@@ -3,11 +3,11 @@ use std::collections::HashMap;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
     traits::{
-        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::FmmOperator,
+        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
@@ -26,6 +26,10 @@ pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
 /// stored in column-major order.
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+
+/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
+/// stored in column-major order.
+pub type CoordinatesSlice<'slc, T> = Array<T, BaseArray<T, SliceContainer<'slc, T>, 2>, 2>;
 
 /// Represents a threadsafe mutable raw pointer to`T`.
 ///
@@ -163,7 +167,7 @@ pub struct SendPtr<T> {
 pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -270,7 +274,7 @@ where
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     <Scalar as RlstScalar>::Real: Default,
 {

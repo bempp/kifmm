@@ -16,7 +16,6 @@ use rlst::{
 use crate::{
     fmm::{
         constants::DEFAULT_SVD_THRESHOLD,
-        field_translation::source_to_target::transfer_vector::compute_transfer_vectors,
         helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
@@ -35,7 +34,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourcetoTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, FmmOperator, SourceToTargetTranslation},
+        fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
     },
@@ -1170,7 +1169,7 @@ where
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Computes the unique Green's function evaluations and places them on a convolution grid on the source box wrt to a given
@@ -1521,10 +1520,58 @@ where
     }
 }
 
+impl<Scalar, SourceToTargetData> FmmOperatorData
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+{
+    fn c2e_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn m2m_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn l2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn m2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+}
+
+impl<Scalar, SourceToTargetData> FmmOperatorData
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
+where
+    Scalar: RlstScalar<Complex = Scalar> + Default,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+{
+    fn c2e_operator_index(&self, level: u64) -> usize {
+        level as usize
+    }
+
+    fn m2m_operator_index(&self, level: u64) -> usize {
+        (level - 1) as usize
+    }
+
+    fn l2l_operator_index(&self, level: u64) -> usize {
+        (level - 1) as usize
+    }
+
+    fn m2l_operator_index(&self, level: u64) -> usize {
+        (level - 2) as usize
+    }
+}
+
 impl<Scalar, Kernel, SourceToTargetData> FmmMetadata for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + FmmOperator + Default + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
@@ -1562,7 +1609,7 @@ where
         // Kernel scale at each target and source leaf
         let source_leaf_scales = leaf_scales::<Scalar>(
             &self.tree.source_tree,
-            self.kernel.is_kernel_homogenous(),
+            self.kernel.is_homogenous(),
             self.ncoeffs,
         );
 
@@ -1647,7 +1694,7 @@ where
     /// Constructor for FFT based field translations
     pub fn new() -> Self {
         Self {
-            transfer_vectors: compute_transfer_vectors(),
+            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
             ..Default::default()
         }
     }
@@ -1673,7 +1720,7 @@ where
 
         Self {
             threshold: threshold.unwrap_or(tmp),
-            transfer_vectors: compute_transfer_vectors(),
+            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
             ..Default::default()
         }
     }
@@ -1763,7 +1810,7 @@ mod test {
 
         let idx = 123;
 
-        let transfer_vectors = compute_transfer_vectors::<f64>();
+        let transfer_vectors = compute_transfer_vectors_at_level::<f64>(3).unwrap();
         let transfer_vector = &transfer_vectors[idx];
 
         // Lookup correct components of SVD compressed M2L operator matrix
@@ -1881,7 +1928,7 @@ mod test {
 
         let transfer_vectors = compute_transfer_vectors_at_level::<f64>(level).unwrap();
 
-        let m2l_operator_index = fmm.kernel.m2l_operator_index(level);
+        let m2l_operator_index = fmm.m2l_operator_index(level);
 
         // Lookup correct components of SVD compressed M2L operator matrix
         let c_idx = transfer_vectors
@@ -2032,7 +2079,7 @@ mod test {
         // Compute all M2L operators
         // Pick a random source/target pair
         let idx = 123;
-        let all_transfer_vectors = compute_transfer_vectors::<f64>();
+        let all_transfer_vectors = compute_transfer_vectors_at_level::<f64>(3).unwrap();
 
         let transfer_vector = &all_transfer_vectors[idx];
 
