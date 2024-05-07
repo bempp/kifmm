@@ -203,7 +203,7 @@ where
                 let mut compressed_multipoles;
                 {
                     //TODO: Rework threading
-                    rlst::threading::enable_threading();
+                rlst::threading::set_num_threads(6);
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
@@ -219,7 +219,6 @@ where
                     }
                 }
 
-                println!("HERE {:?} {:?}", level, rlst::threading::get_num_threads());
 
                 // 2. Apply BLAS operation
                 {
@@ -291,7 +290,7 @@ where
                 // 3. Compute local expansions from compressed check potentials
                 {
                     //TODO: Rework threading
-                    rlst::threading::enable_threading();
+                    rlst::threading::set_num_threads(6);
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -367,13 +366,13 @@ where
                 let mut compressed_multipoles;
                 {
                     //TODO: Rework threading
-                    //rlst_blis::interface::threading::enable_threading();
+                    rlst::threading::set_num_threads(6);
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
                     );
                     //TODO: Rework threading
-                    //rlst_blis::interface::threading::disable_threading();
+                    rlst::threading::disable_threading();
 
                     if self.kernel.is_homogenous() {
                         compressed_multipoles.data_mut().iter_mut().for_each(|d| {
@@ -486,7 +485,7 @@ where
                 // 3. Compute local expansions from compressed check potentials
                 {
                     //TODO: Rework threading
-                    //t_blis::interface::threading::enable_threading();
+                    rlst::threading::set_num_threads(6);
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -498,7 +497,7 @@ where
                         ),
                     );
                     //TODO: Rework threading
-                    //rlst_blis::interface::threading::disable_threading();
+                    rlst::threading::disable_threading();
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
                         std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)
