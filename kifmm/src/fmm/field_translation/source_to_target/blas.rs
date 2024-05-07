@@ -219,6 +219,8 @@ where
                     }
                 }
 
+                println!("HERE {:?} {:?}", level, rlst::threading::get_num_threads());
+
                 // 2. Apply BLAS operation
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)

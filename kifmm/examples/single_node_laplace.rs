@@ -4,18 +4,20 @@ use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuil
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
 
+use std::time::Instant;
+
 extern crate blas_src;
 extern crate lapack_src;
 
 fn main() {
     // Setup random sources and targets
-    let nsources = 1000;
-    let ntargets = 2000;
+    let nsources = 1000000;
+    let ntargets = 1000000;
     let sources = points_fixture::<f32>(nsources, None, None, Some(0));
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(150);
+    let n_crit = Some(400);
     let expansion_order = 5;
     let sparse = true;
 
@@ -39,7 +41,9 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
+        let s = Instant::now();
         fmm_fft.evaluate().unwrap();
+        println!("fft {:?}", s.elapsed());
     }
 
     // BLAS based M2L
@@ -53,7 +57,7 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
-        let singular_value_threshold = Some(1e-5);
+        let singular_value_threshold = Some(1e-1);
 
         let fmm_vec = SingleNodeBuilder::new()
             .tree(&sources, &targets, n_crit, sparse)
@@ -69,8 +73,9 @@ fn main() {
             .build()
             .unwrap();
 
+        let s = Instant::now();
         fmm_vec.evaluate().unwrap();
-
+        println!("blas {:?}", s.elapsed());
         // Matrix of charges
         let nvecs = 5;
         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
@@ -93,6 +98,9 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
+
+        let s = Instant::now();
         fmm_mat.evaluate().unwrap();
+        println!("blas mat {:?}", s.elapsed());
     }
 }
