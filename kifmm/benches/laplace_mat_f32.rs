@@ -62,7 +62,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    let mut group = c.benchmark_group("Laplace Potentials f32");
+    let mut group = c.benchmark_group("Laplace Potentials mat f32");
     group
         .sample_size(10)
         .measurement_time(Duration::from_secs(100));
