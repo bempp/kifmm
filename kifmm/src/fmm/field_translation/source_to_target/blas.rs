@@ -231,26 +231,27 @@ where
                             let c_vt_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
+                            let cutoff_rank = self
+                            .source_to_target
+                            .cutoff_rank[m2l_operator_index];
+
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
                                 [
-                                    self.source_to_target.cutoff_rank[m2l_operator_index],
+                                   cutoff_rank,
                                     multipole_idxs.len()
                                 ]
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                                compressed_multipoles_subset.data_mut()[i * self
-                                    .source_to_target
-                                    .cutoff_rank[m2l_operator_index]
+                                compressed_multipoles_subset.data_mut()[i * cutoff_rank
                                     ..(i + 1)
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]]
+                                        * cutoff_rank]
                                     .copy_from_slice(
                                         &compressed_multipoles.data()[multipole_idx
-                                            * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                            * cutoff_rank
                                             ..(multipole_idx + 1)
-                                                * self.source_to_target.cutoff_rank
-                                                    [m2l_operator_index]],
+                                                *cutoff_rank],
                                     );
                             }
 
@@ -270,13 +271,13 @@ where
                                 let check_potential = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         check_potential_ptr,
-                                        self.source_to_target.cutoff_rank[m2l_operator_index],
+                                        cutoff_rank,
                                     )
                                 };
                                 let tmp = &compressed_check_potential.data()[multipole_idx
-                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    * cutoff_rank
                                     ..(multipole_idx + 1)
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]];
+                                        * cutoff_rank];
                                 check_potential
                                     .iter_mut()
                                     .zip(tmp)
