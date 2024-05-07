@@ -27,7 +27,7 @@ num = "0.4"
 approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
-rlst = { git = "https://github.com/skailasa/rlst.git" }
+rlst = { git = "https://github.com/skailasa/rlst.git" , features = ["blis"]}
 fftw-sys = {path = "../fftw-sys"}
 green-kernels = { git = "https://github.com/skailasa/green-kernels" }
 lazy_static = "1.4.0"
