@@ -5,6 +5,9 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use rlst::{RawAccess, RlstScalar, Shape};
 
+#[cfg(target_os = "linux")]
+use rlst::threading;
+
 use crate::{
     fmm::types::{FmmEvalType, KiFmm},
     traits::{
@@ -126,6 +129,9 @@ where
     fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
+
+        #[cfg(target_os = "linux")]
+        rlst::threading::disable_threading();
 
         if timed {
             {
