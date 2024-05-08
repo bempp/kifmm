@@ -51,6 +51,7 @@ class KiFmm:
         kernel_eval_type,
         kernel,
         field_translation,
+        timed=False,
         svd_threshold=None,
         wavenumber=None,
     ):
@@ -65,7 +66,8 @@ class KiFmm:
             sparse (bool): Optionally drop empty leaf boxes for performance in FMM.
             kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
             kernel (str): Either 'laplace' or 'helmholtz' supported.
-            field_translation (str): Either 'fft' or 'blas'
+            field_translation (str): Either 'fft' or 'blas'.
+            timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
             svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
         """
@@ -152,6 +154,13 @@ class KiFmm:
         except:
             raise TypeError(
                 f"field translation '{field_translation}' is not valid, expect one of {FIELD_TRANSLATION_TYPES}"
+            )
+
+        try:
+            assert isinstance(timed, bool)
+        except:
+            raise TypeError(
+                f"Must specify 'True' or 'False' for timed"
             )
 
         self.dtype = type(sources[0].dtype)
@@ -247,10 +256,12 @@ class KiFmm:
         self.target_tree_depth = self.fmm.target_tree_depth
         self.source_global_indices = self.fmm.source_global_indices
         self.target_global_indices = self.fmm.target_global_indices
+        self.timed = timed
+        self.times = None
 
     def evaluate(self):
         """Run the FMM."""
-        self.fmm.evaluate()
+        self.times = self.fmm.evaluate(self.timed)
 
     def clear(self, charges):
         """Clear currently assigned charges, assign new charges

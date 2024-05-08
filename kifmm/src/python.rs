@@ -1,5 +1,6 @@
 //! Python bindings for constructors and basic methods
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::fmm::KiFmm;
 use crate::traits::fmm::Fmm;
@@ -562,9 +563,9 @@ macro_rules! define_class_methods {
         /// Python interface
         #[pymethods]
         impl $name {
-            fn evaluate(&self) -> PyResult<()> {
-                self.fmm.evaluate(false).unwrap();
-                Ok(())
+            fn evaluate(&self, timed: bool) -> PyResult<HashMap<String, Duration>> {
+                let times = self.fmm.evaluate(timed).unwrap();
+                Ok(times)
             }
 
             fn clear(&mut self, charges: PyReadonlyArrayDyn<'_, $type>) -> PyResult<()> {
