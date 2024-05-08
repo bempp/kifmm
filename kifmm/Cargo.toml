@@ -3,8 +3,6 @@
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
 python = ["dep:pyo3", "dep:numpy"]
-blis = ["rlst/blis"]
-metal = ["rlst/metal"]
 
 
 [package]
