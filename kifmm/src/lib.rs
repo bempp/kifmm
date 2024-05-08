@@ -57,7 +57,7 @@
 //!         .unwrap();
 //!
 //!     // Run the FMM
-//!     fmm_fft.evaluate();
+//!     fmm_fft.evaluate(false);
 //!
 //!     // Optionally clear, to re-evaluate with new charges
 //!     let nvecs = 1;

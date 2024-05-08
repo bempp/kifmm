@@ -563,7 +563,7 @@ macro_rules! define_class_methods {
         #[pymethods]
         impl $name {
             fn evaluate(&self) -> PyResult<()> {
-                self.fmm.evaluate().unwrap();
+                self.fmm.evaluate(false).unwrap();
                 Ok(())
             }
 

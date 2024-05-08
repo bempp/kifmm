@@ -3,7 +3,10 @@ use crate::{fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{tree::Tree, types::FmmError};
+use super::{
+    tree::Tree,
+    types::{FmmError, FmmTime},
+};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -110,7 +113,7 @@ where
     fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&self) -> Result<(), FmmError>;
+    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError>;
 
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///

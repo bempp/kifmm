@@ -1,5 +1,5 @@
 //! Utility types for trait definitions.
-use std::fmt;
+use std::{collections::HashMap, fmt, time::Duration};
 
 /// Type to handle FMM related errors
 #[derive(Debug)]
@@ -13,6 +13,9 @@ pub enum FmmError {
     /// I/O failure
     Io(std::io::Error),
 }
+
+/// Type to handle FMM related errors
+pub type FmmTime = HashMap<String, Duration>;
 
 impl std::fmt::Display for FmmError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
