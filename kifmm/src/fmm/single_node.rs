@@ -1,5 +1,5 @@
 //! Single Node FMM
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
@@ -145,8 +145,6 @@ where
             }
 
             // Downward pass
-            // times.insert("l2l".to_string(), Duration::from_secs(0));
-            // times.insert("m2l".to_string(), Duration::from_secs(0));
             {
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {

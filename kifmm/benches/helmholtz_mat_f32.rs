@@ -151,6 +151,6 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
 }
 
 criterion_group!(helmholtz_p_f32, helmholtz_potentials_f32);
-// criterion_group!(helmholtz_g_f32, helmholtz_potentials_gradients_f32);
+criterion_group!(helmholtz_g_f32, helmholtz_potentials_gradients_f32);
 
-criterion_main!(helmholtz_p_f32);
+criterion_main!(helmholtz_p_f32, helmholtz_g_f32);
