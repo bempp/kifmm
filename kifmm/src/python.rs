@@ -1,5 +1,6 @@
 //! Python bindings for constructors and basic methods
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::fmm::KiFmm;
 use crate::traits::fmm::Fmm;
@@ -304,6 +305,18 @@ macro_rules! laplace_blas_constructors {
                     source_leaves,
                 })
             }
+
+            /// Cutoff rank
+            #[getter]
+            pub fn cutoff_ranks(&self) -> PyResult<usize> {
+                Ok(self.fmm.source_to_target.cutoff_rank)
+            }
+
+            /// Directional cutoff ranks
+            #[getter]
+            pub fn directional_cutoff_ranks(&self) -> PyResult<Vec<usize>> {
+                Ok(self.fmm.source_to_target.directional_cutoff_ranks.clone())
+            }
         }
     };
 }
@@ -544,6 +557,12 @@ macro_rules! helmholtz_blas_constructors {
                     source_leaves,
                 })
             }
+
+            /// Cutoff ranks
+            #[getter]
+            pub fn cutoff_ranks(&self) -> PyResult<Vec<Vec<usize>>> {
+                Ok(self.fmm.source_to_target.cutoff_ranks.clone())
+            }
         }
     };
 }
@@ -562,9 +581,9 @@ macro_rules! define_class_methods {
         /// Python interface
         #[pymethods]
         impl $name {
-            fn evaluate(&self) -> PyResult<()> {
-                self.fmm.evaluate(false).unwrap();
-                Ok(())
+            fn evaluate(&self, timed: bool) -> PyResult<HashMap<String, Duration>> {
+                let times = self.fmm.evaluate(timed).unwrap();
+                Ok(times)
             }
 
             fn clear(&mut self, charges: PyReadonlyArrayDyn<'_, $type>) -> PyResult<()> {

@@ -1,5 +1,5 @@
 //! Single Node FMM
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
@@ -127,32 +127,36 @@ where
         // Upward pass
         let mut times = FmmTime::new();
 
+        #[cfg(target_os = "linux")]
+        rlst::threading::disable_threading();
+
         if timed {
             {
                 let s = Instant::now();
                 self.p2m()?;
                 times.insert("p2m".to_string(), s.elapsed());
 
-                let s = Instant::now();
                 for level in (1..=self.tree().source_tree().depth()).rev() {
+                    let s = Instant::now();
                     self.m2m(level)?;
+                    let label = "m2m".to_string() + &format!("_level_{}", level);
+                    times.insert(label, s.elapsed());
                 }
-                times.insert("m2m".to_string(), s.elapsed());
             }
 
             // Downward pass
-            times.insert("l2l".to_string(), Duration::from_secs(0));
-            times.insert("m2l".to_string(), Duration::from_secs(0));
             {
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {
                         let s = Instant::now();
                         self.l2l(level)?;
-                        *times.get_mut("l2l").unwrap() += s.elapsed();
+                        let label = "l2l".to_string() + &format!("_level_{}", level);
+                        times.insert(label, s.elapsed());
                     }
                     let s = Instant::now();
                     self.m2l(level)?;
-                    *times.get_mut("m2l").unwrap() += s.elapsed();
+                    let label = "m2l".to_string() + &format!("_level_{}", level);
+                    times.insert(label, s.elapsed());
                 }
 
                 // Leaf level computation

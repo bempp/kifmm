@@ -21,7 +21,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let n_crit = Some(400);
     let expansion_order = 5;
     let sparse = true;
-    let svd_threshold = Some(1e-2);
+    let svd_threshold = Some(2e-1);
 
     // FFT based M2L for a vector of charges
     let nvecs = 1;
@@ -82,7 +82,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     let n_crit = Some(400);
     let expansion_order = 5;
     let sparse = true;
-    let svd_threshold = Some(1e-2);
+    let svd_threshold = Some(2e-1);
 
     // FFT based M2L for a vector of charges
     let nvecs = 1;
