@@ -274,7 +274,7 @@ class KiFmm:
         except:
             raise TypeError(f"charges of type {type(charges)}")
 
-        expected_dtypes = KERNEL_DTYPE[kernel]
+        expected_dtypes = KERNEL_DTYPE[self.kernel]
         try:
             assert type(charges[0].dtype) in expected_dtypes
         except:
