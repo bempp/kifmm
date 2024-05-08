@@ -284,6 +284,25 @@ class KiFmm:
 
         self.fmm.clear(charges)
 
+    @property
+    def cutoff_ranks(self):
+        try:
+            assert self.field_translation == "blas"
+        except:
+            raise TypeError("Cutoff ranks only available for FMMs with BLAS based field translations")
+
+        return self.fmm.cutoff_ranks
+
+    @property
+    def directional_cutoff_ranks(self):
+        try:
+            assert self.field_translation == "blas" and self.kernel == "laplace"
+        except:
+            raise TypeError("Directional cutoff ranks only available for FMMs with BLAS based field translations and Laplace kernels")
+
+        return self.fmm.directional_cutoff_ranks
+
+
     def source_key_to_anchor(self, key):
         """Convert a Morton key to its respective anchor representation for source tree keys.
 

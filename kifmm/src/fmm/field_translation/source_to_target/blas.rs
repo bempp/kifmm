@@ -173,13 +173,8 @@ where
                 );
 
                 // Allocate buffer to store compressed check potentials
-                let compressed_check_potentials = rlst_dynamic_array2!(
-                    Scalar,
-                    [
-                        self.source_to_target.cutoff_rank[m2l_operator_index],
-                        ntargets
-                    ]
-                );
+                let compressed_check_potentials =
+                    rlst_dynamic_array2!(Scalar, [self.source_to_target.cutoff_rank, ntargets]);
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
@@ -187,7 +182,7 @@ where
                         compressed_check_potentials
                             .data()
                             .as_ptr()
-                            .add(i * self.source_to_target.cutoff_rank[m2l_operator_index])
+                            .add(i * self.source_to_target.cutoff_rank)
                             as *mut Scalar
                     };
                     let send_ptr = SendPtrMut { raw };
@@ -233,24 +228,19 @@ where
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
-                                [
-                                    self.source_to_target.cutoff_rank[m2l_operator_index],
-                                    multipole_idxs.len()
-                                ]
+                                [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
                                     .source_to_target
-                                    .cutoff_rank[m2l_operator_index]
-                                    ..(i + 1)
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]]
+                                    .cutoff_rank
+                                    ..(i + 1) * self.source_to_target.cutoff_rank]
                                     .copy_from_slice(
                                         &compressed_multipoles.data()[multipole_idx
-                                            * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                            * self.source_to_target.cutoff_rank
                                             ..(multipole_idx + 1)
-                                                * self.source_to_target.cutoff_rank
-                                                    [m2l_operator_index]],
+                                                * self.source_to_target.cutoff_rank],
                                     );
                             }
 
@@ -270,13 +260,12 @@ where
                                 let check_potential = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         check_potential_ptr,
-                                        self.source_to_target.cutoff_rank[m2l_operator_index],
+                                        self.source_to_target.cutoff_rank,
                                     )
                                 };
                                 let tmp = &compressed_check_potential.data()[multipole_idx
-                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
-                                    ..(multipole_idx + 1)
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]];
+                                    * self.source_to_target.cutoff_rank
+                                    ..(multipole_idx + 1) * self.source_to_target.cutoff_rank];
                                 check_potential
                                     .iter_mut()
                                     .zip(tmp)
@@ -327,20 +316,16 @@ where
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     Scalar,
-                    [
-                        self.source_to_target.cutoff_rank[m2l_operator_index],
-                        nsources * nmatvecs
-                    ]
+                    [self.source_to_target.cutoff_rank, nsources * nmatvecs]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
-                    let key_displacement =
-                        i * self.source_to_target.cutoff_rank[m2l_operator_index] * nmatvecs;
+                    let key_displacement = i * self.source_to_target.cutoff_rank * nmatvecs;
                     let mut tmp = Vec::new();
                     for charge_vec_idx in 0..nmatvecs {
                         let charge_vec_displacement =
-                            charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
+                            charge_vec_idx * self.source_to_target.cutoff_rank;
 
                         let raw = unsafe {
                             compressed_check_potentials
@@ -395,7 +380,7 @@ where
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
                                 [
-                                    self.source_to_target.cutoff_rank[m2l_operator_index],
+                                    self.source_to_target.cutoff_rank,
                                     multipole_idxs.len() * nmatvecs
                                 ]
                             );
@@ -404,30 +389,28 @@ where
                                 multipole_idxs.iter().enumerate()
                             {
                                 let key_displacement_global = global_multipole_idx
-                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    * self.source_to_target.cutoff_rank
                                     * nmatvecs;
 
                                 let key_displacement_local = local_multipole_idx
-                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    * self.source_to_target.cutoff_rank
                                     * nmatvecs;
 
                                 for charge_vec_idx in 0..nmatvecs {
-                                    let charge_vec_displacement = charge_vec_idx
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index];
+                                    let charge_vec_displacement =
+                                        charge_vec_idx * self.source_to_target.cutoff_rank;
 
                                     compressed_multipoles_subset.data_mut()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank
-                                                [m2l_operator_index]]
+                                            + self.source_to_target.cutoff_rank]
                                         .copy_from_slice(
                                             &compressed_multipoles.data()[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
-                                                    + self.source_to_target.cutoff_rank
-                                                        [m2l_operator_index]],
+                                                    + self.source_to_target.cutoff_rank],
                                         );
                                 }
                             }
@@ -455,22 +438,21 @@ where
                                     let check_potential = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             check_potential_ptr,
-                                            self.source_to_target.cutoff_rank[m2l_operator_index],
+                                            self.source_to_target.cutoff_rank,
                                         )
                                     };
 
                                     let key_displacement = local_multipole_idx
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                        * self.source_to_target.cutoff_rank
                                         * nmatvecs;
-                                    let charge_vec_displacement = charge_vec_idx
-                                        * self.source_to_target.cutoff_rank[m2l_operator_index];
+                                    let charge_vec_displacement =
+                                        charge_vec_idx * self.source_to_target.cutoff_rank;
 
                                     let tmp = &compressed_check_potential.data()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank
-                                                [m2l_operator_index]];
+                                            + self.source_to_target.cutoff_rank];
                                     check_potential
                                         .iter_mut()
                                         .zip(tmp)

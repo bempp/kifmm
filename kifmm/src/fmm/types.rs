@@ -558,7 +558,9 @@ where
 ///  Indexed by tree level.
 ///
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
-///    matrices corresponding to unique transfer vectors. Indexed by tree level.
+///    matrices corresponding to unique transfer vectors.
+
+/// - `directional_cutoff_ranks`- Rank of recompressed M2L matrix, indexed by transfer vector.
 #[derive(Default)]
 pub struct BlasFieldTranslationSaRcmp<Scalar>
 where
@@ -573,8 +575,11 @@ where
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// Cutoff ranks
-    pub cutoff_rank: Vec<usize>,
+    /// Cutoff rank
+    pub cutoff_rank: usize,
+
+    /// Directional cutoff ranks
+    pub directional_cutoff_ranks: Vec<usize>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -590,6 +595,9 @@ where
 /// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions. Indexed by tree level.
+///
+/// - `cutoff_ranks`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
+///    matrices corresponding to unique transfer vectors. Indexed by level and then by transfer vector.
 #[derive(Default)]
 pub struct BlasFieldTranslationIa<Scalar>
 where
@@ -603,6 +611,9 @@ where
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
+
+    /// Cutoff ranks
+    pub cutoff_ranks: Vec<Vec<usize>>,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.

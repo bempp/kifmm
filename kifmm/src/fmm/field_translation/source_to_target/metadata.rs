@@ -554,6 +554,7 @@ where
                 level_cutoff_rank.push(cutoff_rank);
             }
 
+            result.cutoff_ranks.push(level_cutoff_rank);
             result.metadata.push(level_result);
             result.transfer_vectors.push(transfer_vectors);
         }
@@ -1107,6 +1108,7 @@ where
 
         let mut c_u = Vec::new();
         let mut c_vt = Vec::new();
+        let mut directional_cutoff_ranks = Vec::new();
 
         for i in 0..self.source_to_target.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
@@ -1150,6 +1152,7 @@ where
 
             c_u.push(u_i_compressed);
             c_vt.push(vt_i_compressed);
+            directional_cutoff_ranks.push(directional_cutoff_rank);
         }
 
         let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
@@ -1162,7 +1165,8 @@ where
             c_vt,
         };
         self.source_to_target.metadata = vec![result];
-        self.source_to_target.cutoff_rank = vec![cutoff_rank];
+        self.source_to_target.cutoff_rank = cutoff_rank;
+        self.source_to_target.directional_cutoff_ranks = directional_cutoff_ranks;
     }
 }
 

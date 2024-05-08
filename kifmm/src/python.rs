@@ -305,6 +305,18 @@ macro_rules! laplace_blas_constructors {
                     source_leaves,
                 })
             }
+
+            /// Cutoff rank
+            #[getter]
+            pub fn cutoff_ranks(&self) -> PyResult<usize> {
+                Ok(self.fmm.source_to_target.cutoff_rank)
+            }
+
+            /// Directional cutoff ranks
+            #[getter]
+            pub fn directional_cutoff_ranks(&self) -> PyResult<Vec<usize>> {
+                Ok(self.fmm.source_to_target.directional_cutoff_ranks.clone())
+            }
         }
     };
 }
@@ -544,6 +556,12 @@ macro_rules! helmholtz_blas_constructors {
                     target_leaves,
                     source_leaves,
                 })
+            }
+
+            /// Cutoff ranks
+            #[getter]
+            pub fn cutoff_ranks(&self) -> PyResult<Vec<Vec<usize>>> {
+                Ok(self.fmm.source_to_target.cutoff_ranks.clone())
             }
         }
     };
