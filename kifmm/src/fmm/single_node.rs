@@ -1,4 +1,6 @@
 //! Single Node FMM
+use std::time::{Duration, Instant};
+
 use green_kernels::traits::Kernel as KernelTrait;
 
 use rlst::{RawAccess, RlstScalar, Shape};
@@ -12,7 +14,7 @@ use crate::{
             TargetTranslation,
         },
         tree::{FmmTree, Tree},
-        types::FmmError,
+        types::{FmmError, FmmTime},
     },
     Fmm, SingleNodeFmmTree,
 };
@@ -121,30 +123,72 @@ where
         }
     }
 
-    fn evaluate(&self) -> Result<(), FmmError> {
+    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
         // Upward pass
-        {
-            self.p2m()?;
-            for level in (1..=self.tree().source_tree().depth()).rev() {
-                self.m2m(level)?;
-            }
-        }
+        let mut times = FmmTime::new();
 
-        // Downward pass
-        {
-            for level in 2..=self.tree().target_tree().depth() {
-                if level > 2 {
-                    self.l2l(level)?;
+        if timed {
+            {
+                let s = Instant::now();
+                self.p2m()?;
+                times.insert("p2m".to_string(), s.elapsed());
+
+                let s = Instant::now();
+                for level in (1..=self.tree().source_tree().depth()).rev() {
+                    self.m2m(level)?;
                 }
-                self.m2l(level)?;
+                times.insert("m2m".to_string(), s.elapsed());
             }
 
-            // Leaf level computation
-            self.p2p()?;
-            self.l2p()?;
+            // Downward pass
+            times.insert("l2l".to_string(), Duration::from_secs(0));
+            times.insert("m2l".to_string(), Duration::from_secs(0));
+            {
+                for level in 2..=self.tree().target_tree().depth() {
+                    if level > 2 {
+                        let s = Instant::now();
+                        self.l2l(level)?;
+                        *times.get_mut("l2l").unwrap() += s.elapsed();
+                    }
+                    let s = Instant::now();
+                    self.m2l(level)?;
+                    *times.get_mut("m2l").unwrap() += s.elapsed();
+                }
+
+                // Leaf level computation
+                let s = Instant::now();
+                self.p2p()?;
+                times.insert("p2p".to_string(), s.elapsed());
+                let s = Instant::now();
+                self.l2p()?;
+                times.insert("l2p".to_string(), s.elapsed());
+            }
+        } else {
+            // Upward pass
+            {
+                self.p2m()?;
+
+                for level in (1..=self.tree().source_tree().depth()).rev() {
+                    self.m2m(level)?;
+                }
+            }
+
+            // Downward pass
+            {
+                for level in 2..=self.tree().target_tree().depth() {
+                    if level > 2 {
+                        self.l2l(level)?;
+                    }
+                    self.m2l(level)?;
+                }
+
+                // Leaf level computation
+                self.p2p()?;
+                self.l2p()?;
+            }
         }
 
-        Ok(())
+        Ok(times)
     }
 
     fn clear(&mut self, charges: &Charges<Self::Scalar>) {
@@ -577,7 +621,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate().unwrap();
+        fmm_fft.evaluate(false).unwrap();
 
         let svd_threshold = Some(1e-5);
         let fmm_svd = SingleNodeBuilder::new()
@@ -593,7 +637,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate().unwrap();
+        fmm_svd.evaluate(false).unwrap();
 
         let fmm_fft = Box::new(fmm_fft);
         let fmm_svd = Box::new(fmm_svd);
@@ -637,14 +681,14 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm.evaluate().unwrap();
+        fmm.evaluate(false).unwrap();
 
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         fmm.clear(&charges);
-        fmm.evaluate().unwrap();
+        fmm.evaluate(false).unwrap();
 
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -698,7 +742,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_fft.evaluate().unwrap();
+            fmm_fft.evaluate(false).unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -723,7 +767,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_fft.evaluate().unwrap();
+            fmm_fft.evaluate(false).unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -752,7 +796,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate().unwrap();
+            fmm_blas.evaluate(false).unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -777,7 +821,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate().unwrap();
+            fmm_blas.evaluate(false).unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -824,7 +868,7 @@ mod test {
             .build()
             .unwrap();
 
-        fmm_fft.evaluate().unwrap();
+        fmm_fft.evaluate(false).unwrap();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
     }
@@ -867,7 +911,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate().unwrap();
+            fmm.evaluate(false).unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -889,7 +933,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate().unwrap();
+            fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -917,7 +961,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate().unwrap();
+            fmm.evaluate(false).unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -939,7 +983,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate().unwrap();
+            fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -996,7 +1040,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate().unwrap();
+            fmm_blas.evaluate(false).unwrap();
 
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
@@ -1018,7 +1062,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate().unwrap();
+            fmm_blas.evaluate(false).unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
@@ -1076,7 +1120,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate().unwrap();
+            fmm_blas.evaluate(false).unwrap();
 
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
@@ -1098,7 +1142,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate().unwrap();
+            fmm_blas.evaluate(false).unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas,

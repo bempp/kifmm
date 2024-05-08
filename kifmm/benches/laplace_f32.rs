@@ -63,11 +63,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .measurement_time(Duration::from_secs(15));
 
     group.bench_function(format!("M2L=FFT, N={nsources}"), |b| {
-        b.iter(|| fmm_fft.evaluate().unwrap())
+        b.iter(|| fmm_fft.evaluate(false).unwrap())
     });
 
     group.bench_function(format!("M2L=BLAS, N={nsources}"), |b| {
-        b.iter(|| fmm_blas.evaluate().unwrap())
+        b.iter(|| fmm_blas.evaluate(false).unwrap())
     });
 }
 
@@ -124,11 +124,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         .measurement_time(Duration::from_secs(20));
 
     group.bench_function(format!("M2L=FFT, N={nsources}"), |b| {
-        b.iter(|| fmm_fft.evaluate().unwrap())
+        b.iter(|| fmm_fft.evaluate(false).unwrap())
     });
 
     group.bench_function(format!("M2L=BLAS, N={nsources}"), |b| {
-        b.iter(|| fmm_blas.evaluate().unwrap())
+        b.iter(|| fmm_blas.evaluate(false).unwrap())
     });
 }
 

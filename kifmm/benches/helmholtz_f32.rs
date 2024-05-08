@@ -68,12 +68,12 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
 
     group.bench_function(
         format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_fft.evaluate().unwrap()),
+        |b| b.iter(|| fmm_fft.evaluate(false).unwrap()),
     );
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas.evaluate(false).unwrap()),
     );
 }
 
@@ -133,12 +133,12 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
 
     group.bench_function(
         format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_fft.evaluate().unwrap()),
+        |b| b.iter(|| fmm_fft.evaluate(false).unwrap()),
     );
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas.evaluate(false).unwrap()),
     );
 }
 
