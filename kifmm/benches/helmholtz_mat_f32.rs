@@ -134,7 +134,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
         .build()
         .unwrap();
 
-    let mut group = c.benchmark_group("Helmholtz Gradients f32");
+    let mut group = c.benchmark_group("Helmholtz Gradients mat f32");
     group
         .sample_size(10)
         .measurement_time(Duration::from_secs(300));
