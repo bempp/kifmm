@@ -8,9 +8,10 @@ use green_kernels::{
 use itertools::Itertools;
 use num::{Float, Zero};
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
-    BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
-    SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3,
+    rlst_metal_array2, Array, BaseArray, Gemm, MatrixSvd, MetalDevice, MultIntoResize, RawAccess,
+    RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
+    VectorContainer,
 };
 
 use crate::{
@@ -23,7 +24,10 @@ use crate::{
         },
         pinv::pinv,
         types::{
-            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasFieldTranslationSaRcmpMetalLaplace, BlasMetadataIa, BlasMetadataSaRcmp, BlasMetadataSaRcmpMetalLaplace, Charges, FftFieldTranslation, FftMetadata, KiFmmMetalLaplace
+            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp,
+            BlasFieldTranslationSaRcmpMetalLaplace, BlasMetadataIa, BlasMetadataSaRcmp,
+            BlasMetadataSaRcmpMetalLaplace, Charges, FftFieldTranslation, FftMetadata,
+            KiFmmMetalLaplace,
         },
         KiFmm,
     },
@@ -232,7 +236,6 @@ where
     }
 }
 
-
 impl SourceAndTargetTranslationMetadata for KiFmmMetalLaplace
 where
     Self: SourceToTargetTranslation,
@@ -305,8 +308,7 @@ where
 
             let tmp = empty_array::<f32, 2>().simple_mult_into_resize(
                 uc2e_inv_1[0].view(),
-                empty_array::<f32, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
+                empty_array::<f32, 2>().simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
             );
             let l = i * nequiv_surface * nequiv_surface;
             let r = l + nequiv_surface * nequiv_surface;
@@ -384,8 +386,7 @@ where
             cc2pe.fill_from(cc2pe_t.transpose());
             let mut tmp = empty_array::<f32, 2>().simple_mult_into_resize(
                 dc2e_inv_1[0].view(),
-                empty_array::<f32, 2>()
-                    .simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
+                empty_array::<f32, 2>().simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
             );
             tmp.data_mut()
                 .iter_mut()
@@ -730,11 +731,232 @@ where
     }
 }
 
-
-impl SourcetoTargetTranslationMetadata for KiFmmMetalLaplace
-{
+impl SourcetoTargetTranslationMetadata for KiFmmMetalLaplace {
     fn source_to_target(&mut self) {
+        // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
+        // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
+        let nrows = ncoeffs_kifmm(self.expansion_order);
+        let ncols = ncoeffs_kifmm(self.expansion_order);
 
+        let device = MetalDevice::from_default();
+
+        let mut se2tc_fat = rlst_dynamic_array2!(f32, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin = rlst_dynamic_array2!(f32, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+
+        let alpha = f32::real(ALPHA_INNER);
+
+        for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
+            let source_equivalent_surface = t.source.surface_grid(
+                self.expansion_order,
+                self.tree.source_tree().domain(),
+                alpha,
+            );
+            let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
+
+            let target_check_surface = t.target.surface_grid(
+                self.expansion_order,
+                self.tree.source_tree().domain(),
+                alpha,
+            );
+            let ntargets = target_check_surface.len() / self.kernel.space_dimension();
+
+            let mut tmp_gram_t = rlst_dynamic_array2!(f32, [ntargets, nsources]);
+
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &source_equivalent_surface[..],
+                &target_check_surface[..],
+                tmp_gram_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut tmp_gram = rlst_dynamic_array2!(f32, [nsources, ntargets]);
+            tmp_gram.fill_from(tmp_gram_t.transpose());
+
+            let mut block = se2tc_fat
+                .view_mut()
+                .into_subview([0, i * ncols], [nrows, ncols]);
+            block.fill_from(tmp_gram.view());
+
+            let mut block_column = se2tc_thin
+                .view_mut()
+                .into_subview([i * nrows, 0], [nrows, ncols]);
+            block_column.fill_from(tmp_gram.view());
+        }
+
+        let mu = se2tc_fat.shape()[0];
+        let nvt = se2tc_fat.shape()[1];
+        let k = std::cmp::min(mu, nvt);
+
+        let mut u_big = rlst_dynamic_array2!(f32, [mu, k]);
+        let mut sigma = vec![0f32; k];
+        let mut vt_big = rlst_dynamic_array2!(f32, [k, nvt]);
+
+        se2tc_fat
+            .into_svd_alloc(
+                u_big.view_mut(),
+                vt_big.view_mut(),
+                &mut sigma[..],
+                SvdMode::Reduced,
+            )
+            .unwrap();
+        let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
+        let mut u = rlst_dynamic_array2!(f32, [mu, cutoff_rank]);
+        let mut sigma_mat = rlst_dynamic_array2!(f32, [cutoff_rank, cutoff_rank]);
+        let mut vt = rlst_dynamic_array2!(f32, [cutoff_rank, nvt]);
+
+        u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
+        vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
+        for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
+            unsafe { *sigma_mat.get_unchecked_mut([j, j]) = *s as f32 }
+        }
+
+        // Store compressed M2L operators
+        let thin_nrows = se2tc_thin.shape()[0];
+        let nst = se2tc_thin.shape()[1];
+        let k = std::cmp::min(thin_nrows, nst);
+        let mut _gamma = rlst_dynamic_array2!(f32, [thin_nrows, k]);
+        let mut _r = vec![0f32; k];
+        let mut st = rlst_dynamic_array2!(f32, [k, nst]);
+
+        se2tc_thin
+            .into_svd_alloc(
+                _gamma.view_mut(),
+                st.view_mut(),
+                &mut _r[..],
+                SvdMode::Reduced,
+            )
+            .unwrap();
+
+        let mut s_trunc = rlst_dynamic_array2!(f32, [nst, cutoff_rank]);
+        for j in 0..cutoff_rank {
+            for i in 0..nst {
+                unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
+            }
+        }
+
+        let mut c_u = Vec::new();
+        let mut c_vt = Vec::new();
+        let mut c_u_metal = Vec::new();
+        let mut c_vt_metal = Vec::new();
+
+        let mut directional_cutoff_ranks = Vec::new();
+
+        for i in 0..self.source_to_target.transfer_vectors.len() {
+            let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+
+            let tmp = empty_array::<f32, 2>().simple_mult_into_resize(
+                sigma_mat.view(),
+                empty_array::<f32, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+            );
+
+            let mut u_i = rlst_dynamic_array2!(f32, [cutoff_rank, cutoff_rank]);
+            let mut sigma_i = vec![f32::zero().re(); cutoff_rank];
+            let mut vt_i = rlst_dynamic_array2!(f32, [cutoff_rank, cutoff_rank]);
+
+            tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+                .unwrap();
+
+            let directional_cutoff_rank =
+                find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
+
+            let mut u_i_compressed =
+                rlst_dynamic_array2!(f32, [cutoff_rank, directional_cutoff_rank]);
+            let mut vt_i_compressed_ =
+                rlst_dynamic_array2!(f32, [directional_cutoff_rank, cutoff_rank]);
+
+            let mut sigma_mat_i_compressed =
+                rlst_dynamic_array2!(f32, [directional_cutoff_rank, directional_cutoff_rank]);
+
+            u_i_compressed
+                .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
+            vt_i_compressed_
+                .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
+
+            for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+                unsafe {
+                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = *s as f32;
+                }
+            }
+
+            let vt_i_compressed = empty_array::<f32, 2>()
+                .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
+
+            let mut u_i_compressed_metal = rlst_metal_array2!(&device, f32, u_i_compressed.shape());
+            let mut vt_i_compressed_metal =
+                rlst_metal_array2!(&device, f32, vt_i_compressed.shape());
+
+            // Row major order
+            let [nrows, ncols] = u_i_compressed.shape();
+            for col_idx in 0..ncols {
+                for row_idx in 0..nrows {
+                    let col_major_idx = col_idx * nrows + row_idx;
+                    let row_major_idx = row_idx * ncols + col_idx;
+
+                    u_i_compressed_metal.data_mut()[row_major_idx] =
+                        u_i_compressed.data()[col_major_idx];
+                }
+            }
+
+            let [nrows, ncols] = vt_i_compressed.shape();
+            for col_idx in 0..ncols {
+                for row_idx in 0..nrows {
+                    let col_major_idx = col_idx * nrows + row_idx;
+                    let row_major_idx = row_idx * ncols + col_idx;
+
+                    vt_i_compressed_metal.data_mut()[row_major_idx] =
+                        vt_i_compressed.data()[col_major_idx];
+                }
+            }
+
+            c_u.push(u_i_compressed);
+            c_vt.push(vt_i_compressed);
+
+            c_u_metal.push(u_i_compressed_metal);
+            c_vt_metal.push(vt_i_compressed_metal);
+
+            directional_cutoff_ranks.push(directional_cutoff_rank);
+        }
+
+        let mut st_trunc = rlst_dynamic_array2!(f32, [cutoff_rank, nst]);
+        st_trunc.fill_from(s_trunc.transpose());
+
+        let mut u_metal = rlst_metal_array2!(&device, f32, u.shape());
+        let mut st_trunc_metal = rlst_metal_array2!(&device, f32, st_trunc.shape());
+
+        // Row major order
+        let [nrows, ncols] = u.shape();
+        for col_idx in 0..ncols {
+            for row_idx in 0..nrows {
+                let col_major_idx = col_idx * nrows + row_idx;
+                let row_major_idx = row_idx * ncols + col_idx;
+                u_metal.data_mut()[row_major_idx] = u.data()[col_major_idx];
+            }
+        }
+
+        let [nrows, ncols] = st_trunc.shape();
+        for col_idx in 0..ncols {
+            for row_idx in 0..nrows {
+                let col_major_idx = col_idx * nrows + row_idx;
+                let row_major_idx = row_idx * ncols + col_idx;
+                st_trunc_metal.data_mut()[row_major_idx] = st_trunc.data()[col_major_idx];
+            }
+        }
+
+        let result = BlasMetadataSaRcmpMetalLaplace {
+            u,
+            u_metal,
+            st: st_trunc,
+            st_metal: st_trunc_metal,
+            c_u,
+            c_vt,
+            c_u_metal,
+            c_vt_metal,
+        };
+
+        self.source_to_target.metadata = vec![result];
+        self.source_to_target.cutoff_rank = cutoff_rank;
+        self.source_to_target.directional_cutoff_ranks = directional_cutoff_ranks;
     }
 }
 
@@ -1723,8 +1945,7 @@ where
     }
 }
 
-impl FmmOperatorData for KiFmmMetalLaplace
-{
+impl FmmOperatorData for KiFmmMetalLaplace {
     fn c2e_operator_index(&self, _level: u64) -> usize {
         0
     }
@@ -1884,10 +2105,7 @@ where
     }
 }
 
-
-
-impl FmmMetadata for KiFmmMetalLaplace
-{
+impl FmmMetadata for KiFmmMetalLaplace {
     type Scalar = f32;
 
     fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>) {
@@ -1998,7 +2216,6 @@ impl FmmMetadata for KiFmmMetalLaplace
     }
 }
 
-
 impl<Scalar> FftFieldTranslation<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Dft + Default,
@@ -2046,8 +2263,7 @@ where
     type Metadata = BlasMetadataSaRcmp<Scalar>;
 }
 
-impl BlasFieldTranslationSaRcmpMetalLaplace
-{
+impl BlasFieldTranslationSaRcmpMetalLaplace {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
     pub fn new(threshold: Option<f32>) -> Self {
@@ -2061,8 +2277,7 @@ impl BlasFieldTranslationSaRcmpMetalLaplace
     }
 }
 
-impl SourceToTargetDataTrait for BlasFieldTranslationSaRcmpMetalLaplace
-{
+impl SourceToTargetDataTrait for BlasFieldTranslationSaRcmpMetalLaplace {
     type Metadata = BlasMetadataSaRcmpMetalLaplace;
 }
 

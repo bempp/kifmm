@@ -3,7 +3,10 @@ use std::collections::HashMap;
 
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
-use rlst::{external::metal::MetalDataBuffer, rlst_dynamic_array2, rlst_metal_array2, Array, BaseArray, MetalDevice, RlstScalar, SliceContainer, VectorContainer};
+use rlst::{
+    external::metal::MetalDataBuffer, rlst_dynamic_array2, rlst_metal_array2, Array, BaseArray,
+    MetalDevice, RlstScalar, SliceContainer, VectorContainer,
+};
 
 use crate::{
     traits::{
@@ -317,8 +320,7 @@ where
 }
 
 #[allow(clippy::type_complexity)]
-pub struct KiFmmMetalLaplace
-{
+pub struct KiFmmMetalLaplace {
     /// Dimension of the FMM
     pub dim: usize,
 
@@ -381,13 +383,13 @@ pub struct KiFmmMetalLaplace
     pub source_to_target: BlasFieldTranslationSaRcmpMetalLaplace,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub source: Vec< Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
+    pub source: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
 
     /// The metadata required for source to source translation
-    pub source_vec: Vec<Vec< Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>>, // index corresponds to level
+    pub source_vec: Vec<Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>>, // index corresponds to level
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_vec: Vec<Vec< Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>>, // index corresponds to level
+    pub target_vec: Vec<Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>>, // index corresponds to level
 
     /// The multipole expansion data at each box.
     pub multipoles: Vec<f32>,
@@ -420,8 +422,7 @@ pub struct KiFmmMetalLaplace
     pub potentials_send_pointers: Vec<SendPtrMut<f32>>,
 }
 
-impl Default for KiFmmMetalLaplace
-{
+impl Default for KiFmmMetalLaplace {
     fn default() -> Self {
         Self {
             tree: SingleNodeFmmTree::default(),
@@ -459,7 +460,6 @@ impl Default for KiFmmMetalLaplace
         }
     }
 }
-
 
 /// Specifies the format of the input data for Fast Multipole Method (FMM) calculations.
 ///
@@ -604,8 +604,7 @@ where
 }
 
 #[derive(Default)]
-pub struct SingleNodeBuilderMetalLaplace
-{
+pub struct SingleNodeBuilderMetalLaplace {
     /// Tree
     pub tree: Option<SingleNodeFmmTree<f32>>,
 
@@ -760,8 +759,7 @@ where
 }
 
 #[derive(Default)]
-pub struct BlasFieldTranslationSaRcmpMetalLaplace
-{
+pub struct BlasFieldTranslationSaRcmpMetalLaplace {
     /// Threshold
     pub threshold: f32,
 
@@ -941,19 +939,30 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
-pub struct BlasMetadataSaRcmpMetalLaplace
-{
+pub struct BlasMetadataSaRcmpMetalLaplace {
     /// Left singular vectors from SVD of fat M2L matrix, truncated to a maximum cutoff rank
-    pub u: Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>,
+    pub u: Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>,
 
     /// Right singular vectors from SVD of thin M2L matrix, truncated to a maximum cutoff rank.
-    pub st: Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>,
+    pub st: Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>,
 
     /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_u: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
+    pub c_u: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>,
 
     /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_vt: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
+    pub c_vt: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>,
+
+    /// Left singular vectors from SVD of fat M2L matrix, truncated to a maximum cutoff rank
+    pub u_metal: Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>,
+
+    /// Right singular vectors from SVD of thin M2L matrix, truncated to a maximum cutoff rank.
+    pub st_metal: Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>,
+
+    /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+    pub c_u_metal: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
+
+    /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+    pub c_vt_metal: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
 }
 
 /// Stores metadata for BLAS based acceleration scheme for field translation.
@@ -991,19 +1000,23 @@ where
     }
 }
 
-
-impl Default for BlasMetadataSaRcmpMetalLaplace
-{
+impl Default for BlasMetadataSaRcmpMetalLaplace {
     fn default() -> Self {
         let device = MetalDevice::from_default();
-        let u = rlst_metal_array2!(&device, f32, [1, 1]);
-        let st = rlst_metal_array2!(&device, f32, [1, 1]);
+        let u_metal = rlst_metal_array2!(&device, f32, [1, 1]);
+        let st_metal = rlst_metal_array2!(&device, f32, [1, 1]);
+        let u = rlst_dynamic_array2!(f32, [1, 1]);
+        let st = rlst_dynamic_array2!(f32, [1, 1]);
 
         Self {
+            u_metal,
+            st_metal,
             u,
             st,
             c_u: Vec::default(),
             c_vt: Vec::default(),
+            c_u_metal: Vec::default(),
+            c_vt_metal: Vec::default(),
         }
     }
 }

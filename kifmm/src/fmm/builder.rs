@@ -20,7 +20,9 @@ use crate::{
     tree::{types::Domain, SingleNodeTree},
 };
 
-use super::types::{BlasFieldTranslationSaRcmpMetalLaplace, KiFmmMetalLaplace, SingleNodeBuilderMetalLaplace};
+use super::types::{
+    BlasFieldTranslationSaRcmpMetalLaplace, KiFmmMetalLaplace, SingleNodeBuilderMetalLaplace,
+};
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
@@ -197,10 +199,9 @@ where
 }
 
 impl SingleNodeBuilderMetalLaplace
-    // rray<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
+// rray<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 where
-    KiFmmMetalLaplace:
-    SourcetoTargetTranslationMetadata
+    KiFmmMetalLaplace: SourcetoTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
         + FmmMetadata<Scalar = f32>,
 {
@@ -261,10 +262,8 @@ where
             let [ntargets, _dim] = targets.shape();
 
             // Estimate depth based on a uniform distribution
-            let source_depth =
-                SingleNodeTree::<f32>::minimum_depth(nsources as u64, n_crit);
-            let target_depth =
-                SingleNodeTree::<f32>::minimum_depth(ntargets as u64, n_crit);
+            let source_depth = SingleNodeTree::<f32>::minimum_depth(nsources as u64, n_crit);
+            let target_depth = SingleNodeTree::<f32>::minimum_depth(ntargets as u64, n_crit);
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
             let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain)?;

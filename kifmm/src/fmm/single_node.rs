@@ -1,7 +1,7 @@
 //! Single Node FMM
 use std::time::Instant;
 
-use green_kernels::traits::Kernel as KernelTrait;
+use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
 
 use rlst::{RawAccess, RlstScalar, Shape};
 
@@ -21,8 +21,122 @@ use crate::{
 
 use super::{
     helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
-    types::Charges,
+    types::{Charges, KiFmmMetalLaplace},
 };
+
+impl Fmm for KiFmmMetalLaplace
+where
+    Self: SourceToTargetTranslation + FmmOperatorData,
+{
+    type Kernel = Laplace3dKernel<f32>;
+    type Scalar = f32;
+    type Tree = SingleNodeFmmTree<f32>;
+
+    fn clear(&mut self, charges: &Charges<Self::Scalar>) {}
+
+    fn dim(&self) -> usize {
+        self.dim
+    }
+
+    fn expansion_order(&self) -> usize {
+        self.expansion_order
+    }
+
+    fn kernel(&self) -> &Self::Kernel {
+        &self.kernel
+    }
+
+    fn local(
+        &self,
+        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<&[Self::Scalar]> {
+        if let Some(index) = self.tree.target_tree().index(key) {
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => {
+                    Some(&self.locals[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                }
+                FmmEvalType::Matrix(nmatvecs) => Some(
+                    &self.locals
+                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
+                ),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn multipole(
+        &self,
+        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<&[Self::Scalar]> {
+        if let Some(index) = self.tree().source_tree().index(key) {
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => {
+                    Some(&self.multipoles[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                }
+                FmmEvalType::Matrix(nmatvecs) => Some(
+                    &self.multipoles
+                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
+                ),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn potential(
+        &self,
+        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+    ) -> Option<Vec<&[Self::Scalar]>> {
+        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
+            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
+            let ntargets = r - l;
+
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => Some(vec![
+                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
+                ]),
+                FmmEvalType::Matrix(nmatvecs) => {
+                    let n_leaves = self.tree.target_tree().n_leaves().unwrap();
+                    let mut slices = Vec::new();
+                    for eval_idx in 0..nmatvecs {
+                        let potentials_pointer =
+                            self.potentials_send_pointers[eval_idx * n_leaves + leaf_idx].raw;
+                        slices.push(unsafe {
+                            std::slice::from_raw_parts(
+                                potentials_pointer,
+                                ntargets * self.kernel_eval_size,
+                            )
+                        });
+                    }
+                    Some(slices)
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn tree(&self) -> &Self::Tree {
+        &self.tree
+    }
+
+    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
+
+        let mut times = FmmTime::new();
+
+        // Upward pass
+        {
+            self.p2m()?;
+
+            for level in (1..=self.tree().source_tree().depth()).rev() {
+                self.m2m(level)?;
+            }
+        }
+
+        Ok(times)
+    }
+}
 
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where

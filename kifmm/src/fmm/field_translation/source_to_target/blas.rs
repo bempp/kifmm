@@ -2,13 +2,15 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Mutex, time::{Duration, Instant},
+    sync::Mutex,
+    time::{Duration, Instant},
 };
 
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_metal_array2, MetalDevice, MultIntoResize, RawAccess, RawAccessMut, RlstScalar
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_metal_array2, MetalDevice,
+    MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -206,7 +208,10 @@ where
                     rlst::threading::disable_threading();
 
                     if self.kernel.is_homogenous() {
-                        compressed_multipoles.scale_inplace(homogenous_kernel_scale::<Scalar>(level) * m2l_scale::<Scalar>(level).unwrap());
+                        compressed_multipoles.scale_inplace(
+                            homogenous_kernel_scale::<Scalar>(level)
+                                * m2l_scale::<Scalar>(level).unwrap(),
+                        );
                     }
                 }
 
@@ -238,7 +243,6 @@ where
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-
                                 compressed_multipoles_subset.data_mut()[i * self
                                     .source_to_target
                                     .cutoff_rank
@@ -250,8 +254,6 @@ where
                                                 * self.source_to_target.cutoff_rank],
                                     );
                             }
-
-
 
                             // println!("ALLOCATION COST level={} i={:?} {:?}", level, c_idx, s.elapsed());
 
@@ -288,7 +290,11 @@ where
                             }
                         });
 
-                    println!("MATMUL level = {:?} TOTAL {:?}ms ", level, (mean_matmat.lock().unwrap().as_millis() as usize));
+                    println!(
+                        "MATMUL level = {:?} TOTAL {:?}ms ",
+                        level,
+                        (mean_matmat.lock().unwrap().as_millis() as usize)
+                    );
                 }
 
                 // 3. Compute local expansions from compressed check potentials
@@ -434,7 +440,6 @@ where
                                 }
                             }
 
-
                             let s = Instant::now();
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
@@ -483,7 +488,12 @@ where
                             }
                         });
 
-                        println!("MEAN MATMUL level = {:?} {:?}", level, (mean_matmat.lock().unwrap().as_micros() as usize) / NTRANSFER_VECTORS_KIFMM);
+                    println!(
+                        "MEAN MATMUL level = {:?} {:?}",
+                        level,
+                        (mean_matmat.lock().unwrap().as_micros() as usize)
+                            / NTRANSFER_VECTORS_KIFMM
+                    );
                 }
 
                 // 3. Compute local expansions from compressed check potentials
@@ -931,8 +941,7 @@ where
     }
 }
 
-impl SourceToTargetTranslation
-    for KiFmmMetalLaplace
+impl SourceToTargetTranslation for KiFmmMetalLaplace
 where
     Self: FmmOperatorData,
 {
