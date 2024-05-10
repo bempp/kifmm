@@ -76,7 +76,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     );
 
     group.bench_function(
-        format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
+        format!("M2L=BLAS, N={nsources}, NVecs=10, wavenumber={wavenumber}"),
         |b| b.iter(|| fmm_blas_10.evaluate(false).unwrap()),
     );
 }
