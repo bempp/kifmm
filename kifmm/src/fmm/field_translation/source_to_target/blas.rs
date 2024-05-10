@@ -2,14 +2,13 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Mutex,
+    sync::Mutex, time::{Duration, Instant},
 };
 
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_metal_array2, MetalDevice, MultIntoResize, RawAccess, RawAccessMut, RlstScalar
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -207,15 +206,14 @@ where
                     rlst::threading::disable_threading();
 
                     if self.kernel.is_homogenous() {
-                        compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                            *d *= homogenous_kernel_scale::<Scalar>(level)
-                                * m2l_scale::<Scalar>(level).unwrap()
-                        });
+                        compressed_multipoles.scale_inplace(homogenous_kernel_scale::<Scalar>(level) * m2l_scale::<Scalar>(level).unwrap());
                     }
                 }
 
                 // 2. Apply BLAS operation
                 {
+                    let mut mean_matmat = Mutex::new(Duration::new(0, 0));
+
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
                         .zip(multipole_idxs)
@@ -226,12 +224,22 @@ where
                             let c_vt_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
+                            // let s = Instant::now();
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
                                 [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
 
+                            let device = MetalDevice::from_default();
+                            let mut compressed_multipoles_subset_metal = rlst_metal_array2!(
+                                &device,
+                                f32,
+                                [self.source_to_target.cutoff_rank, multipole_idxs.len()]
+                            );
+
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
+
+
                                 compressed_multipoles_subset.data_mut()[i * self
                                     .source_to_target
                                     .cutoff_rank
@@ -244,6 +252,10 @@ where
                                     );
                             }
 
+                            // println!("ALLOCATION COST level={} i={:?} {:?}", level, c_idx, s.elapsed());
+
+                            // let s = Instant::now();
+                            let s = Instant::now();
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
@@ -252,6 +264,8 @@ where
                                         compressed_multipoles_subset.view(),
                                     ),
                                 );
+                            *mean_matmat.lock().unwrap() += s.elapsed();
+                            // println!("COMPUTATION COST level={:?} i={:?} {:?}", level, c_idx, s.elapsed());
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
@@ -272,6 +286,8 @@ where
                                     .for_each(|(l, r)| *l += *r);
                             }
                         });
+
+                    println!("MATMUL level = {:?} TOTAL {:?}ms ", level, (mean_matmat.lock().unwrap().as_millis() as usize));
                 }
 
                 // 3. Compute local expansions from compressed check potentials
@@ -366,6 +382,8 @@ where
                 }
 
                 // 2. Apply the BLAS operation
+                let mut mean_matmat = Mutex::new(Duration::new(0, 0));
+
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
@@ -415,6 +433,8 @@ where
                                 }
                             }
 
+
+                            let s = Instant::now();
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
@@ -423,6 +443,7 @@ where
                                         compressed_multipoles_subset.view(),
                                     ),
                                 );
+                            *mean_matmat.lock().unwrap() += s.elapsed();
 
                             for (local_multipole_idx, &global_local_idx) in
                                 local_idxs.iter().enumerate()
@@ -460,6 +481,8 @@ where
                                 }
                             }
                         });
+
+                        println!("MEAN MATMUL level = {:?} {:?}", level, (mean_matmat.lock().unwrap().as_micros() as usize) / NTRANSFER_VECTORS_KIFMM);
                 }
 
                 // 3. Compute local expansions from compressed check potentials

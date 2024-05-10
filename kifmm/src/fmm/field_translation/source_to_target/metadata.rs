@@ -23,8 +23,7 @@ use crate::{
         },
         pinv::pinv,
         types::{
-            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
-            Charges, FftFieldTranslation, FftMetadata,
+            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasFieldTranslationSaRcmpMetalLaplace, BlasMetadataIa, BlasMetadataSaRcmp, BlasMetadataSaRcmpMetalLaplace, Charges, FftFieldTranslation, FftMetadata, KiFmmMetalLaplace
         },
         KiFmm,
     },
@@ -1690,6 +1689,121 @@ where
     }
 }
 
+
+
+impl FmmMetadata for KiFmmMetalLaplace
+{
+    type Scalar = f32;
+
+    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>) {
+        let alpha_outer = ALPHA_OUTER as f32;
+
+        // Check if computing potentials, or potentials and derivatives
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => self.dim + 1,
+        };
+
+        // Check if we are computing matvec or matmul
+        let [_ncharges, nmatvecs] = charges.shape();
+        let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
+        let nsource_keys = self.tree.source_tree.n_keys_tot().unwrap();
+        let ntarget_keys = self.tree.target_tree.n_keys_tot().unwrap();
+        let ntarget_leaves = self.tree.target_tree.n_leaves().unwrap();
+        let nsource_leaves = self.tree.source_tree.n_leaves().unwrap();
+
+        // Buffers to store all multipole and local data
+        let multipoles = vec![0f32; self.ncoeffs * nsource_keys * nmatvecs];
+        let locals = vec![0f32; self.ncoeffs * ntarget_keys * nmatvecs];
+
+        // Index pointers of multipole and local data, indexed by level
+        let level_index_pointer_multipoles = level_index_pointer(&self.tree.source_tree);
+        let level_index_pointer_locals = level_index_pointer(&self.tree.target_tree);
+
+        // Buffer to store evaluated potentials and/or gradients at target points
+        let potentials = vec![0f32; ntarget_points * eval_size * nmatvecs];
+
+        // Kernel scale at each target and source leaf
+        let source_leaf_scales = leaf_scales::<f32>(
+            &self.tree.source_tree,
+            self.kernel.is_homogenous(),
+            self.ncoeffs,
+        );
+
+        // Pre compute check surfaces
+        let leaf_upward_surfaces_sources = leaf_surfaces(
+            &self.tree.source_tree,
+            self.ncoeffs,
+            alpha_outer,
+            self.expansion_order,
+        );
+        let leaf_upward_surfaces_targets = leaf_surfaces(
+            &self.tree.target_tree,
+            self.ncoeffs,
+            alpha_outer,
+            self.expansion_order,
+        );
+
+        // Mutable pointers to multipole and local data, indexed by level
+        let level_multipoles =
+            level_expansion_pointers(&self.tree.source_tree, self.ncoeffs, nmatvecs, &multipoles);
+
+        let level_locals =
+            level_expansion_pointers(&self.tree.source_tree, self.ncoeffs, nmatvecs, &locals);
+
+        // Mutable pointers to multipole and local data only at leaf level
+        let leaf_multipoles = leaf_expansion_pointers(
+            &self.tree.source_tree,
+            self.ncoeffs,
+            nmatvecs,
+            nsource_leaves,
+            &multipoles,
+        );
+
+        let leaf_locals = leaf_expansion_pointers(
+            &self.tree.target_tree,
+            self.ncoeffs,
+            nmatvecs,
+            ntarget_leaves,
+            &locals,
+        );
+
+        // Mutable pointers to potential data at each target leaf
+        let potentials_send_pointers = potential_pointers(
+            &self.tree.target_tree,
+            nmatvecs,
+            ntarget_leaves,
+            ntarget_points,
+            eval_size,
+            &potentials,
+        );
+
+        // Index pointer of charge data at each target leaf
+        let charge_index_pointer_targets = coordinate_index_pointer(&self.tree.target_tree);
+        let charge_index_pointer_sources = coordinate_index_pointer(&self.tree.source_tree);
+
+        // Set data
+        self.multipoles = multipoles;
+        self.locals = locals;
+        self.leaf_multipoles = leaf_multipoles;
+        self.level_multipoles = level_multipoles;
+        self.leaf_locals = leaf_locals;
+        self.level_locals = level_locals;
+        self.level_index_pointer_locals = level_index_pointer_locals;
+        self.level_index_pointer_multipoles = level_index_pointer_multipoles;
+        self.potentials = potentials;
+        self.potentials_send_pointers = potentials_send_pointers;
+        self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
+        self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
+        self.charges = charges.data().to_vec();
+        self.charge_index_pointer_targets = charge_index_pointer_targets;
+        self.charge_index_pointer_sources = charge_index_pointer_sources;
+        self.leaf_scales_sources = source_leaf_scales;
+        self.kernel_eval_size = eval_size;
+    }
+}
+
+
 impl<Scalar> FftFieldTranslation<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Dft + Default,
@@ -1735,6 +1849,26 @@ where
     Scalar: RlstScalar,
 {
     type Metadata = BlasMetadataSaRcmp<Scalar>;
+}
+
+impl BlasFieldTranslationSaRcmpMetalLaplace
+{
+    /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
+    /// TODO: More docs
+    pub fn new(threshold: Option<f32>) -> Self {
+        let tmp = <f32 as Float>::epsilon();
+
+        Self {
+            threshold: threshold.unwrap_or(tmp),
+            transfer_vectors: compute_transfer_vectors_at_level::<f32>(3).unwrap(),
+            ..Default::default()
+        }
+    }
+}
+
+impl SourceToTargetDataTrait for BlasFieldTranslationSaRcmpMetalLaplace
+{
+    type Metadata = BlasMetadataSaRcmpMetalLaplace;
 }
 
 impl<Scalar> BlasFieldTranslationIa<Scalar>
