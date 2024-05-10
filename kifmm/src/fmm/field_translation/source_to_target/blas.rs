@@ -16,7 +16,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use crate::{
     fmm::{
         helpers::{homogenous_kernel_scale, m2l_scale},
-        types::{BlasFieldTranslationIa, FmmEvalType, SendPtrMut},
+        types::{BlasFieldTranslationIa, FmmEvalType, KiFmmMetalLaplace, SendPtrMut},
         KiFmm,
     },
     traits::{
@@ -239,7 +239,6 @@ where
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
 
-
                                 compressed_multipoles_subset.data_mut()[i * self
                                     .source_to_target
                                     .cutoff_rank
@@ -251,6 +250,8 @@ where
                                                 * self.source_to_target.cutoff_rank],
                                     );
                             }
+
+
 
                             // println!("ALLOCATION COST level={} i={:?} {:?}", level, c_idx, s.elapsed());
 
@@ -927,5 +928,19 @@ where
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
         Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
+    }
+}
+
+impl SourceToTargetTranslation
+    for KiFmmMetalLaplace
+where
+    Self: FmmOperatorData,
+{
+    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+        Ok(())
+    }
+
+    fn p2l(&self, level: u64) -> Result<(), FmmError> {
+        Ok(())
     }
 }

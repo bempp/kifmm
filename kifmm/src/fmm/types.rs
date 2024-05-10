@@ -603,6 +603,37 @@ where
     pub fmm_eval_type: Option<FmmEvalType>,
 }
 
+#[derive(Default)]
+pub struct SingleNodeBuilderMetalLaplace
+{
+    /// Tree
+    pub tree: Option<SingleNodeFmmTree<f32>>,
+
+    /// Kernel
+    pub kernel: Option<Laplace3dKernel<f32>>,
+
+    /// Charges
+    pub charges: Option<Charges<f32>>,
+
+    /// Data and metadata for field translations
+    pub source_to_target: Option<BlasFieldTranslationSaRcmpMetalLaplace>,
+
+    /// Domain
+    pub domain: Option<Domain<f32>>,
+
+    /// Expansion order
+    pub expansion_order: Option<usize>,
+
+    /// Number of coefficients
+    pub ncoeffs: Option<usize>,
+
+    /// Kernel eval type
+    pub kernel_eval_type: Option<EvalType>,
+
+    /// FMM eval type
+    pub fmm_eval_type: Option<FmmEvalType>,
+}
+
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
 ///
 /// This struct encapsulates octrees for two distributions of points, sources, and targets,

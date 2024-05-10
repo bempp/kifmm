@@ -232,6 +232,174 @@ where
     }
 }
 
+
+impl SourceAndTargetTranslationMetadata for KiFmmMetalLaplace
+where
+    Self: SourceToTargetTranslation,
+{
+    fn source(&mut self) {
+        let root = MortonKey::<f32>::root();
+
+        // Cast surface parameters
+        let alpha_outer = ALPHA_OUTER as f32;
+        let alpha_inner = ALPHA_INNER as f32;
+        let domain = self.tree.domain;
+
+        // Compute required surfaces
+        let upward_equivalent_surface =
+            root.surface_grid(self.expansion_order, &domain, alpha_inner);
+        let upward_check_surface = root.surface_grid(self.expansion_order, &domain, alpha_outer);
+
+        let nequiv_surface = upward_equivalent_surface.len() / self.dim;
+        let ncheck_surface = upward_check_surface.len() / self.dim;
+
+        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+        // As well as estimating their inverses using SVD
+        let mut uc2e_t = rlst_dynamic_array2!(f32, [ncheck_surface, nequiv_surface]);
+        self.kernel.assemble_st(
+            EvalType::Value,
+            &upward_equivalent_surface[..],
+            &upward_check_surface[..],
+            uc2e_t.data_mut(),
+        );
+
+        // Need to transpose so that rows correspond to targets and columns to sources
+        let mut uc2e = rlst_dynamic_array2!(f32, [nequiv_surface, ncheck_surface]);
+        uc2e.fill_from(uc2e_t.transpose());
+
+        let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(f32, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = s[i] as f32;
+        }
+
+        let uc2e_inv_1 =
+            vec![empty_array::<f32, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let uc2e_inv_2 = vec![ut];
+
+        // Calculate M2M operator matrices
+        let children = root.children();
+        let mut m2m = vec![rlst_dynamic_array2!(
+            f32,
+            [nequiv_surface, 8 * nequiv_surface]
+        )];
+        let mut m2m_vec = vec![Vec::new()];
+
+        for (i, child) in children.iter().enumerate() {
+            let child_upward_equivalent_surface =
+                child.surface_grid(self.expansion_order, &domain, alpha_inner);
+
+            let mut pc2ce_t = rlst_dynamic_array2!(f32, [ncheck_surface, nequiv_surface]);
+
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &child_upward_equivalent_surface,
+                &upward_check_surface,
+                pc2ce_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut pc2ce = rlst_dynamic_array2!(f32, [nequiv_surface, ncheck_surface]);
+            pc2ce.fill_from(pc2ce_t.transpose());
+
+            let tmp = empty_array::<f32, 2>().simple_mult_into_resize(
+                uc2e_inv_1[0].view(),
+                empty_array::<f32, 2>()
+                    .simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
+            );
+            let l = i * nequiv_surface * nequiv_surface;
+            let r = l + nequiv_surface * nequiv_surface;
+
+            m2m[0].data_mut()[l..r].copy_from_slice(tmp.data());
+            m2m_vec[0].push(tmp);
+        }
+
+        self.source = m2m;
+        self.source_vec = m2m_vec;
+        self.uc2e_inv_1 = uc2e_inv_1;
+        self.uc2e_inv_2 = uc2e_inv_2;
+    }
+
+    fn target(&mut self) {
+        let root = MortonKey::<f32>::root();
+
+        // Cast surface parameters
+        let alpha_outer = ALPHA_OUTER as f32;
+        let alpha_inner = ALPHA_INNER as f32;
+        let domain = self.tree.domain;
+
+        // Compute required surfaces
+        let downward_equivalent_surface =
+            root.surface_grid(self.expansion_order, &domain, alpha_outer);
+        let downward_check_surface = root.surface_grid(self.expansion_order, &domain, alpha_inner);
+
+        let nequiv_surface = downward_equivalent_surface.len() / self.dim;
+        let ncheck_surface = downward_check_surface.len() / self.dim;
+
+        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+        // As well as estimating their inverses using SVD
+        let mut dc2e_t = rlst_dynamic_array2!(f32, [ncheck_surface, nequiv_surface]);
+        self.kernel.assemble_st(
+            EvalType::Value,
+            &downward_equivalent_surface[..],
+            &downward_check_surface[..],
+            dc2e_t.data_mut(),
+        );
+
+        // Need to transpose so that rows correspond to targets and columns to sources
+        let mut dc2e = rlst_dynamic_array2!(f32, [nequiv_surface, ncheck_surface]);
+        dc2e.fill_from(dc2e_t.transpose());
+
+        let (s, ut, v) = pinv::<f32>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(f32, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = s[i] as f32;
+        }
+
+        let dc2e_inv_1 =
+            vec![empty_array::<f32, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let dc2e_inv_2 = vec![ut];
+
+        // Calculate M2M and L2L operator matrices
+        let children = root.children();
+        let mut l2l = vec![Vec::new()];
+
+        for child in children.iter() {
+            let child_downward_check_surface =
+                child.surface_grid(self.expansion_order, &domain, alpha_inner);
+            // Need to transpose so that rows correspond to targets, and columns to sources
+
+            let mut cc2pe_t = rlst_dynamic_array2!(f32, [ncheck_surface, nequiv_surface]);
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &downward_equivalent_surface,
+                &child_downward_check_surface,
+                cc2pe_t.data_mut(),
+            );
+
+            // Need to transpose so that rows correspond to targets, and columns to sources
+            let mut cc2pe = rlst_dynamic_array2!(f32, [nequiv_surface, ncheck_surface]);
+            cc2pe.fill_from(cc2pe_t.transpose());
+            let mut tmp = empty_array::<f32, 2>().simple_mult_into_resize(
+                dc2e_inv_1[0].view(),
+                empty_array::<f32, 2>()
+                    .simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
+            );
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|d| *d *= homogenous_kernel_scale::<f32>(child.level()));
+
+            l2l[0].push(tmp);
+        }
+
+        self.target_vec = l2l;
+        self.dc2e_inv_1 = dc2e_inv_1;
+        self.dc2e_inv_2 = dc2e_inv_2;
+    }
+}
+
 impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
 where
@@ -559,6 +727,14 @@ where
         }
 
         self.source_to_target = result;
+    }
+}
+
+
+impl SourcetoTargetTranslationMetadata for KiFmmMetalLaplace
+{
+    fn source_to_target(&mut self) {
+
     }
 }
 
@@ -1529,6 +1705,25 @@ where
     Scalar: RlstScalar + Default,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+{
+    fn c2e_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn m2m_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn l2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn m2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+}
+
+impl FmmOperatorData for KiFmmMetalLaplace
 {
     fn c2e_operator_index(&self, _level: u64) -> usize {
         0
