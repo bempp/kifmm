@@ -605,8 +605,7 @@ where
     pub fmm_eval_type: Option<FmmEvalType>,
 }
 
-pub struct SingleNodeBuilderLaplaceMetal
-{
+pub struct SingleNodeBuilderLaplaceMetal {
     /// Tree
     pub tree: Option<SingleNodeFmmTree<f32>>,
 
@@ -967,6 +966,8 @@ pub struct BlasMetadataSaRcmpLaplaceMetal {
 
     /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
     pub c_vt_metal: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
+
+    pub c_metal: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
 }
 
 /// Stores metadata for BLAS based acceleration scheme for field translation.
@@ -1021,6 +1022,7 @@ impl Default for BlasMetadataSaRcmpLaplaceMetal {
             c_vt: Vec::default(),
             c_u_metal: Vec::default(),
             c_vt_metal: Vec::default(),
+            c_metal: Vec::default(),
         }
     }
 }

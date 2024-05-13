@@ -1,5 +1,5 @@
 //! Single Node FMM
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
 
@@ -382,6 +382,8 @@ where
 
             // Downward pass
             {
+                let mut m2l_time = Duration::from_secs(0);
+
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {
                         let s = Instant::now();
@@ -391,9 +393,10 @@ where
                     }
                     let s = Instant::now();
                     self.m2l(level)?;
-                    let label = "m2l".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
+                    m2l_time += s.elapsed();
                 }
+
+                times.insert("m2l".to_string(), m2l_time);
 
                 // Leaf level computation
                 let s = Instant::now();

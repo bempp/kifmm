@@ -1446,6 +1446,9 @@ impl SourcetoTargetTranslationMetadata for KiFmmLaplaceMetal {
         let mut c_vt = Vec::new();
         let mut directional_cutoff_ranks = Vec::new();
 
+        let mut c_metal = Vec::new();
+        let device = MetalDevice::from_default();
+
         for i in 0..self.source_to_target.transfer_vectors.len() {
             let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
@@ -1453,6 +1456,9 @@ impl SourcetoTargetTranslationMetadata for KiFmmLaplaceMetal {
                 sigma_mat.view(),
                 empty_array::<f32, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
             );
+
+            let tmp_metal = rlst_metal_array2!(&device, f32, tmp.shape());
+            c_metal.push(tmp_metal);
 
             let mut u_i = rlst_dynamic_array2!(f32, [cutoff_rank, cutoff_rank]);
             let mut sigma_i = vec![0f32; cutoff_rank];
@@ -1500,6 +1506,7 @@ impl SourcetoTargetTranslationMetadata for KiFmmLaplaceMetal {
 
         let mut c_u_metal = Vec::new();
         let mut c_vt_metal = Vec::new();
+        // let mut c_metal = Vec::new();
 
         for i in 0..c_u.len() {
             let mut tmp = rlst_metal_array2!(&device, f32, c_u[i].shape());
@@ -1520,6 +1527,7 @@ impl SourcetoTargetTranslationMetadata for KiFmmLaplaceMetal {
             c_vt,
             c_u_metal,
             c_vt_metal,
+            c_metal,
         };
 
         self.source_to_target.metadata = vec![result];

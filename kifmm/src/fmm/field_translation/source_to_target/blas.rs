@@ -1147,13 +1147,11 @@ where
                             }
                         });
                 } else {
-
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-
                             let device = MetalDevice::from_default();
 
                             let c_u_sub_metal = &self.source_to_target.metadata[m2l_operator_index]
@@ -1161,6 +1159,7 @@ where
                             let c_vt_sub_metal = &self.source_to_target.metadata
                                 [m2l_operator_index]
                                 .c_vt_metal[c_idx];
+                            // let c_sub_metal = &self.source_to_target.metadata[m2l_operator_index].c_metal[c_idx];
 
                             let mut compressed_multipoles_subset_metal = rlst_metal_array2!(
                                 &device,
@@ -1184,7 +1183,10 @@ where
                             let mut tmp = rlst_metal_array2!(
                                 &device,
                                 f32,
-                                [c_vt_sub_metal.shape()[0], compressed_multipoles_subset_metal.shape()[1]]
+                                [
+                                    c_vt_sub_metal.shape()[0],
+                                    compressed_multipoles_subset_metal.shape()[1]
+                                ]
                             );
                             let mut compressed_check_potential = rlst_metal_array2!(
                                 &device,
@@ -1209,6 +1211,20 @@ where
                                 tmp.view(),
                                 0.0,
                             );
+                            // let mut compressed_check_potential = rlst_metal_array2!(
+                            //     &device,
+                            //     f32,
+                            //     [c_sub_metal.shape()[0], compressed_multipoles_subset_metal.shape()[1]]
+                            // );
+
+                            // compressed_check_potential.view_mut().metal_mult_into(
+                            //     rlst::TransMode::NoTrans,
+                            //     rlst::TransMode::NoTrans,
+                            //     1.0,
+                            //     c_sub_metal.view(),
+                            //     compressed_multipoles_subset_metal.view(),
+                            //     0.0,
+                            // );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
@@ -1307,12 +1323,10 @@ where
                         self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
                     );
-
                 }
 
                 // 2. Apply the BLAS operation
                 if level < self.metal_level {
-
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
                         *d *=
                             homogenous_kernel_scale::<f32>(level) * m2l_scale::<f32>(level).unwrap()
@@ -1417,7 +1431,6 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-
                             let device = MetalDevice::from_default();
 
                             let c_u_sub_metal = &self.source_to_target.metadata[m2l_operator_index]
@@ -1426,10 +1439,15 @@ where
                                 [m2l_operator_index]
                                 .c_vt_metal[c_idx];
 
+                            // let c_sub_metal = &self.source_to_target.metadata[m2l_operator_index].c_metal[c_idx];
+
                             let mut compressed_multipoles_subset_metal = rlst_metal_array2!(
                                 &device,
                                 f32,
-                                [self.source_to_target.cutoff_rank, multipole_idxs.len() * nmatvecs]
+                                [
+                                    self.source_to_target.cutoff_rank,
+                                    multipole_idxs.len() * nmatvecs
+                                ]
                             );
 
                             for (local_multipole_idx, &global_multipole_idx) in
@@ -1447,11 +1465,11 @@ where
                                     let charge_vec_displacement =
                                         charge_vec_idx * self.source_to_target.cutoff_rank;
 
-                                    compressed_multipoles_subset_metal.data_mut()[key_displacement_local
-                                        + charge_vec_displacement
-                                        ..key_displacement_local
-                                            + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank]
+                                    compressed_multipoles_subset_metal.data_mut()
+                                        [key_displacement_local + charge_vec_displacement
+                                            ..key_displacement_local
+                                                + charge_vec_displacement
+                                                + self.source_to_target.cutoff_rank]
                                         .copy_from_slice(
                                             &compressed_multipoles.data()[key_displacement_global
                                                 + charge_vec_displacement
@@ -1465,8 +1483,12 @@ where
                             let mut tmp = rlst_metal_array2!(
                                 &device,
                                 f32,
-                                [c_vt_sub_metal.shape()[0], compressed_multipoles_subset_metal.shape()[1]]
+                                [
+                                    c_vt_sub_metal.shape()[0],
+                                    compressed_multipoles_subset_metal.shape()[1]
+                                ]
                             );
+
                             let mut compressed_check_potential = rlst_metal_array2!(
                                 &device,
                                 f32,
@@ -1489,6 +1511,21 @@ where
                                 tmp.view(),
                                 0.0,
                             );
+
+                            // let mut compressed_check_potential = rlst_metal_array2!(
+                            //     &device,
+                            //     f32,
+                            //     [c_sub_metal.shape()[0], compressed_multipoles_subset_metal.shape()[1]]
+                            // );
+
+                            // compressed_check_potential.view_mut().metal_mult_into(
+                            //     rlst::TransMode::NoTrans,
+                            //     rlst::TransMode::NoTrans,
+                            //     1.0,
+                            //     c_sub_metal.view(),
+                            //     compressed_multipoles_subset_metal.view(),
+                            //     0.0,
+                            // );
 
                             for (local_multipole_idx, &global_local_idx) in
                                 local_idxs.iter().enumerate()
