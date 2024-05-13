@@ -15,6 +15,7 @@ To make a new release of kifmm, follow the following steps:
     * Update the version numbers in `fftw-src/Cargo.toml` and `fftw-sys/Cargo.toml`,
       and update the version number of `kifmm-fftw-src` in `fftw-sys/Cargo.toml`
     * Run `cargo publish` in the `fftw-src` and `fftw-sys` folders.
+      (Note: for `fftw-src`, you may need to do `cargo publish --no-verify`)
 
 3) Update the version number in `Cargo.toml`.
    The version numbers have the format `[x].[y].[z]`. If you are releasing a major
