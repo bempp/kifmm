@@ -28,7 +28,7 @@ num = "0.4"
 approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
-kifmm-fftw-sys = { version = "0.1.0" }
+kifmm-fftw-sys = { path = "../fftw-sys" }
 green-kernels = { git = "https://github.com/bempp/green-kernels" }
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
@@ -39,10 +39,10 @@ pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethod
 numpy = { version = "0.21", optional = true }
 
 [target.aarch64-apple-darwin.dependencies]
-rlst = { git = "https://github.com/linalg-rs/rlst.git", features=["metal"]}
+rlst = { version = "0.1", features=["metal"]}
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-rlst = { git = "https://github.com/linalg-rs/rlst.git", features=["blis"]}
+rlst = { version = "0.1", features=["blis"]}
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}
