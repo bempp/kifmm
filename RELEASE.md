@@ -26,7 +26,9 @@ To make a new release of kifmm, follow the following steps:
 4) In `Cargo.toml`, check that the `rlst`, `green-kernels`, `kifmm-fftw-src` and `kifmm-fftw-sys`
    dependencies are at the latest version.
 
-5) Commit your changes and push to GitHub, and check that all the tests on CI pass.
+5) Commit your changes and push to GitHub. The CI tests will likely fail due to the local version and release
+   both trying to use `links = "fftw3"`
+
 
 6) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
    The release tag and title should be `v[x].[y].[z]` (where `[x]`, `[y]` and `[z]` are as in step 2).
