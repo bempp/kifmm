@@ -23,7 +23,8 @@ To make a new release of kifmm, follow the following steps:
    If you are releasing a minor version, you should increment `[y]` and set `[z]`
    to zero. If you are releasing a bugfix, you should increment `[z]`.
 
-4) In `Cargo.toml`, check that the `rlst` and `green-kernels` dependencies are at the latest version.
+4) In `Cargo.toml`, check that the `rlst`, `green-kernels`, `kifmm-fftw-src` and `kifmm-fftw-sys`
+   dependencies are at the latest version.
 
 5) Commit your changes and push to GitHub, and check that all the tests on CI pass.
 
