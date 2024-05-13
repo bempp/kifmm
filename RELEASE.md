@@ -29,7 +29,6 @@ To make a new release of kifmm, follow the following steps:
 5) Commit your changes and push to GitHub. The CI tests will likely fail due to the local version and release
    both trying to use `links = "fftw3"`
 
-
 6) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
    The release tag and title should be `v[x].[y].[z]` (where `[x]`, `[y]` and `[z]` are as in step 2).
    In the "Describe this release" box, you should bullet point the main changes since the last
