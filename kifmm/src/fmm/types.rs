@@ -1,9 +1,12 @@
 //! Data structures for kernel independent FMM
 use std::collections::HashMap;
 
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
+use rlst::{
+    external::metal::MetalDataBuffer, rlst_dynamic_array2, rlst_metal_array2, Array, BaseArray,
+    MetalDevice, RlstScalar, SliceContainer, VectorContainer,
+};
 
 use crate::{
     traits::{
@@ -315,6 +318,151 @@ where
         }
     }
 }
+
+pub struct KiFmmLaplaceMetal {
+    /// Dimension of the FMM
+    pub dim: usize,
+
+    pub metal_level: u64,
+
+    /// A single node tree
+    pub tree: SingleNodeFmmTree<f32>,
+
+    /// The associated kernel function
+    pub kernel: Laplace3dKernel<f32>,
+
+    /// The charge data at each target leaf box.
+    pub charges: Vec<f32>,
+
+    /// The expansion order of the FMM
+    pub expansion_order: usize,
+
+    /// The number of coefficients, corresponding to points discretising the equivalent surface
+    pub ncoeffs: usize,
+
+    /// The kernel evaluation type, either for potentials or potentials and gradients
+    pub kernel_eval_type: EvalType,
+
+    /// The FMM evaluation type, either for a vector or matrix of input charges.
+    pub fmm_eval_type: FmmEvalType,
+
+    /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
+    pub kernel_eval_size: usize,
+
+    /// Index pointer for source coordinates
+    pub charge_index_pointer_sources: Vec<(usize, usize)>,
+
+    /// Index pointer for target coordinates
+    pub charge_index_pointer_targets: Vec<(usize, usize)>,
+
+    /// Upward surfaces associated with source leaves
+    pub leaf_upward_surfaces_sources: Vec<f32>,
+
+    /// Upward surfaces associated with target leaves
+    pub leaf_upward_surfaces_targets: Vec<f32>,
+
+    /// Scales of each source leaf box
+    pub leaf_scales_sources: Vec<f32>,
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_1: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub uc2e_inv_2: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_1: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
+    pub dc2e_inv_2: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
+
+    /// Data and metadata for field translations
+    pub source_to_target: BlasFieldTranslationSaRcmpLaplaceMetal,
+
+    /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
+    pub source: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>, // index corresponds to level
+
+    /// The metadata required for source to source translation
+    pub source_vec: Vec<Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>>, // index corresponds to level
+
+    /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
+    pub target_vec: Vec<Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>>, // index corresponds to level
+
+    /// The multipole expansion data at each box.
+    pub multipoles: Vec<f32>,
+
+    /// The local expansion at each box
+    pub locals: Vec<f32>,
+
+    /// The evaluated potentials at each target leaf box.
+    pub potentials: Vec<f32>,
+
+    /// Multipole expansions at leaf level
+    pub leaf_multipoles: Vec<Vec<SendPtrMut<f32>>>,
+
+    /// Multipole expansions at each level
+    pub level_multipoles: Vec<Vec<Vec<SendPtrMut<f32>>>>,
+
+    /// Local expansions at the leaf level
+    pub leaf_locals: Vec<Vec<SendPtrMut<f32>>>,
+
+    /// The local expansion data at each level.
+    pub level_locals: Vec<Vec<Vec<SendPtrMut<f32>>>>,
+
+    /// Index pointers to each key at a given level, indexed by level.
+    pub level_index_pointer_locals: Vec<HashMap<MortonKey<f32>, usize>>,
+
+    /// Index pointers to each key at a given level, indexed by level.
+    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<f32>, usize>>,
+
+    /// The evaluated potentials at each target leaf box.
+    pub potentials_send_pointers: Vec<SendPtrMut<f32>>,
+}
+
+impl Default for KiFmmLaplaceMetal {
+    fn default() -> Self {
+        Self {
+            tree: SingleNodeFmmTree::default(),
+            metal_level: 0,
+            source_to_target: BlasFieldTranslationSaRcmpLaplaceMetal::default(),
+            kernel: Laplace3dKernel::default(),
+            expansion_order: 0,
+            fmm_eval_type: FmmEvalType::Vector,
+            kernel_eval_type: EvalType::Value,
+            kernel_eval_size: 0,
+            dim: 0,
+            ncoeffs: 0,
+            uc2e_inv_1: Vec::default(),
+            uc2e_inv_2: Vec::default(),
+            dc2e_inv_1: Vec::default(),
+            dc2e_inv_2: Vec::default(),
+            source: Vec::default(),
+            source_vec: Vec::default(),
+            target_vec: Vec::default(),
+            multipoles: Vec::default(),
+            locals: Vec::default(),
+            leaf_multipoles: Vec::default(),
+            level_multipoles: Vec::default(),
+            leaf_locals: Vec::default(),
+            level_locals: Vec::default(),
+            level_index_pointer_locals: Vec::default(),
+            level_index_pointer_multipoles: Vec::default(),
+            potentials: Vec::default(),
+            potentials_send_pointers: Vec::default(),
+            leaf_upward_surfaces_sources: Vec::default(),
+            leaf_upward_surfaces_targets: Vec::default(),
+            charges: Vec::default(),
+            charge_index_pointer_sources: Vec::default(),
+            charge_index_pointer_targets: Vec::default(),
+            leaf_scales_sources: Vec::default(),
+        }
+    }
+}
+
 /// Specifies the format of the input data for Fast Multipole Method (FMM) calculations.
 ///
 /// This enum is used to indicate whether the input to the FMM algorithm consists
@@ -457,6 +605,38 @@ where
     pub fmm_eval_type: Option<FmmEvalType>,
 }
 
+pub struct SingleNodeBuilderLaplaceMetal
+{
+    /// Tree
+    pub tree: Option<SingleNodeFmmTree<f32>>,
+
+    /// Kernel
+    pub kernel: Option<Laplace3dKernel<f32>>,
+
+    /// Charges
+    pub charges: Option<Charges<f32>>,
+
+    /// Data and metadata for field translations
+    pub source_to_target: Option<BlasFieldTranslationSaRcmpLaplaceMetal>,
+
+    pub metal_level: Option<u64>,
+
+    /// Domain
+    pub domain: Option<Domain<f32>>,
+
+    /// Expansion order
+    pub expansion_order: Option<usize>,
+
+    /// Number of coefficients
+    pub ncoeffs: Option<usize>,
+
+    /// Kernel eval type
+    pub kernel_eval_type: Option<EvalType>,
+
+    /// FMM eval type
+    pub fmm_eval_type: Option<FmmEvalType>,
+}
+
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
 ///
 /// This struct encapsulates octrees for two distributions of points, sources, and targets,
@@ -574,6 +754,24 @@ where
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// Cutoff rank
+    pub cutoff_rank: usize,
+
+    /// Directional cutoff ranks
+    pub directional_cutoff_ranks: Vec<usize>,
+}
+
+#[derive(Default)]
+pub struct BlasFieldTranslationSaRcmpLaplaceMetal {
+    /// Threshold
+    pub threshold: f32,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataSaRcmpLaplaceMetal>,
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<TransferVector<f32>>,
 
     /// Cutoff rank
     pub cutoff_rank: usize,
@@ -745,6 +943,32 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
+pub struct BlasMetadataSaRcmpLaplaceMetal {
+    /// Left singular vectors from SVD of fat M2L matrix, truncated to a maximum cutoff rank
+    pub u: Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>,
+
+    /// Left singular vectors from SVD of fat M2L matrix, truncated to a maximum cutoff rank
+    pub u_metal: Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>,
+
+    /// Right singular vectors from SVD of thin M2L matrix, truncated to a maximum cutoff rank.
+    pub st: Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>,
+
+    /// Right singular vectors from SVD of thin M2L matrix, truncated to a maximum cutoff rank.
+    pub st_metal: Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>,
+
+    /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+    pub c_u: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>,
+
+    /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+    pub c_vt: Vec<Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>>,
+
+    /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+    pub c_u_metal: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
+
+    /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
+    pub c_vt_metal: Vec<Array<f32, BaseArray<f32, MetalDataBuffer, 2>, 2>>,
+}
+
 /// Stores metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
@@ -776,6 +1000,27 @@ where
             st,
             c_u: Vec::default(),
             c_vt: Vec::default(),
+        }
+    }
+}
+
+impl Default for BlasMetadataSaRcmpLaplaceMetal {
+    fn default() -> Self {
+        let device = MetalDevice::from_default();
+        let u = rlst_dynamic_array2!(f32, [1, 1]);
+        let st = rlst_dynamic_array2!(f32, [1, 1]);
+        let u_metal = rlst_metal_array2!(&device, f32, [1, 1]);
+        let st_metal = rlst_metal_array2!(&device, f32, [1, 1]);
+
+        BlasMetadataSaRcmpLaplaceMetal {
+            u,
+            st,
+            u_metal,
+            st_metal,
+            c_u: Vec::default(),
+            c_vt: Vec::default(),
+            c_u_metal: Vec::default(),
+            c_vt_metal: Vec::default(),
         }
     }
 }
