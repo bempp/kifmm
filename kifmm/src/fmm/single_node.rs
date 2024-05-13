@@ -122,7 +122,6 @@ where
     }
 
     fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
-
         let mut times = FmmTime::new();
 
         // Upward pass
@@ -131,6 +130,16 @@ where
 
             for level in (1..=self.tree().source_tree().depth()).rev() {
                 self.m2m(level)?;
+            }
+        }
+
+        // Downward pass
+        {
+            for level in 2..=self.tree().target_tree().depth() {
+                if level > 2 {
+                    // self.l2l(level)?;
+                }
+                self.m2l(level)?;
             }
         }
 
@@ -294,15 +303,15 @@ where
             // Downward pass
             {
                 for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        self.l2l(level)?;
-                    }
+                    // if level > 2 {
+                        // self.l2l(level)?;
+                    // }
                     self.m2l(level)?;
                 }
 
                 // Leaf level computation
-                self.p2p()?;
-                self.l2p()?;
+                // self.p2p()?;
+                // self.l2p()?;
             }
         }
 

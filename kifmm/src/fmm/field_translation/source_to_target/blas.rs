@@ -224,6 +224,7 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                            let s = Instant::now();
                             let c_u_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
                             let c_vt_sub =
@@ -235,12 +236,12 @@ where
                                 [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
 
-                            let device = MetalDevice::from_default();
-                            let mut compressed_multipoles_subset_metal = rlst_metal_array2!(
-                                &device,
-                                f32,
-                                [self.source_to_target.cutoff_rank, multipole_idxs.len()]
-                            );
+                            // let device = MetalDevice::from_default();
+                            // let mut compressed_multipoles_subset_metal = rlst_metal_array2!(
+                            //     &device,
+                            //     f32,
+                            //     [self.source_to_target.cutoff_rank, multipole_idxs.len()]
+                            // );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
@@ -258,7 +259,6 @@ where
                             // println!("ALLOCATION COST level={} i={:?} {:?}", level, c_idx, s.elapsed());
 
                             // let s = Instant::now();
-                            let s = Instant::now();
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
@@ -270,24 +270,24 @@ where
                             *mean_matmat.lock().unwrap() += s.elapsed();
                             // println!("COMPUTATION COST level={:?} i={:?} {:?}", level, c_idx, s.elapsed());
 
-                            for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                                let check_potential_lock =
-                                    compressed_level_check_potentials[local_idx].lock().unwrap();
-                                let check_potential_ptr = check_potential_lock.raw;
-                                let check_potential = unsafe {
-                                    std::slice::from_raw_parts_mut(
-                                        check_potential_ptr,
-                                        self.source_to_target.cutoff_rank,
-                                    )
-                                };
-                                let tmp = &compressed_check_potential.data()[multipole_idx
-                                    * self.source_to_target.cutoff_rank
-                                    ..(multipole_idx + 1) * self.source_to_target.cutoff_rank];
-                                check_potential
-                                    .iter_mut()
-                                    .zip(tmp)
-                                    .for_each(|(l, r)| *l += *r);
-                            }
+                            // for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
+                            //     let check_potential_lock =
+                            //         compressed_level_check_potentials[local_idx].lock().unwrap();
+                            //     let check_potential_ptr = check_potential_lock.raw;
+                            //     let check_potential = unsafe {
+                            //         std::slice::from_raw_parts_mut(
+                            //             check_potential_ptr,
+                            //             self.source_to_target.cutoff_rank,
+                            //         )
+                            //     };
+                            //     let tmp = &compressed_check_potential.data()[multipole_idx
+                            //         * self.source_to_target.cutoff_rank
+                            //         ..(multipole_idx + 1) * self.source_to_target.cutoff_rank];
+                            //     check_potential
+                            //         .iter_mut()
+                            //         .zip(tmp)
+                            //         .for_each(|(l, r)| *l += *r);
+                            // }
                         });
 
                     println!(
@@ -938,18 +938,5 @@ where
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
         Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
-    }
-}
-
-impl SourceToTargetTranslation for KiFmmMetalLaplace
-where
-    Self: FmmOperatorData,
-{
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
-        Ok(())
-    }
-
-    fn p2l(&self, level: u64) -> Result<(), FmmError> {
-        Ok(())
     }
 }

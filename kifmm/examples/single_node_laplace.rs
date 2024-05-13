@@ -1,6 +1,7 @@
 use std::time::Instant;
 
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use kifmm::fmm::types::{BlasFieldTranslationSaRcmpMetalLaplace, SingleNodeBuilderMetalLaplace};
 use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
@@ -17,7 +18,7 @@ fn main() {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(150);
+    let n_crit = Some(2);
     let expansion_order = 5;
     let sparse = false;
 
@@ -57,7 +58,7 @@ fn main() {
 
         let singular_value_threshold = Some(1e-2);
 
-        let fmm_vec = SingleNodeBuilder::new()
+        let fmm_vec = SingleNodeBuilderMetalLaplace::new()
             .tree(&sources, &targets, n_crit, sparse)
             .unwrap()
             .parameters(
@@ -65,18 +66,31 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmpMetalLaplace::new(singular_value_threshold),
             )
             .unwrap()
             .build()
             .unwrap();
 
-        println!("TREE DEPTH {:?}", fmm_vec.tree.source_tree.depth);
+        // let fmm_vec = SingleNodeBuilder::new()
+        //     .tree(&sources, &targets, n_crit, sparse)
+        //     .unwrap()
+        //     .parameters(
+        //         &charges,
+        //         expansion_order,
+        //         Laplace3dKernel::new(),
+        //         EvalType::Value,
+        //         BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
+        // println!("TREE DEPTH {:?}", fmm_vec.tree.source_tree.depth);
 
         let s = Instant::now();
-        let times = fmm_vec.evaluate(true).unwrap();
+        let times = fmm_vec.evaluate(false).unwrap();
         println!("runtime {:?}", s.elapsed());
-        println!("operator times {:?}", times);
+        // println!("operator times {:?}", times);
 
         // // Matrix of charges
         // let nvecs = 5;

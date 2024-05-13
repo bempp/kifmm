@@ -356,10 +356,10 @@ where
             };
 
             // Calculate required metadata
-            // result.source();
-            // result.target();
+            result.source();
+            result.target();
             result.source_to_target();
-            // result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
+            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
 
             Ok(result)
         }
