@@ -8,8 +8,7 @@ use std::{
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_metal_array2, MetalDevice,
-    MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_metal_array2, DefaultIterator, MetalDevice, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -300,7 +299,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0));
+                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), 0.));
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -490,7 +489,7 @@ where
             }
         }
 
-        Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0),  0))
+        Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), 0.))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -747,7 +746,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
+                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), 0.))
 
             }
             FmmEvalType::Matrix(nmatvecs) => {
@@ -900,7 +899,7 @@ where
                 }
             }
         }
-        return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
+        return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), 0.))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -1033,6 +1032,9 @@ where
 
         let mut matmul_time = Mutex::new(Duration::from_secs(0));
         let mut organisation_time = Mutex::new(Duration::from_secs(0));
+        let mut allocation_time = Mutex::new(Duration::from_secs(0));
+        let mut saving_time = Mutex::new(Duration::from_secs(0));
+        let mut flops = Mutex::new(0);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -1079,14 +1081,7 @@ where
                     multipoles,
                 );
 
-                //     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                //         *d *= homogenous_kernel_scale::<f32>(level)
-                //             * m2l_scale::<f32>(level).unwrap()
-                //     });
-                // }
-
                 // 2. Apply BLAS operation
-
                 if level < self.metal_level {
                     // Apply scale outside of matmul
                     compressed_multipoles.data_mut().iter_mut().for_each(|d| {
@@ -1102,6 +1097,9 @@ where
 
                             let mut org_time = Duration::new(0, 0);
                             let mut mat_time = Duration::new(0, 0);
+                            let mut alloc_time = Duration::new(0, 0);
+                            let mut save_time = Duration::new(0, 0);
+
                             let s = Instant::now();
                             let c_u_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
@@ -1112,7 +1110,9 @@ where
                                 f32,
                                 [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
+                            alloc_time += s.elapsed();
 
+                            let s = Instant::now();
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
                                     .source_to_target
@@ -1127,6 +1127,9 @@ where
                             }
                             org_time += s.elapsed();
 
+
+                            let total_flops = c_vt_sub.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1] + c_u_sub.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1];
+                            *flops .lock().unwrap() += total_flops;
 
                             let s = Instant::now();
                             let compressed_check_potential = empty_array::<f32, 2>()
@@ -1158,13 +1161,16 @@ where
                                     .zip(tmp)
                                     .for_each(|(l, r)| *l += *r);
                             }
-                            org_time += s.elapsed();
+                            save_time += s.elapsed();
 
                             *matmul_time.lock().unwrap() += mat_time;
                             *organisation_time.lock().unwrap() += org_time;
+                            *allocation_time.lock().unwrap() += alloc_time;
+                            *saving_time.lock().unwrap() += save_time;
 
                         });
                 } else {
+                    let device = MetalDevice::from_default();
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
                         .zip(multipole_idxs)
@@ -1173,8 +1179,10 @@ where
 
                             let mut org_time = Duration::new(0, 0);
                             let mut mat_time = Duration::new(0, 0);
+                            let mut alloc_time = Duration::new(0, 0);
+                            let mut save_time = Duration::new(0, 0);
+
                             let s = Instant::now();
-                            let device = MetalDevice::from_default();
                             let c_u_sub_metal = &self.source_to_target.metadata[m2l_operator_index]
                                 .c_u_metal[c_idx];
                             let c_vt_sub_metal = &self.source_to_target.metadata
@@ -1187,7 +1195,9 @@ where
                                 f32,
                                 [self.source_to_target.cutoff_rank, multipole_idxs.len()]
                             );
+                            alloc_time += s.elapsed();
 
+                            let s = Instant::now();
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset_metal.data_mut()[i * self
                                     .source_to_target
@@ -1200,7 +1210,9 @@ where
                                                 * self.source_to_target.cutoff_rank],
                                     );
                             }
+                            org_time += s.elapsed();
 
+                            let s = Instant::now();
                             let mut tmp = rlst_metal_array2!(
                                 &device,
                                 f32,
@@ -1214,8 +1226,10 @@ where
                                 f32,
                                 [c_u_sub_metal.shape()[0], tmp.shape()[1]]
                             );
+                            alloc_time += s.elapsed();
 
-                            org_time += s.elapsed();
+                            let total_flops = c_vt_sub_metal.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1] + c_u_sub_metal.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1];
+                            *flops.lock().unwrap() += total_flops;
 
                             let s = Instant::now();
                             tmp.view_mut().metal_mult_into(
@@ -1237,21 +1251,6 @@ where
                             );
                             mat_time += s.elapsed();
 
-                            // let mut compressed_check_potential = rlst_metal_array2!(
-                            //     &device,
-                            //     f32,
-                            //     [c_sub_metal.shape()[0], compressed_multipoles_subset_metal.shape()[1]]
-                            // );
-
-                            // compressed_check_potential.view_mut().metal_mult_into(
-                            //     rlst::TransMode::NoTrans,
-                            //     rlst::TransMode::NoTrans,
-                            //     1.0,
-                            //     c_sub_metal.view(),
-                            //     compressed_multipoles_subset_metal.view(),
-                            //     0.0,
-                            // );
-
                             let s = Instant::now();
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
@@ -1271,11 +1270,12 @@ where
                                     .zip(tmp)
                                     .for_each(|(l, r)| *l += *r);
                             }
-                            org_time += s.elapsed();
+                            save_time += s.elapsed();
 
                             *matmul_time.lock().unwrap() += mat_time;
                             *organisation_time.lock().unwrap() += org_time;
-
+                            *allocation_time.lock().unwrap() += alloc_time;
+                            *saving_time.lock().unwrap() += save_time;
                         });
                 }
 
@@ -1301,7 +1301,9 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(matmul_time.lock().unwrap().clone(), organisation_time.lock().unwrap().clone(), 0))
+                let mut mean_flops = *flops.lock().unwrap() as f64 / (NTRANSFER_VECTORS_KIFMM as f64);
+
+                return Ok(M2LResult(matmul_time.lock().unwrap().clone(), organisation_time.lock().unwrap().clone(), allocation_time.lock().unwrap().clone(), saving_time.lock().unwrap().clone(), mean_flops))
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -1372,8 +1374,10 @@ where
 
                             let mut org_time = Duration::new(0, 0);
                             let mut mat_time = Duration::new(0, 0);
-                            let s = Instant::now();
+                            let mut alloc_time = Duration::new(0, 0);
+                            let mut save_time = Duration::new(0, 0);
 
+                            let s = Instant::now();
                             let c_u_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
                             let c_vt_sub =
@@ -1386,7 +1390,9 @@ where
                                     multipole_idxs.len() * nmatvecs
                                 ]
                             );
+                            alloc_time += s.elapsed();
 
+                            let s = Instant::now();
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
@@ -1417,6 +1423,9 @@ where
                                 }
                             }
                             org_time += s.elapsed();
+
+                            let total_flops = c_vt_sub.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1] + c_u_sub.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1];
+                            *flops .lock().unwrap() += total_flops;
 
                             let s = Instant::now();
                             let compressed_check_potential = empty_array::<f32, 2>()
@@ -1465,12 +1474,15 @@ where
                                         .for_each(|(l, r)| *l += *r);
                                 }
                             }
-                            org_time += s.elapsed();
+                            save_time += s.elapsed();
 
                             *matmul_time.lock().unwrap() += mat_time;
                             *organisation_time.lock().unwrap() += org_time;
                         });
                 } else {
+
+                    let device = MetalDevice::from_default();
+
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
                         .zip(multipole_idxs)
@@ -1479,15 +1491,15 @@ where
 
                             let mut org_time = Duration::new(0, 0);
                             let mut mat_time = Duration::new(0, 0);
+                            let mut alloc_time = Duration::new(0, 0);
+                            let mut save_time = Duration::new(0, 0);
+
                             let s = Instant::now();
-                            let device = MetalDevice::from_default();
                             let c_u_sub_metal = &self.source_to_target.metadata[m2l_operator_index]
                                 .c_u_metal[c_idx];
                             let c_vt_sub_metal = &self.source_to_target.metadata
                                 [m2l_operator_index]
                                 .c_vt_metal[c_idx];
-
-                            // let c_sub_metal = &self.source_to_target.metadata[m2l_operator_index].c_metal[c_idx];
 
                             let mut compressed_multipoles_subset_metal = rlst_metal_array2!(
                                 &device,
@@ -1497,7 +1509,9 @@ where
                                     multipole_idxs.len() * nmatvecs
                                 ]
                             );
+                            alloc_time += s.elapsed();
 
+                            let s = Instant::now();
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
@@ -1527,7 +1541,9 @@ where
                                         );
                                 }
                             }
+                            org_time += s.elapsed();
 
+                            let s = Instant::now();
                             let mut tmp = rlst_metal_array2!(
                                 &device,
                                 f32,
@@ -1542,10 +1558,12 @@ where
                                 f32,
                                 [c_u_sub_metal.shape()[0], tmp.shape()[1]]
                             );
-                            org_time += s.elapsed();
+                            alloc_time += s.elapsed();
+
+                            let total_flops = c_vt_sub_metal.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1] + c_u_sub_metal.shape().iter().product::<usize>() * compressed_check_potentials.shape()[1];
+                            *flops .lock().unwrap() += total_flops;
 
                             let s = Instant::now();
-
                             tmp.view_mut().metal_mult_into(
                                 rlst::TransMode::NoTrans,
                                 rlst::TransMode::NoTrans,
@@ -1564,21 +1582,6 @@ where
                                 0.0,
                             );
                             mat_time += s.elapsed();
-
-                            // let mut compressed_check_potential = rlst_metal_array2!(
-                            //     &device,
-                            //     f32,
-                            //     [c_sub_metal.shape()[0], compressed_multipoles_subset_metal.shape()[1]]
-                            // );
-
-                            // compressed_check_potential.view_mut().metal_mult_into(
-                            //     rlst::TransMode::NoTrans,
-                            //     rlst::TransMode::NoTrans,
-                            //     1.0,
-                            //     c_sub_metal.view(),
-                            //     compressed_multipoles_subset_metal.view(),
-                            //     0.0,
-                            // );
 
                             let s = Instant::now();
                             for (local_multipole_idx, &global_local_idx) in
@@ -1616,10 +1619,12 @@ where
                                         .for_each(|(l, r)| *l += *r);
                                 }
                             }
-                            org_time += s.elapsed();
+                            save_time += s.elapsed();
 
                             *matmul_time.lock().unwrap() += mat_time;
                             *organisation_time.lock().unwrap() += org_time;
+                            *allocation_time.lock().unwrap() += alloc_time;
+                            *saving_time.lock().unwrap() += save_time;
                         });
                 }
 
@@ -1646,9 +1651,11 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
+            let mut mean_flops = *flops.lock().unwrap() as f64 / (NTRANSFER_VECTORS_KIFMM as f64);
+            return Ok(M2LResult(matmul_time.lock().unwrap().clone(), organisation_time.lock().unwrap().clone(), allocation_time.lock().unwrap().clone(), saving_time.lock().unwrap().clone(), mean_flops))
             }
         }
+
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {

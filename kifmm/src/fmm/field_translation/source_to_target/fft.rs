@@ -425,7 +425,7 @@ where
                         });
                 }
 
-                Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
+                Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), Duration::from_secs(0), 0.))
             }
             FmmEvalType::Matrix(_nmatvecs) => Err(FmmError::Unimplemented(
                 "M2L unimplemented for matrix input with FFT field translations".to_string(),

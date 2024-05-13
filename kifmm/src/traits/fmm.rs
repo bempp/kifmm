@@ -113,7 +113,7 @@ where
     fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&self, timed: bool) -> Result<(FmmTime, usize), FmmError>;
+    fn evaluate(&self, timed: bool) -> Result<(FmmTime, f64), FmmError>;
 
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///

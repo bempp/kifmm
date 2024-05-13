@@ -78,10 +78,10 @@ fn main() {
     //     }
 
         {
-            println!("n_leaves,svd_threshold, nvecs, depth, metal_level, using_metal, flops, data_organisation_time, matmat_time");
-            for n_crit in [400] {
-                for nvecs in [1, 5, 10] {
-                    for metal_level in [3, 4, 5] {
+            println!("n_leaves,svd_threshold, nvecs, depth, metal_level, using_metal, flops, data_organisation_time, matmul_time");
+            for n_crit in [15] {
+                for nvecs in [10] {
+                    for metal_level in [5] {
                         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
                         charges
                             .data_mut()

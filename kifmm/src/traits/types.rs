@@ -14,7 +14,7 @@ pub enum FmmError {
     Io(std::io::Error),
 }
 
-pub struct M2LResult (pub Duration, pub Duration, pub usize);
+pub struct M2LResult (pub Duration, pub Duration, pub Duration, pub Duration, pub f64);
 
 
 /// Type to handle FMM related errors

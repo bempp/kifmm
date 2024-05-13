@@ -123,7 +123,7 @@ where
         }
     }
 
-    fn evaluate(&self, timed: bool) -> Result<(FmmTime, usize), FmmError> {
+    fn evaluate(&self, timed: bool) -> Result<(FmmTime, f64), FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
 
@@ -192,7 +192,7 @@ where
             }
         }
 
-        Ok((times, 0))
+        Ok((times, 0.))
     }
 
     fn clear(&mut self, charges: &Charges<Self::Scalar>) {
@@ -359,14 +359,14 @@ where
         }
     }
 
-    fn evaluate(&self, timed: bool) -> Result<(FmmTime, usize), FmmError> {
+    fn evaluate(&self, timed: bool) -> Result<(FmmTime, f64), FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
 
         #[cfg(target_os = "linux")]
         rlst::threading::disable_threading();
 
-        let mut flops = 0;
+        let mut flops: f64 = 0.;
 
         if timed {
             {
@@ -404,6 +404,7 @@ where
                 }
 
                 times.insert("matmul".to_string(), matmul_time);
+                times.insert("data_organisation".to_string(), matmul_time);
 
                 times.insert("m2l".to_string(), m2l_time);
 
