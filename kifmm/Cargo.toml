@@ -28,7 +28,7 @@ num = "0.4"
 approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
-fftw-sys = {path = "../fftw-sys"}
+kifmm-fftw-sys = { version = "0.1.0" }
 green-kernels = { git = "https://github.com/bempp/green-kernels" }
 lazy_static = "1.4.0"
 num-complex = "0.4.5"

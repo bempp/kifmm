@@ -11,20 +11,25 @@ To make a new release of kifmm, follow the following steps:
    git merge main
    ```
 
-2) Update the version number in `Cargo.toml`.
+2) If `fftw-src` or `fftw-sys` has changed:
+    * Update the version numbers in `fftw-src/Cargo.toml` and `fftw-sys/Cargo.toml`,
+      and update the version number of `kifmm-fftw-src` in `fftw-sys/Cargo.toml`
+    * Run `cargo publish` in the `fftw-src` and `fftw-sys` folders.
+
+3) Update the version number in `Cargo.toml`.
    The version numbers have the format `[x].[y].[z]`. If you are releasing a major
    version, you should increment `[x]` and set `[y]` and `[z]` to 0.
    If you are releasing a minor version, you should increment `[y]` and set `[z]`
    to zero. If you are releasing a bugfix, you should increment `[z]`.
 
-3) Commit you changes and push to GitHub, and check that all the tests on CI pass.
+4) In `Cargo.toml`, check that the `rlst` and `green-kernels` dependencies are at the latest version.
 
-4) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
+5) Commit your changes and push to GitHub, and check that all the tests on CI pass.
+
+6) [Create a release on GitHub](https://github.com/bempp/green-kernels/releases/new) from the `release` branch.
    The release tag and title should be `v[x].[y].[z]` (where `[x]`, `[y]` and `[z]` are as in step 2).
    In the "Describe this release" box, you should bullet point the main changes since the last
    release.
-
-6) In `Cargo.toml`, check that the `rlst` and `green-kernels` dependencies are at the latest version.
 
 7) Run `cargo publish --dry-run`, then run `cargo package --list` and
    check that no unwanted extras have been included in the release.
@@ -33,4 +38,4 @@ To make a new release of kifmm, follow the following steps:
    crates.io. Note: this cannot be undone, but you can use `cargo yank` to mark a version as
    unsuitable for use.
 
-8) Open a pull request to `main` to update the version number in `Cargo.toml` to `[x].[y].[z]-dev`
+9) Open a pull request to `main` to update the version number in `Cargo.toml` to `[x].[y].[z]-dev`

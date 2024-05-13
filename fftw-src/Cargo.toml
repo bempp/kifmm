@@ -1,9 +1,11 @@
 [package]
-name = "fftw-src"
+name = "kifmm-fftw-src"
+description = "FFTW src"
 version = "0.1.0"
 edition = "2021"
-
+license = "GPL-2.0-or-later"
 links="fftw3"
+repository="https://github.com/bempp/kifmm"
 
 [dependencies]
 
