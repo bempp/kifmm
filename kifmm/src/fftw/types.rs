@@ -2,7 +2,7 @@
 
 use std::sync::Mutex;
 
-use fftw_sys as ffi;
+use kifmm_fftw_sys as ffi;
 use lazy_static::lazy_static;
 
 /// A threadsafe wrapper for a FFT plan operating on double precision data
