@@ -2,7 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Mutex, time::Duration,
+    sync::Mutex, time::{Duration, Instant},
 };
 
 use itertools::Itertools;
@@ -40,7 +40,7 @@ where
     /// at this octree level.
     ///
     /// Returns a vector of length 316, the maximum number of unique transfer vectors at a tree level for homogenous
-    /// kernels, where each item is a mutex locked vector of indices, of a length equal to the number of source boxes
+    /// kernels, where each item is a Mutex locked vector of indices, of a length equal to the number of source boxes
     /// at this tree level, where an index value of -1 indicates that the box isn't involved in the translation, and
     /// an index values of `usize` gives the target box index that the source box density is being translated to.
     fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
@@ -300,7 +300,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(Duration::from_secs(0), 0));
+                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0));
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -490,7 +490,7 @@ where
             }
         }
 
-        Ok(M2LResult(Duration::from_secs(0), 0))
+        Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0),  0))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -509,7 +509,7 @@ where
     /// at this octree level.
     ///
     /// Returns a vector of length 316, the maximum number of unique transfer vectors at a tree level for homogenous
-    /// kernels, where each item is a mutex locked vector of indices, of a length equal to the number of source boxes
+    /// kernels, where each item is a Mutex locked vector of indices, of a length equal to the number of source boxes
     /// at this tree level, where an index value of -1 indicates that the box isn't involved in the translation, and
     /// an index values of `usize` gives the target box index that the source box density is being translated to.
     fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
@@ -747,7 +747,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(Duration::from_secs(0), 0))
+                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
 
             }
             FmmEvalType::Matrix(nmatvecs) => {
@@ -900,7 +900,7 @@ where
                 }
             }
         }
-        return Ok(M2LResult(Duration::from_secs(0), 0))
+        return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -916,7 +916,7 @@ where
     /// at this octree level.
     ///
     /// Returns a vector of length 316, the maximum number of unique transfer vectors at a tree level for homogenous
-    /// kernels, where each item is a mutex locked vector of indices, of a length equal to the number of source boxes
+    /// kernels, where each item is a Mutex locked vector of indices, of a length equal to the number of source boxes
     /// at this tree level, where an index value of -1 indicates that the box isn't involved in the translation, and
     /// an index values of `usize` gives the target box index that the source box density is being translated to.
     fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
@@ -1031,6 +1031,9 @@ where
         let nsources = sources.len();
         let ntargets = targets.len();
 
+        let mut matmul_time = Mutex::new(Duration::from_secs(0));
+        let mut organisation_time = Mutex::new(Duration::from_secs(0));
+
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 // Lookup multipole data from source tree
@@ -1096,6 +1099,10 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+
+                            let mut org_time = Duration::new(0, 0);
+                            let mut mat_time = Duration::new(0, 0);
+                            let s = Instant::now();
                             let c_u_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
                             let c_vt_sub =
@@ -1118,7 +1125,10 @@ where
                                                 * self.source_to_target.cutoff_rank],
                                     );
                             }
+                            org_time += s.elapsed();
 
+
+                            let s = Instant::now();
                             let compressed_check_potential = empty_array::<f32, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
@@ -1127,7 +1137,9 @@ where
                                         compressed_multipoles_subset.view(),
                                     ),
                                 );
+                            mat_time += s.elapsed();
 
+                            let s = Instant::now();
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
                                     compressed_level_check_potentials[local_idx].lock().unwrap();
@@ -1146,6 +1158,11 @@ where
                                     .zip(tmp)
                                     .for_each(|(l, r)| *l += *r);
                             }
+                            org_time += s.elapsed();
+
+                            *matmul_time.lock().unwrap() += mat_time;
+                            *organisation_time.lock().unwrap() += org_time;
+
                         });
                 } else {
                     (0..NTRANSFER_VECTORS_KIFMM)
@@ -1153,8 +1170,11 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let device = MetalDevice::from_default();
 
+                            let mut org_time = Duration::new(0, 0);
+                            let mut mat_time = Duration::new(0, 0);
+                            let s = Instant::now();
+                            let device = MetalDevice::from_default();
                             let c_u_sub_metal = &self.source_to_target.metadata[m2l_operator_index]
                                 .c_u_metal[c_idx];
                             let c_vt_sub_metal = &self.source_to_target.metadata
@@ -1195,6 +1215,9 @@ where
                                 [c_u_sub_metal.shape()[0], tmp.shape()[1]]
                             );
 
+                            org_time += s.elapsed();
+
+                            let s = Instant::now();
                             tmp.view_mut().metal_mult_into(
                                 rlst::TransMode::NoTrans,
                                 rlst::TransMode::NoTrans,
@@ -1212,6 +1235,8 @@ where
                                 tmp.view(),
                                 0.0,
                             );
+                            mat_time += s.elapsed();
+
                             // let mut compressed_check_potential = rlst_metal_array2!(
                             //     &device,
                             //     f32,
@@ -1227,6 +1252,7 @@ where
                             //     0.0,
                             // );
 
+                            let s = Instant::now();
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
                                     compressed_level_check_potentials[local_idx].lock().unwrap();
@@ -1245,6 +1271,11 @@ where
                                     .zip(tmp)
                                     .for_each(|(l, r)| *l += *r);
                             }
+                            org_time += s.elapsed();
+
+                            *matmul_time.lock().unwrap() += mat_time;
+                            *organisation_time.lock().unwrap() += org_time;
+
                         });
                 }
 
@@ -1270,7 +1301,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(M2LResult(Duration::from_secs(0), 0))
+                return Ok(M2LResult(matmul_time.lock().unwrap().clone(), organisation_time.lock().unwrap().clone(), 0))
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -1338,6 +1369,11 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+
+                            let mut org_time = Duration::new(0, 0);
+                            let mut mat_time = Duration::new(0, 0);
+                            let s = Instant::now();
+
                             let c_u_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
                             let c_vt_sub =
@@ -1380,7 +1416,9 @@ where
                                         );
                                 }
                             }
+                            org_time += s.elapsed();
 
+                            let s = Instant::now();
                             let compressed_check_potential = empty_array::<f32, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.view(),
@@ -1389,7 +1427,9 @@ where
                                         compressed_multipoles_subset.view(),
                                     ),
                                 );
+                            mat_time += s.elapsed();
 
+                            let s = Instant::now();
                             for (local_multipole_idx, &global_local_idx) in
                                 local_idxs.iter().enumerate()
                             {
@@ -1425,6 +1465,10 @@ where
                                         .for_each(|(l, r)| *l += *r);
                                 }
                             }
+                            org_time += s.elapsed();
+
+                            *matmul_time.lock().unwrap() += mat_time;
+                            *organisation_time.lock().unwrap() += org_time;
                         });
                 } else {
                     (0..NTRANSFER_VECTORS_KIFMM)
@@ -1432,8 +1476,11 @@ where
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
-                            let device = MetalDevice::from_default();
 
+                            let mut org_time = Duration::new(0, 0);
+                            let mut mat_time = Duration::new(0, 0);
+                            let s = Instant::now();
+                            let device = MetalDevice::from_default();
                             let c_u_sub_metal = &self.source_to_target.metadata[m2l_operator_index]
                                 .c_u_metal[c_idx];
                             let c_vt_sub_metal = &self.source_to_target.metadata
@@ -1495,6 +1542,9 @@ where
                                 f32,
                                 [c_u_sub_metal.shape()[0], tmp.shape()[1]]
                             );
+                            org_time += s.elapsed();
+
+                            let s = Instant::now();
 
                             tmp.view_mut().metal_mult_into(
                                 rlst::TransMode::NoTrans,
@@ -1513,6 +1563,7 @@ where
                                 tmp.view(),
                                 0.0,
                             );
+                            mat_time += s.elapsed();
 
                             // let mut compressed_check_potential = rlst_metal_array2!(
                             //     &device,
@@ -1529,6 +1580,7 @@ where
                             //     0.0,
                             // );
 
+                            let s = Instant::now();
                             for (local_multipole_idx, &global_local_idx) in
                                 local_idxs.iter().enumerate()
                             {
@@ -1564,6 +1616,10 @@ where
                                         .for_each(|(l, r)| *l += *r);
                                 }
                             }
+                            org_time += s.elapsed();
+
+                            *matmul_time.lock().unwrap() += mat_time;
+                            *organisation_time.lock().unwrap() += org_time;
                         });
                 }
 
@@ -1589,10 +1645,10 @@ where
                         .zip(locals.data().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
+
+                return Ok(M2LResult(Duration::from_secs(0), Duration::from_secs(0), 0))
             }
         }
-
-        return Ok(M2LResult(Duration::from_secs(0), 0))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {

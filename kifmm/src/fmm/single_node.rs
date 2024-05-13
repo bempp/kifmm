@@ -386,6 +386,7 @@ where
             {
                 let mut m2l_time = Duration::from_secs(0);
                 let mut matmul_time = Duration::from_secs(0);
+                let mut data_organisation_time = Duration::from_secs(0);
 
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {
@@ -397,7 +398,8 @@ where
                     let s = Instant::now();
                     let res = self.m2l(level)?;
                     matmul_time += res.0;
-                    flops += res.1;
+                    data_organisation_time += res.1;
+                    flops += res.2;
                     m2l_time += s.elapsed();
                 }
 
