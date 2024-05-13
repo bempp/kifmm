@@ -7,7 +7,7 @@ python = ["dep:pyo3", "dep:numpy"]
 
 [package]
 name = "kifmm"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2021"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 description = "Kernel-independent fast multipole method"
@@ -28,7 +28,7 @@ num = "0.4"
 approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
-kifmm-fftw-sys = { version = "0.1" }
+kifmm-fftw-sys = { path = "../fftw-sys" }
 green-kernels = { version = "0.1" }
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
