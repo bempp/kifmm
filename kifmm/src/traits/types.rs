@@ -14,6 +14,9 @@ pub enum FmmError {
     Io(std::io::Error),
 }
 
+pub struct M2LResult (pub Duration, pub usize);
+
+
 /// Type to handle FMM related errors
 pub type FmmTime = HashMap<String, Duration>;
 

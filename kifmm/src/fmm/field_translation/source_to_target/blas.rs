@@ -2,7 +2,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::Mutex,
+    sync::Mutex, time::Duration,
 };
 
 use itertools::Itertools;
@@ -23,7 +23,7 @@ use crate::{
     traits::{
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         tree::{FmmTree, Tree},
-        types::FmmError,
+        types::{FmmError, M2LResult},
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
     BlasFieldTranslationSaRcmp, Fmm,
@@ -109,7 +109,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<M2LResult, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(
                 "No target boxes at this level".to_string(),
@@ -300,7 +300,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(M2LResult(Duration::from_secs(0), 0));
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -490,7 +490,7 @@ where
             }
         }
 
-        Ok(())
+        Ok(M2LResult(Duration::from_secs(0), 0))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -582,7 +582,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<M2LResult, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(format!(
                 "M2L failed at level {:?}, no targets found",
@@ -747,7 +747,8 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(M2LResult(Duration::from_secs(0), 0))
+
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -899,7 +900,7 @@ where
                 }
             }
         }
-        Ok(())
+        return Ok(M2LResult(Duration::from_secs(0), 0))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -980,7 +981,7 @@ impl SourceToTargetTranslation for KiFmmLaplaceMetal
 where
     Self: FmmOperatorData,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<M2LResult, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(
                 "No target boxes at this level".to_string(),
@@ -1269,7 +1270,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(M2LResult(Duration::from_secs(0), 0))
             }
             FmmEvalType::Matrix(nmatvecs) => {
                 // Lookup multipole data from source tree
@@ -1494,6 +1495,7 @@ where
                                 f32,
                                 [c_u_sub_metal.shape()[0], tmp.shape()[1]]
                             );
+
                             tmp.view_mut().metal_mult_into(
                                 rlst::TransMode::NoTrans,
                                 rlst::TransMode::NoTrans,
@@ -1590,7 +1592,7 @@ where
             }
         }
 
-        Ok(())
+        return Ok(M2LResult(Duration::from_secs(0), 0))
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {

@@ -1,5 +1,5 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, sync::RwLock};
+use std::{collections::HashSet, sync::RwLock, time::Duration};
 
 use itertools::Itertools;
 use num::{One, Zero};
@@ -22,7 +22,7 @@ use crate::{
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::AsComplex,
         tree::{FmmTree, Tree},
-        types::FmmError,
+        types::{FmmError, M2LResult},
     },
     tree::{
         constants::{NHALO, NSIBLINGS},
@@ -110,7 +110,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<M2LResult, FmmError> {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let Some(targets) = self.tree().target_tree().keys(level) else {
@@ -425,7 +425,7 @@ where
                         });
                 }
 
-                Ok(())
+                Ok(M2LResult(Duration::from_secs(0), 0))
             }
             FmmEvalType::Matrix(_nmatvecs) => Err(FmmError::Unimplemented(
                 "M2L unimplemented for matrix input with FFT field translations".to_string(),

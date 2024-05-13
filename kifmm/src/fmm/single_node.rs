@@ -123,7 +123,7 @@ where
         }
     }
 
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
+    fn evaluate(&self, timed: bool) -> Result<(FmmTime, usize), FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
 
@@ -192,7 +192,7 @@ where
             }
         }
 
-        Ok(times)
+        Ok((times, 0))
     }
 
     fn clear(&mut self, charges: &Charges<Self::Scalar>) {
@@ -359,12 +359,14 @@ where
         }
     }
 
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
+    fn evaluate(&self, timed: bool) -> Result<(FmmTime, usize), FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
 
         #[cfg(target_os = "linux")]
         rlst::threading::disable_threading();
+
+        let mut flops = 0;
 
         if timed {
             {
@@ -383,6 +385,7 @@ where
             // Downward pass
             {
                 let mut m2l_time = Duration::from_secs(0);
+                let mut matmul_time = Duration::from_secs(0);
 
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {
@@ -392,9 +395,13 @@ where
                         times.insert(label, s.elapsed());
                     }
                     let s = Instant::now();
-                    self.m2l(level)?;
+                    let res = self.m2l(level)?;
+                    matmul_time += res.0;
+                    flops += res.1;
                     m2l_time += s.elapsed();
                 }
+
+                times.insert("matmul".to_string(), matmul_time);
 
                 times.insert("m2l".to_string(), m2l_time);
 
@@ -431,7 +438,7 @@ where
             }
         }
 
-        Ok(times)
+        Ok((times, flops))
     }
 
     fn clear(&mut self, charges: &Charges<Self::Scalar>) {}
