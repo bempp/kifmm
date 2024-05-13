@@ -1,10 +1,11 @@
 //! Implementation of traits for threadsafe pointers
 use crate::fmm::types::{SendPtr, SendPtrMut};
-use num::Complex;
+use rlst::RlstScalar;
 
-unsafe impl<T> Sync for SendPtrMut<T> {}
-unsafe impl<T> Send for SendPtrMut<Complex<T>> {}
-unsafe impl<T> Sync for SendPtr<T> {}
+unsafe impl<T: RlstScalar> Sync for SendPtrMut<T> {}
+unsafe impl<T: RlstScalar> Send for SendPtrMut<T> {}
+unsafe impl<T: RlstScalar> Sync for SendPtr<T> {}
+unsafe impl<T: RlstScalar> Send for SendPtr<T> {}
 
 impl<T> Default for SendPtrMut<T> {
     fn default() -> Self {

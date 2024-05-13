@@ -1,5 +1,6 @@
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
-use kifmm::{BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder};
+use kifmm::fmm::types::BlasFieldTranslationIa;
+use kifmm::{FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};
@@ -21,7 +22,7 @@ fn main() {
     let sparse = true;
 
     // Kernel parameter
-    let wavenumber = 0.000001;
+    let wavenumber = 2.5;
 
     // FFT based M2L for a vector of charges
     {
@@ -43,7 +44,7 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate();
+        fmm_fft.evaluate(false).unwrap();
     }
 
     // BLAS based M2L
@@ -71,13 +72,13 @@ fn main() {
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslation::new(singular_value_threshold),
+                BlasFieldTranslationIa::new(singular_value_threshold),
             )
             .unwrap()
             .build()
             .unwrap();
 
-        fmm_vec.evaluate();
+        fmm_vec.evaluate(false).unwrap();
 
         // Matrix of charges
         let nvecs = 5;
@@ -100,11 +101,11 @@ fn main() {
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslation::new(singular_value_threshold),
+                BlasFieldTranslationIa::new(singular_value_threshold),
             )
             .unwrap()
             .build()
             .unwrap();
-        fmm_mat.evaluate();
+        fmm_mat.evaluate(false).unwrap();
     }
 }

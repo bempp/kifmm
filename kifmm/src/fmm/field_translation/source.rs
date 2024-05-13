@@ -17,8 +17,10 @@ use crate::{
         types::{FmmEvalType, KiFmm},
     },
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceTranslation,
-        tree::FmmTree, tree::Tree,
+        field::SourceToTargetData as SourceToTargetDataTrait,
+        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation},
+        tree::{FmmTree, Tree},
+        types::FmmError,
     },
     tree::constants::NSIBLINGS,
 };
@@ -27,19 +29,24 @@ impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar>,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
-    fn p2m(&self) {
+    fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {
-            return;
+            return Err(FmmError::Failed(
+                "P2M failed, no leaves found in source tree".to_string(),
+            ));
         };
 
-        let n_leaves = self.tree.source_tree.n_leaves().unwrap();
+        let n_leaves = self.tree.source_tree().n_leaves().unwrap();
         let surface_size = self.ncoeffs * self.dim;
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
         let ncoordinates = coordinates.len() / self.dim;
+        let depth = self.tree.source_tree().depth();
+        let operator_index = self.c2e_operator_index(depth);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -99,17 +106,29 @@ where
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, chunk_size]);
-                        let scale = rlst_array_from_slice2!(scale, [self.ncoeffs, chunk_size]);
 
-                        let mut cmp_prod = rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
+                        let tmp = if self.kernel.is_homogenous() {
+                            let mut scaled_check_potential =
+                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
+                            scaled_check_potential.fill_from(check_potential);
+                            scaled_check_potential.scale_inplace(scale[0]);
 
-                        cmp_prod.fill_from(check_potential * scale);
-
-                        let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.uc2e_inv_1.view(),
-                            empty_array::<Scalar, 2>()
-                                .simple_mult_into_resize(self.uc2e_inv_2.view(), cmp_prod),
-                        );
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_1[operator_index].view(),
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_2[operator_index].view(),
+                                    scaled_check_potential,
+                                ),
+                            )
+                        } else {
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_1[operator_index].view(),
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_2[operator_index].view(),
+                                    check_potential.view(),
+                                ),
+                            )
+                        };
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
                         {
@@ -121,7 +140,9 @@ where
                                 .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
                                 .for_each(|(m, t)| *m += *t);
                         }
-                    })
+                    });
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -179,25 +200,35 @@ where
                 check_potentials
                     .data()
                     .par_chunks_exact(self.ncoeffs * nmatvecs)
-                    .zip(self.leaf_multipoles.into_par_iter())
+                    .zip(self.leaf_multipoles.par_iter())
                     .zip(self.leaf_scales_sources.par_chunks_exact(self.ncoeffs))
                     .for_each(|((check_potential, multipole_ptrs), scale)| {
                         let check_potential =
                             rlst_array_from_slice2!(check_potential, [self.ncoeffs, nmatvecs]);
 
-                        let mut scaled_check_potential =
-                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
+                        let tmp = if self.kernel.is_homogenous() {
+                            let mut scaled_check_potential =
+                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
 
-                        scaled_check_potential.fill_from(check_potential);
-                        scaled_check_potential.scale_inplace(scale[0]);
+                            scaled_check_potential.fill_from(check_potential);
+                            scaled_check_potential.scale_inplace(scale[0]);
 
-                        let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.uc2e_inv_1.view(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_2.view(),
-                                scaled_check_potential.view(),
-                            ),
-                        );
+                                self.uc2e_inv_1[operator_index].view(),
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_2[operator_index].view(),
+                                    scaled_check_potential.view(),
+                                ),
+                            )
+                        } else {
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_1[operator_index].view(),
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_2[operator_index].view(),
+                                    check_potential.view(),
+                                ),
+                            )
+                        };
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(nmatvecs) {
                             let multipole = unsafe {
@@ -208,14 +239,18 @@ where
                                 .zip(&tmp.data()[i * self.ncoeffs..(i + 1) * self.ncoeffs])
                                 .for_each(|(m, t)| *m += *t);
                         }
-                    })
+                    });
+                Ok(())
             }
         }
     }
 
-    fn m2m(&self, level: u64) {
+    fn m2m(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_sources) = self.tree.source_tree.keys(level) else {
-            return;
+            return Err(FmmError::Failed(format!(
+                "M2M failed at level {:?}, no sources found",
+                level
+            )));
         };
 
         let nchild_sources = self.tree.source_tree().n_keys(level).unwrap();
@@ -223,6 +258,7 @@ where
         let max = &child_sources[nchild_sources - 1];
         let min_idx = self.tree.source_tree.index(min).unwrap();
         let max_idx = self.tree.source_tree.index(max).unwrap();
+        let operator_index = self.m2m_operator_index(level);
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -266,7 +302,7 @@ where
 
                             let parent_multipoles_chunk = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    self.source.view(),
+                                    self.source[operator_index].view(),
                                     child_multipoles_chunk_mat,
                                 );
 
@@ -292,7 +328,9 @@ where
                                     .for_each(|(p, t)| *p += *t);
                             }
                         },
-                    )
+                    );
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -329,7 +367,7 @@ where
                             );
 
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_vec[i].view(),
+                                self.source_vec[operator_index][i].view(),
                                 child_multipoles_i,
                             );
 
@@ -348,6 +386,7 @@ where
                             }
                         }
                     });
+                Ok(())
             }
         }
     }

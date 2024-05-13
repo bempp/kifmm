@@ -56,7 +56,7 @@ pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
     if level < 2 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "M2L only perfomed on level 2 and below",
+            "M2L only performed on level 2 and below",
         ));
     }
 
@@ -76,18 +76,21 @@ pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
 /// # Arguments
 /// * `tree`- Single node tree
 /// * `ncoeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales<T>(tree: &SingleNodeTree<T::Real>, ncoeffs: usize) -> Vec<T>
+pub fn leaf_scales<T>(tree: &SingleNodeTree<T::Real>, homogenous: bool, ncoeffs: usize) -> Vec<T>
 where
     T: RlstScalar + Default,
 {
     let mut result = vec![T::default(); tree.n_leaves().unwrap() * ncoeffs];
 
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        // Assign scales
-        let l = i * ncoeffs;
-        let r = l + ncoeffs;
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); ncoeffs].as_slice());
+    if homogenous {
+        for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+            // Assign scales
+            let l = i * ncoeffs;
+            let r = l + ncoeffs;
+
+            result[l..r]
+                .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); ncoeffs].as_slice());
+        }
     }
     result
 }
@@ -306,7 +309,7 @@ pub fn map_charges<T: RlstScalar>(global_indices: &[usize], charges: &Charges<T>
 /// * `arr` - An array to be padded.
 /// * `pad_size` - The amount of padding to be added along each axis.
 /// * `pad_index` - The position in the array to start the padding from.
-pub fn pad3<T: RlstScalar>(
+pub fn pad3<T>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
     pad_size: (usize, usize, usize),
     pad_index: (usize, usize, usize),
@@ -339,7 +342,7 @@ where
 ///
 /// # Arguments
 /// * `arr` - An array to be flipped.
-pub fn flip3<T: RlstScalar>(
+pub fn flip3<T>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where

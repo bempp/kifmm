@@ -15,8 +15,9 @@ use crate::{
     fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::TargetTranslation,
+        fmm::{FmmOperatorData, HomogenousKernel, TargetTranslation},
         tree::{FmmTree, Tree},
+        types::FmmError,
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
 };
@@ -25,13 +26,17 @@ impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
-    Kernel: KernelTrait<T = Scalar> + Send + Sync,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    Self: FmmOperatorData,
 {
-    fn l2l(&self, level: u64) {
+    fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
-            return;
+            return Err(FmmError::Failed(format!(
+                "L2L failed at level {:?}, no sources found",
+                level
+            )));
         };
 
         let parent_sources: HashSet<MortonKey<_>> =
@@ -39,6 +44,7 @@ where
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();
         let nparents = parent_sources.len();
+        let operator_index = self.l2l_operator_index(level);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -84,7 +90,7 @@ where
 
                         for i in 0..NSIBLINGS {
                             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.target_vec[i].view(),
+                                self.target_vec[operator_index][i].view(),
                                 parent_locals.view(),
                             );
 
@@ -104,6 +110,7 @@ where
                             }
                         }
                     });
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {
@@ -143,7 +150,7 @@ where
                             child_locals_pointers.iter().enumerate().take(NSIBLINGS)
                         {
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.target_vec[i].view(),
+                                self.target_vec[operator_index][i].view(),
                                 parent_locals.view(),
                             );
 
@@ -165,13 +172,17 @@ where
                             }
                         }
                     });
+
+                Ok(())
             }
         }
     }
 
-    fn l2p(&self) {
+    fn l2p(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.target_tree().all_leaves() else {
-            return;
+            return Err(FmmError::Failed(
+                "L2P failed, no leaves found in target tree".to_string(),
+            ));
         };
 
         let coordinates = self.tree.target_tree().all_coordinates().unwrap();
@@ -181,7 +192,7 @@ where
             FmmEvalType::Vector => {
                 self.leaf_upward_surfaces_targets
                     .par_chunks_exact(surface_size)
-                    .zip(self.leaf_locals.into_par_iter())
+                    .zip(self.leaf_locals.par_iter())
                     .zip(&self.charge_index_pointer_targets)
                     .zip(&self.potentials_send_pointers)
                     .for_each(
@@ -228,6 +239,8 @@ where
                             }
                         },
                     );
+
+                Ok(())
             }
 
             FmmEvalType::Matrix(nmatvec) => {
@@ -287,13 +300,16 @@ where
                             },
                         )
                 }
+                Ok(())
             }
         }
     }
 
-    fn p2p(&self) {
+    fn p2p(&self) -> Result<(), FmmError> {
         let Some(leaves) = self.tree.target_tree().all_leaves() else {
-            return;
+            return Err(FmmError::Failed(
+                "P2P failed, no leaves found in target tree".to_string(),
+            ));
         };
 
         let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
@@ -301,7 +317,8 @@ where
         let n_all_source_coordinates = all_source_coordinates.len() / self.dim;
 
         match self.fmm_eval_type {
-            FmmEvalType::Vector => leaves
+            FmmEvalType::Vector => {
+                leaves
                 .par_iter()
                 .zip(&self.charge_index_pointer_targets)
                 .zip(&self.potentials_send_pointers)
@@ -382,7 +399,9 @@ where
                             }
                         }
                     },
-                ),
+                );
+                Ok(())
+            }
 
             FmmEvalType::Matrix(nmatvec) => {
                 let n_leaves = self.tree.target_tree().n_leaves().unwrap();
@@ -473,9 +492,12 @@ where
                             }
                         })
                 }
+                Ok(())
             }
         }
     }
 
-    fn m2p(&self) {}
+    fn m2p(&self) -> Result<(), FmmError> {
+        Err(FmmError::Unimplemented("M2P unimplemented".to_string()))
+    }
 }

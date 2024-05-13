@@ -1,5 +1,5 @@
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::{BlasFieldTranslation, FftFieldTranslation, Fmm, SingleNodeBuilder};
+use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccessMut};
@@ -39,7 +39,7 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate();
+        fmm_fft.evaluate(false).unwrap();
     }
 
     // BLAS based M2L
@@ -63,13 +63,13 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslation::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
             )
             .unwrap()
             .build()
             .unwrap();
 
-        fmm_vec.evaluate();
+        fmm_vec.evaluate(false).unwrap();
 
         // Matrix of charges
         let nvecs = 5;
@@ -88,11 +88,11 @@ fn main() {
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslation::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
             )
             .unwrap()
             .build()
             .unwrap();
-        fmm_mat.evaluate();
+        fmm_mat.evaluate(false).unwrap();
     }
 }
