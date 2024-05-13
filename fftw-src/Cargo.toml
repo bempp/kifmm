@@ -7,7 +7,6 @@ repository = "https://github.com/bempp/kifmm"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
-repository="https://github.com/bempp/kifmm"
 
 links="fftw3"
 
