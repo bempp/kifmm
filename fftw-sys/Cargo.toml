@@ -1,12 +1,16 @@
 [package]
 name = "kifmm-fftw-sys"
-description = "FFTW sys"
-authors = ["Toshiki Teramura <toshiki.teramura@gmail.com>", "Srinath Kailasa <srinathkailasa@gmail.com>"]
+description = "FFTW sys for kifmm"
+license = "BSD-3-Clause"
+homepage = "https://github.com/bempp/kifmm"
+repository = "https://github.com/bempp/kifmm"
+authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 license = "GPL-2.0-or-later"
-links="fftw3"
 repository="https://github.com/bempp/kifmm"
+
+links="fftw3"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
