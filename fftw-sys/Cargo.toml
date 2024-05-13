@@ -1,12 +1,17 @@
 [package]
-name = "fftw-sys"
-version = "0.1.0"
+name = "kifmm-fftw-sys"
+description = "FFTW sys for kifmm"
+license = "BSD-3-Clause"
+homepage = "https://github.com/bempp/kifmm"
+repository = "https://github.com/bempp/kifmm"
+authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
+version = "0.1.0-dev"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fftw-src = {path = "../fftw-src"}
+kifmm-fftw-src = { path = "../fftw-src" }
 libc = "0.2.153"
 num-complex = "0.4.5"
 

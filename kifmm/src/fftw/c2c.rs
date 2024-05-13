@@ -1,5 +1,5 @@
 //! # Complex to Complex Transform
-use fftw_sys as ffi;
+use kifmm_fftw_sys as ffi;
 
 use itertools::Itertools;
 
