@@ -1030,11 +1030,11 @@ where
         let nsources = sources.len();
         let ntargets = targets.len();
 
-        let mut matmul_time = Mutex::new(Duration::from_secs(0));
-        let mut organisation_time = Mutex::new(Duration::from_secs(0));
-        let mut allocation_time = Mutex::new(Duration::from_secs(0));
-        let mut saving_time = Mutex::new(Duration::from_secs(0));
-        let mut flops = Mutex::new(0);
+        let matmul_time = Mutex::new(Duration::from_secs(0));
+        let organisation_time = Mutex::new(Duration::from_secs(0));
+        let allocation_time = Mutex::new(Duration::from_secs(0));
+        let saving_time = Mutex::new(Duration::from_secs(0));
+        let flops = Mutex::new(0);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -1478,6 +1478,8 @@ where
 
                             *matmul_time.lock().unwrap() += mat_time;
                             *organisation_time.lock().unwrap() += org_time;
+                            *allocation_time.lock().unwrap() += alloc_time;
+                            *saving_time.lock().unwrap() += save_time;
                         });
                 } else {
 

@@ -78,10 +78,10 @@ fn main() {
     //     }
 
         {
-            println!("n_leaves,svd_threshold, nvecs, depth, metal_level, using_metal, flops, data_organisation_time, matmul_time");
+            println!("n_leaves,svd_threshold, nvecs, depth, metal_level, using_metal, flops, data_organisation_time, matmul_time, allocation_time, saving_time");
             for n_crit in [15] {
-                for nvecs in [10] {
-                    for metal_level in [5] {
+                for nvecs in [1, 1, 5, 10] {
+                    for metal_level in [5, 6, 7] {
                         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
                         charges
                             .data_mut()
@@ -108,8 +108,10 @@ fn main() {
                         let (times, flops) = fmm.evaluate(true).unwrap();
                         // let runtime = s.elapsed().as_secs_f64() / (nvecs as f64);
                         // // let m2l_time = times.get("m2l").unwrap().as_secs_f64() /( nvecs as f64);
-                        let data_organisation_time = times.get("data_organisation").unwrap().as_secs_f64() /( nvecs as f64);
-                        let matmul_time = times.get("matmul").unwrap().as_secs_f64() / (nvecs as f64);
+                        let data_organisation_time = times.get("data_organisation").unwrap().as_secs_f64();
+                        let allocation_time = times.get("allocation").unwrap().as_secs_f64();
+                        let saving_time = times.get("saving").unwrap().as_secs_f64();
+                        let matmul_time = times.get("matmul").unwrap().as_secs_f64();
 
                         let svd_threshold = singular_value_threshold.unwrap();
                         let depth = fmm.tree.source_tree.depth;
@@ -119,7 +121,7 @@ fn main() {
                         // for mat in  fmm.source_to_target.metadata[0].c_metal.iter() {
                         //     flops += mat.shape().iter().product::<usize>() * n_leaves * ncoeffs_kifmm(fmm.expansion_order)
                         // };
-                        println!("{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}", n_leaves, svd_threshold, nvecs, depth, metal_level, using_metal, flops, data_organisation_time, matmul_time);
+                        println!("{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}", n_leaves, svd_threshold, nvecs, depth, metal_level, using_metal, flops as usize, data_organisation_time, matmul_time, allocation_time, saving_time);
                     }
                 }
             }

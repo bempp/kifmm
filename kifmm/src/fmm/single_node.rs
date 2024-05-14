@@ -387,6 +387,8 @@ where
                 let mut m2l_time = Duration::from_secs(0);
                 let mut matmul_time = Duration::from_secs(0);
                 let mut data_organisation_time = Duration::from_secs(0);
+                let mut allocation_time = Duration::from_secs(0);
+                let mut saving_time = Duration::from_secs(0);
 
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {
@@ -399,12 +401,16 @@ where
                     let res = self.m2l(level)?;
                     matmul_time += res.0;
                     data_organisation_time += res.1;
-                    flops += res.2;
+                    allocation_time += res.2;
+                    saving_time += res.3;
+                    flops += res.4;
                     m2l_time += s.elapsed();
                 }
 
                 times.insert("matmul".to_string(), matmul_time);
-                times.insert("data_organisation".to_string(), matmul_time);
+                times.insert("data_organisation".to_string(), data_organisation_time);
+                times.insert("allocation".to_string(), allocation_time);
+                times.insert("saving".to_string(), saving_time);
 
                 times.insert("m2l".to_string(), m2l_time);
 
