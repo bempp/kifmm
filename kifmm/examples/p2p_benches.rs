@@ -10,13 +10,13 @@ extern crate lapack_src;
 
 fn main() {
     // Setup random sources and targets
-    let nsources = 10000000;
-    let ntargets = 10000000;
+    let nsources = 1000000;
+    let ntargets = 1000000;
     let sources = points_fixture::<f32>(nsources, None, None, Some(0));
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(50);
+    let n_crit = Some(150);
     let expansion_order = 5;
     let sparse = false;
 
