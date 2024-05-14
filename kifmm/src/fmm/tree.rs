@@ -1,11 +1,10 @@
-//! Implementation of FMM compatible trees
 use num::traits::Float;
 use rlst::RlstScalar;
 
 use crate::{
     fmm::types::SingleNodeFmmTree,
     traits::tree::{FmmTree, Tree},
-    tree::types::SingleNodeTree,
+    tree::types::{MortonKey, SingleNodeTree},
 };
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
@@ -30,40 +29,14 @@ where
         &self,
         leaf: &<Self::Tree as Tree>::Node,
     ) -> Option<Vec<<Self::Tree as Tree>::Node>> {
-        let mut u_list = Vec::new();
-        let neighbours = leaf.neighbors();
-
-        // // Child level
-        // let mut neighbors_children_adj = neighbours
-        //     .iter()
-        //     .flat_map(|n| n.children())
-        //     .filter(|nc| {
-        //         self.source_tree().all_keys_set().unwrap().contains(nc) && leaf.is_adjacent(nc)
-        //     })
-        //     .collect();
+        let u_list = leaf.neighbors();
 
         // Key level
-        let mut neighbors_adj = neighbours
-            .iter()
-            .filter(|n| {
-                self.source_tree().all_keys_set().unwrap().contains(n) && leaf.is_adjacent(n)
-            })
-            .cloned()
+        let mut u_list: Vec<MortonKey<_>> = u_list
+            .into_iter()
+            .filter(|n| {self.source_tree().all_keys_set().unwrap().contains(n)})
             .collect();
 
-        // // Parent level
-        // let mut parent_neighbours_adj = leaf
-        //     .parent()
-        //     .neighbors()
-        //     .into_iter()
-        //     .filter(|pn| {
-        //         self.source_tree().all_keys_set().unwrap().contains(pn) && leaf.is_adjacent(pn)
-        //     })
-        //     .collect();
-
-        // u_list.append(&mut neighbors_children_adj);
-        u_list.append(&mut neighbors_adj);
-        // u_list.append(&mut parent_neighbours_adj);
         u_list.push(*leaf);
 
         if !u_list.is_empty() {
