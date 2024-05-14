@@ -1,6 +1,10 @@
 //! Local expansion translations
 
-use std::{collections::HashSet, sync::Mutex, time::{Duration, Instant}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -305,7 +309,7 @@ where
         }
     }
 
-    fn p2p(&self) -> Result<(), FmmError> {
+    fn p2p(&self) -> Result<HashMap<String, Duration>, FmmError> {
         let Some(leaves) = self.tree.target_tree().all_leaves() else {
             return Err(FmmError::Failed(
                 "P2P failed, no leaves found in target tree".to_string(),
@@ -322,6 +326,7 @@ where
         let write_time = Mutex::new(Duration::from_secs(0));
         let interaction_list_time = Mutex::new(Duration::from_secs(0));
 
+        let mut microbenches = HashMap::new();
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -436,7 +441,15 @@ where
                         }
                     },
                 );
-                Ok(())
+                microbenches.insert("evaluation".to_string(), *evaluation_time.lock().unwrap());
+                microbenches.insert("reordering".to_string(), *reordering_time.lock().unwrap());
+                microbenches.insert("reading".to_string(), *read_time.lock().unwrap());
+                microbenches.insert("writing".to_string(), *write_time.lock().unwrap());
+                microbenches.insert(
+                    "interaction_lists".to_string(),
+                    *interaction_list_time.lock().unwrap(),
+                );
+                Ok(microbenches)
             }
 
             FmmEvalType::Matrix(nmatvec) => {
@@ -448,7 +461,6 @@ where
                         .zip(&self.charge_index_pointer_targets)
                         .zip(&self.potentials_send_pointers[i * n_leaves..(i + 1) * n_leaves])
                         .for_each(|((leaf, charge_index_pointer), potential_send_ptr)| {
-
                             let s = Instant::now();
                             let target_coordinates_row_major = &all_target_coordinates
                                 [charge_index_pointer.0 * self.dim
@@ -457,7 +469,6 @@ where
                             *read_time.lock().unwrap() += s.elapsed();
 
                             if ntargets > 0 {
-
                                 let s = Instant::now();
                                 let target_coordinates_row_major = rlst_array_from_slice2!(
                                     target_coordinates_row_major,
@@ -480,7 +491,6 @@ where
                                 }
 
                                 if let Some(u_list) = self.tree.near_field(leaf) {
-
                                     let s = Instant::now();
                                     let u_list_indices = u_list
                                         .iter()
@@ -532,7 +542,6 @@ where
                                         *reordering_time.lock().unwrap() += s.elapsed();
 
                                         if nsources > 0 {
-
                                             let result = unsafe {
                                                 std::slice::from_raw_parts_mut(
                                                     potential_send_ptr.raw,
@@ -554,7 +563,15 @@ where
                             }
                         })
                 }
-                Ok(())
+                microbenches.insert("evaluation".to_string(), *evaluation_time.lock().unwrap());
+                microbenches.insert("reordering".to_string(), *reordering_time.lock().unwrap());
+                microbenches.insert("reading".to_string(), *read_time.lock().unwrap());
+                microbenches.insert("writing".to_string(), *write_time.lock().unwrap());
+                microbenches.insert(
+                    "interaction_lists".to_string(),
+                    *interaction_list_time.lock().unwrap(),
+                );
+                Ok(microbenches)
             }
         }
     }

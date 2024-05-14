@@ -1,4 +1,6 @@
 //! FMM traits
+use std::{collections::HashMap, time::Duration};
+
 use crate::{fmm::types::Charges, traits::tree::FmmTree};
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
@@ -39,7 +41,7 @@ pub trait TargetTranslation {
 
     /// Near field particle to particle (direct) potential contributions to particles in a given leaf box's
     /// near field where the `p2l` and `m2p` do not apply. Defined over all leaf target boxes.
-    fn p2p(&self) -> Result<(), FmmError>;
+    fn p2p(&self) -> Result<HashMap<String, Duration>, FmmError>;
 }
 
 /// Interface for the source to target (multipole to local / M2L) field translations.

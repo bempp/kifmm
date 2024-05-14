@@ -161,8 +161,11 @@ where
 
                 // Leaf level computation
                 let s = Instant::now();
-                self.p2p()?;
+                let microbenches = self.p2p()?;
                 times.insert("p2p".to_string(), s.elapsed());
+                for (k, v) in microbenches.into_iter() {
+                    times.insert(k, v);
+                }
                 let s = Instant::now();
                 self.l2p()?;
                 times.insert("l2p".to_string(), s.elapsed());
