@@ -160,9 +160,9 @@ where
                     .zip(&self.charge_index_pointer_sources)
                     .for_each(
                         |((check_potential, upward_check_surface), charge_index_pointer)| {
-                            let coordinates_row_major: &[Scalar::Real] = &coordinates
-                                [charge_index_pointer.0 * self.dim
-                                    ..charge_index_pointer.1 * self.dim];
+                            let coordinates_row_major = &coordinates[charge_index_pointer.0
+                                * self.dim
+                                ..charge_index_pointer.1 * self.dim];
                             let nsources = coordinates_row_major.len() / self.dim;
 
                             if nsources > 0 {
