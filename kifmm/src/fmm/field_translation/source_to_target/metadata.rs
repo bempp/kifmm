@@ -15,7 +15,6 @@ use rlst::{
 
 use crate::{
     fmm::{
-        constants::DEFAULT_SVD_THRESHOLD,
         helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
@@ -32,7 +31,7 @@ use crate::{
         fftw::{Dft, DftType},
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
-            SourcetoTargetTranslationMetadata,
+            SourceToTargetTranslationMetadata,
         },
         fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
@@ -461,7 +460,7 @@ where
     }
 }
 
-impl<Scalar> SourcetoTargetTranslationMetadata
+impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,
@@ -563,7 +562,7 @@ where
     }
 }
 
-impl<Scalar> SourcetoTargetTranslationMetadata
+impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar<Complex = Scalar>
@@ -996,7 +995,7 @@ where
     }
 }
 
-impl<Scalar> SourcetoTargetTranslationMetadata
+impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default,
@@ -1299,7 +1298,7 @@ where
     }
 }
 
-impl<Scalar> SourcetoTargetTranslationMetadata
+impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar
@@ -1579,7 +1578,6 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    // type Scalar = <Self as
     type Scalar = Scalar;
 
     fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>) {
@@ -1720,7 +1718,7 @@ where
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
     pub fn new(threshold: Option<Scalar::Real>) -> Self {
-        let tmp = Scalar::real(DEFAULT_SVD_THRESHOLD) * Scalar::epsilon().re();
+        let tmp = Scalar::epsilon().re();
 
         Self {
             threshold: threshold.unwrap_or(tmp),
@@ -1745,7 +1743,7 @@ where
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
     pub fn new(threshold: Option<Scalar::Real>) -> Self {
-        let tmp = Scalar::real(DEFAULT_SVD_THRESHOLD) * Scalar::epsilon().re();
+        let tmp = Scalar::epsilon().re();
 
         Self {
             threshold: threshold.unwrap_or(tmp),

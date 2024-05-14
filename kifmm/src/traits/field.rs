@@ -16,7 +16,7 @@ pub trait SourceAndTargetTranslationMetadata {
 }
 
 /// Set M2L metadata associated with a kernel
-pub trait SourcetoTargetTranslationMetadata {
+pub trait SourceToTargetTranslationMetadata {
     /// Source to target field translation
     fn source_to_target(&mut self);
 }

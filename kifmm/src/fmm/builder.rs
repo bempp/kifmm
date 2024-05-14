@@ -11,7 +11,7 @@ use crate::{
     traits::{
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
-            SourcetoTargetTranslationMetadata,
+            SourceToTargetTranslationMetadata,
         },
         fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
@@ -27,7 +27,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SourcetoTargetTranslationMetadata
+    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
         + FmmMetadata<Scalar = Scalar>,
 {
