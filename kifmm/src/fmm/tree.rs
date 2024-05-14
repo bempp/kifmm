@@ -5,7 +5,7 @@ use rlst::RlstScalar;
 use crate::{
     fmm::types::SingleNodeFmmTree,
     traits::tree::{FmmTree, Tree},
-    tree::types::SingleNodeTree,
+    tree::types::{MortonKey, SingleNodeTree},
 };
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
@@ -30,19 +30,14 @@ where
         &self,
         leaf: &<Self::Tree as Tree>::Node,
     ) -> Option<Vec<<Self::Tree as Tree>::Node>> {
-        let mut u_list = Vec::new();
-        let neighbours = leaf.neighbors();
+        let u_list = leaf.neighbors();
 
         // Key level
-        let mut neighbors_adj = neighbours
-            .iter()
-            .filter(|n| {
-                self.source_tree().all_keys_set().unwrap().contains(n) && leaf.is_adjacent(n)
-            })
-            .cloned()
+        let mut u_list: Vec<MortonKey<_>> = u_list
+            .into_iter()
+            .filter(|n| {self.source_tree().all_keys_set().unwrap().contains(n)})
             .collect();
 
-        u_list.append(&mut neighbors_adj);
         u_list.push(*leaf);
 
         if !u_list.is_empty() {
