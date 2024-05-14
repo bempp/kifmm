@@ -1,10 +1,11 @@
+//! Implementation of FMM compatible trees
 use num::traits::Float;
 use rlst::RlstScalar;
 
 use crate::{
     fmm::types::SingleNodeFmmTree,
     traits::tree::{FmmTree, Tree},
-    tree::types::{MortonKey, SingleNodeTree},
+    tree::types::SingleNodeTree,
 };
 
 impl<T> FmmTree for SingleNodeFmmTree<T>
@@ -29,21 +30,20 @@ where
         &self,
         leaf: &<Self::Tree as Tree>::Node,
     ) -> Option<Vec<<Self::Tree as Tree>::Node>> {
-        let u_list = leaf.neighbors();
+        // Get the all_keys_set if it exists
+        self.source_tree().all_keys_set().map(|all_keys_set| {
+            // Collect neighbors that exist in the all_keys_set and push the leaf into the vector
+            let mut u_list: Vec<_> = leaf
+                .neighbors()
+                .into_iter()
+                .filter(|neighbor| all_keys_set.contains(neighbor))
+                .collect();
 
-        // Key level
-        let mut u_list: Vec<MortonKey<_>> = u_list
-            .into_iter()
-            .filter(|n| {self.source_tree().all_keys_set().unwrap().contains(n)})
-            .collect();
+            // Push the leaf into the vector
+            u_list.push(*leaf);
 
-        u_list.push(*leaf);
-
-        if !u_list.is_empty() {
-            Some(u_list)
-        } else {
-            None
-        }
+            u_list
+        })
     }
 }
 

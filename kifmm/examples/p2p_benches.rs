@@ -16,7 +16,7 @@ fn main() {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(5);
+    let n_crit = Some(150);
     let expansion_order = 5;
     let sparse = false;
 
