@@ -118,10 +118,7 @@ where
     fn domain(&self) -> &<Self::Tree as Tree>::Domain;
 
     /// Get the near field of a leaf node
-    fn near_field(
-        &self,
-        leaf: &<Self::Tree as Tree>::Node,
-    ) -> Option<Vec<<Self::Tree as Tree>::Node>>;
+    fn near_field(&self, leaf: &<Self::Tree as Tree>::Node) -> Vec<<Self::Tree as Tree>::Node>;
 }
 
 /// Interface for tree nodes
