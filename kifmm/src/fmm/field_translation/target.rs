@@ -1,6 +1,6 @@
 //! Local expansion translations
 
-use std::collections::HashSet;
+use std::{collections::HashSet, sync::Mutex, time::{Duration, Instant}};
 
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -316,6 +316,13 @@ where
         let all_source_coordinates = self.tree.source_tree().all_coordinates().unwrap();
         let n_all_source_coordinates = all_source_coordinates.len() / self.dim;
 
+        let evaluation_time = Mutex::new(Duration::from_secs(0));
+        let reordering_time = Mutex::new(Duration::from_secs(0));
+        let read_time = Mutex::new(Duration::from_secs(0));
+        let write_time = Mutex::new(Duration::from_secs(0));
+        let interaction_list_time = Mutex::new(Duration::from_secs(0));
+
+
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 leaves
@@ -324,12 +331,18 @@ where
                 .zip(&self.potentials_send_pointers)
                 .for_each(
                     |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+
+                        let s = Instant::now();
                         let target_coordinates_row_major = &all_target_coordinates
                             [charge_index_pointer_targets.0 * self.dim
                                 ..charge_index_pointer_targets.1 * self.dim];
+                        *read_time.lock().unwrap() += s.elapsed();
+
                         let ntargets = target_coordinates_row_major.len() / self.dim;
 
                         if ntargets > 0 {
+
+                            let s = Instant::now();
                             let target_coordinates_row_major = rlst_array_from_slice2!(
                                 target_coordinates_row_major,
                                 [ntargets, self.dim],
@@ -337,14 +350,28 @@ where
                             );
                             let mut target_coordinates_col_major =
                                 rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
+                            *write_time.lock().unwrap() += s.elapsed();
+
+                            let s = Instant::now();
                             target_coordinates_col_major
                                 .fill_from(target_coordinates_row_major.view());
+                            *reordering_time.lock().unwrap() += s.elapsed();
+
+                            let s = Instant::now();
 
                             if let Some(u_list) = self.tree.near_field(leaf) {
+                                *interaction_list_time.lock().unwrap() += s.elapsed();
+                            }
+
+                            if let Some(u_list) = self.tree.near_field(leaf) {
+
+                                let s = Instant::now();
                                 let u_list_indices = u_list
                                     .iter()
                                     .filter_map(|k| self.tree.source_tree().leaf_index(k));
+                                *interaction_list_time.lock().unwrap() += s.elapsed();
 
+                                let s = Instant::now();
                                 let charges = u_list_indices
                                     .clone()
                                     .map(|&idx| {
@@ -352,7 +379,9 @@ where
                                         &self.charges[index_pointer.0..index_pointer.1]
                                     })
                                     .collect_vec();
+                                *read_time.lock().unwrap() += s.elapsed();
 
+                                let s = Instant::now();
                                 let sources_coordinates = u_list_indices
                                     .into_iter()
                                     .map(|&idx| {
@@ -361,6 +390,8 @@ where
                                             [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
                                     })
                                     .collect_vec();
+                                *read_time.lock().unwrap() += s.elapsed();
+
 
                                 for (&charges, source_coordinates_row_major) in
                                     charges.iter().zip(sources_coordinates)
@@ -368,6 +399,8 @@ where
                                     let nsources = source_coordinates_row_major.len() / self.dim;
 
                                     if nsources > 0 {
+
+                                        let s = Instant::now();
                                         let source_coordinates_row_major = rlst_array_from_slice2!(
                                             source_coordinates_row_major,
                                             [nsources, self.dim],
@@ -379,6 +412,7 @@ where
                                         );
                                         source_coordinates_col_major
                                             .fill_from(source_coordinates_row_major.view());
+                                        *reordering_time.lock().unwrap() += s.elapsed();
 
                                         let result = unsafe {
                                             std::slice::from_raw_parts_mut(
@@ -387,13 +421,15 @@ where
                                             )
                                         };
 
+                                        let s = Instant::now();
                                         self.kernel.evaluate_st(
                                             self.kernel_eval_type,
                                             source_coordinates_col_major.data(),
                                             target_coordinates_col_major.data(),
                                             charges,
                                             result,
-                                        )
+                                        );
+                                        *evaluation_time.lock().unwrap() += s.elapsed();
                                     }
                                 }
                             }
@@ -412,27 +448,46 @@ where
                         .zip(&self.charge_index_pointer_targets)
                         .zip(&self.potentials_send_pointers[i * n_leaves..(i + 1) * n_leaves])
                         .for_each(|((leaf, charge_index_pointer), potential_send_ptr)| {
+
+                            let s = Instant::now();
                             let target_coordinates_row_major = &all_target_coordinates
                                 [charge_index_pointer.0 * self.dim
                                     ..charge_index_pointer.1 * self.dim];
                             let ntargets = target_coordinates_row_major.len() / self.dim;
+                            *read_time.lock().unwrap() += s.elapsed();
 
                             if ntargets > 0 {
+
+                                let s = Instant::now();
                                 let target_coordinates_row_major = rlst_array_from_slice2!(
                                     target_coordinates_row_major,
                                     [ntargets, self.dim],
                                     [self.dim, 1]
                                 );
+                                *write_time.lock().unwrap() += s.elapsed();
+
+                                let s = Instant::now();
                                 let mut target_coordinates_col_major =
                                     rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
                                 target_coordinates_col_major
                                     .fill_from(target_coordinates_row_major.view());
+                                *reordering_time.lock().unwrap() += s.elapsed();
+
+                                let s = Instant::now();
 
                                 if let Some(u_list) = self.tree.near_field(leaf) {
+                                    *interaction_list_time.lock().unwrap() += s.elapsed();
+                                }
+
+                                if let Some(u_list) = self.tree.near_field(leaf) {
+
+                                    let s = Instant::now();
                                     let u_list_indices = u_list
                                         .iter()
                                         .filter_map(|k| self.tree.source_tree().leaf_index(k));
+                                    *interaction_list_time.lock().unwrap() += s.elapsed();
 
+                                    let s = Instant::now();
                                     let charge_vec_displacement = i * n_all_source_coordinates;
                                     let charges = u_list_indices
                                         .clone()
@@ -443,7 +498,9 @@ where
                                                 ..charge_vec_displacement + index_pointer.1]
                                         })
                                         .collect_vec();
+                                    *read_time.lock().unwrap() += s.elapsed();
 
+                                    let s = Instant::now();
                                     let sources_coordinates = u_list_indices
                                         .into_iter()
                                         .map(|&idx| {
@@ -453,10 +510,12 @@ where
                                                 ..index_pointer.1 * self.dim]
                                         })
                                         .collect_vec();
+                                    *read_time.lock().unwrap() += s.elapsed();
 
                                     for (&charges, source_coordinates_row_major) in
                                         charges.iter().zip(sources_coordinates)
                                     {
+                                        let s = Instant::now();
                                         let nsources =
                                             source_coordinates_row_major.len() / self.dim;
                                         let source_coordinates_row_major = rlst_array_from_slice2!(
@@ -470,15 +529,17 @@ where
                                         );
                                         source_coordinates_col_major
                                             .fill_from(source_coordinates_row_major.view());
+                                        *reordering_time.lock().unwrap() += s.elapsed();
 
                                         if nsources > 0 {
+
                                             let result = unsafe {
                                                 std::slice::from_raw_parts_mut(
                                                     potential_send_ptr.raw,
                                                     ntargets * self.kernel_eval_size,
                                                 )
                                             };
-
+                                            let s = Instant::now();
                                             self.kernel.evaluate_st(
                                                 self.kernel_eval_type,
                                                 source_coordinates_col_major.data(),
@@ -486,6 +547,7 @@ where
                                                 charges,
                                                 result,
                                             );
+                                            *evaluation_time.lock().unwrap() += s.elapsed();
                                         }
                                     }
                                 }
