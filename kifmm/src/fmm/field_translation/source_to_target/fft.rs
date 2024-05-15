@@ -350,7 +350,10 @@ where
                                         let k_f = &kernel_data_ft[i + frequency_offset];
 
                                         let k_f_slice = k_f.as_slice();
-                                        let k_f_slice = unsafe { &*(k_f_slice.as_ptr() as *const [<Scalar as AsComplex>::ComplexType; 64]) };
+                                        let k_f_slice = unsafe {
+                                            &*(k_f_slice.as_ptr()
+                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
+                                        };
 
                                         // Lookup signals
                                         let displacements = &all_displacements[i].read().unwrap()
@@ -360,19 +363,26 @@ where
                                             let displacement = displacements[j];
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
-                                            let s_f_slice = unsafe {  &*(s_f.as_ptr() as *const [<Scalar as AsComplex>::ComplexType; 8]) };
+                                            let s_f_slice = unsafe {
+                                                &*(s_f.as_ptr()
+                                                    as *const [<Scalar as AsComplex>::ComplexType;
+                                                        8])
+                                            };
 
-                                            let save_locations = &mut save_locations[j * NSIBLINGS..(j + 1) * NSIBLINGS];
-                                            let save_locations_slice = unsafe { &mut *(save_locations.as_ptr() as *mut [<Scalar as AsComplex>::ComplexType; 8])};
+                                            let save_locations = &mut save_locations
+                                                [j * NSIBLINGS..(j + 1) * NSIBLINGS];
+                                            let save_locations_slice = unsafe {
+                                                &mut *(save_locations.as_ptr()
+                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                                            };
 
-                                            // matvec8x8_auto::<<Scalar as AsComplex>::ComplexType>(
-                                            //     k_f_slice,
-                                            //     s_f_slice,
-                                            //     save_locations_slice,
-                                            //     scale,
-                                            // );
-
-                                            <Scalar as AsComplex>::ComplexType::matvec8x8(simd, k_f_slice, s_f_slice, save_locations_slice, scale);
+                                            <Scalar as AsComplex>::ComplexType::matvec8x8(
+                                                simd,
+                                                k_f_slice,
+                                                s_f_slice,
+                                                save_locations_slice,
+                                                scale,
+                                            );
                                         }
                                     }
                                 },

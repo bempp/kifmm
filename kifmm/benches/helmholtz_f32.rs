@@ -20,7 +20,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(400);
+    let n_crit = Some(150);
     let expansion_order = 5;
     let sparse = true;
     let svd_threshold = Some(1e-2);
@@ -85,7 +85,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(400);
+    let n_crit = Some(150);
     let expansion_order = 5;
     let sparse = true;
     let svd_threshold = Some(1e-2);
