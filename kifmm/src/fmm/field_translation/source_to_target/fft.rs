@@ -3,6 +3,7 @@ use std::{collections::HashSet, sync::RwLock};
 
 use itertools::Itertools;
 use num::{One, Zero};
+use pulp::aarch64::NeonFcma;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
@@ -12,7 +13,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::matvec::matvec8x8,
+        field_translation::source_to_target::matvec::{matvec8x8_auto, Matvec},
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
@@ -37,6 +38,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
+    <Scalar as AsComplex>::ComplexType: Matvec<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -106,6 +108,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
+    <Scalar as AsComplex>::ComplexType: Matvec<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -325,6 +328,8 @@ where
 
                 // 2. Compute the Hadamard product
                 {
+                    let simd = NeonFcma::try_new().unwrap();
+
                     (0..size_out)
                         .into_par_iter()
                         .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
@@ -343,6 +348,10 @@ where
                                     for i in 0..NHALO {
                                         let frequency_offset = freq * NHALO;
                                         let k_f = &kernel_data_ft[i + frequency_offset];
+
+                                        let k_f_slice = k_f.as_slice();
+                                        let k_f_slice = unsafe { &*(k_f_slice.as_ptr() as *const [<Scalar as AsComplex>::ComplexType; 64]) };
+
                                         // Lookup signals
                                         let displacements = &all_displacements[i].read().unwrap()
                                             [chunk_start..chunk_end];
@@ -351,14 +360,19 @@ where
                                             let displacement = displacements[j];
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
+                                            let s_f_slice = unsafe {  &*(s_f.as_ptr() as *const [<Scalar as AsComplex>::ComplexType; 8]) };
 
-                                            matvec8x8::<<Scalar as AsComplex>::ComplexType>(
-                                                k_f,
-                                                s_f,
-                                                &mut save_locations
-                                                    [j * NSIBLINGS..(j + 1) * NSIBLINGS],
-                                                scale,
-                                            )
+                                            let save_locations = &mut save_locations[j * NSIBLINGS..(j + 1) * NSIBLINGS];
+                                            let save_locations_slice = unsafe { &mut *(save_locations.as_ptr() as *mut [<Scalar as AsComplex>::ComplexType; 8])};
+
+                                            // matvec8x8_auto::<<Scalar as AsComplex>::ComplexType>(
+                                            //     k_f_slice,
+                                            //     s_f_slice,
+                                            //     save_locations_slice,
+                                            //     scale,
+                                            // );
+
+                                            <Scalar as AsComplex>::ComplexType::matvec8x8(simd, k_f_slice, s_f_slice, save_locations_slice, scale);
                                         }
                                     }
                                 },

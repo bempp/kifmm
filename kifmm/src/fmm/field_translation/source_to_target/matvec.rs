@@ -1,6 +1,6 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
 use std::arch::aarch64::float32x4_t;
-use rlst::{RlstScalar, c32};
+use rlst::{RlstScalar, c32, c64};
 use pulp::{aarch64::NeonFcma, f32x4, Simd};
 
 /// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
@@ -11,7 +11,7 @@ use pulp::{aarch64::NeonFcma, f32x4, Simd};
 /// * `save_locations` - Save buffer.
 /// * `scale` - Scalar scaling factor.
 #[inline(always)]
-pub fn matvec8x8<U>(matrix: &[U], vector: &[U], save_buffer: &mut [U], alpha: U)
+pub fn matvec8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], save_buffer: &mut [U; 8], alpha: U)
 where
     U: RlstScalar,
 {
@@ -57,11 +57,10 @@ where
 pub struct ComplexMul8x8NeonFcma32<'a> {
     pub simd: NeonFcma,
     pub alpha: f32,
-    pub matrix: &'a [[c32; 8]; 8],
+    pub matrix: &'a [c32; 64],
     pub vector: &'a [c32; 8],
     pub result: &'a mut [c32; 8],
 }
-
 impl pulp::NullaryFnOnce for ComplexMul8x8NeonFcma32<'_> {
     type Output = ();
 
@@ -80,6 +79,7 @@ impl pulp::NullaryFnOnce for ComplexMul8x8NeonFcma32<'_> {
         let mut a3 = f32x4(0., 0., 0., 0.);
         let mut a4 = f32x4(0., 0., 0., 0.);
 
+        let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
         let [v1, v2, v3, v4]: [f32x4; 4] = pulp::cast(*vector);
 
         // Unroll loop
@@ -146,5 +146,67 @@ impl pulp::NullaryFnOnce for ComplexMul8x8NeonFcma32<'_> {
         unsafe { simd.neon.vst1q_f32(ptr.add(4), a2) };
         unsafe { simd.neon.vst1q_f32(ptr.add(8), a3) };
         unsafe { simd.neon.vst1q_f32(ptr.add(12), a4) };
+    }
+}
+
+
+pub trait Matvec {
+    type Scalar: RlstScalar;
+
+    fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar);
+}
+
+impl Matvec for f64 {
+    type Scalar = c64;
+
+    #[inline(always)]
+    // fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar], vector: &[Self::Scalar], save_buffer: &mut [Self::Scalar], alpha: Self::Scalar) {
+    fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar) {
+        matvec8x8_auto(matrix, vector, save_buffer, alpha)
+    }
+}
+
+impl Matvec for c32 {
+    type Scalar = c32;
+
+    // #[inline(always)]
+    // // fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar], vector: &[Self::Scalar], save_buffer: &mut [Self::Scalar], alpha: Self::Scalar) {
+    // fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar) {
+    //     matvec8x8_auto(matrix, vector, save_buffer, alpha)
+    // }
+    #[inline(always)]
+    fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar) {
+        simd.vectorize(ComplexMul8x8NeonFcma32 {
+            simd,
+            alpha: alpha.re(),
+            matrix: matrix,
+            vector: vector,
+            result: save_buffer,
+        });
+    }
+}
+
+impl Matvec for c64 {
+    type Scalar = c64;
+
+    #[inline(always)]
+    // fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar], vector: &[Self::Scalar], save_buffer: &mut [Self::Scalar], alpha: Self::Scalar) {
+    fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar) {
+        matvec8x8_auto(matrix, vector, save_buffer, alpha)
+    }
+}
+
+impl Matvec for f32 {
+    type Scalar = c32;
+
+    #[inline(always)]
+    fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar) {
+        simd.vectorize(ComplexMul8x8NeonFcma32 {
+            simd,
+            alpha: alpha.re(),
+            matrix: matrix,
+            vector: vector,
+            result: save_buffer,
+        });
     }
 }
