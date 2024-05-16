@@ -212,7 +212,6 @@ where
                     <<Scalar as AsComplex>::ComplexType>::one()
                 };
 
-                println!("LEVEL {:?} {:?}", level, scale);
 
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft =
@@ -377,6 +376,7 @@ where
                                                     as *mut [<Scalar as AsComplex>::ComplexType; 8])
                                             };
 
+                                            // matvec8x8_auto(k_f_slice, s_f_slice, save_locations_slice, scale);
                                             <Scalar as AsComplex>::ComplexType::matvec8x8(
                                                 simd,
                                                 k_f_slice,

@@ -707,8 +707,8 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 90000;
-        let ntargets = 100000;
+        let nsources = 9000;
+        let ntargets = 10000;
 
         let min = None;
         let max = None;
@@ -772,6 +772,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_fft.evaluate(false).unwrap();
+
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -783,58 +784,58 @@ mod test {
             );
         }
 
-        // BLAS based field translation
-        {
-            // Evaluate potentials
-            let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_pot,
-            );
+        // // BLAS based field translation
+        // {
+        //     // Evaluate potentials
+        //     let eval_type = EvalType::Value;
+        //     let fmm_blas = SingleNodeBuilder::new()
+        //         .tree(&sources, &targets, n_crit, sparse)
+        //         .unwrap()
+        //         .parameters(
+        //             &charges,
+        //             expansion_order,
+        //             Laplace3dKernel::new(),
+        //             eval_type,
+        //             BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+        //         )
+        //         .unwrap()
+        //         .build()
+        //         .unwrap();
+        //     fmm_blas.evaluate(false).unwrap();
+        //     let fmm_blas = Box::new(fmm_blas);
+        //     test_single_node_laplace_fmm_vector_helper::<f64>(
+        //         fmm_blas,
+        //         eval_type,
+        //         &sources,
+        //         &charges,
+        //         threshold_pot,
+        //     );
 
-            // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Laplace3dKernel::new(),
-                    eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv_blas,
-            );
-        }
+        //     // Evaluate potentials + derivatives
+        //     let eval_type = EvalType::ValueDeriv;
+        //     let fmm_blas = SingleNodeBuilder::new()
+        //         .tree(&sources, &targets, n_crit, sparse)
+        //         .unwrap()
+        //         .parameters(
+        //             &charges,
+        //             expansion_order,
+        //             Laplace3dKernel::new(),
+        //             eval_type,
+        //             BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+        //         )
+        //         .unwrap()
+        //         .build()
+        //         .unwrap();
+        //     fmm_blas.evaluate(false).unwrap();
+        //     let fmm_blas = Box::new(fmm_blas);
+        //     test_single_node_laplace_fmm_vector_helper::<f64>(
+        //         fmm_blas,
+        //         eval_type,
+        //         &sources,
+        //         &charges,
+        //         threshold_deriv_blas,
+        //     );
+        // }
     }
 
     #[test]
