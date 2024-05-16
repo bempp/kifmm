@@ -161,15 +161,10 @@ impl pulp::NullaryFnOnce for ComplexMul8x8NeonFcma32<'_> {
         a3 = simd.c32s_mul_add_e(m3, v08, a3);
         a4 = simd.c32s_mul_add_e(m4, v08, a4);
 
-        a1 = simd.mul_f32x4(a1, alpha);
-        a2 = simd.mul_f32x4(a2, alpha);
-        a3 = simd.mul_f32x4(a3, alpha);
-        a4 = simd.mul_f32x4(a4, alpha);
-
-        a1 = simd.add_f32x4(r1, a1);
-        a2 = simd.add_f32x4(r2, a2);
-        a3 = simd.add_f32x4(r3, a3);
-        a4 = simd.add_f32x4(r4, a4);
+        a1 = simd.mul_add_f32x4(a1, alpha, r1);
+        a2 = simd.mul_add_f32x4(a2, alpha, r2);
+        a3 = simd.mul_add_f32x4(a3, alpha, r3);
+        a4 = simd.mul_add_f32x4(a4, alpha, r4);
 
         let a1: float32x4_t = unsafe { std::mem::transmute(a1) };
         let a2: float32x4_t = unsafe { std::mem::transmute(a2) };
@@ -294,23 +289,14 @@ impl pulp::NullaryFnOnce for ComplexMul8x8NeonFcma64<'_> {
         a7 = simd.c64s_mul_add_e(m7, v8, a7);
         a8 = simd.c64s_mul_add_e(m8, v8, a8);
 
-        a1 = simd.mul_f64x2(a1, alpha);
-        a2 = simd.mul_f64x2(a2, alpha);
-        a3 = simd.mul_f64x2(a3, alpha);
-        a4 = simd.mul_f64x2(a4, alpha);
-        a5 = simd.mul_f64x2(a5, alpha);
-        a6 = simd.mul_f64x2(a6, alpha);
-        a7 = simd.mul_f64x2(a7, alpha);
-        a8 = simd.mul_f64x2(a8, alpha);
-
-        a1 = simd.add_f64x2(r1, a1);
-        a2 = simd.add_f64x2(r2, a2);
-        a3 = simd.add_f64x2(r3, a3);
-        a4 = simd.add_f64x2(r4, a4);
-        a5 = simd.add_f64x2(r5, a5);
-        a6 = simd.add_f64x2(r6, a6);
-        a7 = simd.add_f64x2(r7, a7);
-        a8 = simd.add_f64x2(r8, a8);
+        a1 = simd.mul_add_f64x2(a1, alpha, r1);
+        a2 = simd.mul_add_f64x2(a2, alpha, r2);
+        a3 = simd.mul_add_f64x2(a3, alpha, r3);
+        a4 = simd.mul_add_f64x2(a4, alpha, r4);
+        a5 = simd.mul_add_f64x2(a5, alpha, r5);
+        a6 = simd.mul_add_f64x2(a6, alpha, r6);
+        a7 = simd.mul_add_f64x2(a7, alpha, r7);
+        a8 = simd.mul_add_f64x2(a8, alpha, r8);
 
         let a1: float64x2_t = unsafe { std::mem::transmute(a1) };
         let a2: float64x2_t = unsafe { std::mem::transmute(a2) };
