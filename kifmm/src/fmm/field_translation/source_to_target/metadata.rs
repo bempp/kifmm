@@ -784,7 +784,7 @@ where
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft =
                     rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
-                k_ft.fill_from(k_f_.view());
+                k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
         }
@@ -975,7 +975,7 @@ where
                         <Scalar as DftType>::OutputType,
                         [NSIBLINGS, NSIBLINGS]
                     );
-                    k_ft.fill_from(k_f_.view());
+                    k_ft.fill_from(k_f_.view().transpose());
                     kernel_data_ft.push(k_ft.data().to_vec());
                 }
             }
@@ -1504,7 +1504,7 @@ where
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft =
                     rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
-                k_ft.fill_from(k_f_.view());
+                k_ft.fill_from(k_f_.view().transpose());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
         }

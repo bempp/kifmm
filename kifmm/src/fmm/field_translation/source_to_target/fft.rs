@@ -212,6 +212,8 @@ where
                     <<Scalar as AsComplex>::ComplexType>::one()
                 };
 
+                println!("LEVEL {:?} {:?}", level, scale);
+
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft =
                     &self.source_to_target.metadata[m2l_operator_index].kernel_data_f;
@@ -349,9 +351,8 @@ where
                                         let frequency_offset = freq * NHALO;
                                         let k_f = &kernel_data_ft[i + frequency_offset];
 
-                                        let k_f_slice = k_f.as_slice();
                                         let k_f_slice = unsafe {
-                                            &*(k_f_slice.as_ptr()
+                                            &*(k_f.as_slice().as_ptr()
                                                 as *const [<Scalar as AsComplex>::ComplexType; 64])
                                         };
 

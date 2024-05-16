@@ -707,8 +707,8 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let nsources = 90000;
+        let ntargets = 100000;
 
         let min = None;
         let max = None;
