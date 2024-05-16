@@ -15,42 +15,6 @@ pub fn matvec8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], save_buffer: &mut [U
 where
     U: RlstScalar,
 {
-    // let s1 = vector[0];
-    // let s2 = vector[1];
-    // let s3 = vector[2];
-    // let s4 = vector[3];
-    // let s5 = vector[4];
-    // let s6 = vector[5];
-    // let s7 = vector[6];
-    // let s8 = vector[7];
-
-    // for i in 0..4 {
-    //     let mut sum1 = U::zero();
-    //     let mut sum2 = U::zero();
-    //     let i1 = 2 * i;
-    //     let i2 = 2 * i + 1;
-
-    //     sum1 += matrix[i1 * 8] * s1;
-    //     sum1 += matrix[i1 * 8 + 1] * s2;
-    //     sum1 += matrix[i1 * 8 + 2] * s3;
-    //     sum1 += matrix[i1 * 8 + 3] * s4;
-    //     sum1 += matrix[i1 * 8 + 4] * s5;
-    //     sum1 += matrix[i1 * 8 + 5] * s6;
-    //     sum1 += matrix[i1 * 8 + 6] * s7;
-    //     sum1 += matrix[i1 * 8 + 7] * s8;
-
-    //     sum2 += matrix[i2 * 8] * s1;
-    //     sum2 += matrix[i2 * 8 + 1] * s2;
-    //     sum2 += matrix[i2 * 8 + 2] * s3;
-    //     sum2 += matrix[i2 * 8 + 3] * s4;
-    //     sum2 += matrix[i2 * 8 + 4] * s5;
-    //     sum2 += matrix[i2 * 8 + 5] * s6;
-    //     sum2 += matrix[i2 * 8 + 6] * s7;
-    //     sum2 += matrix[i2 * 8 + 7] * s8;
-
-    //     save_buffer[i1] += sum1 * alpha;
-    //     save_buffer[i2] += sum2 * alpha;
-    // }
 
     for i in 0..8 {
 
@@ -322,12 +286,14 @@ pub trait Matvec {
     type Scalar: RlstScalar;
 
     fn matvec8x8(
-        simd: NeonFcma,
+        _simd: NeonFcma,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         save_buffer: &mut [Self::Scalar; 8],
         alpha: Self::Scalar,
-    );
+    ) {
+        matvec8x8_auto(matrix, vector, save_buffer, alpha)
+    }
 }
 
 impl Matvec for c32 {
@@ -354,11 +320,6 @@ impl Matvec for c32 {
 impl Matvec for c64 {
     type Scalar = c64;
 
-    // #[inline(always)]
-    // // fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar], vector: &[Self::Scalar], save_buffer: &mut [Self::Scalar], alpha: Self::Scalar) {
-    // fn matvec8x8(simd: NeonFcma, matrix: &[Self::Scalar; 64], vector: &[Self::Scalar; 8], save_buffer: &mut [Self::Scalar; 8], alpha: Self::Scalar) {
-    //     matvec8x8_auto(matrix, vector, save_buffer, alpha)
-    // }
     #[inline(always)]
     fn matvec8x8(
         simd: NeonFcma,
