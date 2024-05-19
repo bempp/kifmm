@@ -636,6 +636,7 @@ pub mod x86 {
                 vector,
                 result,
             } = self;
+
             let mut a1 = simd.splat_f64x4(0.);
             let mut a2 = simd.splat_f64x4(0.);
             let mut a3 = simd.splat_f64x4(0.);
@@ -1037,6 +1038,48 @@ pub mod x86 {
                 simd.avx
                     ._mm256_storeu_pd(ptr.add(12), std::mem::transmute(a4))
             }
+        }
+    }
+
+    impl Matvec for c32 {
+        type Scalar = c32;
+
+        #[inline(always)]
+        fn matvec8x8(
+            simd: V3,
+            matrix: &[Self::Scalar; 64],
+            vector: &[Self::Scalar; 8],
+            save_buffer: &mut [Self::Scalar; 8],
+            alpha: Self::Scalar,
+        ) {
+            simd.vectorize(Matvec8x8 {
+                simd,
+                scale: alpha.re(),
+                matrix: matrix,
+                vector: vector,
+                result: save_buffer,
+            });
+        }
+    }
+
+    impl Matvec for c64 {
+        type Scalar = c64;
+
+        #[inline(always)]
+        fn matvec8x8(
+            simd: V3,
+            matrix: &[Self::Scalar; 64],
+            vector: &[Self::Scalar; 8],
+            save_buffer: &mut [Self::Scalar; 8],
+            alpha: Self::Scalar,
+        ) {
+            simd.vectorize(Matvec8x8 {
+                simd,
+                scale: alpha.re(),
+                matrix: matrix,
+                vector: vector,
+                result: save_buffer,
+            })
         }
     }
 }

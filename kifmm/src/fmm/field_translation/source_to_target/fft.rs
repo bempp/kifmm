@@ -7,7 +7,7 @@ use num::{One, Zero};
 #[cfg(target_arch = "aarch64")]
 use pulp::aarch64::NeonFcma;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(target_arch = "x86_64")]
 use pulp::x86::V3;
 
 use rayon::prelude::*;
