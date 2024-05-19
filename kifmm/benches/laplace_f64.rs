@@ -133,6 +133,6 @@ fn laplace_potentials_gradients_f64(c: &mut Criterion) {
 }
 
 criterion_group!(laplace_p_f64, laplace_potentials_f64);
-// criterion_group!(laplace_g_f64, laplace_potentials_gradients_f64);
+criterion_group!(laplace_g_f64, laplace_potentials_gradients_f64);
 
-criterion_main!(laplace_p_f64);
+criterion_main!(laplace_p_f64, laplace_g_f64);

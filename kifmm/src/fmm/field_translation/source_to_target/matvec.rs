@@ -1,5 +1,4 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
-use pulp::{f32x4, f64x2, Simd};
 use rlst::{c32, c64, RlstScalar};
 
 /// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
@@ -7,8 +6,8 @@ use rlst::{c32, c64, RlstScalar};
 /// # Arguments
 /// * - `matrix` - 8x8 matrix.
 /// * - `signal` - 8x1 vector.
-/// * `result` - Save buffer.
-/// * `scale` - Scalar scaling factor.
+/// * - `result` - Save buffer.
+/// * - `scale` - Scalar scaling factor.
 #[inline(always)]
 pub fn matvec8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], scale: U)
 where
@@ -56,9 +55,7 @@ macro_rules! matvec_trait {
 pub mod aarch64 {
     use super::*;
     use pulp::aarch64::NeonFcma;
-    use std::{
-        arch::aarch64::{float32x4_t, float64x2_t},
-    };
+    use std::arch::aarch64::{float32x4_t, float64x2_t};
 
     matvec_trait!(NeonFcma);
 
@@ -95,49 +92,49 @@ pub mod aarch64 {
             let v08 = f32x4(v4.2, v4.3, v4.2, v4.3);
 
             // Unroll loop
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[0]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[0]);
             a1 = simd.c32s_mul_add_e(m1, v01, a1);
             a2 = simd.c32s_mul_add_e(m2, v01, a2);
             a3 = simd.c32s_mul_add_e(m3, v01, a3);
             a4 = simd.c32s_mul_add_e(m4, v01, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[1]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[1]);
             a1 = simd.c32s_mul_add_e(m1, v02, a1);
             a2 = simd.c32s_mul_add_e(m2, v02, a2);
             a3 = simd.c32s_mul_add_e(m3, v02, a3);
             a4 = simd.c32s_mul_add_e(m4, v02, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[2]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[2]);
             a1 = simd.c32s_mul_add_e(m1, v03, a1);
             a2 = simd.c32s_mul_add_e(m2, v03, a2);
             a3 = simd.c32s_mul_add_e(m3, v03, a3);
             a4 = simd.c32s_mul_add_e(m4, v03, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[3]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[3]);
             a1 = simd.c32s_mul_add_e(m1, v04, a1);
             a2 = simd.c32s_mul_add_e(m2, v04, a2);
             a3 = simd.c32s_mul_add_e(m3, v04, a3);
             a4 = simd.c32s_mul_add_e(m4, v04, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[4]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[4]);
             a1 = simd.c32s_mul_add_e(m1, v05, a1);
             a2 = simd.c32s_mul_add_e(m2, v05, a2);
             a3 = simd.c32s_mul_add_e(m3, v05, a3);
             a4 = simd.c32s_mul_add_e(m4, v05, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[5]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[5]);
             a1 = simd.c32s_mul_add_e(m1, v06, a1);
             a2 = simd.c32s_mul_add_e(m2, v06, a2);
             a3 = simd.c32s_mul_add_e(m3, v06, a3);
             a4 = simd.c32s_mul_add_e(m4, v06, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[6]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[6]);
             a1 = simd.c32s_mul_add_e(m1, v07, a1);
             a2 = simd.c32s_mul_add_e(m2, v07, a2);
             a3 = simd.c32s_mul_add_e(m3, v07, a3);
             a4 = simd.c32s_mul_add_e(m4, v07, a4);
 
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(*&matrix[7]);
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[7]);
             a1 = simd.c32s_mul_add_e(m1, v08, a1);
             a2 = simd.c32s_mul_add_e(m2, v08, a2);
             a3 = simd.c32s_mul_add_e(m3, v08, a3);
@@ -189,7 +186,7 @@ pub mod aarch64 {
             let [v1, v2, v3, v4, v5, v6, v7, v8]: [f64x2; 8] = pulp::cast(*vector);
 
             // Unroll loop
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[0]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[0]);
             a1 = simd.c64s_mul_add_e(m1, v1, a1);
             a2 = simd.c64s_mul_add_e(m2, v1, a2);
             a3 = simd.c64s_mul_add_e(m3, v1, a3);
@@ -199,7 +196,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v1, a7);
             a8 = simd.c64s_mul_add_e(m8, v1, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[1]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[1]);
             a1 = simd.c64s_mul_add_e(m1, v2, a1);
             a2 = simd.c64s_mul_add_e(m2, v2, a2);
             a3 = simd.c64s_mul_add_e(m3, v2, a3);
@@ -209,7 +206,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v2, a7);
             a8 = simd.c64s_mul_add_e(m8, v2, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[2]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[2]);
             a1 = simd.c64s_mul_add_e(m1, v3, a1);
             a2 = simd.c64s_mul_add_e(m2, v3, a2);
             a3 = simd.c64s_mul_add_e(m3, v3, a3);
@@ -219,7 +216,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v3, a7);
             a8 = simd.c64s_mul_add_e(m8, v3, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[3]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[3]);
             a1 = simd.c64s_mul_add_e(m1, v4, a1);
             a2 = simd.c64s_mul_add_e(m2, v4, a2);
             a3 = simd.c64s_mul_add_e(m3, v4, a3);
@@ -229,7 +226,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v4, a7);
             a8 = simd.c64s_mul_add_e(m8, v4, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[4]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[4]);
             a1 = simd.c64s_mul_add_e(m1, v5, a1);
             a2 = simd.c64s_mul_add_e(m2, v5, a2);
             a3 = simd.c64s_mul_add_e(m3, v5, a3);
@@ -239,7 +236,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v5, a7);
             a8 = simd.c64s_mul_add_e(m8, v5, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[5]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[5]);
             a1 = simd.c64s_mul_add_e(m1, v6, a1);
             a2 = simd.c64s_mul_add_e(m2, v6, a2);
             a3 = simd.c64s_mul_add_e(m3, v6, a3);
@@ -249,7 +246,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v6, a7);
             a8 = simd.c64s_mul_add_e(m8, v6, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[6]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[6]);
             a1 = simd.c64s_mul_add_e(m1, v7, a1);
             a2 = simd.c64s_mul_add_e(m2, v7, a2);
             a3 = simd.c64s_mul_add_e(m3, v7, a3);
@@ -259,7 +256,7 @@ pub mod aarch64 {
             a7 = simd.c64s_mul_add_e(m7, v7, a7);
             a8 = simd.c64s_mul_add_e(m8, v7, a8);
 
-            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(*&matrix[7]);
+            let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[7]);
             a1 = simd.c64s_mul_add_e(m1, v8, a1);
             a2 = simd.c64s_mul_add_e(m2, v8, a2);
             a3 = simd.c64s_mul_add_e(m3, v8, a3);
@@ -347,8 +344,8 @@ pub use aarch64::Matvec;
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86 {
-    use super::*;
-    use pulp::{f32x8, f64x2, f64x4};
+    use super::{Matvec8x8, RlstScalar, c32, c64, matvec8x8_auto};
+    use pulp::{f32x8, f64x4};
     use pulp::x86::V3;
 
     matvec_trait!(V3);
@@ -403,7 +400,7 @@ pub mod x86 {
             let [r1, r2]: [f32x8; 2] = pulp::cast(*result);
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[0]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[0]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.0);
                 let v1_im = simd.splat_f32x8(v_im.0);
 
@@ -429,7 +426,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[1]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[1]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.1);
                 let v1_im = simd.splat_f32x8(v_im.1);
 
@@ -455,7 +452,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[2]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[2]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.2);
                 let v1_im = simd.splat_f32x8(v_im.2);
 
@@ -481,7 +478,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[3]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[3]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.3);
                 let v1_im = simd.splat_f32x8(v_im.3);
 
@@ -507,7 +504,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[4]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[4]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.4);
                 let v1_im = simd.splat_f32x8(v_im.4);
 
@@ -533,7 +530,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[5]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[5]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.5);
                 let v1_im = simd.splat_f32x8(v_im.5);
 
@@ -559,7 +556,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[6]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[6]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.6);
                 let v1_im = simd.splat_f32x8(v_im.6);
 
@@ -585,7 +582,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[7]); // 9 registers
+                let [m1, m2]: [f32x8; 2] = pulp::cast(matrix[7]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.7);
                 let v1_im = simd.splat_f32x8(v_im.7);
 
@@ -654,7 +651,7 @@ pub mod x86 {
             let [v2_re, v2_im] = deinterleave_avx_f64(simd, pulp::cast(vectors[1]));
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[0]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[0]);
                 let v1_re = simd.splat_f64x4(v1_re.0);
                 let v1_im = simd.splat_f64x4(v1_im.0);
 
@@ -701,7 +698,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[1]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[1]);
                 let v1_re = simd.splat_f64x4(v1_re.1);
                 let v1_im = simd.splat_f64x4(v1_im.1);
 
@@ -747,7 +744,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[2]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[2]);
                 let v1_re = simd.splat_f64x4(v1_re.2);
                 let v1_im = simd.splat_f64x4(v1_im.2);
 
@@ -793,7 +790,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[3]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[3]);
                 let v1_re = simd.splat_f64x4(v1_re.3);
                 let v1_im = simd.splat_f64x4(v1_im.3);
 
@@ -839,7 +836,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[4]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[4]);
                 let v1_re = simd.splat_f64x4(v2_re.0);
                 let v1_im = simd.splat_f64x4(v2_im.0);
 
@@ -885,7 +882,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[5]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[5]);
                 let v1_re = simd.splat_f64x4(v2_re.1);
                 let v1_im = simd.splat_f64x4(v2_im.1);
 
@@ -931,7 +928,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[6]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[6]);
                 let v1_re = simd.splat_f64x4(v2_re.2);
                 let v1_im = simd.splat_f64x4(v2_im.2);
 
@@ -977,7 +974,7 @@ pub mod x86 {
             }
 
             {
-                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(*&matrix[7]);
+                let [m1, m2, m3, m4]: [f64x4; 4] = pulp::cast(matrix[7]);
                 let v1_re = simd.splat_f64x4(v2_re.3);
                 let v1_im = simd.splat_f64x4(v2_im.3);
 
@@ -1053,15 +1050,15 @@ pub mod x86 {
             simd: V3,
             matrix: &[Self::Scalar; 64],
             vector: &[Self::Scalar; 8],
-            save_buffer: &mut [Self::Scalar; 8],
+            result: &mut [Self::Scalar; 8],
             alpha: Self::Scalar,
         ) {
             simd.vectorize(Matvec8x8 {
                 simd,
                 scale: alpha.re(),
-                matrix: matrix,
-                vector: vector,
-                result: save_buffer,
+                matrix,
+                vector,
+                result,
             });
         }
     }
@@ -1074,15 +1071,15 @@ pub mod x86 {
             simd: V3,
             matrix: &[Self::Scalar; 64],
             vector: &[Self::Scalar; 8],
-            save_buffer: &mut [Self::Scalar; 8],
+            result: &mut [Self::Scalar; 8],
             alpha: Self::Scalar,
         ) {
             simd.vectorize(Matvec8x8 {
                 simd,
                 scale: alpha.re(),
-                matrix: matrix,
-                vector: vector,
-                result: save_buffer,
+                matrix,
+                vector,
+                result,
             })
         }
     }

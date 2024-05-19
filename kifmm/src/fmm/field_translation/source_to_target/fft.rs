@@ -4,12 +4,6 @@ use std::{collections::HashSet, sync::RwLock};
 use itertools::Itertools;
 use num::{One, Zero};
 
-#[cfg(target_arch = "aarch64")]
-use pulp::aarch64::NeonFcma;
-
-#[cfg(target_arch = "x86_64")]
-use pulp::x86::V3;
-
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
@@ -19,7 +13,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::matvec::{matvec8x8_auto, Matvec},
+        field_translation::source_to_target::matvec::Matvec,
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
