@@ -346,10 +346,10 @@ pub mod aarch64 {
 pub use aarch64::Matvec;
 
 #[cfg(target_arch = "x86_64")]
-pub mod x84 {
+pub mod x86 {
     use super::*;
-    use pulp::f32x8;
-    use pulp::x64::V3;
+    use pulp::{f32x8, f64x2, f64x4};
+    use pulp::x86::V3;
 
     matvec_trait!(V3);
 
@@ -384,6 +384,15 @@ pub mod x84 {
 
         #[inline(always)]
         fn call(self) -> Self::Output {
+
+            let Self {
+                simd,
+                scale,
+                matrix,
+                vector,
+                result,
+            } = self;
+
             let mut a1 = simd.splat_f32x8(0.);
             let mut a2 = simd.splat_f32x8(0.);
 
@@ -599,9 +608,9 @@ pub mod x84 {
                 a2 = simd.add_f32x8(a2, pulp::cast(r2));
             }
 
-            let alpha = simd.splat_f32x8(alpha);
-            a1 = simd.mul_f32x8(alpha, a1);
-            a2 = simd.mul_f32x8(alpha, a2);
+            let scale = simd.splat_f32x8(scale);
+            a1 = simd.mul_f32x8(scale, a1);
+            a2 = simd.mul_f32x8(scale, a2);
 
             // Store results
             {
@@ -631,7 +640,7 @@ pub mod x84 {
             let mut a2 = simd.splat_f64x4(0.);
             let mut a3 = simd.splat_f64x4(0.);
             let mut a4 = simd.splat_f64x4(0.);
-            let alpha = simd.splat_f64x4(alpha);
+            let scale = simd.splat_f64x4(scale);
 
             let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
             let (vectors, _) = pulp::as_arrays::<4, _>(vector);
@@ -1008,10 +1017,10 @@ pub mod x84 {
                 a4 = simd.add_f64x4(a4, pulp::cast(r4));
             }
 
-            a1 = simd.mul_f64x4(alpha, a1);
-            a2 = simd.mul_f64x4(alpha, a2);
-            a3 = simd.mul_f64x4(alpha, a3);
-            a4 = simd.mul_f64x4(alpha, a4);
+            a1 = simd.mul_f64x4(scale, a1);
+            a2 = simd.mul_f64x4(scale, a2);
+            a3 = simd.mul_f64x4(scale, a3);
+            a4 = simd.mul_f64x4(scale, a4);
 
             let ptr = result.as_mut_ptr() as *mut f64;
 
@@ -1032,5 +1041,5 @@ pub mod x84 {
     }
 }
 
-#[cfg(target_arch = "x64_64")]
+#[cfg(target_arch = "x86_64")]
 pub use x86::Matvec;

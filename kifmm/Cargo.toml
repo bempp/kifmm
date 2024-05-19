@@ -38,6 +38,7 @@ superslice = {version = "1.0.0", optional = true}
 pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethods"] , optional = true }
 numpy = { version = "0.21", optional = true }
 pulp = "0.18.12"
+bytemuck = "1.16.0"
 
 [target.aarch64-apple-darwin.dependencies]
 rlst = { version = "0.1", features=["metal"]}

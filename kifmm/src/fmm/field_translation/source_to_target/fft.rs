@@ -3,7 +3,13 @@ use std::{collections::HashSet, sync::RwLock};
 
 use itertools::Itertools;
 use num::{One, Zero};
+
+#[cfg(target_arch = "aarch64")]
 use pulp::aarch64::NeonFcma;
+
+#[cfg(target_arch = "aarch64")]
+use pulp::x86::V3;
+
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
