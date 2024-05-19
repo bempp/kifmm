@@ -56,8 +56,6 @@ macro_rules! matvec_trait {
     };
 }
 
-
-
 #[cfg(target_arch = "aarch64")]
 pub mod aarch64 {
     use super::*;
@@ -348,12 +346,11 @@ pub mod aarch64 {
 #[cfg(target_arch = "aarch64")]
 pub use aarch64::Matvec;
 
-
 #[cfg(target_arch = "x86_64")]
 pub mod x84 {
     use super::*;
+    use pulp::f32x8;
     use pulp::x64::V3;
-    use pulp::{f32x8};
 
     matvec_trait!(V3);
 
@@ -363,7 +360,8 @@ pub mod x84 {
                 let mut out = [simd.$splat_method(0.); 2];
 
                 {
-                    let n = std::mem::size_of::<$array_type>() / std::mem::size_of::<$scalar_type>();
+                    let n =
+                        std::mem::size_of::<$array_type>() / std::mem::size_of::<$scalar_type>();
                     let out: &mut [$scalar_type] =
                         bytemuck::cast_slice_mut(std::slice::from_mut(&mut out));
                     let x: &[$scalar_type] = bytemuck::cast_slice(std::slice::from_ref(&value));
@@ -382,7 +380,7 @@ pub mod x84 {
     generate_deinterleave_fn!(deinterleave_avx_f32, V3, f32x8, splat_f32x8, f32);
     generate_deinterleave_fn!(deinterleave_avx_f64, V3, f64x4, splat_f64x4, f64);
 
-    impl <'a> pulp::NullaryFnOnce for Matvec8x8<'a, c32, V3> {
+    impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c32, V3> {
         type Output = ();
 
         #[inline(always)]
@@ -618,7 +616,7 @@ pub mod x84 {
         }
     }
 
-    impl <'a> pulp::NullaryFnOnce for Matvec8x8<'a, c64, V3> {
+    impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c64, V3> {
         type Output = ();
 
         #[inline(always)]
@@ -1031,7 +1029,6 @@ pub mod x84 {
                 simd.avx
                     ._mm256_storeu_pd(ptr.add(12), std::mem::transmute(a4))
             }
-
         }
     }
 }
