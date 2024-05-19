@@ -212,7 +212,6 @@ where
                     <<Scalar as AsComplex>::ComplexType>::one()
                 };
 
-
                 // Lookup all of the precomputed Green's function evaluations' FFT sequences
                 let kernel_data_ft =
                     &self.source_to_target.metadata[m2l_operator_index].kernel_data_f;
@@ -329,7 +328,11 @@ where
 
                 // 2. Compute the Hadamard product
                 {
-                    let simd = NeonFcma::try_new().unwrap();
+                    #[cfg(target_arch = "aarch64")]
+                    let simd = pulp::aarch64::NeonFcma::try_new().unwrap();
+
+                    #[cfg(target_arch = "x86_64")]
+                    let simd = pulp::x86::V3::try_new().unwrap();
 
                     (0..size_out)
                         .into_par_iter()
