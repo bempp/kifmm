@@ -23,7 +23,7 @@ name = "kifmm"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-itertools = "0.12.*"
+itertools = "0.13.*"
 num = "0.4"
 approx = "0.5"
 rayon = "1.9"
