@@ -53,8 +53,9 @@ macro_rules! matvec_trait {
 
 #[cfg(target_arch = "aarch64")]
 pub mod aarch64 {
-    use super::*;
+    use super::{c32, c64, matvec8x8_auto, Matvec8x8, RlstScalar};
     use pulp::aarch64::NeonFcma;
+    use pulp::{f32x4, f64x2, Simd};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
     matvec_trait!(NeonFcma);
@@ -304,15 +305,15 @@ pub mod aarch64 {
             simd: NeonFcma,
             matrix: &[Self::Scalar; 64],
             vector: &[Self::Scalar; 8],
-            save_buffer: &mut [Self::Scalar; 8],
+            result: &mut [Self::Scalar; 8],
             alpha: Self::Scalar,
         ) {
             simd.vectorize(Matvec8x8 {
                 simd,
                 scale: alpha.re(),
-                matrix: matrix,
-                vector: vector,
-                result: save_buffer,
+                matrix,
+                vector,
+                result,
             });
         }
     }
@@ -325,15 +326,15 @@ pub mod aarch64 {
             simd: NeonFcma,
             matrix: &[Self::Scalar; 64],
             vector: &[Self::Scalar; 8],
-            save_buffer: &mut [Self::Scalar; 8],
+            result: &mut [Self::Scalar; 8],
             alpha: Self::Scalar,
         ) {
             simd.vectorize(Matvec8x8 {
                 simd,
                 scale: alpha.re(),
-                matrix: matrix,
-                vector: vector,
-                result: save_buffer,
+                matrix,
+                vector,
+                result,
             })
         }
     }
@@ -344,9 +345,9 @@ pub use aarch64::Matvec;
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86 {
-    use super::{Matvec8x8, RlstScalar, c32, c64, matvec8x8_auto};
-    use pulp::{f32x8, f64x4};
+    use super::{c32, c64, matvec8x8_auto, Matvec8x8, RlstScalar};
     use pulp::x86::V3;
+    use pulp::{f32x8, f64x4};
 
     matvec_trait!(V3);
 
@@ -381,7 +382,6 @@ pub mod x86 {
 
         #[inline(always)]
         fn call(self) -> Self::Output {
-
             let Self {
                 simd,
                 scale,
