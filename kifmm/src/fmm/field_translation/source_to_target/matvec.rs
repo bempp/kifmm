@@ -1,10 +1,6 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
 use pulp::{f32x4, f64x2, Simd};
 use rlst::{c32, c64, RlstScalar};
-use std::{
-    arch::aarch64::{float32x4_t, float64x2_t},
-    marker::PhantomData,
-};
 
 /// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
 ///
@@ -60,6 +56,9 @@ macro_rules! matvec_trait {
 pub mod aarch64 {
     use super::*;
     use pulp::aarch64::NeonFcma;
+    use std::{
+        arch::aarch64::{float32x4_t, float64x2_t},
+    };
 
     matvec_trait!(NeonFcma);
 
