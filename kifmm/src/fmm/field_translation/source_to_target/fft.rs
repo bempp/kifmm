@@ -385,7 +385,6 @@ where
                                                     as *mut [<Scalar as AsComplex>::ComplexType; 8])
                                             };
 
-                                            // matvec8x8_auto(k_f_slice, s_f_slice, save_locations_slice, scale);
                                             <Scalar as AsComplex>::ComplexType::matvec8x8(
                                                 simd,
                                                 k_f_slice,

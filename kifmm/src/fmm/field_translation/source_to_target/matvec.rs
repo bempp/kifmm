@@ -400,6 +400,8 @@ pub mod x86 {
             let (vectors, _) = pulp::as_arrays::<8, _>(vector);
             let [v_re, v_im] = deinterleave_avx_f32(simd, pulp::cast(vectors[0]));
 
+            let [r1, r2]: [f32x8; 2] = pulp::cast(*result);
+
             {
                 let [m1, m2]: [f32x8; 2] = pulp::cast(*&matrix[0]); // 9 registers
                 let v1_re = simd.splat_f32x8(v_re.0);
@@ -609,8 +611,8 @@ pub mod x86 {
             }
 
             let scale = simd.splat_f32x8(scale);
-            a1 = simd.mul_f32x8(scale, a1);
-            a2 = simd.mul_f32x8(scale, a2);
+            a1 = simd.mul_add_f32x8(scale, a1, r1);
+            a2 = simd.mul_add_f32x8(scale, a2, r2);
 
             // Store results
             {
@@ -642,6 +644,8 @@ pub mod x86 {
             let mut a3 = simd.splat_f64x4(0.);
             let mut a4 = simd.splat_f64x4(0.);
             let scale = simd.splat_f64x4(scale);
+
+            let [r1, r2, r3, r4]: [f64x4; 4] = pulp::cast(*result);
 
             let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
             let (vectors, _) = pulp::as_arrays::<4, _>(vector);
@@ -1018,10 +1022,10 @@ pub mod x86 {
                 a4 = simd.add_f64x4(a4, pulp::cast(r4));
             }
 
-            a1 = simd.mul_f64x4(scale, a1);
-            a2 = simd.mul_f64x4(scale, a2);
-            a3 = simd.mul_f64x4(scale, a3);
-            a4 = simd.mul_f64x4(scale, a4);
+            a1 = simd.mul_add_f64x4(scale, a1, r1);
+            a2 = simd.mul_add_f64x4(scale, a2, r2);
+            a3 = simd.mul_add_f64x4(scale, a3, r3);
+            a4 = simd.mul_add_f64x4(scale, a4, r4);
 
             let ptr = result.as_mut_ptr() as *mut f64;
 
