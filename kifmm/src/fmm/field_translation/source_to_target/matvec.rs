@@ -1,4 +1,5 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
+use pulp::Simd;
 use rlst::{c32, c64, RlstScalar};
 
 /// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
@@ -25,27 +26,57 @@ where
 }
 
 #[derive(Debug)]
-pub struct Matvec8x8<'a, T: RlstScalar, S> {
+pub struct Matvec8x8<'a, T: RlstScalar, S: Simd> {
     pub simd: S,
-    matrix: &'a [T; 64],
-    vector: &'a [T; 8],
-    result: &'a mut [T; 8],
-    scale: T::Real,
+    pub matrix: &'a [T; 64],
+    pub vector: &'a [T; 8],
+    pub result: &'a mut [T; 8],
+    pub scale: T::Real,
 }
 
-macro_rules! matvec_trait {
+/// Generate a platform dependent trait for 8x8 matrix vector products, defaults to autovectorised implementation.
+#[macro_export]
+macro_rules! matvec8x8 {
     ($simd:ty) => {
-        pub trait Matvec {
+        pub trait Matvec8x8Trait {
             type Scalar: RlstScalar;
 
+            #[inline(always)]
             fn matvec8x8(
                 _simd: $simd,
                 matrix: &[Self::Scalar; 64],
                 vector: &[Self::Scalar; 8],
-                save_buffer: &mut [Self::Scalar; 8],
+                result: &mut [Self::Scalar; 8],
                 scale: Self::Scalar,
             ) {
-                matvec8x8_auto(matrix, vector, save_buffer, scale)
+                crate::fmm::field_translation::source_to_target::matvec::matvec8x8_auto(
+                    matrix, vector, result, scale,
+                )
+            }
+        }
+    };
+}
+
+macro_rules! impl_matvec8x8 {
+    ($simd:ty, $scalar:ty) => {
+        impl Matvec8x8Trait for $scalar {
+            type Scalar = $scalar;
+
+            #[inline(always)]
+            fn matvec8x8(
+                simd: $simd,
+                matrix: &[Self::Scalar; 64],
+                vector: &[Self::Scalar; 8],
+                result: &mut [Self::Scalar; 8],
+                scale: Self::Scalar,
+            ) {
+                simd.vectorize(Matvec8x8 {
+                    simd,
+                    scale: scale.re(),
+                    matrix,
+                    vector,
+                    result,
+                })
             }
         }
     };
@@ -53,12 +84,14 @@ macro_rules! matvec_trait {
 
 #[cfg(target_arch = "aarch64")]
 pub mod aarch64 {
-    use super::{c32, c64, matvec8x8_auto, Matvec8x8, RlstScalar};
+    use super::{c32, c64, Matvec8x8, RlstScalar};
     use pulp::aarch64::NeonFcma;
     use pulp::{f32x4, f64x2, Simd};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
-    matvec_trait!(NeonFcma);
+    matvec8x8!(NeonFcma);
+    impl_matvec8x8!(NeonFcma, c32);
+    impl_matvec8x8!(NeonFcma, c64);
 
     impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c32, NeonFcma> {
         type Output = ();
@@ -296,52 +329,10 @@ pub mod aarch64 {
             unsafe { simd.neon.vst1q_f64(ptr.add(14), a8) };
         }
     }
-
-    impl Matvec for c32 {
-        type Scalar = c32;
-
-        #[inline(always)]
-        fn matvec8x8(
-            simd: NeonFcma,
-            matrix: &[Self::Scalar; 64],
-            vector: &[Self::Scalar; 8],
-            result: &mut [Self::Scalar; 8],
-            alpha: Self::Scalar,
-        ) {
-            simd.vectorize(Matvec8x8 {
-                simd,
-                scale: alpha.re(),
-                matrix,
-                vector,
-                result,
-            });
-        }
-    }
-
-    impl Matvec for c64 {
-        type Scalar = c64;
-
-        #[inline(always)]
-        fn matvec8x8(
-            simd: NeonFcma,
-            matrix: &[Self::Scalar; 64],
-            vector: &[Self::Scalar; 8],
-            result: &mut [Self::Scalar; 8],
-            alpha: Self::Scalar,
-        ) {
-            simd.vectorize(Matvec8x8 {
-                simd,
-                scale: alpha.re(),
-                matrix,
-                vector,
-                result,
-            })
-        }
-    }
 }
 
 #[cfg(target_arch = "aarch64")]
-pub use aarch64::Matvec;
+pub use aarch64::Matvec8x8Trait;
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86 {
@@ -349,7 +340,9 @@ pub mod x86 {
     use pulp::x86::V3;
     use pulp::{f32x8, f64x4};
 
-    matvec_trait!(V3);
+    matvec8x8!(V3);
+    impl_matvec8x8!(V3, c32);
+    impl_matvec8x8!(V3, c64);
 
     macro_rules! generate_deinterleave_fn {
         ($fn_name:ident, $simd_type:ty, $array_type:ty, $splat_method:ident, $scalar_type:ty) => {
@@ -368,7 +361,6 @@ pub mod x86 {
                         out[n + i] = x[2 * i + 1];
                     }
                 }
-
                 out
             }
         };
@@ -1041,49 +1033,7 @@ pub mod x86 {
             }
         }
     }
-
-    impl Matvec for c32 {
-        type Scalar = c32;
-
-        #[inline(always)]
-        fn matvec8x8(
-            simd: V3,
-            matrix: &[Self::Scalar; 64],
-            vector: &[Self::Scalar; 8],
-            result: &mut [Self::Scalar; 8],
-            alpha: Self::Scalar,
-        ) {
-            simd.vectorize(Matvec8x8 {
-                simd,
-                scale: alpha.re(),
-                matrix,
-                vector,
-                result,
-            });
-        }
-    }
-
-    impl Matvec for c64 {
-        type Scalar = c64;
-
-        #[inline(always)]
-        fn matvec8x8(
-            simd: V3,
-            matrix: &[Self::Scalar; 64],
-            vector: &[Self::Scalar; 8],
-            result: &mut [Self::Scalar; 8],
-            alpha: Self::Scalar,
-        ) {
-            simd.vectorize(Matvec8x8 {
-                simd,
-                scale: alpha.re(),
-                matrix,
-                vector,
-                result,
-            })
-        }
-    }
 }
 
 #[cfg(target_arch = "x86_64")]
-pub use x86::Matvec;
+pub use x86::Matvec8x8Trait;

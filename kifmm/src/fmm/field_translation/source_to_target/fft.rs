@@ -13,7 +13,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::matvec::Matvec,
+        field_translation::source_to_target::matvec::Matvec8x8Trait,
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
@@ -38,7 +38,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    <Scalar as AsComplex>::ComplexType: Matvec<Scalar = <Scalar as AsComplex>::ComplexType>,
+    <Scalar as AsComplex>::ComplexType: Matvec8x8Trait<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -108,7 +108,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    <Scalar as AsComplex>::ComplexType: Matvec<Scalar = <Scalar as AsComplex>::ComplexType>,
+    <Scalar as AsComplex>::ComplexType: Matvec8x8Trait<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
