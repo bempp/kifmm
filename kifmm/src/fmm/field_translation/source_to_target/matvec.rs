@@ -49,7 +49,7 @@ macro_rules! matvec8x8 {
                 result: &mut [Self::Scalar; 8],
                 scale: Self::Scalar,
             ) {
-                crate::fmm::field_translation::source_to_target::matvec::matvec8x8_auto(
+                $crate::fmm::field_translation::source_to_target::matvec::matvec8x8_auto(
                     matrix, vector, result, scale,
                 )
             }
