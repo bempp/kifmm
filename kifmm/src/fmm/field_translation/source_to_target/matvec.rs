@@ -336,7 +336,7 @@ pub use aarch64::Matvec8x8Trait;
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86 {
-    use super::{c32, c64, matvec8x8_auto, Matvec8x8, RlstScalar};
+    use super::{c32, c64, Matvec8x8, RlstScalar};
     use pulp::x86::V3;
     use pulp::{f32x8, f64x4};
 
