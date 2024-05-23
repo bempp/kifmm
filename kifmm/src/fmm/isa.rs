@@ -30,7 +30,7 @@ impl Isa {
 
     /// Getter
     #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
-    pub fn isa(&self) -> Option<&pulp::x86_64::V3> {
+    pub fn isa(&self) -> Option<&pulp::x86::V3> {
         if let Isa::Avx(ref avx) = self {
             Some(avx)
         } else {

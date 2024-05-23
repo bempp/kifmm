@@ -412,7 +412,7 @@ pub mod aarch64 {
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86 {
-    use super::{c32, c64, Gemv8x8Data, RlstScalar};
+    use super::{c32, c64, Gemv8x8Data};
     use pulp::x86::V3;
     use pulp::{f32x8, f64x4};
 
@@ -454,7 +454,7 @@ pub mod x86 {
                 result,
             } = self;
 
-            let simd = isa.isa().unwrap();
+            let simd = *isa.isa().unwrap();
 
             let mut a1 = simd.splat_f32x8(0.);
             let mut a2 = simd.splat_f32x8(0.);
@@ -702,7 +702,7 @@ pub mod x86 {
                 result,
             } = self;
 
-            let simd = isa.isa().unwrap();
+            let simd = *isa.isa().unwrap();
 
             let mut a1 = simd.splat_f64x4(0.);
             let mut a2 = simd.splat_f64x4(0.);
