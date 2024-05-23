@@ -161,7 +161,7 @@ impl Gemv8x8 for c64 {
     }
 }
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod aarch64 {
     use super::{c32, c64, Gemv8x8Data};
     use pulp::{f32x4, f64x2, Simd};
@@ -410,7 +410,7 @@ pub mod aarch64 {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
 pub mod x86 {
     use super::{c32, c64, Gemv8x8Data};
     use pulp::x86::V3;
