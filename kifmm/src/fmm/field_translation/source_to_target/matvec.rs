@@ -1,15 +1,17 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
-use rlst::RlstScalar;
+use rlst::{RlstScalar, c32, c64};
 
-/// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
+use crate::fmm::types::Isa;
+
+/// The 8x8 gemv operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
 ///
 /// # Arguments
 /// * - `matrix` - 8x8 matrix.
 /// * - `signal` - 8x1 vector.
-/// * `save_locations` - Save buffer.
-/// * `scale` - Scalar scaling factor.
+/// * - `result` - Save buffer.
+/// * - `scale` - Scalar scaling factor.
 #[inline(always)]
-pub fn matvec8x8<U>(matrix: &[U], vector: &[U], save_buffer: &mut [U], alpha: U)
+pub fn gemv8x8<U>(matrix: &[U], vector: &[U], result: &mut [U], scale: U)
 where
     U: RlstScalar,
 {
@@ -46,7 +48,82 @@ where
         sum2 += matrix[i2 * 8 + 6] * s7;
         sum2 += matrix[i2 * 8 + 7] * s8;
 
-        save_buffer[i1] += sum1 * alpha;
-        save_buffer[i2] += sum2 * alpha;
+        result[i1] += sum1 * scale;
+        result[i2] += sum2 * scale;
+    }
+}
+
+/// Implement vectorised 8x8 gemv,
+pub trait Gemv8x8 {
+
+    type Scalar: RlstScalar;
+
+    /// 8x8 GEMV
+    fn gemv8x8(
+        simd: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+    );
+}
+
+
+impl Gemv8x8 for c32 {
+    type Scalar = Self;
+
+    #[inline(always)]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn gemv8x8(
+            isa: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+        ) {
+
+    }
+
+    #[inline(always)]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    fn gemv8x8(
+        isa: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+        ) {
+
+    }
+
+    #[inline(always)]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "x86_64", target_feature = "avx")
+    )))]
+    fn gemv8x8(
+            isa: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+        ) {
+
+        gemv8x8(matrix, vector, result, scale)
+    }
+}
+
+impl Gemv8x8 for c64 {
+    type Scalar = Self;
+    #[inline(always)]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn gemv8x8(
+            isa: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+        ) {
+
+    }
+
+    #[inline(always)]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    fn gemv8x8(
+        isa: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+        ) {
+
+    }
+
+    #[inline(always)]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "x86_64", target_feature = "avx")
+    )))]
+    fn gemv8x8(
+            isa: Isa, matrix: &[Self::Scalar], vector: &[Self::Scalar], result: &mut [Self::Scalar], scale: Self::Scalar
+        ) {
+
+        gemv8x8(matrix, vector, result, scale)
     }
 }

@@ -1,5 +1,5 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, sync::RwLock};
+use std::{collections::HashSet, os::fd::AsRawFd, sync::RwLock};
 
 use itertools::Itertools;
 use num::{One, Zero};
@@ -12,7 +12,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::matvec::matvec8x8,
+        field_translation::source_to_target::matvec::gemv8x8,
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
@@ -31,6 +31,8 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
+use super::matvec::Gemv8x8;
+
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar
@@ -39,6 +41,7 @@ where
         + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
     Self: FmmOperatorData,
 {
     /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
@@ -108,6 +111,7 @@ where
         + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
+    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
     Self: FmmOperatorData,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
@@ -352,7 +356,9 @@ where
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
 
-                                            matvec8x8::<<Scalar as AsComplex>::ComplexType>(
+                                            <Scalar as AsComplex>::ComplexType::gemv8x8(self.simd, &k_f, &s_f[..], &mut save_locations[..], scale);
+
+                                            gemv8x8::<<Scalar as AsComplex>::ComplexType>(
                                                 k_f,
                                                 s_f,
                                                 &mut save_locations

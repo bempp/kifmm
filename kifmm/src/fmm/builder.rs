@@ -20,6 +20,9 @@ use crate::{
     tree::{types::Domain, SingleNodeTree},
 };
 
+use super::types::Isa;
+
+
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Epsilon,
@@ -34,6 +37,7 @@ where
     /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
         Self {
+            simd: None,
             tree: None,
             kernel: None,
             charges: None,
@@ -148,6 +152,8 @@ where
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
+
+            self.simd = Some(Isa::new());
             self.expansion_order = Some(expansion_order);
             self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
 
@@ -172,6 +178,7 @@ where
             let dim = kernel.space_dimension();
 
             let mut result = KiFmm {
+                simd: self.simd.unwrap(),
                 tree: self.tree.unwrap(),
                 expansion_order: self.expansion_order.unwrap(),
                 ncoeffs: self.ncoeffs.unwrap(),
