@@ -43,7 +43,7 @@ impl Isa {
         all(target_arch = "aarch64", target_feature = "neon"),
         all(target_arch = "x86_64", target_feature = "avx")
     )))]
-    pub fn isa(&self) -> Option<_> {
+    pub fn isa(&self) -> Option<()> {
         None
     }
 }
