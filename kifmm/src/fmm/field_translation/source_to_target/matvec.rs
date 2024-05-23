@@ -2,7 +2,7 @@
 use crate::fmm::types::Isa;
 use rlst::{c32, c64, RlstScalar};
 
-/// The 8x8 matvec operation, always inlined.
+/// The 8x8 gemv operation, always inlined.
 ///
 /// # Arguments
 /// * - `matrix` - 8x8 matrix.
@@ -11,20 +11,26 @@ use rlst::{c32, c64, RlstScalar};
 /// * - `scale` - Scalar scaling factor.
 #[allow(unused)]
 #[inline(always)]
-pub fn matvec8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], scale: U)
+pub fn gemv8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], scale: U)
 where
     U: RlstScalar,
 {
+    let mut tmp = vec![U::zero(); 8];
+
     for i in 0..8 {
         // cols
         for j in 0..8 {
             // rows
-            result[j] += matrix[i * 8 + j] * vector[i]
+            tmp[j] += matrix[i * 8 + j] * vector[i]
         }
     }
 
-    for r in result.iter_mut().take(8) {
-        *r *= scale
+    for t in tmp.iter_mut().take(8) {
+        *t *= scale
+    }
+
+    for (r, t) in result.iter_mut().zip(tmp.iter()) {
+        *r += *t
     }
 }
 
@@ -103,7 +109,7 @@ impl Gemv8x8 for c32 {
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        matvec8x8_auto(matrix, vector, result, scale)
+        gemv8x8_auto(matrix, vector, result, scale)
     }
 }
 
@@ -158,7 +164,7 @@ impl Gemv8x8 for c64 {
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        matvec8x8_auto(matrix, vector, result, scale)
+        gemv8x8_auto(matrix, vector, result, scale)
     }
 }
 
