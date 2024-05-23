@@ -15,7 +15,7 @@ pub fn gemv8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], s
 where
     U: RlstScalar,
 {
-    let mut tmp = vec![U::zero(); 8];
+    let mut tmp = [U::zero(); 8];
 
     for i in 0..8 {
         // cols
@@ -25,12 +25,8 @@ where
         }
     }
 
-    for t in tmp.iter_mut().take(8) {
-        *t *= scale
-    }
-
     for (r, t) in result.iter_mut().zip(tmp.iter()) {
-        *r += *t
+        *r += *t * scale
     }
 }
 
