@@ -29,6 +29,7 @@ where
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct Gemv8x8Data<'a, T: RlstScalar> {
     pub isa: Isa,
     pub matrix: &'a [T; 64],
