@@ -2,7 +2,7 @@
 use crate::fmm::types::Isa;
 use rlst::{c32, c64, RlstScalar};
 
-/// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
+/// The 8x8 matvec operation, always inlined.
 ///
 /// # Arguments
 /// * - `matrix` - 8x8 matrix.
