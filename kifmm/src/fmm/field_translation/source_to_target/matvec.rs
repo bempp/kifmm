@@ -96,7 +96,7 @@ impl Gemv8x8 for c32 {
         all(target_arch = "x86_64", target_feature = "avx")
     )))]
     fn gemv8x8(
-        isa: Isa,
+        _isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
@@ -151,7 +151,7 @@ impl Gemv8x8 for c64 {
         all(target_arch = "x86_64", target_feature = "avx")
     )))]
     fn gemv8x8(
-        isa: Isa,
+        _isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
