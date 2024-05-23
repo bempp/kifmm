@@ -20,6 +20,7 @@ impl<T> SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {
+    // TODO: row major
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
     /// # Arguments
@@ -174,6 +175,7 @@ where
         })
     }
 
+    // TODO: row major
     /// Constructor for uniform trees on a single node refined to a user defined depth, however excludes
     /// empty nodes which don't contain particles and their ancestors.
     ///

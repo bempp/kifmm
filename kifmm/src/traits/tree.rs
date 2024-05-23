@@ -1,3 +1,5 @@
+
+// TODO: row major
 //! Tree Traits
 use std::{collections::HashSet, hash::Hash};
 

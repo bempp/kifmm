@@ -55,13 +55,13 @@ where
     /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
     /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
-    /// * `sparse` - Optionally drop empty leaf boxes for performance.`
+    /// * `prune_empty` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
         mut self,
         sources: &Coordinates<Scalar::Real>,
         targets: &Coordinates<Scalar::Real>,
         n_crit: Option<u64>,
-        sparse: bool,
+        prune_empty: bool,
     ) -> Result<Self, std::io::Error> {
         let [nsources, dims] = sources.shape();
         let [ntargets, dimt] = targets.shape();
@@ -97,8 +97,8 @@ where
                 SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit);
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain)?;
-            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain)?;
+            let source_tree = SingleNodeTree::new(sources.data(), depth, prune_empty, self.domain)?;
+            let target_tree = SingleNodeTree::new(targets.data(), depth, prune_empty, self.domain)?;
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,

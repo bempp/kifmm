@@ -22,6 +22,7 @@ impl<T, C: Communicator> MultiNodeTree<T, C>
 where
     T: RlstScalar + Float + Equivalence + Default,
 {
+    // TODO: Convert to row major
     /// Constructor for uniform trees, distributed with MPI, node refined to a user defined depth.
     ///
     /// The input point data is also assumed to be distributed across each node.
@@ -209,6 +210,7 @@ where
         })
     }
 
+    // TODO: Convert to row major
     /// Constructor for uniform trees, distributed with MPI, refined to a user defined depth, however excludes
     /// empty nodes which don't contain particles and their ancestors.
     ///
@@ -407,6 +409,7 @@ where
         })
     }
 
+    // TODO: Convert to row major
     /// Constructs a new multi-node tree distributed with MPI with uniform refinement up to a specified depth.
     ///
     /// This method initializes a single-node tree, uniformly subdivided to a user-defined maximum

@@ -1,3 +1,4 @@
+// TODO: Make row major
 //! Python bindings for constructors and basic methods
 use std::collections::HashMap;
 use std::time::Duration;
@@ -84,7 +85,7 @@ macro_rules! laplace_fft_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
@@ -137,7 +138,7 @@ macro_rules! laplace_fft_constructors {
                 }
 
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(&sources_arr, &targets_arr, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         &charges_arr,
@@ -206,7 +207,7 @@ macro_rules! laplace_blas_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 svd_threshold: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
@@ -253,7 +254,7 @@ macro_rules! laplace_blas_constructors {
                 }
 
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(&sources_arr, &targets_arr, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         &charges_arr,
@@ -334,7 +335,7 @@ macro_rules! helmholtz_fft_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
@@ -388,7 +389,7 @@ macro_rules! helmholtz_fft_constructors {
                 }
 
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(&sources_arr, &targets_arr, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         &charges_arr,
@@ -457,7 +458,7 @@ macro_rules! helmholtz_blas_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
                 svd_threshold: <$type as RlstScalar>::Real,
@@ -505,7 +506,7 @@ macro_rules! helmholtz_blas_constructors {
                 }
 
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(&sources_arr, &targets_arr, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         &charges_arr,

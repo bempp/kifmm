@@ -6,6 +6,7 @@ use rand::prelude::*;
 use rlst::RlstScalar;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
 
+// TODO: Convert to row major
 /// Alias for an rlst container for point data, expected with shape [n_points, 3];
 pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
@@ -43,6 +44,7 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
     points
 }
 
+// TODO: Convert to row major
 /// Points fixture for testing, uniformly samples on surface of a sphere of diameter 1.
 ///
 /// # Arguments
@@ -78,6 +80,7 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     points
 }
 
+// TODO: Convert to row major
 /// Points fixture for testing, uniformly samples in the bounds [[0, 1), [0, 1), [0, 500)] for the x, y, and z
 /// axes respectively.
 ///
@@ -104,6 +107,8 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::
     points
 }
 
+
+// TODO: Convert to row major
 /// Find the corners of a box discretising the surface of a box described by a Morton Key. The coordinates
 /// are expected in column major order [x_1, x_2...x_N, y_1, y_2....y_N, z_1, z_2...z_N]
 ///

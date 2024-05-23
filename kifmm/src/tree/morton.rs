@@ -902,6 +902,8 @@ where
     }
 }
 
+
+// TODO: Convert to row major
 /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
 /// returns a tuple, the first element is an owned vector of the physical coordinates of the
 /// surface grid in column major order [x_1, x_2, ... x_n, y_1, y_2, ..., y_n, z_1, z_2, ..., z_n].
@@ -951,7 +953,10 @@ pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
     surface
 }
 
+
 impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
+
+    // TODO: Convert to row major
     fn convolution_grid(
         &self,
         expansion_order: usize,
@@ -1023,6 +1028,7 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         (grid, conv_idxs)
     }
 
+    // TODO: Convert to row major
     fn scale_surface(
         &self,
         surface: Vec<Self::Scalar>,
