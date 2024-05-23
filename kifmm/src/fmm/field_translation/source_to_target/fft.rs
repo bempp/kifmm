@@ -356,7 +356,13 @@ where
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
 
-                                            <Scalar as AsComplex>::ComplexType::gemv8x8(self.simd, &k_f, &s_f[..], &mut save_locations[..], scale);
+                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
+                                                self.simd,
+                                                &k_f,
+                                                &s_f[..],
+                                                &mut save_locations[..],
+                                                scale,
+                                            );
 
                                             gemv8x8::<<Scalar as AsComplex>::ComplexType>(
                                                 k_f,

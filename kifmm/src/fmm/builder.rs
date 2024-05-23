@@ -22,7 +22,6 @@ use crate::{
 
 use super::types::Isa;
 
-
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Epsilon,

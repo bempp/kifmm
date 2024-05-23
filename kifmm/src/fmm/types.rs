@@ -364,7 +364,6 @@ pub enum Isa {
 }
 
 impl Isa {
-
     /// Constructor
     #[allow(unreachable_code)]
     pub fn new() -> Self {
@@ -375,12 +374,11 @@ impl Isa {
 
         #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
         {
-            return  Isa::Avx(pulp::x86::V3::try_new().unwrap());
+            return Isa::Avx(pulp::x86::V3::try_new().unwrap());
         }
 
         Isa::Default
     }
-
 
     /// Getter
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
@@ -411,8 +409,6 @@ impl Isa {
         None
     }
 }
-
-
 
 /// A builder for constructing a Kernel-Independent Fast Multipole Method (KiFMM) object
 /// for simulations on a single node.
