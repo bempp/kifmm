@@ -1,5 +1,5 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, os::fd::AsRawFd, sync::RwLock};
+use std::{collections::HashSet, sync::RwLock};
 
 use itertools::Itertools;
 use num::{One, Zero};
@@ -343,34 +343,40 @@ where
 
                                     let save_locations = &mut check_potential_hat_f
                                         [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
-
+                                    let save_locations_slice = unsafe {
+                                        &mut *(save_locations.as_ptr()
+                                            as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                                    };
                                     for i in 0..NHALO {
                                         let frequency_offset = freq * NHALO;
                                         let k_f = &kernel_data_ft[i + frequency_offset];
+                                        let k_f_slice = unsafe {
+                                            &*(k_f.as_slice().as_ptr()
+                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
+                                        };
+
                                         // Lookup signals
                                         let displacements = &all_displacements[i].read().unwrap()
                                             [chunk_start..chunk_end];
 
                                         for j in 0..(chunk_end - chunk_start) {
                                             let displacement = displacements[j];
+
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
+                                            let s_f_slice = unsafe {
+                                                &*(s_f.as_ptr()
+                                                    as *const [<Scalar as AsComplex>::ComplexType;
+                                                        8])
+                                            };
 
                                             <Scalar as AsComplex>::ComplexType::gemv8x8(
                                                 self.simd,
-                                                &k_f,
-                                                &s_f[..],
-                                                &mut save_locations[..],
+                                                &k_f_slice,
+                                                &s_f_slice,
+                                                save_locations_slice,
                                                 scale,
                                             );
-
-                                            gemv8x8::<<Scalar as AsComplex>::ComplexType>(
-                                                k_f,
-                                                s_f,
-                                                &mut save_locations
-                                                    [j * NSIBLINGS..(j + 1) * NSIBLINGS],
-                                                scale,
-                                            )
                                         }
                                     }
                                 },

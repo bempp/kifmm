@@ -348,7 +348,7 @@ pub enum FmmEvalType {
 
 /// Instruction set architecture
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub enum Isa {
     /// Neon FCMA ISA, extension which provides floating point complex multiply-add instructions.
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
