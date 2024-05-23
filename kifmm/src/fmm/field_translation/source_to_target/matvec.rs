@@ -1,5 +1,5 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
-use pulp::Simd;
+use crate::fmm::types::Isa;
 use rlst::{c32, c64, RlstScalar};
 
 /// The 8x8 matvec operation, always inlined. Implemented via a fully unrolled inner loop, and partially unrolled outer loop.
@@ -9,201 +9,179 @@ use rlst::{c32, c64, RlstScalar};
 /// * - `signal` - 8x1 vector.
 /// * - `result` - Save buffer.
 /// * - `scale` - Scalar scaling factor.
+#[allow(unused)]
 #[inline(always)]
 pub fn matvec8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], scale: U)
 where
     U: RlstScalar,
 {
     for i in 0..8 {
-        let mut sum = U::zero();
-        let row = &matrix[i * 8..(i + 1) * 8];
+        // cols
         for j in 0..8 {
-            sum += row[j] * vector[j]
+            // rows
+            result[j] += matrix[i * 8 + j] * vector[i]
         }
+    }
 
-        result[i] += sum * scale;
+    for r in result.iter_mut().take(8) {
+        *r *= scale
     }
 }
 
 #[derive(Debug)]
-pub struct Matvec8x8<'a, T: RlstScalar, S: Simd> {
-    pub simd: S,
+pub struct Gemv8x8Data<'a, T: RlstScalar> {
+    pub isa: Isa,
     pub matrix: &'a [T; 64],
     pub vector: &'a [T; 8],
     pub result: &'a mut [T; 8],
     pub scale: T::Real,
 }
 
-/// Generate a platform dependent trait for 8x8 matrix vector products, defaults to autovectorised implementation.
-#[macro_export]
-macro_rules! matvec8x8 {
-    ($simd:ty) => {
-        pub trait Matvec8x8Trait {
-            type Scalar: RlstScalar;
+/// Implement vectorised 8x8 gemv,
+pub trait Gemv8x8 {
+    type Scalar: RlstScalar;
 
-            #[inline(always)]
-            fn matvec8x8(
-                _simd: $simd,
-                matrix: &[Self::Scalar; 64],
-                vector: &[Self::Scalar; 8],
-                result: &mut [Self::Scalar; 8],
-                scale: Self::Scalar,
-            ) {
-                $crate::fmm::field_translation::source_to_target::matvec::matvec8x8_auto(
-                    matrix, vector, result, scale,
-                )
-            }
-        }
-    };
+    /// 8x8 GEMV
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    );
 }
 
-macro_rules! impl_matvec8x8 {
-    ($simd:ty, $scalar:ty) => {
-        impl Matvec8x8Trait for $scalar {
-            type Scalar = $scalar;
+impl Gemv8x8 for c32 {
+    type Scalar = Self;
 
-            #[inline(always)]
-            fn matvec8x8(
-                simd: $simd,
-                matrix: &[Self::Scalar; 64],
-                vector: &[Self::Scalar; 8],
-                result: &mut [Self::Scalar; 8],
-                scale: Self::Scalar,
-            ) {
-                simd.vectorize(Matvec8x8 {
-                    simd,
-                    scale: scale.re(),
-                    matrix,
-                    vector,
-                    result,
-                })
-            }
-        }
-    };
+    #[inline(always)]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    ) {
+        isa.isa().unwrap().vectorize(Gemv8x8Data {
+            isa,
+            scale: scale.re(),
+            matrix,
+            vector,
+            result,
+        })
+    }
+
+    #[inline(always)]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    ) {
+        isa.isa().unwrap().vectorize(Gemv8x8Data {
+            isa,
+            scale: scale.re(),
+            matrix,
+            vector,
+            result,
+        })
+    }
+
+    #[inline(always)]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "x86_64", target_feature = "avx")
+    )))]
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    ) {
+        matvec8x8_auto(matrix, vector, result, scale)
+    }
+}
+
+impl Gemv8x8 for c64 {
+    type Scalar = Self;
+
+    #[inline(always)]
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    ) {
+        isa.isa().unwrap().vectorize(Gemv8x8Data {
+            isa,
+            scale: scale.re(),
+            matrix,
+            vector,
+            result,
+        })
+    }
+
+    #[inline(always)]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    ) {
+        isa.isa().unwrap().vectorize(Gemv8x8Data {
+            isa,
+            scale: scale.re(),
+            matrix,
+            vector,
+            result,
+        })
+    }
+
+    #[inline(always)]
+    #[cfg(not(any(
+        all(target_arch = "aarch64", target_feature = "neon"),
+        all(target_arch = "x86_64", target_feature = "avx")
+    )))]
+    fn gemv8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    ) {
+        matvec8x8_auto(matrix, vector, result, scale)
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
 pub mod aarch64 {
-    use super::{c32, c64, Matvec8x8, RlstScalar};
-    use pulp::aarch64::NeonFcma;
+    use super::{c32, c64, Gemv8x8Data};
     use pulp::{f32x4, f64x2, Simd};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
-    matvec8x8!(NeonFcma);
-    impl_matvec8x8!(NeonFcma, c32);
-    impl_matvec8x8!(NeonFcma, c64);
-
-    impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c32, NeonFcma> {
+    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c64> {
         type Output = ();
 
         #[inline(always)]
         fn call(self) -> Self::Output {
             let Self {
-                simd,
+                isa,
                 scale,
                 matrix,
                 vector,
                 result,
             } = self;
 
-            let mut a1 = f32x4(0., 0., 0., 0.);
-            let mut a2 = f32x4(0., 0., 0., 0.);
-            let mut a3 = f32x4(0., 0., 0., 0.);
-            let mut a4 = f32x4(0., 0., 0., 0.);
-            let [r1, r2, r3, r4]: [f32x4; 4] = pulp::cast(*result);
-            let scale = simd.f32s_splat(scale);
+            let simd = isa.isa().unwrap();
 
-            let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
-            let [v1, v2, v3, v4]: [f32x4; 4] = pulp::cast(*vector);
-
-            let v01 = f32x4(v1.0, v1.1, v1.0, v1.1);
-            let v02 = f32x4(v1.2, v1.3, v1.2, v1.3);
-            let v03 = f32x4(v2.0, v2.1, v2.0, v2.1);
-            let v04 = f32x4(v2.2, v2.3, v2.2, v2.3);
-            let v05 = f32x4(v3.0, v3.1, v3.0, v3.1);
-            let v06 = f32x4(v3.2, v3.3, v3.2, v3.3);
-            let v07 = f32x4(v4.0, v4.1, v4.0, v4.1);
-            let v08 = f32x4(v4.2, v4.3, v4.2, v4.3);
-
-            // Unroll loop
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[0]);
-            a1 = simd.c32s_mul_add_e(m1, v01, a1);
-            a2 = simd.c32s_mul_add_e(m2, v01, a2);
-            a3 = simd.c32s_mul_add_e(m3, v01, a3);
-            a4 = simd.c32s_mul_add_e(m4, v01, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[1]);
-            a1 = simd.c32s_mul_add_e(m1, v02, a1);
-            a2 = simd.c32s_mul_add_e(m2, v02, a2);
-            a3 = simd.c32s_mul_add_e(m3, v02, a3);
-            a4 = simd.c32s_mul_add_e(m4, v02, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[2]);
-            a1 = simd.c32s_mul_add_e(m1, v03, a1);
-            a2 = simd.c32s_mul_add_e(m2, v03, a2);
-            a3 = simd.c32s_mul_add_e(m3, v03, a3);
-            a4 = simd.c32s_mul_add_e(m4, v03, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[3]);
-            a1 = simd.c32s_mul_add_e(m1, v04, a1);
-            a2 = simd.c32s_mul_add_e(m2, v04, a2);
-            a3 = simd.c32s_mul_add_e(m3, v04, a3);
-            a4 = simd.c32s_mul_add_e(m4, v04, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[4]);
-            a1 = simd.c32s_mul_add_e(m1, v05, a1);
-            a2 = simd.c32s_mul_add_e(m2, v05, a2);
-            a3 = simd.c32s_mul_add_e(m3, v05, a3);
-            a4 = simd.c32s_mul_add_e(m4, v05, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[5]);
-            a1 = simd.c32s_mul_add_e(m1, v06, a1);
-            a2 = simd.c32s_mul_add_e(m2, v06, a2);
-            a3 = simd.c32s_mul_add_e(m3, v06, a3);
-            a4 = simd.c32s_mul_add_e(m4, v06, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[6]);
-            a1 = simd.c32s_mul_add_e(m1, v07, a1);
-            a2 = simd.c32s_mul_add_e(m2, v07, a2);
-            a3 = simd.c32s_mul_add_e(m3, v07, a3);
-            a4 = simd.c32s_mul_add_e(m4, v07, a4);
-
-            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[7]);
-            a1 = simd.c32s_mul_add_e(m1, v08, a1);
-            a2 = simd.c32s_mul_add_e(m2, v08, a2);
-            a3 = simd.c32s_mul_add_e(m3, v08, a3);
-            a4 = simd.c32s_mul_add_e(m4, v08, a4);
-
-            a1 = simd.mul_add_f32x4(a1, scale, r1);
-            a2 = simd.mul_add_f32x4(a2, scale, r2);
-            a3 = simd.mul_add_f32x4(a3, scale, r3);
-            a4 = simd.mul_add_f32x4(a4, scale, r4);
-
-            let a1: float32x4_t = unsafe { std::mem::transmute(a1) };
-            let a2: float32x4_t = unsafe { std::mem::transmute(a2) };
-            let a3: float32x4_t = unsafe { std::mem::transmute(a3) };
-            let a4: float32x4_t = unsafe { std::mem::transmute(a4) };
-
-            let ptr = result.as_ptr() as *mut f32;
-            unsafe { simd.neon.vst1q_f32(ptr, a1) };
-            unsafe { simd.neon.vst1q_f32(ptr.add(4), a2) };
-            unsafe { simd.neon.vst1q_f32(ptr.add(8), a3) };
-            unsafe { simd.neon.vst1q_f32(ptr.add(12), a4) };
-        }
-    }
-
-    impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c64, NeonFcma> {
-        type Output = ();
-
-        #[inline(always)]
-        fn call(self) -> Self::Output {
-            let Self {
-                simd,
-                scale,
-                matrix,
-                vector,
-                result,
-            } = self;
             let mut a1 = f64x2(0., 0.);
             let mut a2 = f64x2(0., 0.);
             let mut a3 = f64x2(0., 0.);
@@ -329,20 +307,114 @@ pub mod aarch64 {
             unsafe { simd.neon.vst1q_f64(ptr.add(14), a8) };
         }
     }
-}
 
-#[cfg(target_arch = "aarch64")]
-pub use aarch64::Matvec8x8Trait;
+    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c32> {
+        type Output = ();
+
+        #[inline(always)]
+        fn call(self) -> Self::Output {
+            let Self {
+                isa,
+                scale,
+                matrix,
+                vector,
+                result,
+            } = self;
+
+            let simd = isa.isa().unwrap();
+
+            let mut a1 = f32x4(0., 0., 0., 0.);
+            let mut a2 = f32x4(0., 0., 0., 0.);
+            let mut a3 = f32x4(0., 0., 0., 0.);
+            let mut a4 = f32x4(0., 0., 0., 0.);
+            let [r1, r2, r3, r4]: [f32x4; 4] = pulp::cast(*result);
+            let scale = simd.f32s_splat(scale);
+
+            let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
+            let [v1, v2, v3, v4]: [f32x4; 4] = pulp::cast(*vector);
+
+            let v01 = f32x4(v1.0, v1.1, v1.0, v1.1);
+            let v02 = f32x4(v1.2, v1.3, v1.2, v1.3);
+            let v03 = f32x4(v2.0, v2.1, v2.0, v2.1);
+            let v04 = f32x4(v2.2, v2.3, v2.2, v2.3);
+            let v05 = f32x4(v3.0, v3.1, v3.0, v3.1);
+            let v06 = f32x4(v3.2, v3.3, v3.2, v3.3);
+            let v07 = f32x4(v4.0, v4.1, v4.0, v4.1);
+            let v08 = f32x4(v4.2, v4.3, v4.2, v4.3);
+
+            // Unroll loop
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[0]);
+            a1 = simd.c32s_mul_add_e(m1, v01, a1);
+            a2 = simd.c32s_mul_add_e(m2, v01, a2);
+            a3 = simd.c32s_mul_add_e(m3, v01, a3);
+            a4 = simd.c32s_mul_add_e(m4, v01, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[1]);
+            a1 = simd.c32s_mul_add_e(m1, v02, a1);
+            a2 = simd.c32s_mul_add_e(m2, v02, a2);
+            a3 = simd.c32s_mul_add_e(m3, v02, a3);
+            a4 = simd.c32s_mul_add_e(m4, v02, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[2]);
+            a1 = simd.c32s_mul_add_e(m1, v03, a1);
+            a2 = simd.c32s_mul_add_e(m2, v03, a2);
+            a3 = simd.c32s_mul_add_e(m3, v03, a3);
+            a4 = simd.c32s_mul_add_e(m4, v03, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[3]);
+            a1 = simd.c32s_mul_add_e(m1, v04, a1);
+            a2 = simd.c32s_mul_add_e(m2, v04, a2);
+            a3 = simd.c32s_mul_add_e(m3, v04, a3);
+            a4 = simd.c32s_mul_add_e(m4, v04, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[4]);
+            a1 = simd.c32s_mul_add_e(m1, v05, a1);
+            a2 = simd.c32s_mul_add_e(m2, v05, a2);
+            a3 = simd.c32s_mul_add_e(m3, v05, a3);
+            a4 = simd.c32s_mul_add_e(m4, v05, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[5]);
+            a1 = simd.c32s_mul_add_e(m1, v06, a1);
+            a2 = simd.c32s_mul_add_e(m2, v06, a2);
+            a3 = simd.c32s_mul_add_e(m3, v06, a3);
+            a4 = simd.c32s_mul_add_e(m4, v06, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[6]);
+            a1 = simd.c32s_mul_add_e(m1, v07, a1);
+            a2 = simd.c32s_mul_add_e(m2, v07, a2);
+            a3 = simd.c32s_mul_add_e(m3, v07, a3);
+            a4 = simd.c32s_mul_add_e(m4, v07, a4);
+
+            let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[7]);
+            a1 = simd.c32s_mul_add_e(m1, v08, a1);
+            a2 = simd.c32s_mul_add_e(m2, v08, a2);
+            a3 = simd.c32s_mul_add_e(m3, v08, a3);
+            a4 = simd.c32s_mul_add_e(m4, v08, a4);
+
+            a1 = simd.mul_add_f32x4(a1, scale, r1);
+            a2 = simd.mul_add_f32x4(a2, scale, r2);
+            a3 = simd.mul_add_f32x4(a3, scale, r3);
+            a4 = simd.mul_add_f32x4(a4, scale, r4);
+
+            let a1: float32x4_t = unsafe { std::mem::transmute(a1) };
+            let a2: float32x4_t = unsafe { std::mem::transmute(a2) };
+            let a3: float32x4_t = unsafe { std::mem::transmute(a3) };
+            let a4: float32x4_t = unsafe { std::mem::transmute(a4) };
+
+            let ptr = result.as_ptr() as *mut f32;
+            unsafe { simd.neon.vst1q_f32(ptr, a1) };
+            unsafe { simd.neon.vst1q_f32(ptr.add(4), a2) };
+            unsafe { simd.neon.vst1q_f32(ptr.add(8), a3) };
+            unsafe { simd.neon.vst1q_f32(ptr.add(12), a4) };
+        }
+    }
+}
 
 #[cfg(target_arch = "x86_64")]
 pub mod x86 {
-    use super::{c32, c64, Matvec8x8, RlstScalar};
+    use super::{c32, c64, Gemv8x8Data, RlstScalar};
     use pulp::x86::V3;
     use pulp::{f32x8, f64x4};
-
-    matvec8x8!(V3);
-    impl_matvec8x8!(V3, c32);
-    impl_matvec8x8!(V3, c64);
 
     macro_rules! generate_deinterleave_fn {
         ($fn_name:ident, $simd_type:ty, $array_type:ty, $splat_method:ident, $scalar_type:ty) => {
@@ -369,18 +441,20 @@ pub mod x86 {
     generate_deinterleave_fn!(deinterleave_avx_f32, V3, f32x8, splat_f32x8, f32);
     generate_deinterleave_fn!(deinterleave_avx_f64, V3, f64x4, splat_f64x4, f64);
 
-    impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c32, V3> {
+    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c32> {
         type Output = ();
 
         #[inline(always)]
         fn call(self) -> Self::Output {
             let Self {
-                simd,
+                isa,
                 scale,
                 matrix,
                 vector,
                 result,
             } = self;
+
+            let simd = isa.isa().unwrap();
 
             let mut a1 = simd.splat_f32x8(0.);
             let mut a2 = simd.splat_f32x8(0.);
@@ -615,18 +689,20 @@ pub mod x86 {
         }
     }
 
-    impl<'a> pulp::NullaryFnOnce for Matvec8x8<'a, c64, V3> {
+    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c64> {
         type Output = ();
 
         #[inline(always)]
         fn call(self) -> Self::Output {
             let Self {
-                simd,
+                isa,
                 scale,
                 matrix,
                 vector,
                 result,
             } = self;
+
+            let simd = isa.isa().unwrap();
 
             let mut a1 = simd.splat_f64x4(0.);
             let mut a2 = simd.splat_f64x4(0.);
@@ -1034,6 +1110,3 @@ pub mod x86 {
         }
     }
 }
-
-#[cfg(target_arch = "x86_64")]
-pub use x86::Matvec8x8Trait;

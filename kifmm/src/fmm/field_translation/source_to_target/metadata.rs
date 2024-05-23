@@ -962,8 +962,7 @@ where
                 }
             }
 
-            // TODO: Get rid of transpose
-            // Transpose results for better cache locality in application
+            // Re-order
             let mut kernel_data_ft = Vec::new();
             for freq in 0..transform_size {
                 let frequency_offset = NSIBLINGS_SQUARED * freq;
@@ -1494,7 +1493,7 @@ where
             }
         }
 
-        // Transpose results for better cache locality in application
+        // Re-order
         let mut kernel_data_ft = Vec::new();
         for freq in 0..transform_size {
             let frequency_offset = NSIBLINGS_SQUARED * freq;
@@ -1504,7 +1503,6 @@ where
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft =
                     rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
-                // k_ft.fill_from(k_f_.view().transpose());
                 k_ft.fill_from(k_f_.view());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }

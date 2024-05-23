@@ -13,7 +13,6 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::matvec::Matvec8x8Trait,
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
@@ -32,13 +31,15 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
+use super::matvec::Gemv8x8;
+
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
     Scalar: RlstScalar
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    <Scalar as AsComplex>::ComplexType: Matvec8x8Trait<Scalar = <Scalar as AsComplex>::ComplexType>,
+    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -108,7 +109,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
-    <Scalar as AsComplex>::ComplexType: Matvec8x8Trait<Scalar = <Scalar as AsComplex>::ComplexType>,
+    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -328,12 +329,6 @@ where
 
                 // 2. Compute the Hadamard product
                 {
-                    #[cfg(target_arch = "aarch64")]
-                    let simd = pulp::aarch64::NeonFcma::try_new().unwrap();
-
-                    #[cfg(target_arch = "x86_64")]
-                    let simd = pulp::x86::V3::try_new().unwrap();
-
                     (0..size_out)
                         .into_par_iter()
                         .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
@@ -379,8 +374,8 @@ where
                                                     as *mut [<Scalar as AsComplex>::ComplexType; 8])
                                             };
 
-                                            <Scalar as AsComplex>::ComplexType::matvec8x8(
-                                                simd,
+                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
+                                                self.isa,
                                                 k_f_slice,
                                                 s_f_slice,
                                                 save_locations_slice,

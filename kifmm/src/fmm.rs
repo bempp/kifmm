@@ -2,6 +2,7 @@
 mod builder;
 pub mod constants;
 pub mod helpers;
+pub mod isa;
 mod kernel;
 mod multi_node;
 pub mod pinv;

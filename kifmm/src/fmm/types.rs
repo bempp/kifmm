@@ -174,6 +174,9 @@ where
     /// Dimension of the FMM
     pub dim: usize,
 
+    /// Instruction set architecture
+    pub isa: Isa,
+
     /// A single node tree
     pub tree: SingleNodeFmmTree<Scalar::Real>,
 
@@ -280,6 +283,7 @@ where
 {
     fn default() -> Self {
         KiFmm {
+            isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
@@ -429,6 +433,9 @@ where
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Instruction set architecture
+    pub isa: Option<Isa>,
+
     /// Tree
     pub tree: Option<SingleNodeFmmTree<Scalar::Real>>,
 
@@ -778,4 +785,21 @@ where
             c_vt: Vec::default(),
         }
     }
+}
+
+/// Instruction set architecture
+
+#[derive(Default, Clone, Copy, Debug)]
+pub enum Isa {
+    /// Neon FCMA ISA, extension which provides floating point complex multiply-add instructions.
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    Neon(pulp::aarch64::NeonFcma),
+
+    /// AVX2 ISA
+    #[cfg(all(target_arch = "x64_64", target_feature = "avx"))]
+    Avx(pulp::x64::V3),
+
+    /// Default is no vectorisation
+    #[default]
+    Default,
 }
