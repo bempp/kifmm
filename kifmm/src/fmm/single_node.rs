@@ -772,6 +772,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_fft.evaluate(false).unwrap();
+
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
