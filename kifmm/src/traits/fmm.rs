@@ -149,6 +149,9 @@ where
 
     /// Lookup l2l operator
     fn l2l_operator_index(&self, level: u64) -> usize;
+
+    /// Displacement index
+    fn displacement_index(&self, level: u64) -> usize;
 }
 
 /// Marker trait for homogenous kernels

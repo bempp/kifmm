@@ -1,5 +1,8 @@
 //! Implementation of traits to compute metadata for field translation operations.
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::RwLock,
+};
 
 use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
@@ -7,6 +10,7 @@ use green_kernels::{
 };
 use itertools::Itertools;
 use num::{Float, Zero};
+use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
@@ -467,6 +471,76 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
+    fn displacements(&mut self) {
+        let mut displacements = Vec::new();
+
+        for level in 2..=self.tree.source_tree().depth() {
+            let sources = self.tree.source_tree().keys(level).unwrap();
+            let nsources = sources.len();
+            let m2l_operator_index = self.m2l_operator_index(level);
+            let sentinel = nsources;
+
+            let result = vec![vec![sentinel; nsources]; 316];
+            let result = result.into_iter().map(RwLock::new).collect_vec();
+
+            sources
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(source_idx, source)| {
+                    // Find interaction list of each source, as this defines scatter locations
+                    let interaction_list = source
+                        .parent()
+                        .neighbors()
+                        .iter()
+                        .flat_map(|pn| pn.children())
+                        .filter(|pnc| {
+                            !source.is_adjacent(pnc)
+                                && self
+                                    .tree
+                                    .target_tree()
+                                    .all_keys_set()
+                                    .unwrap()
+                                    .contains(pnc)
+                        })
+                        .collect_vec();
+
+                    let transfer_vectors = interaction_list
+                        .iter()
+                        .map(|target| source.find_transfer_vector(target).unwrap())
+                        .collect_vec();
+
+                    let mut transfer_vectors_map = HashMap::new();
+                    for (i, v) in transfer_vectors.iter().enumerate() {
+                        transfer_vectors_map.insert(v, i);
+                    }
+
+                    let transfer_vectors_set: HashSet<_> =
+                        transfer_vectors.iter().cloned().collect();
+
+                    // Mark items in interaction list for scattering
+                    for (tv_idx, tv) in self.source_to_target.transfer_vectors[m2l_operator_index]
+                        .iter()
+                        .enumerate()
+                    {
+                        let mut all_displacements_lock = result[tv_idx].write().unwrap();
+                        if transfer_vectors_set.contains(&tv.hash) {
+                            // Look up scatter location in target tree
+                            let target =
+                                &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                            let &target_idx = self.level_index_pointer_locals[level as usize]
+                                .get(target)
+                                .unwrap();
+                            all_displacements_lock[source_idx] = target_idx;
+                        }
+                    }
+                });
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
     fn source_to_target(&mut self) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -571,6 +645,62 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
+    fn displacements(&mut self) {
+
+        let mut displacements = Vec::new();
+
+        for level in 2..=self.tree.source_tree().depth() {
+            let targets = self.tree.target_tree().keys(level).unwrap();
+            let targets_parents: HashSet<MortonKey<_>> =
+                targets.iter().map(|target| target.parent()).collect();
+            let mut targets_parents = targets_parents.into_iter().collect_vec();
+            targets_parents.sort();
+            let ntargets_parents = targets_parents.len();
+
+            let sources = self.tree.source_tree().keys(level).unwrap();
+
+            let sources_parents: HashSet<MortonKey<_>> =
+                sources.iter().map(|source| source.parent()).collect();
+            let mut sources_parents = sources_parents.into_iter().collect_vec();
+            sources_parents.sort();
+            let nsources_parents = sources_parents.len();
+
+            let result = vec![Vec::new(); NHALO];
+            let result = result.into_iter().map(RwLock::new).collect_vec();
+
+            let targets_parents_neighbors = targets_parents
+                .iter()
+                .map(|parent| parent.all_neighbors())
+                .collect_vec();
+
+            let zero_displacement = nsources_parents * NSIBLINGS;
+
+            (0..NHALO).into_par_iter().for_each(|i| {
+                let mut result_i = result[i].write().unwrap();
+                for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
+                    // Check if neighbor exists in a valid tree
+                    if let Some(neighbor) = all_neighbors[i] {
+                        // If it does, check if first child exists in the source tree
+                        let first_child = neighbor.first_child();
+                        if let Some(neighbor_displacement) =
+                            self.level_index_pointer_multipoles[level as usize].get(&first_child)
+                        {
+                            result_i.push(*neighbor_displacement)
+                        } else {
+                            result_i.push(zero_displacement)
+                        }
+                    } else {
+                        result_i.push(zero_displacement)
+                    }
+                }
+            });
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
     fn source_to_target(&mut self) {
         // Compute the field translation operators
         let shape = <Scalar as Dft>::shape_in(self.expansion_order);
@@ -1003,6 +1133,72 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
+    fn displacements(&mut self) {
+        let mut displacements = Vec::new();
+
+        for level in 2..=self.tree.source_tree().depth() {
+            let sources = self.tree.source_tree().keys(level).unwrap();
+            let nsources = sources.len();
+
+            let sentinel = nsources;
+            let result = vec![vec![sentinel; nsources]; 316];
+            let result = result.into_iter().map(RwLock::new).collect_vec();
+
+            sources
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(source_idx, source)| {
+                    // Find interaction list of each source, as this defines scatter locations
+                    let interaction_list = source
+                        .parent()
+                        .neighbors()
+                        .iter()
+                        .flat_map(|pn| pn.children())
+                        .filter(|pnc| {
+                            !source.is_adjacent(pnc)
+                                && self
+                                    .tree
+                                    .target_tree()
+                                    .all_keys_set()
+                                    .unwrap()
+                                    .contains(pnc)
+                        })
+                        .collect_vec();
+
+                    let transfer_vectors = interaction_list
+                        .iter()
+                        .map(|target| source.find_transfer_vector(target).unwrap())
+                        .collect_vec();
+
+                    let mut transfer_vectors_map = HashMap::new();
+                    for (i, v) in transfer_vectors.iter().enumerate() {
+                        transfer_vectors_map.insert(v, i);
+                    }
+
+                    let transfer_vectors_set: HashSet<_> =
+                        transfer_vectors.iter().cloned().collect();
+
+                    // Mark items in interaction list for scattering
+                    for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
+                        let mut result_lock = result[tv_idx].write().unwrap();
+                        if transfer_vectors_set.contains(&tv.hash) {
+                            // Look up scatter location in target tree
+                            let target =
+                                &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                            let &target_idx = self.level_index_pointer_locals[level as usize]
+                                .get(target)
+                                .unwrap();
+                            result_lock[source_idx] = target_idx;
+                        }
+                    }
+                });
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
     fn source_to_target(&mut self) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
@@ -1308,6 +1504,61 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
+    fn displacements(&mut self) {
+        let mut displacements = Vec::new();
+
+        for level in 2..=self.tree.source_tree().depth() {
+            let targets = self.tree.target_tree().keys(level).unwrap();
+            let targets_parents: HashSet<MortonKey<_>> =
+                targets.iter().map(|target| target.parent()).collect();
+            let mut targets_parents = targets_parents.into_iter().collect_vec();
+            targets_parents.sort();
+            let ntargets_parents = targets_parents.len();
+
+            let sources = self.tree.source_tree().keys(level).unwrap();
+
+            let sources_parents: HashSet<MortonKey<_>> =
+                sources.iter().map(|source| source.parent()).collect();
+            let mut sources_parents = sources_parents.into_iter().collect_vec();
+            sources_parents.sort();
+            let nsources_parents = sources_parents.len();
+
+            let result = vec![Vec::new(); NHALO];
+            let result = result.into_iter().map(RwLock::new).collect_vec();
+
+            let targets_parents_neighbors = targets_parents
+                .iter()
+                .map(|parent| parent.all_neighbors())
+                .collect_vec();
+
+            let zero_displacement = nsources_parents * NSIBLINGS;
+
+            (0..NHALO).into_par_iter().for_each(|i| {
+                let mut result_i = result[i].write().unwrap();
+                for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
+                    // Check if neighbor exists in a valid tree
+                    if let Some(neighbor) = all_neighbors[i] {
+                        // If it does, check if first child exists in the source tree
+                        let first_child = neighbor.first_child();
+                        if let Some(neighbor_displacement) =
+                            self.level_index_pointer_multipoles[level as usize].get(&first_child)
+                        {
+                            result_i.push(*neighbor_displacement)
+                        } else {
+                            result_i.push(zero_displacement)
+                        }
+                    } else {
+                        result_i.push(zero_displacement)
+                    }
+                }
+            });
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
     fn source_to_target(&mut self) {
         // Compute the field translation operators
         let shape = <Scalar as Dft>::shape_in(self.expansion_order);
@@ -1546,6 +1797,10 @@ where
     fn m2l_operator_index(&self, _level: u64) -> usize {
         0
     }
+
+    fn displacement_index(&self, level: u64) -> usize {
+        (level - 2) as usize
+    }
 }
 
 impl<Scalar, SourceToTargetData> FmmOperatorData
@@ -1568,6 +1823,10 @@ where
     }
 
     fn m2l_operator_index(&self, level: u64) -> usize {
+        (level - 2) as usize
+    }
+
+    fn displacement_index(&self, level: u64) -> usize {
         (level - 2) as usize
     }
 }

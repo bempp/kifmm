@@ -1,5 +1,8 @@
 //! Data structures for kernel independent FMM
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Mutex, RwLock},
+};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
@@ -273,6 +276,7 @@ where
 
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
+
 }
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
@@ -545,6 +549,9 @@ where
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// The map between sources/targets in
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -587,6 +594,9 @@ where
 
     /// Directional cutoff ranks
     pub directional_cutoff_ranks: Vec<usize>,
+
+    /// The map between sources/targets in
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -621,6 +631,9 @@ where
 
     /// Cutoff ranks
     pub cutoff_ranks: Vec<Vec<usize>>,
+
+    /// The map between sources/targets in
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.

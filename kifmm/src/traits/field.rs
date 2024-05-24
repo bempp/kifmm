@@ -19,4 +19,6 @@ pub trait SourceAndTargetTranslationMetadata {
 pub trait SourceToTargetTranslationMetadata {
     /// Source to target field translation
     fn source_to_target(&mut self);
+
+    fn displacements(&mut self);
 }
