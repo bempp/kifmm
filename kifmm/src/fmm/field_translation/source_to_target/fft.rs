@@ -1,5 +1,5 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet};
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use num::{One, Zero};

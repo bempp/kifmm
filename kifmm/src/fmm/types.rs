@@ -1,8 +1,5 @@
 //! Data structures for kernel independent FMM
-use std::{
-    collections::HashMap,
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
