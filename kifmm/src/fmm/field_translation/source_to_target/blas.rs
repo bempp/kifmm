@@ -1,9 +1,6 @@
 //! Multipole to local field translation trait implementation using BLAS.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Mutex,
-};
+use std::sync::Mutex;
 
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -29,78 +26,6 @@ use crate::{
     BlasFieldTranslationSaRcmp, Fmm,
 };
 
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
-where
-    Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default,
-    <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData,
-{
-    /// Map between each transfer vector for homogenous kernels, and the source boxes involved in that translation
-    /// at this octree level.
-    ///
-    /// Returns a vector of length 316, the maximum number of unique transfer vectors at a tree level for homogenous
-    /// kernels, where each item is a mutex locked vector of indices, of a length equal to the number of source boxes
-    /// at this tree level, where an index value of -1 indicates that the box isn't involved in the translation, and
-    /// an index values of `usize` gives the target box index that the source box density is being translated to.
-    fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
-        let sources = self.tree.source_tree().keys(level).unwrap();
-        let nsources = sources.len();
-
-        let all_displacements = vec![vec![-1i64; nsources]; 316];
-        let all_displacements = all_displacements.into_iter().map(Mutex::new).collect_vec();
-
-        sources
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(source_idx, source)| {
-                // Find interaction list of each source, as this defines scatter locations
-                let interaction_list = source
-                    .parent()
-                    .neighbors()
-                    .iter()
-                    .flat_map(|pn| pn.children())
-                    .filter(|pnc| {
-                        !source.is_adjacent(pnc)
-                            && self
-                                .tree
-                                .target_tree()
-                                .all_keys_set()
-                                .unwrap()
-                                .contains(pnc)
-                    })
-                    .collect_vec();
-
-                let transfer_vectors = interaction_list
-                    .iter()
-                    .map(|target| source.find_transfer_vector(target).unwrap())
-                    .collect_vec();
-
-                let mut transfer_vectors_map = HashMap::new();
-                for (i, v) in transfer_vectors.iter().enumerate() {
-                    transfer_vectors_map.insert(v, i);
-                }
-
-                let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
-
-                // Mark items in interaction list for scattering
-                for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
-                    let mut all_displacements_lock = all_displacements[tv_idx].lock().unwrap();
-                    if transfer_vectors_set.contains(&tv.hash) {
-                        // Look up scatter location in target tree
-                        let target =
-                            &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                        let &target_idx = self.level_index_pointer_locals[level as usize]
-                            .get(target)
-                            .unwrap();
-                        all_displacements_lock[source_idx] = target_idx as i64;
-                    }
-                }
-            });
-        all_displacements
-    }
-}
-
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
@@ -123,19 +48,22 @@ where
 
         let m2l_operator_index = self.m2l_operator_index(level);
         let c2e_operator_index = self.c2e_operator_index(level);
+        let displacement_index = self.displacement_index(level);
+
+        let sentinel = sources.len();
 
         // Compute the displacements
-        let all_displacements = self.displacements(level);
+        let all_displacements = &self.source_to_target.displacements[displacement_index];
 
         let multipole_idxs = all_displacements
             .iter()
             .map(|displacement| {
                 displacement
-                    .lock()
+                    .read()
                     .unwrap()
                     .iter()
                     .enumerate()
-                    .filter(|(_, &d)| d != -1)
+                    .filter(|(_, &d)| d != sentinel)
                     .map(|(i, _)| i)
                     .collect_vec()
             })
@@ -145,12 +73,12 @@ where
             .iter()
             .map(|displacements| {
                 displacements
-                    .lock()
+                    .read()
                     .unwrap()
                     .iter()
                     .enumerate()
-                    .filter(|(_, &d)| d != -1)
-                    .map(|(_, &j)| j as usize)
+                    .filter(|(_, &d)| d != sentinel)
+                    .map(|(_, &j)| j)
                     .collect_vec()
             })
             .collect_vec();
@@ -498,82 +426,6 @@ where
     }
 }
 
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
-where
-    Scalar: RlstScalar + Default,
-    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default,
-    <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData,
-{
-    /// Map between each transfer vector for homogenous kernels, and the source boxes involved in that translation
-    /// at this octree level.
-    ///
-    /// Returns a vector of length 316, the maximum number of unique transfer vectors at a tree level for homogenous
-    /// kernels, where each item is a mutex locked vector of indices, of a length equal to the number of source boxes
-    /// at this tree level, where an index value of -1 indicates that the box isn't involved in the translation, and
-    /// an index values of `usize` gives the target box index that the source box density is being translated to.
-    fn displacements(&self, level: u64) -> Vec<Mutex<Vec<i64>>> {
-        let sources = self.tree.source_tree().keys(level).unwrap();
-        let nsources = sources.len();
-        let m2l_operator_index = self.m2l_operator_index(level);
-
-        let all_displacements = vec![vec![-1i64; nsources]; 316];
-        let all_displacements = all_displacements.into_iter().map(Mutex::new).collect_vec();
-
-        sources
-            .into_par_iter()
-            .enumerate()
-            .for_each(|(source_idx, source)| {
-                // Find interaction list of each source, as this defines scatter locations
-                let interaction_list = source
-                    .parent()
-                    .neighbors()
-                    .iter()
-                    .flat_map(|pn| pn.children())
-                    .filter(|pnc| {
-                        !source.is_adjacent(pnc)
-                            && self
-                                .tree
-                                .target_tree()
-                                .all_keys_set()
-                                .unwrap()
-                                .contains(pnc)
-                    })
-                    .collect_vec();
-
-                let transfer_vectors = interaction_list
-                    .iter()
-                    .map(|target| source.find_transfer_vector(target).unwrap())
-                    .collect_vec();
-
-                let mut transfer_vectors_map = HashMap::new();
-                for (i, v) in transfer_vectors.iter().enumerate() {
-                    transfer_vectors_map.insert(v, i);
-                }
-
-                let transfer_vectors_set: HashSet<_> = transfer_vectors.iter().cloned().collect();
-
-                // Mark items in interaction list for scattering
-                for (tv_idx, tv) in self.source_to_target.transfer_vectors[m2l_operator_index]
-                    .iter()
-                    .enumerate()
-                {
-                    let mut all_displacements_lock = all_displacements[tv_idx].lock().unwrap();
-                    if transfer_vectors_set.contains(&tv.hash) {
-                        // Look up scatter location in target tree
-                        let target =
-                            &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                        let &target_idx = self.level_index_pointer_locals[level as usize]
-                            .get(target)
-                            .unwrap();
-                        all_displacements_lock[source_idx] = target_idx as i64;
-                    }
-                }
-            });
-        all_displacements
-    }
-}
-
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
 where
@@ -589,6 +441,7 @@ where
                 level
             )));
         };
+
         let Some(sources) = self.tree().source_tree().keys(level) else {
             return Err(FmmError::Failed(format!(
                 "M2L failed at level {:?}, no sources found",
@@ -605,19 +458,21 @@ where
 
         let m2l_operator_index = self.m2l_operator_index(level);
         let c2e_operator_index = self.c2e_operator_index(level);
+        let displacement_index = self.displacement_index(level);
+        let sentinel = sources.len();
 
         // Compute the displacements
-        let all_displacements = self.displacements(level);
+        let all_displacements = &self.source_to_target.displacements[displacement_index];
 
         let multipole_idxs = all_displacements
             .iter()
             .map(|displacement| {
                 displacement
-                    .lock()
+                    .read()
                     .unwrap()
                     .iter()
                     .enumerate()
-                    .filter(|(_, &d)| d != -1)
+                    .filter(|(_, &d)| d != sentinel)
                     .map(|(i, _)| i)
                     .collect_vec()
             })
@@ -627,12 +482,12 @@ where
             .iter()
             .map(|displacements| {
                 displacements
-                    .lock()
+                    .read()
                     .unwrap()
                     .iter()
                     .enumerate()
-                    .filter(|(_, &d)| d != -1)
-                    .map(|(_, &j)| j as usize)
+                    .filter(|(_, &d)| d != sentinel)
+                    .map(|(_, &j)| j)
                     .collect_vec()
             })
             .collect_vec();

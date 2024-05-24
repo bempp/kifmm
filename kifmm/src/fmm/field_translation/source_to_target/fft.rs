@@ -1,5 +1,5 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, sync::RwLock};
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use num::{One, Zero};
@@ -31,76 +31,7 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
-use super::matvec::Gemv8x8;
-
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
-where
-    Scalar: RlstScalar
-        + AsComplex
-        + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
-        + Default,
-    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
-    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData,
-{
-    /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
-    /// to target cluster.
-    ///
-    /// Returns a vector of read-write locked index vectors, of length 26 - i.e. the number of unique halo positions
-    /// between a target cluster and its source clusters for homogenous kernels. Each element consists of a vector
-    /// of indices containing the index of the source cluster multipole coefficients being translated for each target
-    /// cluster index respectively.
-    fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
-        let targets = self.tree().target_tree().keys(level).unwrap();
-
-        let targets_parents: HashSet<MortonKey<_>> =
-            targets.iter().map(|target| target.parent()).collect();
-        let mut targets_parents = targets_parents.into_iter().collect_vec();
-        targets_parents.sort();
-        let ntargets_parents = targets_parents.len();
-
-        let sources = self.tree().source_tree().keys(level).unwrap();
-
-        let sources_parents: HashSet<MortonKey<_>> =
-            sources.iter().map(|source| source.parent()).collect();
-        let mut sources_parents = sources_parents.into_iter().collect_vec();
-        sources_parents.sort();
-        let nsources_parents = sources_parents.len();
-
-        let result = vec![Vec::new(); NHALO];
-        let result = result.into_iter().map(RwLock::new).collect_vec();
-
-        let targets_parents_neighbors = targets_parents
-            .iter()
-            .map(|parent| parent.all_neighbors())
-            .collect_vec();
-
-        let zero_displacement = nsources_parents * NSIBLINGS;
-
-        (0..NHALO).into_par_iter().for_each(|i| {
-            let mut result_i = result[i].write().unwrap();
-            for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-                // Check if neighbor exists in a valid tree
-                if let Some(neighbor) = all_neighbors[i] {
-                    // If it does, check if first child exists in the source tree
-                    let first_child = neighbor.first_child();
-                    if let Some(neighbor_displacement) =
-                        self.level_index_pointer_multipoles[level as usize].get(&first_child)
-                    {
-                        result_i.push(*neighbor_displacement)
-                    } else {
-                        result_i.push(zero_displacement)
-                    }
-                } else {
-                    result_i.push(zero_displacement)
-                }
-            }
-        });
-
-        result
-    }
-}
+use super::gemv::Gemv8x8;
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
@@ -132,6 +63,7 @@ where
 
                 let m2l_operator_index = self.m2l_operator_index(level);
                 let c2e_operator_index = self.c2e_operator_index(level);
+                let displacement_index = self.displacement_index(level);
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -156,7 +88,7 @@ where
                 let size_out = <Scalar as Dft>::size_out(self.expansion_order);
 
                 // Calculate displacements of multipole data with respect to source tree
-                let all_displacements = self.displacements(level);
+                let all_displacements = &self.source_to_target.displacements[displacement_index];
 
                 // Lookup multipole data from source tree
                 let min = &sources[0];
