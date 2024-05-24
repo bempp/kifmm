@@ -22,14 +22,13 @@ impl<T, C: Communicator> MultiNodeTree<T, C>
 where
     T: RlstScalar + Float + Equivalence + Default,
 {
-    // TODO: Convert to row major
     /// Constructor for uniform trees, distributed with MPI, node refined to a user defined depth.
     ///
     /// The input point data is also assumed to be distributed across each node.
     ///
     /// # Arguments
-    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order, local to this node.
-    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
+    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
+    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
     /// * `domain` - The (global) physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
@@ -38,32 +37,27 @@ where
     /// [hyksort](https://dl.acm.org/doi/abs/10.1145/2464996.2465442?casa_token=vfaxtoyb_xsaaaaa:dqq1hfnp_gokaatn_d0svex37v_xooiqevdrong-4lyn_pmsuphmr3cp-0qvbisxtbwvuucaua).
     /// must be a power of 2.
     pub fn uniform_tree(
-        coordinates_col_major: &[T],
+        coordinates_row_major: &[T],
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
         world: &C,
         hyksort_subcomm_size: i32,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
-        // Size of global communicator, and processor rank
         let size = world.size();
         let rank = world.rank();
-
-        // Convert column major coordinate into `Point`, containing Morton encoding
         let dim = 3;
-        let n_coords = coordinates_col_major.len() / dim;
-
+        let n_coords = coordinates_row_major.len() / dim;
         let mut points = Points::default();
+
         for i in 0..n_coords {
-            let point = [
-                coordinates_col_major[i],
-                coordinates_col_major[i + n_coords],
-                coordinates_col_major[i + 2 * n_coords],
-            ];
-            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, &domain, depth);
+
+            let coord: &[T; 3] = &coordinates_row_major[i*dim..(i+1)*dim].try_into().unwrap();
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth);
+
             points.push(Point {
-                coordinate: point,
+                coordinate: *coord,
                 base_key,
                 encoded_key,
                 global_index: global_indices[i],
@@ -170,7 +164,7 @@ where
         }
 
         // Collect coordinates in row-major order, for ease of lookup
-        let coordinates_row_major = points
+        let coordinates = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
@@ -196,7 +190,7 @@ where
             world: world.duplicate(),
             depth,
             domain,
-            coordinates: coordinates_row_major,
+            coordinates,
             global_indices,
             leaves,
             keys,
@@ -210,15 +204,14 @@ where
         })
     }
 
-    // TODO: Convert to row major
     /// Constructor for uniform trees, distributed with MPI, refined to a user defined depth, however excludes
     /// empty nodes which don't contain particles and their ancestors.
     ///
     /// The input point data is also assumed to be distributed across each node.
     ///
     /// # Arguments
-    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order
-    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
+    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
+    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
@@ -227,32 +220,27 @@ where
     /// [hyksort](https://dl.acm.org/doi/abs/10.1145/2464996.2465442?casa_token=vfaxtoyb_xsaaaaa:dqq1hfnp_gokaatn_d0svex37v_xooiqevdrong-4lyn_pmsuphmr3cp-0qvbisxtbwvuucaua).
     /// must be a power of 2.
     pub fn uniform_tree_pruned(
-        coordinates_col_major: &[T],
+        coordinates_row_major: &[T],
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
         world: &C,
         hyksort_subcomm_size: i32,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
-        // Size of global communicator, and processor rank
         let size = world.size();
         let rank = world.rank();
-
-        // Convert column major coordinate into `Point`, containing Morton encoding
         let dim = 3;
-        let n_coords = coordinates_col_major.len() / dim;
-
+        let n_coords = coordinates_row_major.len() / dim;
         let mut points = Points::default();
+
         for i in 0..n_coords {
-            let point = [
-                coordinates_col_major[i],
-                coordinates_col_major[i + n_coords],
-                coordinates_col_major[i + 2 * n_coords],
-            ];
-            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, &domain, depth);
+
+            let coord: &[T; 3] = &coordinates_row_major[i*dim..(i+1)*dim].try_into().unwrap();
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth);
+
             points.push(Point {
-                coordinate: point,
+                coordinate: *coord,
                 base_key,
                 encoded_key,
                 global_index: global_indices[i],
@@ -369,7 +357,7 @@ where
         }
 
         // Collect coordinates in row-major order, for ease of lookup
-        let coordinates_row_major = points
+        let coordinates = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
@@ -395,7 +383,7 @@ where
             world: world.duplicate(),
             depth,
             domain,
-            coordinates: coordinates_row_major,
+            coordinates,
             global_indices,
             leaves,
             keys,
@@ -419,8 +407,8 @@ where
     ///
     /// # Arguments
 
-    /// - `coordinates_col_major` - A slice of coordinates in column major order, structured as
-    ///   [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]. This ordering facilitates
+    /// - `coordinates_row_major` - A slice of coordinates in row major order, structured as
+    ///   [x_1, y_1, z_1,...x_N, y_N, z_N]. This ordering facilitates
     ///   efficient spatial indexing and operations within the tree.
     ///
     /// - `depth` - Defines the maximum recursion level of the tree, determining the granularity of
@@ -438,17 +426,17 @@ where
     ///
     /// - `world` - The global MPI communicator for this tree.
     pub fn new(
-        coordinates_col_major: &[T],
+        coordinates_row_major: &[T],
         depth: u64,
         prune_empty: bool,
         domain: Option<Domain<T>>,
         world: &C,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         let dim = 3;
-        let coords_len = coordinates_col_major.len();
+        let coords_len = coordinates_row_major.len();
 
-        if !coordinates_col_major.is_empty() && coords_len & dim == 0 {
-            let domain = domain.unwrap_or(Domain::from_global_points(coordinates_col_major, world));
+        if !coordinates_row_major.is_empty() && coords_len & dim == 0 {
+            let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, world));
             let n_coords = coords_len / dim;
 
             // Calculate subcommunicator size for hyksort
@@ -459,7 +447,7 @@ where
 
             if prune_empty {
                 return MultiNodeTree::uniform_tree_pruned(
-                    coordinates_col_major,
+                    coordinates_row_major,
                     &domain,
                     depth,
                     &global_indices,
@@ -468,7 +456,7 @@ where
                 );
             } else {
                 return MultiNodeTree::uniform_tree(
-                    coordinates_col_major,
+                    coordinates_row_major,
                     &domain,
                     depth,
                     &global_indices,

@@ -35,16 +35,14 @@ where
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
-
         let n_coords = coordinates_row_major.len() / dim;
-        // Convert column major coordinate into `Point`, containing Morton encoding
+
         let mut points: Vec<Point<T>> = Points::default();
         for i in 0..n_coords {
 
             let coord: &[T; 3] = &coordinates_row_major[i*dim..(i+1)*dim].try_into().unwrap();
-
-            let base_key = MortonKey::<T>::from_point(&coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::<T>::from_point(&coord, &domain, depth);
+            let base_key = MortonKey::<T>::from_point(coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::<T>::from_point(coord, &domain, depth);
 
             points.push(Point {
                 coordinate: *coord,
@@ -190,17 +188,14 @@ where
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
-
         let n_coords = coordinates_row_major.len() / dim;
-
-        // Convert column major coordinate into `Point`, containing Morton encoding
         let mut points = Points::default();
+
         for i in 0..n_coords {
 
             let coord: &[T; 3] = &coordinates_row_major[i*dim..(i+1)*dim].try_into().unwrap();
-
-            let base_key = MortonKey::from_point(&coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&coord, &domain, depth);
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth);
 
             points.push(Point {
                 coordinate: *coord,
