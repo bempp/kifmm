@@ -70,21 +70,12 @@ where
                             let coordinates_row_major = &coordinates[charge_index_pointer.0
                                 * self.dim
                                 ..charge_index_pointer.1 * self.dim];
-
                             let nsources = coordinates_row_major.len() / self.dim;
-                            if nsources > 0 {
-                                let coordinates_row_major = rlst_array_from_slice2!(
-                                    coordinates_row_major,
-                                    [nsources, self.dim],
-                                    [self.dim, 1]
-                                );
-                                let mut coordinates_col_major =
-                                    rlst_dynamic_array2!(Scalar::Real, [nsources, self.dim]);
-                                coordinates_col_major.fill_from(coordinates_row_major.view());
 
+                            if nsources > 0 {
                                 self.kernel.evaluate_st(
                                     EvalType::Value,
-                                    coordinates_col_major.data(),
+                                    coordinates_row_major,
                                     upward_check_surface,
                                     charges,
                                     check_potential,
@@ -175,18 +166,9 @@ where
                                     let check_potential_i = &mut check_potential
                                         [i * self.ncoeffs..(i + 1) * self.ncoeffs];
 
-                                    let coordinates_mat = rlst_array_from_slice2!(
-                                        coordinates_row_major,
-                                        [nsources, self.dim],
-                                        [self.dim, 1]
-                                    );
-                                    let mut coordinates_col_major =
-                                        rlst_dynamic_array2!(Scalar::Real, [nsources, self.dim]);
-                                    coordinates_col_major.fill_from(coordinates_mat.view());
-
                                     self.kernel.evaluate_st(
                                         EvalType::Value,
-                                        coordinates_col_major.data(),
+                                        coordinates_row_major,
                                         upward_check_surface,
                                         charges_i,
                                         check_potential_i,

@@ -207,16 +207,6 @@ where
 
                             // Compute direct
                             if ntargets > 0 {
-                                let target_coordinates_row_major = rlst_array_from_slice2!(
-                                    target_coordinates_row_major,
-                                    [ntargets, self.dim],
-                                    [self.dim, 1]
-                                );
-                                let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                                target_coordinates_col_major
-                                    .fill_from(target_coordinates_row_major.view());
-
                                 let result = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         potential_send_ptr.raw,
@@ -227,7 +217,7 @@ where
                                 self.kernel.evaluate_st(
                                     self.kernel_eval_type,
                                     leaf_downward_equivalent_surface,
-                                    target_coordinates_col_major.data(),
+                                    target_coordinates_row_major,
                                     unsafe {
                                         std::slice::from_raw_parts_mut(
                                             leaf_locals[0].raw,
@@ -265,16 +255,6 @@ where
                                 let ntargets = target_coordinates_row_major.len() / self.dim;
 
                                 if ntargets > 0 {
-                                    let target_coordinates_row_major = rlst_array_from_slice2!(
-                                        target_coordinates_row_major,
-                                        [ntargets, self.dim],
-                                        [self.dim, 1]
-                                    );
-                                    let mut target_coordinates_col_major =
-                                        rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                                    target_coordinates_col_major
-                                        .fill_from(target_coordinates_row_major.view());
-
                                     let local_expansion_ptr = leaf_locals[i].raw;
                                     let local_expansion = unsafe {
                                         std::slice::from_raw_parts(
@@ -292,7 +272,7 @@ where
                                     self.kernel.evaluate_st(
                                         self.kernel_eval_type,
                                         leaf_downward_equivalent_surface,
-                                        target_coordinates_col_major.data(),
+                                        target_coordinates_row_major,
                                         local_expansion,
                                         result,
                                     );
@@ -330,15 +310,6 @@ where
                         let ntargets = target_coordinates_row_major.len() / self.dim;
 
                         if ntargets > 0 {
-                            let target_coordinates_row_major = rlst_array_from_slice2!(
-                                target_coordinates_row_major,
-                                [ntargets, self.dim],
-                                [self.dim, 1]
-                            );
-                            let mut target_coordinates_col_major =
-                                rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                            target_coordinates_col_major
-                                .fill_from(target_coordinates_row_major.view());
 
                             if let Some(u_list) = self.tree.near_field(leaf) {
                                 let u_list_indices = u_list
@@ -368,17 +339,6 @@ where
                                     let nsources = source_coordinates_row_major.len() / self.dim;
 
                                     if nsources > 0 {
-                                        let source_coordinates_row_major = rlst_array_from_slice2!(
-                                            source_coordinates_row_major,
-                                            [nsources, self.dim],
-                                            [self.dim, 1]
-                                        );
-                                        let mut source_coordinates_col_major = rlst_dynamic_array2!(
-                                            Scalar::Real,
-                                            [nsources, self.dim]
-                                        );
-                                        source_coordinates_col_major
-                                            .fill_from(source_coordinates_row_major.view());
 
                                         let result = unsafe {
                                             std::slice::from_raw_parts_mut(
@@ -389,8 +349,8 @@ where
 
                                         self.kernel.evaluate_st(
                                             self.kernel_eval_type,
-                                            source_coordinates_col_major.data(),
-                                            target_coordinates_col_major.data(),
+                                            source_coordinates_row_major,
+                                            target_coordinates_row_major,
                                             charges,
                                             result,
                                         )
@@ -418,15 +378,6 @@ where
                             let ntargets = target_coordinates_row_major.len() / self.dim;
 
                             if ntargets > 0 {
-                                let target_coordinates_row_major = rlst_array_from_slice2!(
-                                    target_coordinates_row_major,
-                                    [ntargets, self.dim],
-                                    [self.dim, 1]
-                                );
-                                let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                                target_coordinates_col_major
-                                    .fill_from(target_coordinates_row_major.view());
 
                                 if let Some(u_list) = self.tree.near_field(leaf) {
                                     let u_list_indices = u_list
@@ -459,17 +410,6 @@ where
                                     {
                                         let nsources =
                                             source_coordinates_row_major.len() / self.dim;
-                                        let source_coordinates_row_major = rlst_array_from_slice2!(
-                                            source_coordinates_row_major,
-                                            [nsources, self.dim],
-                                            [self.dim, 1]
-                                        );
-                                        let mut source_coordinates_col_major = rlst_dynamic_array2!(
-                                            Scalar::Real,
-                                            [nsources, self.dim]
-                                        );
-                                        source_coordinates_col_major
-                                            .fill_from(source_coordinates_row_major.view());
 
                                         if nsources > 0 {
                                             let result = unsafe {
@@ -481,8 +421,8 @@ where
 
                                             self.kernel.evaluate_st(
                                                 self.kernel_eval_type,
-                                                source_coordinates_col_major.data(),
-                                                target_coordinates_col_major.data(),
+                                                source_coordinates_row_major,
+                                                target_coordinates_row_major,
                                                 charges,
                                                 result,
                                             );

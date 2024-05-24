@@ -229,5 +229,5 @@ where
     fn origin(&self) -> &[Self::Scalar; 3];
 
     /// Side length along each axis
-    fn diameter(&self) -> &[Self::Scalar; 3];
+    fn side_length(&self) -> &[Self::Scalar; 3];
 }

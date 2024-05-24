@@ -52,8 +52,8 @@ where
     /// Associate FMM builder with an FMM Tree
     ///
     /// # Arguments
-    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
-    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
+    /// * `sources` - Source coordinates, data expected in row major order such that the shape is [dim, n_coords]
+    /// * `target` - Target coordinates,  data expected in row major order such that the shape is [dim, n_coords]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
     /// * `prune_empty` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
@@ -63,10 +63,10 @@ where
         n_crit: Option<u64>,
         prune_empty: bool,
     ) -> Result<Self, std::io::Error> {
-        let [nsources, dims] = sources.shape();
-        let [ntargets, dimt] = targets.shape();
+        let [dims, nsources] = sources.shape();
+        let [dimt, ntargets] = targets.shape();
 
-        if dims < 3 || dimt < 3 {
+        if dims != 3 || dimt != 3 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Only 3D FMM supported",
@@ -77,7 +77,7 @@ where
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            // Source and target trees calcualted over the same domain
+            // Source and target trees calculated over the same domain
             let source_domain = Domain::from_local_points(sources.data());
             let target_domain = Domain::from_local_points(targets.data());
 
@@ -87,8 +87,8 @@ where
 
             // If not specified estimate from point data estimate critical value
             let n_crit = n_crit.unwrap_or(DEFAULT_NCRIT);
-            let [nsources, _dim] = sources.shape();
-            let [ntargets, _dim] = targets.shape();
+            let [_, nsources] = sources.shape();
+            let [_, ntargets] = targets.shape();
 
             // Estimate depth based on a uniform distribution
             let source_depth =

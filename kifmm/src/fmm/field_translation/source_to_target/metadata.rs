@@ -19,17 +19,14 @@ use rlst::{
 
 use crate::{
     fmm::{
-        helpers::{
+        field_translation::target, helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
             ncoeffs_kifmm, potential_pointers,
-        },
-        pinv::pinv,
-        types::{
+        }, pinv::pinv, types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             Charges, FftFieldTranslation, FftMetadata,
-        },
-        KiFmm,
+        }, KiFmm
     },
     traits::{
         fftw::{Dft, DftType},
@@ -712,7 +709,7 @@ where
             .tree
             .source_tree()
             .domain()
-            .side_length
+            .side_length()
             .iter()
             .map(|d| *d / two)
             .collect_vec();
@@ -821,10 +818,16 @@ where
                     // Compute convolution grid around the source box
                     let conv_point_corner_index = 7;
                     let corners = find_corners(&source_equivalent_surface[..]);
+                    // let conv_point_corner = [
+                    //     corners[conv_point_corner_index],
+                    //     corners[NCORNERS + conv_point_corner_index],
+                    //     corners[2 * NCORNERS + conv_point_corner_index],
+                    // ];
+
                     let conv_point_corner = [
-                        corners[conv_point_corner_index],
-                        corners[NCORNERS + conv_point_corner_index],
-                        corners[2 * NCORNERS + conv_point_corner_index],
+                        corners[self.dim * conv_point_corner_index],
+                        corners[self.dim * conv_point_corner_index + 1],
+                        corners[self.dim * conv_point_corner_index + 2],
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
@@ -837,11 +840,18 @@ where
 
                     // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                     let kernel_point_index = 0;
+                    // let kernel_point = [
+                    //     target_check_surface[kernel_point_index],
+                    //     target_check_surface[n_target_check_surface + kernel_point_index],
+                    //     target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                    // ];
+
                     let kernel_point = [
-                        target_check_surface[kernel_point_index],
-                        target_check_surface[n_target_check_surface + kernel_point_index],
-                        target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                        target_check_surface[self.dim * kernel_point_index],
+                        target_check_surface[self.dim * kernel_point_index + 1],
+                        target_check_surface[self.dim * kernel_point_index + 2],
                     ];
+
 
                     // Compute Green's fct evaluations
                     let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
@@ -971,7 +981,7 @@ where
                 sources[i] = tmp_sources;
             }
 
-            let n_source_equivalent_surface = 6 * (self.expansion_order - 1).pow(2) + 2;
+            let n_source_equivalent_surface = ncoeffs_kifmm(self.expansion_order);
             let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
@@ -1007,9 +1017,9 @@ where
                         let conv_point_corner_index = 7;
                         let corners = find_corners(&source_equivalent_surface[..]);
                         let conv_point_corner = [
-                            corners[conv_point_corner_index],
-                            corners[NCORNERS + conv_point_corner_index],
-                            corners[2 * NCORNERS + conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index + 1],
+                            corners[self.dim + conv_point_corner_index + 2],
                         ];
 
                         let (conv_grid, _) = source.convolution_grid(
@@ -1023,9 +1033,9 @@ where
                         // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                         let kernel_point_index = 0;
                         let kernel_point = [
-                            target_check_surface[kernel_point_index],
-                            target_check_surface[n_target_check_surface + kernel_point_index],
-                            target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index + 1],
+                            target_check_surface[self.dim * kernel_point_index + 2],
                         ];
 
                         // Compute Green's fct evaluations
@@ -1264,6 +1274,7 @@ where
                 SvdMode::Reduced,
             )
             .unwrap();
+
         let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
         let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
         let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
@@ -1376,7 +1387,7 @@ where
     ///
     /// # Arguments
     /// * `expansion_order` - The expansion order of the FMM
-    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in column major order.
+    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in row major order.
     /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn evaluate_greens_fct_convolution_grid(
         &self,
@@ -1388,6 +1399,7 @@ where
         let npad = n + 1; // padded size
         let nconv = n.pow(3); // length of buffer storing values on convolution grid
 
+
         let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
@@ -1397,6 +1409,10 @@ where
             &target_pt[..],
             &mut kernel_evals[..],
         );
+
+        println!("target_pt {:?}", &target_pt);
+        println!("Kernel {:?}", &kernel_evals);
+        assert!(false);
 
         for k in 0..n {
             for j in 0..n {
@@ -1569,16 +1585,18 @@ where
         let midway = self
             .tree
             .source_tree()
-            .domain
-            .side_length
+            .domain()
+            .side_length()
             .iter()
             .map(|d| *d / two)
             .collect_vec();
+
         let point = midway
             .iter()
             .zip(self.tree.source_tree().domain().origin())
             .map(|(m, o)| *m + *o)
             .collect_vec();
+
         let point = [point[0], point[1], point[2]];
 
         // Encode point in centre of domain and compute halo of parent, and their resp. children
@@ -1626,8 +1644,6 @@ where
             sources[i] = tmp_sources;
         }
 
-        let n_source_equivalent_surface = 6 * (self.expansion_order - 1).pow(2) + 2;
-        let n_target_check_surface = n_source_equivalent_surface;
         let alpha = Scalar::real(ALPHA_INNER);
 
         // Iterate over each set of convolutions in the halo (26)
@@ -1661,10 +1677,11 @@ where
                     // Compute convolution grid around the source box
                     let conv_point_corner_index = 7;
                     let corners = find_corners(&source_equivalent_surface[..]);
+
                     let conv_point_corner = [
-                        corners[conv_point_corner_index],
-                        corners[NCORNERS + conv_point_corner_index],
-                        corners[2 * NCORNERS + conv_point_corner_index],
+                        corners[self.dim * conv_point_corner_index],
+                        corners[self.dim * conv_point_corner_index + 1],
+                        corners[self.dim * conv_point_corner_index + 2],
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
@@ -1677,10 +1694,11 @@ where
 
                     // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                     let kernel_point_index = 0;
+
                     let kernel_point = [
-                        target_check_surface[kernel_point_index],
-                        target_check_surface[n_target_check_surface + kernel_point_index],
-                        target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                        target_check_surface[self.dim * kernel_point_index],
+                        target_check_surface[self.dim * kernel_point_index + 1],
+                        target_check_surface[self.dim * kernel_point_index + 2],
                     ];
 
                     // Compute Green's fct evaluations
@@ -2308,7 +2326,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = 2;
         let sparse = true;
 
         // Charge data
@@ -2367,9 +2385,9 @@ mod test {
         let conv_point_corner_index = 7;
         let corners = find_corners(&source_equivalent_surface[..]);
         let conv_point_corner = [
-            corners[conv_point_corner_index],
-            corners[8 + conv_point_corner_index],
-            corners[16 + conv_point_corner_index],
+            corners[fmm.dim() * conv_point_corner_index],
+            corners[fmm.dim() * conv_point_corner_index + 1],
+            corners[fmm.dim() * conv_point_corner_index + 2],
         ];
 
         let (conv_grid, _) = transfer_vector.source.convolution_grid(
@@ -2382,17 +2400,20 @@ mod test {
 
         let kernel_point_index = 0;
         let kernel_point = [
-            target_check_surface[kernel_point_index],
-            target_check_surface[ntargets + kernel_point_index],
-            target_check_surface[2 * ntargets + kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index + 1],
+            target_check_surface[fmm.dim() * kernel_point_index + 2],
         ];
+
 
         // Compute kernel
         let kernel =
             fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
         let [m, n, o] = kernel.shape();
 
+
         let mut kernel = flip3(&kernel);
+
 
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
@@ -2436,6 +2457,8 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
+
+        println!("rel error {:?} \n {:?}", &result[0..5], &direct[0..5]);
 
         assert!(rel_error < 1e-15);
     }
