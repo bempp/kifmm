@@ -31,7 +31,7 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
-use super::matvec::Gemv8x8;
+use super::gemv::Gemv8x8;
 
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
