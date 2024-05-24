@@ -646,7 +646,6 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
     fn displacements(&mut self) {
-
         let mut displacements = Vec::new();
 
         for level in 2..=self.tree.source_tree().depth() {

@@ -276,7 +276,6 @@ where
 
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
-
 }
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where

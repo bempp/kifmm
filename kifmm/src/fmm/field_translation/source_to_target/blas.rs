@@ -429,7 +429,6 @@ where
     }
 }
 
-
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
 where
