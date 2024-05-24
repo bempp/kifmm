@@ -193,6 +193,7 @@ where
             result.target();
             result.source_to_target();
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
+            result.displacements();
 
             Ok(result)
         }
