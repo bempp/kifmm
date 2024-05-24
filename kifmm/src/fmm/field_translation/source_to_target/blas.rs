@@ -1,9 +1,6 @@
 //! Multipole to local field translation trait implementation using BLAS.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::{Mutex, RwLock},
-};
+use std::sync::Mutex;
 
 use itertools::Itertools;
 use rayon::prelude::*;
@@ -81,7 +78,7 @@ where
                     .iter()
                     .enumerate()
                     .filter(|(_, &d)| d != sentinel)
-                    .map(|(_, &j)| j as usize)
+                    .map(|(_, &j)| j)
                     .collect_vec()
             })
             .collect_vec();
@@ -490,7 +487,7 @@ where
                     .iter()
                     .enumerate()
                     .filter(|(_, &d)| d != sentinel)
-                    .map(|(_, &j)| j as usize)
+                    .map(|(_, &j)| j)
                     .collect_vec()
             })
             .collect_vec();

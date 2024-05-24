@@ -20,5 +20,6 @@ pub trait SourceToTargetTranslationMetadata {
     /// Source to target field translation
     fn source_to_target(&mut self);
 
+    /// Map between source/target nodes, indexed by level.
     fn displacements(&mut self);
 }
