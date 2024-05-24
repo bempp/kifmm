@@ -1,4 +1,5 @@
 //! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
+use crate::fmm::helpers::ncoeffs_kifmm;
 use crate::traits::tree::{FmmTreeNode, TreeNode};
 use crate::tree::{
     constants::{
@@ -906,14 +907,14 @@ where
 // TODO: Convert to row major
 /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
 /// returns a tuple, the first element is an owned vector of the physical coordinates of the
-/// surface grid in column major order [x_1, x_2, ... x_n, y_1, y_2, ..., y_n, z_1, z_2, ..., z_n].
+/// surface grid in row major order [x_1, y_1, z_1,...x_N, y_N, z_N]
 /// the second element is a vector of indices corresponding to each of these coordinates.
 ///
 /// # Arguments
 /// * `expansion_order` - the expansion order of the fmm
-pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
+pub fn surface_grid<T: RlstScalar>(expansion_order: usize) -> Vec<T> {
     let dim = 3;
-    let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
+    let n_coeffs = ncoeffs_kifmm(expansion_order);
 
     // Implicitly in column major order
     let mut surface: Vec<T> = vec![T::zero(); dim * n_coeffs];
@@ -932,10 +933,13 @@ pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
                     || (j >= lower && k >= lower && (i == lower || i == upper))
                     || (k >= lower && i >= lower && (j == lower || j == upper))
                 {
+                    // surface[idx] = T::from(i).unwrap();
+                    // surface[(dim - 2) * n_coeffs + idx] = T::from(j).unwrap();
+                    // surface[(dim - 1) * n_coeffs + idx] = T::from(k).unwrap();
                     surface[idx] = T::from(i).unwrap();
-                    surface[(dim - 2) * n_coeffs + idx] = T::from(j).unwrap();
-                    surface[(dim - 1) * n_coeffs + idx] = T::from(k).unwrap();
-                    idx += 1;
+                    surface[idx + 1] = T::from(j).unwrap();
+                    surface[idx + 2] = T::from(k).unwrap();
+                    idx += dim;
                 }
             }
         }

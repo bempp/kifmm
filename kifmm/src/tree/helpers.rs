@@ -1,6 +1,7 @@
 //! Helper functions used in testing tree implementations, specifically test point generators,
 //! as well as helpers for handling surfaces that discretise a box corresponding to a Morton key.
 
+use itertools::Itertools;
 use num::Float;
 use rand::prelude::*;
 use rlst::RlstScalar;
@@ -14,7 +15,7 @@ pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 ///
 /// # Arguments
 /// * `n_points` - The number of points to sample.
-/// * `min` - The minumum coordinate value along each axis.
+/// * `min` - The minimum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
     n_points: usize,
@@ -32,24 +33,22 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
     } else {
         between = rand::distributions::Uniform::from(T::zero()..T::one());
     }
-
-    let mut points = rlst_dynamic_array2!(T, [n_points, 3]);
+    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
 
     for i in 0..n_points {
-        points[[i, 0]] = between.sample(&mut range);
-        points[[i, 1]] = between.sample(&mut range);
-        points[[i, 2]] = between.sample(&mut range);
+        points[[0, i]] = between.sample(&mut range);
+        points[[1, i]] = between.sample(&mut range);
+        points[[2, i]] = between.sample(&mut range);
     }
 
     points
 }
 
-// TODO: Convert to row major
 /// Points fixture for testing, uniformly samples on surface of a sphere of diameter 1.
 ///
 /// # Arguments
 /// * `n_points` - The number of points to sample.
-/// * `min` - The minumum coordinate value along each axis.
+/// * `min` - The minimum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
     n_points: usize,
@@ -62,7 +61,7 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
 
     let between = rand::distributions::Uniform::from(T::zero()..T::one());
 
-    let mut points = rlst_dynamic_array2!(T, [n_points, 3]);
+    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
     let mut phi = rlst_dynamic_array2!(T, [n_points, 1]);
     let mut theta = rlst_dynamic_array2!(T, [n_points, 1]);
 
@@ -72,15 +71,14 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     }
 
     for i in 0..n_points {
-        points[[i, 0]] = half * theta[[i, 0]].sin() * phi[[i, 0]].cos() + half;
-        points[[i, 1]] = half * theta[[i, 0]].sin() * phi[[i, 0]].sin() + half;
-        points[[i, 2]] = half * theta[[i, 0]].cos() + half;
+        points[[0, i]] = half * theta[[i, 0]].sin() * phi[[i, 0]].cos() + half;
+        points[[1, i]] = half * theta[[i, 0]].sin() * phi[[i, 0]].sin() + half;
+        points[[2, i]] = half * theta[[i, 0]].cos() + half;
     }
 
     points
 }
 
-// TODO: Convert to row major
 /// Points fixture for testing, uniformly samples in the bounds [[0, 1), [0, 1), [0, 500)] for the x, y, and z
 /// axes respectively.
 ///
@@ -95,66 +93,70 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::
     let between1 = rand::distributions::Uniform::from(T::zero()..T::from(0.1).unwrap());
     let between2 = rand::distributions::Uniform::from(T::zero()..T::from(500).unwrap());
 
-    let mut points = rlst_dynamic_array2!(T, [n_points, 3]);
+    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
 
     for i in 0..n_points {
         // One axis has a different sampling
-        points[[i, 0]] = between1.sample(&mut range);
-        points[[i, 1]] = between1.sample(&mut range);
-        points[[i, 2]] = between2.sample(&mut range);
+        points[[0, i]] = between1.sample(&mut range);
+        points[[1, i]] = between1.sample(&mut range);
+        points[[2, i]] = between2.sample(&mut range);
     }
 
     points
 }
 
 
-// TODO: Convert to row major
 /// Find the corners of a box discretising the surface of a box described by a Morton Key. The coordinates
-/// are expected in column major order [x_1, x_2...x_N, y_1, y_2....y_N, z_1, z_2...z_N]
+/// are expected in row major order [x_1, y_1, z_1,...x_N, y_N, z_N]
 ///
-/// # Arguements:
+/// # Arguments:
 /// * `coordinates` - points on the surface of a box.
 pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
-    let n = coordinates.len() / 3;
 
-    let xs = coordinates.iter().take(n);
-    let ys = coordinates[n..].iter().take(n);
-    let zs = coordinates[2 * n..].iter().take(n);
+    let xs = coordinates.iter().step_by(3).cloned().collect_vec();
+    let ys = coordinates.iter().skip(1).step_by(3).cloned().collect_vec();
+    let zs = coordinates.iter().skip(2).step_by(3).cloned().collect_vec();
 
     let x_min = *xs
-        .clone()
+        .iter()
         .min_by(|&a, &b| a.partial_cmp(b).unwrap())
         .unwrap();
 
     let x_max = *xs
-        .clone()
+        .iter()
         .max_by(|&a, &b| a.partial_cmp(b).unwrap())
         .unwrap();
 
     let y_min = *ys
-        .clone()
+        .iter()
         .min_by(|&a, &b| a.partial_cmp(b).unwrap())
         .unwrap();
 
     let y_max = *ys
-        .clone()
+        .iter()
         .max_by(|&a, &b| a.partial_cmp(b).unwrap())
         .unwrap();
 
     let z_min = *zs
-        .clone()
+        .iter()
         .min_by(|&a, &b| a.partial_cmp(b).unwrap())
         .unwrap();
 
     let z_max = *zs
-        .clone()
+        .iter()
         .max_by(|&a, &b| a.partial_cmp(b).unwrap())
         .unwrap();
 
-    // Returned in column major order
+    // Returned in row major order
     let corners = vec![
-        x_min, x_max, x_min, x_max, x_min, x_max, x_min, x_max, y_min, y_min, y_max, y_max, y_min,
-        y_min, y_max, y_max, z_min, z_min, z_min, z_min, z_max, z_max, z_max, z_max,
+        x_min, y_min, z_min,
+        x_max, y_min, z_min,
+        x_min, y_max, z_min,
+        x_max, y_max, z_min,
+        x_min, y_min, z_max,
+        x_max, y_min, z_max,
+        x_min, y_max, z_max,
+        x_max, y_max, z_max
     ];
 
     corners
