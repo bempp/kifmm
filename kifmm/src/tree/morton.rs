@@ -922,7 +922,7 @@ pub fn surface_grid<T: RlstScalar>(expansion_order: usize) -> Vec<T> {
     let lower = 0;
     let upper = expansion_order - 1;
 
-    // Orders the surface grid, implicitly column major
+    // Orders the surface grid, implicitly row major
     let mut idx = 0;
 
     for k in 0..expansion_order {
@@ -932,10 +932,10 @@ pub fn surface_grid<T: RlstScalar>(expansion_order: usize) -> Vec<T> {
                     || (j >= lower && k >= lower && (i == lower || i == upper))
                     || (k >= lower && i >= lower && (j == lower || j == upper))
                 {
-                    surface[idx] = T::from(i).unwrap();
-                    surface[idx + 1] = T::from(j).unwrap();
-                    surface[idx + 2] = T::from(k).unwrap();
-                    idx += dim;
+                    surface[dim * idx] = T::from(i).unwrap();
+                    surface[dim * idx + 1] = T::from(j).unwrap();
+                    surface[dim * idx + 2] = T::from(k).unwrap();
+                    idx += 1;
                 }
             }
         }
@@ -974,10 +974,10 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         for k in 0..n {
             for j in 0..n {
                 for i in 0..n {
-                    let conv_index = dim * (i + j * n + k * n * n);
-                    grid[conv_index] = T::from(i).unwrap();
-                    grid[conv_index + 1] = T::from(j).unwrap();
-                    grid[conv_index + 2] = T::from(k).unwrap();
+                    let conv_index = i + j * n + k * n * n;
+                    grid[dim * conv_index] = T::from(i).unwrap();
+                    grid[dim * conv_index + 1] = T::from(j).unwrap();
+                    grid[dim * conv_index + 2] = T::from(k).unwrap();
                 }
             }
         }
@@ -1007,7 +1007,9 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         let corners = find_corners(&grid);
 
         let surface_point = [
-            corners[conv_point_corner_index], corners[conv_point_corner_index + 1], corners[conv_point_corner_index + 2]
+            corners[dim * conv_point_corner_index],
+            corners[dim * conv_point_corner_index + 1],
+            corners[dim * conv_point_corner_index + 2]
         ];
 
         let diff = conv_point_corner
@@ -1905,6 +1907,7 @@ mod test {
 
         let expansion_order = 5;
         let alpha = 1.0;
+        let dim = 3;
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
@@ -1915,10 +1918,11 @@ mod test {
         let conv_point_corner_index = 7;
 
         let conv_point = vec![
-            corners[conv_point_corner_index],
-            corners[conv_point_corner_index + 1],
-            corners[conv_point_corner_index + 2],
+            corners[dim * conv_point_corner_index],
+            corners[dim * conv_point_corner_index + 1],
+            corners[dim * conv_point_corner_index + 2],
         ];
+
 
         let (conv_grid, _) = key.convolution_grid(
             expansion_order,

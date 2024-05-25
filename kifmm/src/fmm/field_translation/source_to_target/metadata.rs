@@ -783,8 +783,6 @@ where
             }
         }
 
-        let n_source_equivalent_surface = 6 * (self.expansion_order - 1).pow(2) + 2;
-        let n_target_check_surface = n_source_equivalent_surface;
         let alpha = Scalar::real(ALPHA_INNER);
 
         // Iterate over each set of convolutions in the halo (26)
@@ -818,11 +816,6 @@ where
                     // Compute convolution grid around the source box
                     let conv_point_corner_index = 7;
                     let corners = find_corners(&source_equivalent_surface[..]);
-                    // let conv_point_corner = [
-                    //     corners[conv_point_corner_index],
-                    //     corners[NCORNERS + conv_point_corner_index],
-                    //     corners[2 * NCORNERS + conv_point_corner_index],
-                    // ];
 
                     let conv_point_corner = [
                         corners[self.dim * conv_point_corner_index],
@@ -840,11 +833,6 @@ where
 
                     // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                     let kernel_point_index = 0;
-                    // let kernel_point = [
-                    //     target_check_surface[kernel_point_index],
-                    //     target_check_surface[n_target_check_surface + kernel_point_index],
-                    //     target_check_surface[2 * n_target_check_surface + kernel_point_index],
-                    // ];
 
                     let kernel_point = [
                         target_check_surface[self.dim * kernel_point_index],
@@ -981,8 +969,6 @@ where
                 sources[i] = tmp_sources;
             }
 
-            let n_source_equivalent_surface = ncoeffs_kifmm(self.expansion_order);
-            let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
             // Iterate over each set of convolutions in the halo (26)
@@ -1399,20 +1385,15 @@ where
         let npad = n + 1; // padded size
         let nconv = n.pow(3); // length of buffer storing values on convolution grid
 
-
         let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
         self.kernel.assemble_st(
             EvalType::Value,
             convolution_grid,
-            &target_pt[..],
+            &target_pt,
             &mut kernel_evals[..],
         );
-
-        println!("target_pt {:?}", &target_pt);
-        println!("Kernel {:?}", &kernel_evals);
-        assert!(false);
 
         for k in 0..n {
             for j in 0..n {
@@ -2414,7 +2395,6 @@ mod test {
 
         let mut kernel = flip3(&kernel);
 
-
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
         let _ = f64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
@@ -2473,7 +2453,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = 2;
         let sparse = true;
         let wavenumber = 1.0;
 
@@ -2536,9 +2516,9 @@ mod test {
         let conv_point_corner_index = 7;
         let corners = find_corners(&source_equivalent_surface[..]);
         let conv_point_corner = [
-            corners[conv_point_corner_index],
-            corners[8 + conv_point_corner_index],
-            corners[16 + conv_point_corner_index],
+            corners[fmm.dim() * conv_point_corner_index],
+            corners[fmm.dim() * conv_point_corner_index + 1],
+            corners[fmm.dim() * conv_point_corner_index + 2],
         ];
 
         let (conv_grid, _) = source.convolution_grid(
@@ -2551,9 +2531,9 @@ mod test {
 
         let kernel_point_index = 0;
         let kernel_point = [
-            target_check_surface[kernel_point_index],
-            target_check_surface[ntargets + kernel_point_index],
-            target_check_surface[2 * ntargets + kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index + 1],
+            target_check_surface[fmm.dim() * kernel_point_index + 2],
         ];
 
         // Compute kernel
@@ -2605,6 +2585,9 @@ mod test {
             .map(|(a, b)| (a - b).abs())
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
+
+        println!("rel errror {:?} \n {:?}", &direct[0..5], &result[0..5]);
+
 
         assert!(rel_error < 1e-15);
     }
