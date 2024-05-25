@@ -903,7 +903,6 @@ where
     }
 }
 
-
 /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
 /// returns a tuple, the first element is an owned vector of the physical coordinates of the
 /// surface grid in row major order [x_1, y_1, z_1,...x_N, y_N, z_N]
@@ -953,9 +952,7 @@ pub fn surface_grid<T: RlstScalar>(expansion_order: usize) -> Vec<T> {
     surface
 }
 
-
 impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
-
     fn convolution_grid(
         &self,
         expansion_order: usize,
@@ -1009,7 +1006,7 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         let surface_point = [
             corners[dim * conv_point_corner_index],
             corners[dim * conv_point_corner_index + 1],
-            corners[dim * conv_point_corner_index + 2]
+            corners[dim * conv_point_corner_index + 2],
         ];
 
         let diff = conv_point_corner
@@ -1019,9 +1016,10 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
             .collect_vec();
 
         grid.chunks_exact_mut(dim).for_each(|coord| {
-            coord.iter_mut().zip(diff.iter()).for_each(|(c, d)| {
-                *c += *d
-            })
+            coord
+                .iter_mut()
+                .zip(diff.iter())
+                .for_each(|(c, d)| *c += *d)
         });
 
         (grid, conv_idxs)
@@ -1045,14 +1043,14 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         let two = T::from(2.0).unwrap();
         let ncoeffs = surface.len() / 3;
         for i in 0..ncoeffs {
-            let idx = i*dim;
+            let idx = i * dim;
 
             scaled_surface[idx] = (surface[idx] * T::from(dilated_diameter[0] / two).unwrap())
                 + T::from(centre[0]).unwrap();
-            scaled_surface[idx+1] = (surface[idx+1]
+            scaled_surface[idx + 1] = (surface[idx + 1]
                 * T::from(dilated_diameter[1] / two).unwrap())
                 + T::from(centre[1]).unwrap();
-            scaled_surface[idx+2] = (surface[idx+2]
+            scaled_surface[idx + 2] = (surface[idx + 2]
                 * T::from(dilated_diameter[2] / two).unwrap())
                 + T::from(centre[2]).unwrap();
         }
@@ -1066,7 +1064,6 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         domain: &Domain<Self::Scalar>,
         alpha: Self::Scalar,
     ) -> Vec<Self::Scalar> {
-
         self.scale_surface(surface_grid(expansion_order), domain, alpha)
     }
 }
@@ -1923,7 +1920,6 @@ mod test {
             corners[dim * conv_point_corner_index + 2],
         ];
 
-
         let (conv_grid, _) = key.convolution_grid(
             expansion_order,
             &domain,
@@ -1936,10 +1932,10 @@ mod test {
         let mut surface = Vec::new();
         let nsurf = surface_grid.len() / 3;
         for i in 0..nsurf {
-            let idx = i*3;
+            let idx = i * 3;
             surface.push([
                 surface_grid[idx],
-                surface_grid[idx+1],
+                surface_grid[idx + 1],
                 surface_grid[idx + 2],
             ])
         }
@@ -1947,7 +1943,7 @@ mod test {
         let mut convolution = Vec::new();
         let nconv = conv_grid.len() / 3;
         for i in 0..nconv {
-            let idx = i*3;
+            let idx = i * 3;
             convolution.push([conv_grid[idx], conv_grid[idx + 1], conv_grid[idx + 2]])
         }
 

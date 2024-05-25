@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
+    empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar,
 };
 
@@ -299,67 +299,68 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 leaves
-                .par_iter()
-                .zip(&self.charge_index_pointer_targets)
-                .zip(&self.potentials_send_pointers)
-                .for_each(
-                    |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
-                        let target_coordinates_row_major = &all_target_coordinates
-                            [charge_index_pointer_targets.0 * self.dim
-                                ..charge_index_pointer_targets.1 * self.dim];
-                        let ntargets = target_coordinates_row_major.len() / self.dim;
+                    .par_iter()
+                    .zip(&self.charge_index_pointer_targets)
+                    .zip(&self.potentials_send_pointers)
+                    .for_each(
+                        |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+                            let target_coordinates_row_major = &all_target_coordinates
+                                [charge_index_pointer_targets.0 * self.dim
+                                    ..charge_index_pointer_targets.1 * self.dim];
+                            let ntargets = target_coordinates_row_major.len() / self.dim;
 
-                        if ntargets > 0 {
+                            if ntargets > 0 {
+                                if let Some(u_list) = self.tree.near_field(leaf) {
+                                    let u_list_indices = u_list
+                                        .iter()
+                                        .filter_map(|k| self.tree.source_tree().leaf_index(k));
 
-                            if let Some(u_list) = self.tree.near_field(leaf) {
-                                let u_list_indices = u_list
-                                    .iter()
-                                    .filter_map(|k| self.tree.source_tree().leaf_index(k));
+                                    let charges = u_list_indices
+                                        .clone()
+                                        .map(|&idx| {
+                                            let index_pointer =
+                                                &self.charge_index_pointer_sources[idx];
+                                            &self.charges[index_pointer.0..index_pointer.1]
+                                        })
+                                        .collect_vec();
 
-                                let charges = u_list_indices
-                                    .clone()
-                                    .map(|&idx| {
-                                        let index_pointer = &self.charge_index_pointer_sources[idx];
-                                        &self.charges[index_pointer.0..index_pointer.1]
-                                    })
-                                    .collect_vec();
+                                    let sources_coordinates = u_list_indices
+                                        .into_iter()
+                                        .map(|&idx| {
+                                            let index_pointer =
+                                                &self.charge_index_pointer_sources[idx];
+                                            &all_source_coordinates[index_pointer.0 * self.dim
+                                                ..index_pointer.1 * self.dim]
+                                        })
+                                        .collect_vec();
 
-                                let sources_coordinates = u_list_indices
-                                    .into_iter()
-                                    .map(|&idx| {
-                                        let index_pointer = &self.charge_index_pointer_sources[idx];
-                                        &all_source_coordinates
-                                            [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
-                                    })
-                                    .collect_vec();
+                                    for (&charges, source_coordinates_row_major) in
+                                        charges.iter().zip(sources_coordinates)
+                                    {
+                                        let nsources =
+                                            source_coordinates_row_major.len() / self.dim;
 
-                                for (&charges, source_coordinates_row_major) in
-                                    charges.iter().zip(sources_coordinates)
-                                {
-                                    let nsources = source_coordinates_row_major.len() / self.dim;
+                                        if nsources > 0 {
+                                            let result = unsafe {
+                                                std::slice::from_raw_parts_mut(
+                                                    potential_send_pointer.raw,
+                                                    ntargets * self.kernel_eval_size,
+                                                )
+                                            };
 
-                                    if nsources > 0 {
-
-                                        let result = unsafe {
-                                            std::slice::from_raw_parts_mut(
-                                                potential_send_pointer.raw,
-                                                ntargets * self.kernel_eval_size,
+                                            self.kernel.evaluate_st(
+                                                self.kernel_eval_type,
+                                                source_coordinates_row_major,
+                                                target_coordinates_row_major,
+                                                charges,
+                                                result,
                                             )
-                                        };
-
-                                        self.kernel.evaluate_st(
-                                            self.kernel_eval_type,
-                                            source_coordinates_row_major,
-                                            target_coordinates_row_major,
-                                            charges,
-                                            result,
-                                        )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                );
+                        },
+                    );
                 Ok(())
             }
 
@@ -378,7 +379,6 @@ where
                             let ntargets = target_coordinates_row_major.len() / self.dim;
 
                             if ntargets > 0 {
-
                                 if let Some(u_list) = self.tree.near_field(leaf) {
                                     let u_list_indices = u_list
                                         .iter()

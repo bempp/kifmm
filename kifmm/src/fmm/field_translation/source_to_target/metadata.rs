@@ -19,14 +19,17 @@ use rlst::{
 
 use crate::{
     fmm::{
-        field_translation::target, helpers::{
+        helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
             ncoeffs_kifmm, potential_pointers,
-        }, pinv::pinv, types::{
+        },
+        pinv::pinv,
+        types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             Charges, FftFieldTranslation, FftMetadata,
-        }, KiFmm
+        },
+        KiFmm,
     },
     traits::{
         fftw::{Dft, DftType},
@@ -40,7 +43,7 @@ use crate::{
     },
     tree::{
         constants::{
-            ALPHA_INNER, ALPHA_OUTER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
+            ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
             NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
@@ -839,7 +842,6 @@ where
                         target_check_surface[self.dim * kernel_point_index + 1],
                         target_check_surface[self.dim * kernel_point_index + 2],
                     ];
-
 
                     // Compute Green's fct evaluations
                     let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
@@ -2386,12 +2388,10 @@ mod test {
             target_check_surface[fmm.dim() * kernel_point_index + 2],
         ];
 
-
         // Compute kernel
         let kernel =
             fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
         let [m, n, o] = kernel.shape();
-
 
         let mut kernel = flip3(&kernel);
 
@@ -2587,7 +2587,6 @@ mod test {
     //     let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
 
     //     println!("rel errror {:?} \n {:?}", &direct[0..5], &result[0..5]);
-
 
     //     assert!(rel_error < 1e-15);
     // }

@@ -105,14 +105,12 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::
     points
 }
 
-
 /// Find the corners of a box discretising the surface of a box described by a Morton Key. The coordinates
 /// are expected in row major order [x_1, y_1, z_1,...x_N, y_N, z_N]
 ///
 /// # Arguments:
 /// * `coordinates` - points on the surface of a box.
 pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
-
     let xs = coordinates.iter().step_by(3).cloned().collect_vec();
     let ys = coordinates.iter().skip(1).step_by(3).cloned().collect_vec();
     let zs = coordinates.iter().skip(2).step_by(3).cloned().collect_vec();
@@ -149,14 +147,8 @@ pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
 
     // Returned in row major order
     let corners = vec![
-        x_min, y_min, z_min,
-        x_max, y_min, z_min,
-        x_min, y_max, z_min,
-        x_max, y_max, z_min,
-        x_min, y_min, z_max,
-        x_max, y_min, z_max,
-        x_min, y_max, z_max,
-        x_max, y_max, z_max
+        x_min, y_min, z_min, x_max, y_min, z_min, x_min, y_max, z_min, x_max, y_max, z_min, x_min,
+        y_min, z_max, x_max, y_min, z_max, x_min, y_max, z_max, x_max, y_max, z_max,
     ];
 
     corners

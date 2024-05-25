@@ -51,8 +51,9 @@ where
         let mut points = Points::default();
 
         for i in 0..n_coords {
-
-            let coord: &[T; 3] = &coordinates_row_major[i*dim..(i+1)*dim].try_into().unwrap();
+            let coord: &[T; 3] = &coordinates_row_major[i * dim..(i + 1) * dim]
+                .try_into()
+                .unwrap();
             let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(coord, &domain, depth);
 
@@ -234,8 +235,9 @@ where
         let mut points = Points::default();
 
         for i in 0..n_coords {
-
-            let coord: &[T; 3] = &coordinates_row_major[i*dim..(i+1)*dim].try_into().unwrap();
+            let coord: &[T; 3] = &coordinates_row_major[i * dim..(i + 1) * dim]
+                .try_into()
+                .unwrap();
             let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(coord, &domain, depth);
 

@@ -18,7 +18,6 @@ where
     /// # Arguments
     /// * `points` - A slice of point coordinates, expected in row row order [x_1, y_1, z_1,...x_N, y_N, z_N].
     pub fn from_local_points(coordinates: &[T]) -> Domain<T> {
-
         let xs = coordinates.iter().step_by(3).cloned().collect_vec();
         let ys = coordinates.iter().skip(1).step_by(3).cloned().collect_vec();
         let zs = coordinates.iter().skip(2).step_by(3).cloned().collect_vec();
