@@ -750,31 +750,31 @@ mod test {
                 threshold_pot,
             );
 
-            // // Evaluate potentials + derivatives
-            // let fmm_fft = SingleNodeBuilder::new()
-            //     .tree(&sources, &targets, n_crit, sparse)
-            //     .unwrap()
-            //     .parameters(
-            //         &charges,
-            //         expansion_order,
-            //         Laplace3dKernel::new(),
-            //         EvalType::ValueDeriv,
-            //         FftFieldTranslation::new(),
-            //     )
-            //     .unwrap()
-            //     .build()
-            //     .unwrap();
-            // fmm_fft.evaluate(false).unwrap();
+            // Evaluate potentials + derivatives
+            let fmm_fft = SingleNodeBuilder::new()
+                .tree(&sources, &targets, n_crit, sparse)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    EvalType::ValueDeriv,
+                    FftFieldTranslation::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_fft.evaluate(false).unwrap();
 
-            // let eval_type = fmm_fft.kernel_eval_type;
-            // let fmm_fft = Box::new(fmm_fft);
-            // test_single_node_laplace_fmm_vector_helper::<f64>(
-            //     fmm_fft,
-            //     eval_type,
-            //     &sources,
-            //     &charges,
-            //     threshold_deriv,
-            // );
+            let eval_type = fmm_fft.kernel_eval_type;
+            let fmm_fft = Box::new(fmm_fft);
+            test_single_node_laplace_fmm_vector_helper::<f64>(
+                fmm_fft,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
+            );
         }
 
         // BLAS based field translation
@@ -804,195 +804,195 @@ mod test {
                 threshold_pot,
             );
 
-            // // Evaluate potentials + derivatives
-            // let eval_type = EvalType::ValueDeriv;
-            // let fmm_blas = SingleNodeBuilder::new()
-            //     .tree(&sources, &targets, n_crit, sparse)
-            //     .unwrap()
-            //     .parameters(
-            //         &charges,
-            //         expansion_order,
-            //         Laplace3dKernel::new(),
-            //         eval_type,
-            //         BlasFieldTranslationSaRcmp::new(singular_value_threshold),
-            //     )
-            //     .unwrap()
-            //     .build()
-            //     .unwrap();
-            // fmm_blas.evaluate(false).unwrap();
-            // let fmm_blas = Box::new(fmm_blas);
-            // test_single_node_laplace_fmm_vector_helper::<f64>(
-            //     fmm_blas,
-            //     eval_type,
-            //     &sources,
-            //     &charges,
-            //     threshold_deriv_blas,
-            // );
-        }
-    }
-
-    #[test]
-    fn test_upward_pass_vector_helmholtz() {
-        // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
-
-        // FMM parameters
-        let n_crit = Some(100);
-        let expansion_order = 6;
-        let sparse = true;
-
-        // Charge data
-        let nvecs = 1;
-        let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
-
-        let wavenumber = 2.5;
-
-        let fmm_fft = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
-            .unwrap()
-            .parameters(
-                &charges,
-                expansion_order,
-                Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
-                FftFieldTranslation::new(),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-
-        fmm_fft.evaluate(false).unwrap();
-        let fmm_fft = Box::new(fmm_fft);
-        test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
-    }
-
-    #[test]
-    fn test_helmholtz_fmm_vector() {
-        // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
-        let threshold = 1e-5;
-        let threshold_deriv = 1e-3;
-
-        // FMM parameters
-        let n_crit = Some(100);
-        let expansion_order = 6;
-        let sparse = true;
-        let wavenumber = 2.5;
-
-        // Charge data
-        let nvecs = 1;
-        let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
-
-        // BLAS based field translation
-        {
-            // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
-                    BlasFieldTranslationIa::new(None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm.evaluate(false).unwrap();
-
-            let fmm: Box<_> = Box::new(fmm);
-            let eval_type = fmm.kernel_eval_type;
-            test_single_node_helmholtz_fmm_vector_helper::<c64>(
-                fmm, eval_type, &sources, &charges, threshold,
-            );
-
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = SingleNodeBuilder::new()
                 .tree(&sources, &targets, n_crit, sparse)
                 .unwrap()
                 .parameters(
                     &charges,
                     expansion_order,
-                    Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None),
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
-            let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
-            test_single_node_helmholtz_fmm_vector_helper::<c64>(
-                fmm,
+            fmm_blas.evaluate(false).unwrap();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_laplace_fmm_vector_helper::<f64>(
+                fmm_blas,
                 eval_type,
                 &sources,
                 &charges,
-                threshold_deriv,
-            );
-        }
-
-        // FFT based field translation
-        {
-            // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
-                    FftFieldTranslation::new(),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm.evaluate(false).unwrap();
-
-            let fmm: Box<_> = Box::new(fmm);
-            let eval_type = fmm.kernel_eval_type;
-            test_single_node_helmholtz_fmm_vector_helper::<c64>(
-                fmm, eval_type, &sources, &charges, 1e-5,
-            );
-
-            // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm.evaluate(false).unwrap();
-            let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
-            test_single_node_helmholtz_fmm_vector_helper::<c64>(
-                fmm,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv,
+                threshold_deriv_blas,
             );
         }
     }
+
+    // #[test]
+    // fn test_upward_pass_vector_helmholtz() {
+    //     // Setup random sources and targets
+    //     let nsources = 10000;
+    //     let ntargets = 10000;
+    //     let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+    //     let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+    //     // FMM parameters
+    //     let n_crit = Some(100);
+    //     let expansion_order = 6;
+    //     let sparse = true;
+
+    //     // Charge data
+    //     let nvecs = 1;
+    //     let mut rng = StdRng::seed_from_u64(0);
+    //     let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+    //     charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+    //     let wavenumber = 2.5;
+
+    //     let fmm_fft = SingleNodeBuilder::new()
+    //         .tree(&sources, &targets, n_crit, sparse)
+    //         .unwrap()
+    //         .parameters(
+    //             &charges,
+    //             expansion_order,
+    //             Helmholtz3dKernel::new(wavenumber),
+    //             EvalType::Value,
+    //             FftFieldTranslation::new(),
+    //         )
+    //         .unwrap()
+    //         .build()
+    //         .unwrap();
+
+    //     fmm_fft.evaluate(false).unwrap();
+    //     let fmm_fft = Box::new(fmm_fft);
+    //     test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
+    // }
+
+    // #[test]
+    // fn test_helmholtz_fmm_vector() {
+    //     // Setup random sources and targets
+    //     let nsources = 9000;
+    //     let ntargets = 10000;
+    //     let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+    //     let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+    //     let threshold = 1e-5;
+    //     let threshold_deriv = 1e-3;
+
+    //     // FMM parameters
+    //     let n_crit = Some(100);
+    //     let expansion_order = 6;
+    //     let sparse = true;
+    //     let wavenumber = 2.5;
+
+    //     // Charge data
+    //     let nvecs = 1;
+    //     let mut rng = StdRng::seed_from_u64(0);
+    //     let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+    //     charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+    //     // BLAS based field translation
+    //     {
+    //         // Evaluate potentials
+    //         let fmm = SingleNodeBuilder::new()
+    //             .tree(&sources, &targets, n_crit, sparse)
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 expansion_order,
+    //                 Helmholtz3dKernel::new(wavenumber),
+    //                 EvalType::Value,
+    //                 BlasFieldTranslationIa::new(None),
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+    //         fmm.evaluate(false).unwrap();
+
+    //         let fmm: Box<_> = Box::new(fmm);
+    //         let eval_type = fmm.kernel_eval_type;
+    //         test_single_node_helmholtz_fmm_vector_helper::<c64>(
+    //             fmm, eval_type, &sources, &charges, threshold,
+    //         );
+
+    //         // Evaluate potentials + derivatives
+    //         let fmm = SingleNodeBuilder::new()
+    //             .tree(&sources, &targets, n_crit, sparse)
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 expansion_order,
+    //                 Helmholtz3dKernel::new(wavenumber),
+    //                 EvalType::ValueDeriv,
+    //                 BlasFieldTranslationIa::new(None),
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+    //         fmm.evaluate(false).unwrap();
+    //         let eval_type = fmm.kernel_eval_type;
+    //         let fmm = Box::new(fmm);
+    //         test_single_node_helmholtz_fmm_vector_helper::<c64>(
+    //             fmm,
+    //             eval_type,
+    //             &sources,
+    //             &charges,
+    //             threshold_deriv,
+    //         );
+    //     }
+
+    //     // FFT based field translation
+    //     {
+    //         // Evaluate potentials
+    //         let fmm = SingleNodeBuilder::new()
+    //             .tree(&sources, &targets, n_crit, sparse)
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 expansion_order,
+    //                 Helmholtz3dKernel::new(wavenumber),
+    //                 EvalType::Value,
+    //                 FftFieldTranslation::new(),
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+    //         fmm.evaluate(false).unwrap();
+
+    //         let fmm: Box<_> = Box::new(fmm);
+    //         let eval_type = fmm.kernel_eval_type;
+    //         test_single_node_helmholtz_fmm_vector_helper::<c64>(
+    //             fmm, eval_type, &sources, &charges, 1e-5,
+    //         );
+
+    //         // Evaluate potentials + derivatives
+    //         let fmm = SingleNodeBuilder::new()
+    //             .tree(&sources, &targets, n_crit, sparse)
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 expansion_order,
+    //                 Helmholtz3dKernel::new(wavenumber),
+    //                 EvalType::ValueDeriv,
+    //                 FftFieldTranslation::new(),
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+    //         fmm.evaluate(false).unwrap();
+    //         let eval_type = fmm.kernel_eval_type;
+    //         let fmm = Box::new(fmm);
+    //         test_single_node_helmholtz_fmm_vector_helper::<c64>(
+    //             fmm,
+    //             eval_type,
+    //             &sources,
+    //             &charges,
+    //             threshold_deriv,
+    //         );
+    //     }
+    // }
 
     #[test]
     fn test_laplace_fmm_matrix() {
@@ -1045,86 +1045,6 @@ mod test {
                 fmm_blas, eval_type, &sources, &charges, threshold,
             );
 
-            // // Evaluate potentials + derivatives
-            // let eval_type = EvalType::ValueDeriv;
-            // let fmm_blas = SingleNodeBuilder::new()
-            //     .tree(&sources, &targets, n_crit, sparse)
-            //     .unwrap()
-            //     .parameters(
-            //         &charges,
-            //         expansion_order,
-            //         Laplace3dKernel::new(),
-            //         eval_type,
-            //         BlasFieldTranslationSaRcmp::new(singular_value_threshold),
-            //     )
-            //     .unwrap()
-            //     .build()
-            //     .unwrap();
-            // fmm_blas.evaluate(false).unwrap();
-            // let fmm_blas = Box::new(fmm_blas);
-            // test_single_node_laplace_fmm_matrix_helper::<f64>(
-            //     fmm_blas,
-            //     eval_type,
-            //     &sources,
-            //     &charges,
-            //     threshold_deriv,
-            // );
-        }
-    }
-
-    #[test]
-    fn test_helmholtz_fmm_matrix() {
-        // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-
-        let min = None;
-        let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
-
-        // FMM parameters
-        let n_crit = Some(10);
-        let expansion_order = 6;
-        let sparse = true;
-        let threshold = 1e-5;
-        let threshold_deriv = 1e-3;
-        let singular_value_threshold = Some(1e-2);
-        let wavenumber = 1.0;
-
-        // Charge data
-        let nvecs = 2;
-        let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
-        charges
-            .data_mut()
-            .chunks_exact_mut(nsources)
-            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
-
-        // fmm with blas based field translation
-        {
-            // Evaluate potentials
-            let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
-                .unwrap()
-                .parameters(
-                    &charges,
-                    expansion_order,
-                    Helmholtz3dKernel::new(wavenumber),
-                    eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_helmholtz_fmm_matrix_helper::<c64>(
-                fmm_blas, eval_type, &sources, &charges, threshold,
-            );
-
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
@@ -1133,16 +1053,16 @@ mod test {
                 .parameters(
                     &charges,
                     expansion_order,
-                    Helmholtz3dKernel::new(wavenumber),
+                    Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
                 )
                 .unwrap()
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
             let fmm_blas = Box::new(fmm_blas);
-            test_single_node_helmholtz_fmm_matrix_helper::<c64>(
+            test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
                 eval_type,
                 &sources,
@@ -1151,4 +1071,84 @@ mod test {
             );
         }
     }
+
+    // #[test]
+    // fn test_helmholtz_fmm_matrix() {
+    //     // Setup random sources and targets
+    //     let nsources = 9000;
+    //     let ntargets = 10000;
+
+    //     let min = None;
+    //     let max = None;
+    //     let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+    //     let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
+    //     // FMM parameters
+    //     let n_crit = Some(10);
+    //     let expansion_order = 6;
+    //     let sparse = true;
+    //     let threshold = 1e-5;
+    //     let threshold_deriv = 1e-3;
+    //     let singular_value_threshold = Some(1e-2);
+    //     let wavenumber = 1.0;
+
+    //     // Charge data
+    //     let nvecs = 2;
+    //     let mut rng = StdRng::seed_from_u64(0);
+    //     let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+    //     charges
+    //         .data_mut()
+    //         .chunks_exact_mut(nsources)
+    //         .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
+
+    //     // fmm with blas based field translation
+    //     {
+    //         // Evaluate potentials
+    //         let eval_type = EvalType::Value;
+    //         let fmm_blas = SingleNodeBuilder::new()
+    //             .tree(&sources, &targets, n_crit, sparse)
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 expansion_order,
+    //                 Helmholtz3dKernel::new(wavenumber),
+    //                 eval_type,
+    //                 BlasFieldTranslationIa::new(singular_value_threshold),
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+    //         fmm_blas.evaluate(false).unwrap();
+
+    //         let fmm_blas = Box::new(fmm_blas);
+    //         test_single_node_helmholtz_fmm_matrix_helper::<c64>(
+    //             fmm_blas, eval_type, &sources, &charges, threshold,
+    //         );
+
+    //         // Evaluate potentials + derivatives
+    //         let eval_type = EvalType::ValueDeriv;
+    //         let fmm_blas = SingleNodeBuilder::new()
+    //             .tree(&sources, &targets, n_crit, sparse)
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 expansion_order,
+    //                 Helmholtz3dKernel::new(wavenumber),
+    //                 eval_type,
+    //                 BlasFieldTranslationIa::new(singular_value_threshold),
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+    //         fmm_blas.evaluate(false).unwrap();
+    //         let fmm_blas = Box::new(fmm_blas);
+    //         test_single_node_helmholtz_fmm_matrix_helper::<c64>(
+    //             fmm_blas,
+    //             eval_type,
+    //             &sources,
+    //             &charges,
+    //             threshold_deriv,
+    //         );
+    //     }
+    // }
 }
