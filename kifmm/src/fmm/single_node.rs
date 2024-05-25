@@ -274,12 +274,13 @@ mod test {
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
+        // c64,
+        rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
         RawAccessMut, RlstScalar, Shape, VectorContainer,
     };
 
     use crate::{
-        fmm::types::BlasFieldTranslationIa,
+        // fmm::types::BlasFieldTranslationIa,
         traits::tree::{FmmTree, FmmTreeNode, Tree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
@@ -342,7 +343,7 @@ mod test {
         }
     }
 
-    fn test_single_node_helmholtz_fmm_matrix_helper<T: RlstScalar<Complex = T> + Default>(
+    fn _test_single_node_helmholtz_fmm_matrix_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
@@ -397,7 +398,7 @@ mod test {
         }
     }
 
-    fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
+    fn _test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
@@ -538,7 +539,7 @@ mod test {
         assert!(rel_error <= threshold);
     }
 
-    fn test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
+    fn _test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,

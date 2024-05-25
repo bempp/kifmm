@@ -2026,7 +2026,7 @@ mod test {
     use rand::rngs::StdRng;
     use rand::Rng;
     use rand::SeedableRng;
-    use rlst::c64;
+    // use rlst::c64;
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
