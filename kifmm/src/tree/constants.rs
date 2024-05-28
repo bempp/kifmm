@@ -1,13 +1,13 @@
 //! Module wide constants.
 
 /// Maximum possible level of octree recursion, by definition.
-pub (crate) const DEEPEST_LEVEL: u64 = 16;
+pub(crate) const DEEPEST_LEVEL: u64 = 16;
 
 /// The 'size' of each level in terms of octants along each axis, at the maximum depth of recursion.
-pub (crate) const LEVEL_SIZE: u64 = 65536;
+pub(crate) const LEVEL_SIZE: u64 = 65536;
 
 /// Transfer vectors in component form to nearest octant neighbours, in Morton order.
-pub (crate) const DIRECTIONS: [[i64; 3]; 26] = [
+pub(crate) const DIRECTIONS: [[i64; 3]; 26] = [
     [-1, -1, -1],
     [-1, -1, 0],
     [-1, -1, 1],
@@ -37,7 +37,7 @@ pub (crate) const DIRECTIONS: [[i64; 3]; 26] = [
 ];
 
 /// Lookup tables for encoding 'z' position in a Morton encoding from Cartesian coordinates.
-pub (crate) const Z_LOOKUP_ENCODE: [u64; 256] = [
+pub(crate) const Z_LOOKUP_ENCODE: [u64; 256] = [
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,
     0x00000200, 0x00000201, 0x00000208, 0x00000209, 0x00000240, 0x00000241, 0x00000248, 0x00000249,
     0x00001000, 0x00001001, 0x00001008, 0x00001009, 0x00001040, 0x00001041, 0x00001048, 0x00001049,
@@ -73,7 +73,7 @@ pub (crate) const Z_LOOKUP_ENCODE: [u64; 256] = [
 ];
 
 /// Lookup tables for encoding 'y' position in a Morton encoding from Cartesian coordinates.
-pub (crate) const Y_LOOKUP_ENCODE: [u64; 256] = [
+pub(crate) const Y_LOOKUP_ENCODE: [u64; 256] = [
     0x00000000, 0x00000002, 0x00000010, 0x00000012, 0x00000080, 0x00000082, 0x00000090, 0x00000092,
     0x00000400, 0x00000402, 0x00000410, 0x00000412, 0x00000480, 0x00000482, 0x00000490, 0x00000492,
     0x00002000, 0x00002002, 0x00002010, 0x00002012, 0x00002080, 0x00002082, 0x00002090, 0x00002092,
@@ -109,7 +109,7 @@ pub (crate) const Y_LOOKUP_ENCODE: [u64; 256] = [
 ];
 
 /// Lookup tables for encoding 'x' position in a Morton encoding from Cartesian coordinates.
-pub (crate) const X_LOOKUP_ENCODE: [u64; 256] = [
+pub(crate) const X_LOOKUP_ENCODE: [u64; 256] = [
     0x00000000, 0x00000004, 0x00000020, 0x00000024, 0x00000100, 0x00000104, 0x00000120, 0x00000124,
     0x00000800, 0x00000804, 0x00000820, 0x00000824, 0x00000900, 0x00000904, 0x00000920, 0x00000924,
     0x00004000, 0x00004004, 0x00004020, 0x00004024, 0x00004100, 0x00004104, 0x00004120, 0x00004124,
@@ -145,7 +145,7 @@ pub (crate) const X_LOOKUP_ENCODE: [u64; 256] = [
 ];
 
 /// Lookup tables for decoding 'z' position in a Morton encoding from Cartesian coordinates.
-pub (crate) const Z_LOOKUP_DECODE: [u64; 512] = [
+pub(crate) const Z_LOOKUP_DECODE: [u64; 512] = [
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3, 2, 3,
     4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7, 4, 5, 4, 5, 4, 5, 4, 5, 6, 7, 6, 7, 6, 7, 6, 7,
@@ -165,7 +165,7 @@ pub (crate) const Z_LOOKUP_DECODE: [u64; 512] = [
 ];
 
 /// Lookup tables for decoding 'y' position in a Morton encoding from Cartesian coordinates.
-pub (crate) const Y_LOOKUP_DECODE: [u64; 512] = [
+pub(crate) const Y_LOOKUP_DECODE: [u64; 512] = [
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
     0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3, 2, 2, 3, 3,
@@ -185,7 +185,7 @@ pub (crate) const Y_LOOKUP_DECODE: [u64; 512] = [
 ];
 
 /// Lookup tables for decoding 'x' position in a Morton encoding from Cartesian coordinates.
-pub (crate) const X_LOOKUP_DECODE: [u64; 512] = [
+pub(crate) const X_LOOKUP_DECODE: [u64; 512] = [
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
     2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2, 2, 2, 3, 3, 3, 3,
     0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1,
@@ -205,19 +205,19 @@ pub (crate) const X_LOOKUP_DECODE: [u64; 512] = [
 ];
 
 /// Number of bits used for Level information.
-pub (crate) const LEVEL_DISPLACEMENT: usize = 15;
+pub(crate) const LEVEL_DISPLACEMENT: usize = 15;
 
 /// Mask for the last 15 bits.
-pub (crate) const LEVEL_MASK: u64 = 0x7FFF;
+pub(crate) const LEVEL_MASK: u64 = 0x7FFF;
 
 /// Mask for lowest order byte.
-pub (crate) const BYTE_MASK: u64 = 0xFF;
+pub(crate) const BYTE_MASK: u64 = 0xFF;
 
 /// Number of bits in a byte.
-pub (crate) const BYTE_DISPLACEMENT: u64 = 8;
+pub(crate) const BYTE_DISPLACEMENT: u64 = 8;
 
 /// Mask encapsulating a bit.
-pub (crate) const NINE_BIT_MASK: u64 = 0x1FF;
+pub(crate) const NINE_BIT_MASK: u64 = 0x1FF;
 
 /// Ratio of side length of inner surface with respect to surface of a box.
 pub(crate) const ALPHA_INNER: f64 = 1.05;
@@ -226,16 +226,16 @@ pub(crate) const ALPHA_INNER: f64 = 1.05;
 pub(crate) const ALPHA_OUTER: f64 = 2.95;
 
 /// Number of siblings for each node in octree
-pub (crate) const NSIBLINGS: usize = 8;
+pub(crate) const NSIBLINGS: usize = 8;
 
 /// Number of siblings squared for each node in octree.
-pub (crate) const NSIBLINGS_SQUARED: usize = 64;
+pub(crate) const NSIBLINGS_SQUARED: usize = 64;
 
 /// Number of corners for each box.
-pub (crate) const NCORNERS: usize = 8;
+pub(crate) const NCORNERS: usize = 8;
 
 /// Number of unique transfer vectors for homogenous, scale invariant, kernels.
-pub (crate) const NTRANSFER_VECTORS_KIFMM: usize = 316;
+pub(crate) const NTRANSFER_VECTORS_KIFMM: usize = 316;
 
 /// Maximum number of boxes in a 1 box deep halo around a given box in 3D.
-pub (crate) const NHALO: usize = 26;
+pub(crate) const NHALO: usize = 26;
