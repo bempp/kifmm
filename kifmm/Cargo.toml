@@ -2,8 +2,7 @@
 # Treat warnings as a build error.
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
-python = ["dep:pyo3", "dep:numpy"]
-
+python = ["dep:pyo3"]
 
 [package]
 name = "kifmm"
@@ -35,16 +34,19 @@ num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
 memoffset = {version = "0.9.1", optional = true}
 superslice = {version = "1.0.0", optional = true}
-pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethods"] , optional = true }
-numpy = { version = "0.21", optional = true }
+pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethods", "abi3-py310"] , optional = true }
 pulp = "0.18.12"
 bytemuck = "1.16.0"
 
 [target.aarch64-apple-darwin.dependencies]
 rlst = { version = "0.1", features=["metal"]}
+blas-src = { version = "0.10", features = ["accelerate"]}
+lapack-src = { version = "0.10", features = ["accelerate"]}
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 rlst = { version = "0.1", features=["blis"]}
+blas-src = { version = "0.10", features = ["blis"]}
+lapack-src = { version = "0.10", features = ["netlib"]}
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}

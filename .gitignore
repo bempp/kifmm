@@ -26,3 +26,5 @@ fftw-src/fftw-*
 *.ipynb_checkpoints/
 *.pyc
 *.so
+kifmm_rust/
+__pycache__/
