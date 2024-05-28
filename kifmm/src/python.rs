@@ -23,7 +23,7 @@ macro_rules! laplace_fft_constructors {
             targets: *const $type,
             ntargets: usize,
             n_crit: u64,
-            sparse: bool,
+            prune_empty: bool,
             kernel_eval_type: usize,
         ) -> *const KiFmm<$type, Laplace3dKernel<$type>, FftFieldTranslation<$type>> {
             let dim = 3;
@@ -47,7 +47,7 @@ macro_rules! laplace_fft_constructors {
 
             let b = Box::new(
                 SingleNodeBuilder::new()
-                    .tree(&sources_slice, &targets_slice, Some(n_crit), sparse)
+                    .tree(&sources_slice, &targets_slice, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         charges_slice,
@@ -81,9 +81,9 @@ macro_rules! laplace_blas_constructors {
             targets: *const $type,
             ntargets: usize,
             n_crit: u64,
-            sparse: bool,
+            prune_empty: bool,
             kernel_eval_type: usize,
-            svd_threshold: <$type as RlstScalar>::Real,
+            svd_threshold: $type,
         ) -> *const KiFmm<$type, Laplace3dKernel<$type>, BlasFieldTranslationSaRcmp<$type>> {
             let dim = 3;
 
@@ -106,7 +106,7 @@ macro_rules! laplace_blas_constructors {
 
             let b = Box::new(
                 SingleNodeBuilder::new()
-                    .tree(&sources_slice, &targets_slice, Some(n_crit), sparse)
+                    .tree(&sources_slice, &targets_slice, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         &charges_slice,
@@ -129,21 +129,21 @@ laplace_blas_constructors!(laplace_blas_f32, f32);
 laplace_blas_constructors!(laplace_blas_f64, f64);
 
 macro_rules! helmholtz_fft_constructors {
-    ($name: ident, $type: ident) => {
+    ($name: ident, $type: ident, $ctype: ident) => {
         /// Constructor for Laplace FFT FMMs
         #[no_mangle]
         pub extern "C" fn $name(
             expansion_order: usize,
             charges: *const $type,
-            sources: *const <$type as RlstScalar>::Real,
+            sources: *const $type,
             nsources: usize,
-            targets: *const <$type as RlstScalar>::Real,
+            targets: *const $type,
             ntargets: usize,
             n_crit: u64,
-            sparse: bool,
+            prune_empty: bool,
             kernel_eval_type: usize,
-            wavenumber: <$type as RlstScalar>::Real,
-        ) -> *const KiFmm<$type, Helmholtz3dKernel<$type>, FftFieldTranslation<$type>> {
+            wavenumber: $type,
+        ) -> *const KiFmm<$ctype, Helmholtz3dKernel<$ctype>, FftFieldTranslation<$ctype>> {
             let dim = 3;
 
             let kernel_eval_type = if kernel_eval_type == 0 {
@@ -154,18 +154,19 @@ macro_rules! helmholtz_fft_constructors {
                 panic!("Invalid evaluation mode")
             };
 
-            let source_to_target = FftFieldTranslation::<$type>::new();
-            let kernel = Helmholtz3dKernel::<$type>::new(wavenumber);
+            let source_to_target = FftFieldTranslation::<$ctype>::new();
+            let kernel = Helmholtz3dKernel::<$ctype>::new(wavenumber);
 
             let sources_slice: &[<$type as RlstScalar>::Real] =
                 unsafe { std::slice::from_raw_parts(sources, nsources * dim) };
             let targets_slice: &[<$type as RlstScalar>::Real] =
                 unsafe { std::slice::from_raw_parts(targets, ntargets * dim) };
-            let charges_slice: &[$type] = unsafe { std::slice::from_raw_parts(charges, nsources) };
+            let charges_slice: &[$ctype] =
+                unsafe { std::slice::from_raw_parts(charges as *const $ctype, nsources * 2) };
 
             let b = Box::new(
                 SingleNodeBuilder::new()
-                    .tree(&sources_slice, &targets_slice, Some(n_crit), sparse)
+                    .tree(&sources_slice, &targets_slice, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         charges_slice,
@@ -184,26 +185,26 @@ macro_rules! helmholtz_fft_constructors {
     };
 }
 
-helmholtz_fft_constructors!(helmholtz_fft_f32, c32);
-helmholtz_fft_constructors!(helmholtz_fft_f64, c64);
+helmholtz_fft_constructors!(helmholtz_fft_f32, f32, c32);
+helmholtz_fft_constructors!(helmholtz_fft_f64, f64, c64);
 
 macro_rules! helmholtz_blas_constructors {
-    ($name: ident, $type: ident) => {
+    ($name: ident, $type: ident, $ctype: ident) => {
         /// Constructor for Laplace FFT FMMs
         #[no_mangle]
         pub extern "C" fn $name(
             expansion_order: usize,
             charges: *const $type,
-            sources: *const <$type as RlstScalar>::Real,
+            sources: *const $type,
             nsources: usize,
-            targets: *const <$type as RlstScalar>::Real,
+            targets: *const $type,
             ntargets: usize,
             n_crit: u64,
-            sparse: bool,
+            prune_empty: bool,
             kernel_eval_type: usize,
-            wavenumber: <$type as RlstScalar>::Real,
-            svd_threshold: <$type as RlstScalar>::Real,
-        ) -> *const KiFmm<$type, Helmholtz3dKernel<$type>, BlasFieldTranslationIa<$type>> {
+            wavenumber: $type,
+            svd_threshold: $type,
+        ) -> *const KiFmm<$ctype, Helmholtz3dKernel<$ctype>, BlasFieldTranslationIa<$ctype>> {
             let dim = 3;
 
             let kernel_eval_type = if kernel_eval_type == 0 {
@@ -214,18 +215,20 @@ macro_rules! helmholtz_blas_constructors {
                 panic!("Invalid evaluation mode")
             };
 
-            let source_to_target = BlasFieldTranslationIa::<$type>::new(Some(svd_threshold));
-            let kernel = Helmholtz3dKernel::<$type>::new(wavenumber);
+            let source_to_target = BlasFieldTranslationIa::<$ctype>::new(Some(svd_threshold));
+            let kernel = Helmholtz3dKernel::<$ctype>::new(wavenumber);
 
             let sources_slice: &[<$type as RlstScalar>::Real] =
                 unsafe { std::slice::from_raw_parts(sources, nsources * dim) };
             let targets_slice: &[<$type as RlstScalar>::Real] =
                 unsafe { std::slice::from_raw_parts(targets, ntargets * dim) };
-            let charges_slice: &[$type] = unsafe { std::slice::from_raw_parts(charges, nsources) };
+
+            let charges_slice: &[$ctype] =
+                unsafe { std::slice::from_raw_parts(charges as *const $ctype, nsources * 2) };
 
             let b = Box::new(
                 SingleNodeBuilder::new()
-                    .tree(&sources_slice, &targets_slice, Some(n_crit), sparse)
+                    .tree(&sources_slice, &targets_slice, Some(n_crit), prune_empty)
                     .unwrap()
                     .parameters(
                         charges_slice,
@@ -244,5 +247,5 @@ macro_rules! helmholtz_blas_constructors {
     };
 }
 
-helmholtz_blas_constructors!(helmholtz_blas_f32, c32);
-helmholtz_blas_constructors!(helmholtz_blas_f64, c64);
+helmholtz_blas_constructors!(helmholtz_blas_f32, f32, c32);
+helmholtz_blas_constructors!(helmholtz_blas_f64, f64, c64);

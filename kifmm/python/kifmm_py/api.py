@@ -2,247 +2,266 @@
 Python API
 """
 
-# import re
+import re
 
-# from kifmm_py import kifmm_rust
-# import numpy as np
-
-
-# KERNELS = ["laplace", "helmholtz"]
-# KERNEL_EVAL_TYPES = {"eval": 0, "eval_deriv": 1}
-# KERNEL_EVAL_SIZE = {"eval": 1, "eval_deriv": 4}
-# FIELD_TRANSLATION_TYPES = ["fft", "blas"]
-# KERNEL_DTYPE = {
-#     "laplace": [np.dtypes.Float32DType, np.dtypes.Float64DType],
-#     "helmholtz": [np.dtypes.Complex64DType, np.dtypes.Complex128DType],
-# }
-
-# CONSTRUCTORS = {
-#     np.dtypes.Float32DType: {
-#         "laplace": {"blas": kifmm_rust.LaplaceBlas32, "fft": kifmm_rust.LaplaceFft32},
-#         "helmholtz": {
-#             "blas": kifmm_rust.HelmholtzBlas32,
-#             "fft": kifmm_rust.HelmholtzFft32,
-#         },
-#     },
-#     np.dtypes.Float64DType: {
-#         "laplace": {"blas": kifmm_rust.LaplaceBlas64, "fft": kifmm_rust.LaplaceFft64},
-#         "helmholtz": {
-#             "blas": kifmm_rust.HelmholtzBlas64,
-#             "fft": kifmm_rust.HelmholtzFft64,
-#         },
-#     },
-# }
+from kifmm_py import kifmm_rust
+import numpy as np
 
 
-# class KiFmm:
-#     """
-#     Wraps around the low level Rust interface.
-#     """
+KERNELS = ["laplace", "helmholtz"]
+KERNEL_EVAL_TYPES = {"eval": 0, "eval_deriv": 1}
+KERNEL_EVAL_SIZE = {"eval": 1, "eval_deriv": 4}
+FIELD_TRANSLATION_TYPES = ["fft", "blas"]
+KERNEL_DTYPE = {
+    "laplace": [np.dtypes.Float32DType, np.dtypes.Float64DType],
+    "helmholtz": [np.dtypes.Complex64DType, np.dtypes.Complex128DType],
+}
 
-#     def __init__(
-#         self,
-#         expansion_order,
-#         sources,
-#         targets,
-#         charges,
-#         n_crit,
-#         sparse,
-#         kernel_eval_type,
-#         kernel,
-#         field_translation,
-#         timed=False,
-#         svd_threshold=None,
-#         wavenumber=None,
-#     ):
-#         """Constructor for Single Node FMMss.
+CONSTRUCTORS = {
+    np.dtypes.Float32DType: {
+        "laplace": {"blas": kifmm_rust.lib.laplace_blas_f32, "fft": kifmm_rust.lib.laplace_fft_f32},
+        "helmholtz": {
+            "blas":  kifmm_rust.lib.helmholtz_blas_f32
+            "fft": kifmm_rust.lib.helmholtz_fft_f32,
+        },
+    },
+    np.dtypes.Float64DType: {
+        "laplace": {"blas": kifmm_rust.lib.laplace_blas_f64, "fft": kifmm_rust.lib.laplace_fft_f64},
+        "helmholtz": {
+            "blas":  kifmm_rust.lib.helmholtz_blas_f64
+            "fft": kifmm_rust.lib.helmholtz_fft_f64,
+        },
+    },
+}
 
-#         Args:
-#             expansion_order (int): The expansion order of the FMM
-#             sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
-#             targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
-#             charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
-#             n_crit (int):  Maximum number of particles per leaf box, must be less than number of particles in domain.
-#             sparse (bool): Optionally drop empty leaf boxes for performance in FMM.
-#             kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
-#             kernel (str): Either 'laplace' or 'helmholtz' supported.
-#             field_translation (str): Either 'fft' or 'blas'.
-#             timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
-#             svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
-#             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
-#         """
-#         # Check valid expansion order
-#         try:
-#             assert expansion_order >= 2 and isinstance(expansion_order, int)
-#         except:
-#             raise TypeError(f"Invalid expansion order {expansion_order}")
+class KiFmm:
+    """
+    Wraps around the low level Rust interface.
+    """
 
-#         # Check that inputs are numpy arrays
-#         try:
-#             assert (
-#                 isinstance(sources, np.ndarray)
-#                 and isinstance(targets, np.ndarray)
-#                 and isinstance(charges, np.ndarray)
-#             )
-#         except:
-#             raise TypeError(
-#                 f"sources of type {type(sources)}, targets of type {type(targets)}, charges of type {type(charges)}"
-#             )
+    def __init__(
+        self,
+        expansion_order,
+        sources,
+        targets,
+        charges,
+        n_crit,
+        kernel_eval_type,
+        kernel,
+        field_translation,
+        sparse=True,
+        timed=False,
+        svd_threshold=None,
+        wavenumber=None,
+    ):
+        """Constructor for Single Node FMMss.
 
-#         try:
-#             assert (
-#                 np.isreal(sources[0][0])
-#                 and np.isreal(targets[0][0])
-#                 and sources.shape[1] == 3
-#                 and targets.shape[1] == 3
-#             )
-#         except:
-#             raise TypeError("sources and targets must be reals, and of shape [N, 3]")
+        Args:
+            expansion_order (int): The expansion order of the FMM
+            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
+            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
+            n_crit (int):  Maximum number of particles per leaf box, must be less than number of particles in domain.
+            kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
+            kernel (str): Either 'laplace' or 'helmholtz' supported.
+            field_translation (str): Either 'fft' or 'blas'.
+            prune_empty (bool, optional): Optionally drop empty leaf boxes for performance in FMM.
+            timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
+            svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
+            wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
+        """
+        # Check valid expansion order
+        try:
+            assert expansion_order >= 2 and isinstance(expansion_order, int)
+        except:
+            raise TypeError(f"Invalid expansion order {expansion_order}")
 
-#         try:
-#             assert type(sources[0].dtype) == type(targets[0].dtype)
-#         except:
-#             raise TypeError(
-#                 f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
-#             )
+        # Check that inputs are numpy arrays
+        try:
+            assert (
+                isinstance(sources, np.ndarray)
+                and isinstance(targets, np.ndarray)
+                and isinstance(charges, np.ndarray)
+            )
+        except:
+            raise TypeError(
+                f"sources of type {type(sources)}, targets of type {type(targets)}, charges of type {type(charges)}"
+            )
 
-#         # Check that arrays are in Fortran order
-#         try:
-#             assert np.isfortran(sources) and np.isfortran(targets)
-#         except:
-#             raise TypeError(f"sources, targets expected in Fortran order")
+        try:
+            assert (
+                np.isreal(sources[0][0])
+                and np.isreal(targets[0][0])
+                and sources.shape[1] == 3
+                and targets.shape[1] == 3
+            )
+        except:
+            raise TypeError("sources and targets must be reals, and of shape [N, 3]")
 
-#         # Check for valid n_crit
-#         try:
-#             assert n_crit < sources.shape[0] and n_crit < targets.shape[0]
-#         except:
-#             raise TypeError(f"ncrit={ncrit} is too large for these sources/targets")
+        try:
+            assert type(sources[0].dtype) == type(targets[0].dtype)
+        except:
+            raise TypeError(
+                f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
+            )
 
-#         # Check for valid tree
-#         try:
-#             assert isinstance(sparse, bool)
+        # Check that arrays are in Fortran order
+        try:
+            assert np.isfortran(sources) and np.isfortran(targets)
+        except:
+            raise TypeError(f"sources, targets expected in Fortran order")
 
-#         except:
-#             raise TypeError(f"'sparse' must be a boolean")
+        # Check for valid n_crit
+        try:
+            assert n_crit < sources.shape[0] and n_crit < targets.shape[0]
+        except:
+            raise TypeError(f"ncrit={ncrit} is too large for these sources/targets")
 
-#         # Check for valid kernel
-#         try:
-#             assert kernel in KERNELS
-#         except:
-#             raise TypeError(
-#                 f"kernel '{kernel}' invalid choice, must be one of {KERNELS}"
-#             )
+        # Check for valid tree
+        try:
+            assert isinstance(sparse, bool)
 
-#         try:
-#             assert kernel_eval_type in KERNEL_EVAL_TYPES.keys()
-#         except:
-#             raise TypeError(
-#                 f"kernel eval type '{kernel_eval_type}' invalid choice, must be one of {list(KERNEL_EVAL_TYPES.keys())}"
-#             )
+        except:
+            raise TypeError(f"'sparse' must be a boolean")
 
-#         expected_dtypes = KERNEL_DTYPE[kernel]
-#         try:
-#             assert type(charges[0].dtype) in expected_dtypes
-#         except:
-#             raise TypeError(
-#                 f"charges of the wrong type '{type(charges[0].dtype)}' for this kernel"
-#             )
+        # Check for valid kernel
+        try:
+            assert kernel in KERNELS
+        except:
+            raise TypeError(
+                f"kernel '{kernel}' invalid choice, must be one of {KERNELS}"
+            )
 
-#         # Check that field translation is valid
-#         try:
-#             assert field_translation in FIELD_TRANSLATION_TYPES
-#         except:
-#             raise TypeError(
-#                 f"field translation '{field_translation}' is not valid, expect one of {FIELD_TRANSLATION_TYPES}"
-#             )
+        try:
+            assert kernel_eval_type in KERNEL_EVAL_TYPES.keys()
+        except:
+            raise TypeError(
+                f"kernel eval type '{kernel_eval_type}' invalid choice, must be one of {list(KERNEL_EVAL_TYPES.keys())}"
+            )
 
-#         try:
-#             assert isinstance(timed, bool)
-#         except:
-#             raise TypeError(
-#                 f"Must specify 'True' or 'False' for timed"
-#             )
+        expected_dtypes = KERNEL_DTYPE[kernel]
+        try:
+            assert type(charges[0].dtype) in expected_dtypes
+        except:
+            raise TypeError(
+                f"charges of the wrong type '{type(charges[0].dtype)}' for this kernel"
+            )
 
-#         self.dtype = type(sources[0].dtype)
-#         self.expansion_order = expansion_order
-#         self.sources = sources
-#         self.targets = targets
-#         self.charges = charges
-#         self.n_crit = n_crit
-#         self.sparse = sparse
-#         self.kernel_eval_type = KERNEL_EVAL_TYPES[kernel_eval_type]
-#         self.kernel_eval_size = KERNEL_EVAL_SIZE[kernel_eval_type]
-#         self.kernel = kernel
-#         self.field_translation = field_translation
-#         self.constructor = CONSTRUCTORS[self.dtype][self.kernel][self.field_translation]
+        # Check that field translation is valid
+        try:
+            assert field_translation in FIELD_TRANSLATION_TYPES
+        except:
+            raise TypeError(
+                f"field translation '{field_translation}' is not valid, expect one of {FIELD_TRANSLATION_TYPES}"
+            )
 
-#         if self.field_translation == "blas":
-#             try:
-#                 assert svd_threshold is not None
-#             except:
-#                 raise TypeError(
-#                     "svd threshold must be set for BLAS based field translations"
-#                 )
+        try:
+            assert isinstance(timed, bool)
+        except:
+            raise TypeError(
+                f"Must specify 'True' or 'False' for timed"
+            )
 
-#         self.svd_threshold = svd_threshold
+        self.dtype = type(sources[0].dtype)
+        self.charge_dtype = type(charges[0].dtype)
+        self.expansion_order = expansion_order
+        self.sources = sources
+        self.nsources = sources.shape[0]
+        self.ntargets = targets.shape[0]
+        self.targets = targets
+        self.charges = charges
+        self.n_crit = n_crit
+        self.sparse = sparse
+        self.kernel_eval_type = KERNEL_EVAL_TYPES[kernel_eval_type]
+        self.kernel_eval_size = KERNEL_EVAL_SIZE[kernel_eval_type]
+        self.kernel = kernel
+        self.field_translation = field_translation
+        self.constructor = CONSTRUCTORS[self.dtype][self.kernel][self.field_translation]
 
-#         if self.kernel == "helmholtz":
-#             try:
-#                 assert wavenumber is not None
-#             except:
-#                 raise TypeError("wavenumber must be set for Helmholtz kernels")
+        if self.field_translation == "blas":
+            try:
+                assert svd_threshold is not None
+            except:
+                raise TypeError(
+                    "svd threshold must be set for BLAS based field translations"
+                )
 
-#         self.wavenumber = wavenumber
+        self.svd_threshold = svd_threshold
 
-#         if kernel == "laplace":
-#             if self.field_translation == "fft":
-#                 self.fmm = self.constructor(
-#                     self.expansion_order,
-#                     self.sources,
-#                     self.targets,
-#                     self.charges,
-#                     self.n_crit,
-#                     self.sparse,
-#                     self.kernel_eval_type,
-#                 )
+        if self.kernel == "helmholtz":
+            try:
+                assert wavenumber is not None
+            except:
+                raise TypeError("wavenumber must be set for Helmholtz kernels")
 
-#             elif self.field_translation == "blas":
-#                 self.fmm = self.constructor(
-#                     self.expansion_order,
-#                     self.sources,
-#                     self.targets,
-#                     self.charges,
-#                     self.n_crit,
-#                     self.sparse,
-#                     self.kernel_eval_type,
-#                     self.svd_threshold,
-#                 )
+        self.wavenumber = wavenumber
 
-#         elif kernel == "helmholtz":
-#             if self.field_translation == "fft":
-#                 self.fmm = self.constructor(
-#                     self.expansion_order,
-#                     self.sources,
-#                     self.targets,
-#                     self.charges,
-#                     self.n_crit,
-#                     self.sparse,
-#                     self.kernel_eval_type,
-#                     self.wavenumber,
-#                 )
+        if self.dtype == np.dtypes.Float32DType:
+            self.sources_raw = ffi.from_buffer('float *', self.sources)
+            self.targets_raw = ffi.from_buffer('float *', self.targets)
+            self.charges_raw = ffi.from_buffer('float *', self.charges)
+        elif self.dtype == np.dtypes.Float64Dtype:
+            self.sources_raw = ffi.from_buffer('double *', self.sources)
+            self.targets_raw = ffi.from_buffer('double *', self.targets)
+            self.charges_raw = ffi.from_buffer('double *', self.charges)
 
-#             elif self.field_translation == "blas":
-#                 self.fmm = self.constructor(
-#                     self.expansion_order,
-#                     self.sources,
-#                     self.targets,
-#                     self.charges,
-#                     self.n_crit,
-#                     self.sparse,
-#                     self.kernel_eval_type,
-#                     self.wavenumber,
-#                     self.svd_threshold,
-#                 )
+        if kernel == "laplace":
+            if self.field_translation == "fft":
+                self.fmm = self.constructor(
+                    self.expansion_order,
+                    self.charges_raw,
+                    self.sources_raw,
+                    self.nsources,
+                    self.targets_raw,
+                    self.ntargets,
+                    self.n_crit,
+                    self.prune_empty,
+                    self.kernel_eval_type,
+                )
+
+            elif self.field_translation == "blas":
+                self.fmm = self.constructor(
+                    self.expansion_order,
+                    self.charges,
+                    self.sources,
+                    self.nsources,
+                    self.targets,
+                    self.ntargets,
+                    self.n_crit,
+                    self.prune_empty,
+                    self.kernel_eval_type,
+                    self.svd_threshold,
+                )
+
+        elif kernel == "helmholtz":
+            if self.field_translation == "fft":
+                self.fmm = self.constructor(
+                    self.expansion_order,
+                    self.charges,
+                    self.sources,
+                    self.nsources,
+                    self.targets,
+                    self.ntargets,
+                    self.n_crit,
+                    self.prune_empty,
+                    self.kernel_eval_type,
+                    self.wavenumber,
+                )
+
+            elif self.field_translation == "blas":
+                self.fmm = self.constructor(
+                    self.expansion_order,
+                    self.charges,
+                    self.sources,
+                    self.nsources,
+                    self.targets,
+                    self.ntargets,
+                    self.n_crit,
+                    self.prune_empty,
+                    self.kernel_eval_type,
+                    self.wavenumber,
+                    self.svd_threshold,
+                )
 
 #         self.source_keys = self.fmm.source_keys
 #         self.source_keys_set = set(self.source_keys)
@@ -441,16 +460,16 @@ Python API
 
 #         return self.fmm.evaluate_kernel_st(sources, targets, charges)
 
-#     def __repr__(self):
-#         _type = match = re.search(r"'builtins\.([^']+)'", str(self.constructor)).group(
-#             1
-#         )
-#         res = f"type={_type}, expansion_order={self.expansion_order}, eval_type={self.kernel_eval_type}"
+    def __repr__(self):
+        _type = match = re.search(r"'builtins\.([^']+)'", str(self.constructor)).group(
+            1
+        )
+        res = f"type={_type}, expansion_order={self.expansion_order}, eval_type={self.kernel_eval_type}"
 
-#         if self.field_translation == "blas":
-#             res += f" svd_threshold={self.svd_threshold}"
+        if self.field_translation == "blas":
+            res += f" svd_threshold={self.svd_threshold}"
 
-#         if self.kernel == "helmholtz":
-#             res += f" wavenumber={self.wavenumber}"
+        if self.kernel == "helmholtz":
+            res += f" wavenumber={self.wavenumber}"
 
-#         return res
+        return res
