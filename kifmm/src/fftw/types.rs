@@ -39,7 +39,6 @@ unsafe impl Sync for Plan64 {}
 
 /// FFTW in 'estimate' mode. A sub-optimal heuristic is used to create FFT plan.
 /// input/output arrays are not overwritten during planning, see [original doc](https://www.fftw.org/fftw3_doc/Planner-Flags.html) for detail
-// pub const FFTW_ESTIMATE: u32 = 1 << 6;
 pub(crate) const FFTW_ESTIMATE: u32 = 1 << 6;
 
 lazy_static! {
