@@ -3,12 +3,12 @@ use std::collections::HashMap;
 
 use num::traits::Float;
 use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut,
-    RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
+    rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape,
+    VectorContainer,
 };
 
 use crate::{
-    fmm::types::{Charges, SendPtrMut},
+    fmm::types::SendPtrMut,
     traits::tree::{FmmTreeNode, Tree},
     tree::types::{MortonKey, SingleNodeTree},
 };
@@ -287,16 +287,19 @@ where
 }
 
 /// Map charges to map global indices
-pub fn map_charges<T: RlstScalar>(global_indices: &[usize], charges: &Charges<T>) -> Charges<T> {
-    let [ncharges, nmatvecs] = charges.shape();
+pub fn map_charges<T: RlstScalar>(
+    global_indices: &[usize],
+    charges: &[T],
+    nmatvecs: usize,
+) -> Vec<T> {
+    let ncharges = charges.len() / nmatvecs;
 
-    let mut reordered_charges = rlst_dynamic_array2!(T, [ncharges, nmatvecs]);
+    let mut reordered_charges = vec![T::zero(); ncharges * nmatvecs];
 
     for eval_idx in 0..nmatvecs {
         let eval_displacement = eval_idx * ncharges;
         for (new_idx, old_idx) in global_indices.iter().enumerate() {
-            reordered_charges.data_mut()[new_idx + eval_displacement] =
-                charges.data()[old_idx + eval_displacement];
+            reordered_charges[new_idx + eval_displacement] = charges[old_idx + eval_displacement];
         }
     }
 

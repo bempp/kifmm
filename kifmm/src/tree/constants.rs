@@ -220,10 +220,10 @@ pub const BYTE_DISPLACEMENT: u64 = 8;
 pub const NINE_BIT_MASK: u64 = 0x1FF;
 
 /// Ratio of side length of inner surface with respect to surface of a box.
-pub (crate) const ALPHA_INNER: f64 = 1.05;
+pub(crate) const ALPHA_INNER: f64 = 1.05;
 
 /// Ratio of side length of outer surface with respect to surface of a box.
-pub (crate) const ALPHA_OUTER: f64 = 2.95;
+pub(crate) const ALPHA_OUTER: f64 = 2.95;
 
 /// Number of siblings for each node in octree
 pub const NSIBLINGS: usize = 8;

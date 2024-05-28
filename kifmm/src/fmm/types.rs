@@ -384,7 +384,7 @@ pub enum FmmEvalType {
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::helpers::points_fixture;
-/// use rlst::{rlst_dynamic_array2, RawAccessMut};
+/// use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 /// use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 ///
 /// /// Particle data
@@ -406,13 +406,13 @@ pub enum FmmEvalType {
 ///
 /// /// Create a new builder, and attach a tree
 /// let fmm = SingleNodeBuilder::new()
-///     .tree(&sources, &targets, n_crit, sparse)
+///     .tree(sources.data(), targets.data(), n_crit, sparse)
 ///     .unwrap();
 ///
 /// /// Specify the FMM parameters, such as the kernel , the kernel evaluation mode, expansion order and charge data
 /// let fmm = fmm
 ///     .parameters(
-///         &charges,
+///         charges.data(),
 ///         expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
@@ -439,11 +439,14 @@ where
     /// Tree
     pub tree: Option<SingleNodeFmmTree<Scalar::Real>>,
 
+    /// Number of sources
+    pub nsources: Option<usize>,
+
     /// Kernel
     pub kernel: Option<Kernel>,
 
     /// Charges
-    pub charges: Option<Charges<Scalar>>,
+    pub charges: Option<Vec<Scalar>>,
 
     /// Data and metadata for field translations
     pub source_to_target: Option<SourceToTargetData>,

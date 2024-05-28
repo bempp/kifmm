@@ -1,5 +1,5 @@
 //! FMM traits
-use crate::{fmm::types::Charges, traits::tree::FmmTree};
+use crate::traits::tree::FmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
@@ -119,7 +119,7 @@ where
     ///
     /// # Arguments
     /// * `charges` - new charge data.
-    fn clear(&mut self, charges: &Charges<Self::Scalar>);
+    fn clear(&mut self, charges: &[Self::Scalar]);
 }
 
 /// Set all metadata required for FMMs
@@ -129,7 +129,7 @@ pub trait FmmMetadata {
 
     /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
-    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]);
 }
 
 /// Defines how metadata associated with field translations is looked up at runtime.

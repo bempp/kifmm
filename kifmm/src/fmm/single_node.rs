@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-use rlst::{RawAccess, RlstScalar, Shape};
+use rlst::RlstScalar;
 
 use crate::{
     fmm::types::{FmmEvalType, KiFmm},
@@ -19,9 +19,8 @@ use crate::{
     Fmm, SingleNodeFmmTree,
 };
 
-use super::{
-    helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
-    types::Charges,
+use super::helpers::{
+    leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
 };
 
 impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -195,11 +194,12 @@ where
         Ok(times)
     }
 
-    fn clear(&mut self, charges: &Charges<Self::Scalar>) {
-        let [_ncharges, nmatvecs] = charges.shape();
+    fn clear(&mut self, charges: &[Self::Scalar]) {
         let ntarget_points = self.tree().target_tree().n_coordinates_tot().unwrap();
+        let nsource_points = self.tree().source_tree().n_coordinates_tot().unwrap();
         let nsource_leaves = self.tree().source_tree().n_leaves().unwrap();
         let ntarget_leaves = self.tree().target_tree().n_leaves().unwrap();
+        let nmatvecs = charges.len() / nsource_points;
 
         // Clear buffers and set new buffers
         self.multipoles = vec![Scalar::default(); self.multipoles.len()];
@@ -258,8 +258,8 @@ where
         self.charges = map_charges(
             self.tree.source_tree().all_global_indices().unwrap(),
             charges,
+            nmatvecs,
         )
-        .data()
         .to_vec();
     }
 }
@@ -613,10 +613,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -629,10 +629,10 @@ mod test {
 
         let svd_threshold = Some(1e-5);
         let fmm_svd = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -673,10 +673,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -691,7 +691,7 @@ mod test {
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        fmm.clear(&charges);
+        fmm.clear(charges.data());
         fmm.evaluate(false).unwrap();
 
         let fmm = Box::new(fmm);
@@ -734,10 +734,10 @@ mod test {
         {
             // Evaluate potentials
             let fmm_fft = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
@@ -759,10 +759,10 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm_fft = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::ValueDeriv,
@@ -789,10 +789,10 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -814,10 +814,10 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -860,10 +860,10 @@ mod test {
         let wavenumber = 2.5;
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
@@ -904,10 +904,10 @@ mod test {
         {
             // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
@@ -926,10 +926,10 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
@@ -954,10 +954,10 @@ mod test {
         {
             // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
@@ -976,10 +976,10 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
@@ -1033,10 +1033,10 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1055,10 +1055,10 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1113,10 +1113,10 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
@@ -1135,10 +1135,10 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(&sources, &targets, n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, sparse)
                 .unwrap()
                 .parameters(
-                    &charges,
+                    charges.data(),
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,

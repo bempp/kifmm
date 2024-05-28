@@ -42,8 +42,6 @@ unsafe impl Sync for Plan64 {}
 // pub const FFTW_ESTIMATE: u32 = 1 << 6;
 pub(crate) const FFTW_ESTIMATE: u32 = 1 << 6;
 
-
-
 lazy_static! {
     /// Mutex for FFTW call.
     ///

@@ -21,7 +21,7 @@
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 //! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
-//! use rlst::{rlst_dynamic_array2, RawAccessMut};
+//! use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 //!
 //! // Setup random sources and targets
 //! let nsources = 1000;
@@ -43,10 +43,10 @@
 //!
 //!     // Build FMM object, with a given kernel and field translation
 //!     let mut fmm_fft = SingleNodeBuilder::new()
-//!         .tree(&sources, &targets, n_crit, sparse)
+//!         .tree(sources.data(), targets.data(), n_crit, sparse)
 //!         .unwrap()
 //!         .parameters(
-//!             &charges,
+//!             charges.data(),
 //!             expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
@@ -64,7 +64,7 @@
 //!     let tmp = vec![1.0; nsources * nvecs];
 //!     let mut new_charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 //!     new_charges.data_mut().copy_from_slice(&tmp);
-//!     fmm_fft.clear(&new_charges);
+//!     fmm_fft.clear(new_charges.data());
 //! }
 //!
 //! ````

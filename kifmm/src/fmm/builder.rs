@@ -1,12 +1,12 @@
 //! Builder objects to construct FMMs
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
-use rlst::{Array, BaseArray, MatrixSvd, RawAccess, RlstScalar, Shape, VectorContainer};
+use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
 
 use crate::{
     fmm::{
         constants::DEFAULT_NCRIT,
         helpers::{map_charges, ncoeffs_kifmm},
-        types::{Charges, Coordinates, FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
+        types::{FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
     traits::{
         field::{
@@ -36,6 +36,7 @@ where
     /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
         Self {
+            nsources: None,
             isa: None,
             tree: None,
             kernel: None,
@@ -52,21 +53,26 @@ where
     /// Associate FMM builder with an FMM Tree
     ///
     /// # Arguments
-    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
-    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
+    /// * `sources` - Source coordinates, data expected in column major order such that the shape is \[n_coords, dim\]
+    /// * `target` - Target coordinates,  data expected in column major order such that the shape is \[n_coords, dim\]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
     /// * `sparse` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
         mut self,
-        sources: &Coordinates<Scalar::Real>,
-        targets: &Coordinates<Scalar::Real>,
+        sources: &[Scalar::Real],
+        targets: &[Scalar::Real],
         n_crit: Option<u64>,
         sparse: bool,
     ) -> Result<Self, std::io::Error> {
-        let [nsources, dims] = sources.shape();
-        let [ntargets, dimt] = targets.shape();
+        let dim = 3;
+        let dims = sources.len() % dim;
+        let dimt = sources.len() % dim;
 
-        if dims < 3 || dimt < 3 {
+        let nsources = sources.len() / dim;
+        let ntargets = targets.len() / dim;
+        self.nsources = Some(nsources);
+
+        if dims != 0 || dimt != 0 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Only 3D FMM supported",
@@ -78,8 +84,8 @@ where
             ))
         } else {
             // Source and target trees calcualted over the same domain
-            let source_domain = Domain::from_local_points(sources.data());
-            let target_domain = Domain::from_local_points(targets.data());
+            let source_domain = Domain::from_local_points(sources);
+            let target_domain = Domain::from_local_points(targets);
 
             // Calculate union of domains for source and target points, needed to define operators
             let domain = source_domain.union(&target_domain);
@@ -87,8 +93,6 @@ where
 
             // If not specified estimate from point data estimate critical value
             let n_crit = n_crit.unwrap_or(DEFAULT_NCRIT);
-            let [nsources, _dim] = sources.shape();
-            let [ntargets, _dim] = targets.shape();
 
             // Estimate depth based on a uniform distribution
             let source_depth =
@@ -97,8 +101,8 @@ where
                 SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit);
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree = SingleNodeTree::new(sources.data(), depth, sparse, self.domain)?;
-            let target_tree = SingleNodeTree::new(targets.data(), depth, sparse, self.domain)?;
+            let source_tree = SingleNodeTree::new(sources, depth, sparse, self.domain)?;
+            let target_tree = SingleNodeTree::new(targets, depth, sparse, self.domain)?;
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,
@@ -121,7 +125,7 @@ where
     /// * `source_to_target` - A field translation method.
     pub fn parameters(
         mut self,
-        charges: &Charges<Scalar>,
+        charges: &[Scalar],
         expansion_order: usize,
         kernel: Kernel,
         eval_type: EvalType,
@@ -142,15 +146,22 @@ where
                 .all_global_indices()
                 .unwrap();
 
-            let [_ncharges, nmatvecs] = charges.shape();
+            let ncharges = self.nsources.unwrap();
+            let nmatvecs = charges.len() / ncharges;
 
-            self.charges = Some(map_charges(global_indices, charges));
+            self.charges = Some(map_charges(global_indices, charges, nmatvecs));
 
-            if nmatvecs > 1 {
-                self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))
-            } else {
-                self.fmm_eval_type = Some(FmmEvalType::Vector)
+            match nmatvecs {
+                n if n > 1 => self.fmm_eval_type = Some(FmmEvalType::Matrix(n)),
+                1 => self.fmm_eval_type = Some(FmmEvalType::Vector),
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Number of charge vectors must be greater than or equal to 1",
+                    ))
+                }
             }
+
             self.expansion_order = Some(expansion_order);
             self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
             self.isa = Some(Isa::new());
