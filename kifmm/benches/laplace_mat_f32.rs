@@ -19,7 +19,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(400);
-    let expansion_order = 5;
+    let expansion_order = [5];
     let prune_empty = true;
     let svd_threshold = Some(2e-1);
 
@@ -30,11 +30,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
             BlasFieldTranslationSaRcmp::new(svd_threshold),
@@ -49,11 +49,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
             BlasFieldTranslationSaRcmp::new(svd_threshold),
@@ -85,7 +85,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(400);
-    let expansion_order = 5;
+    let expansion_order = [5];
     let prune_empty = true;
     let svd_threshold = Some(2e-1);
 
@@ -96,11 +96,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
             BlasFieldTranslationSaRcmp::new(svd_threshold),
@@ -115,11 +115,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
             BlasFieldTranslationSaRcmp::new(svd_threshold),

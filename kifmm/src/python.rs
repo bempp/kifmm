@@ -110,12 +110,13 @@ macro_rules! laplace_fft_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
+                        None,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        &[expansion_order],
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -199,12 +200,13 @@ macro_rules! laplace_blas_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
+                        None,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        &[expansion_order],
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         BlasFieldTranslationSaRcmp::new(Some(svd_threshold)),
@@ -308,12 +310,13 @@ macro_rules! helmholtz_fft_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
+                        None,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        &[expansion_order],
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -408,12 +411,13 @@ macro_rules! helmholtz_blas_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
+                        None,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        &[expansion_order],
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         BlasFieldTranslationIa::new(Some(svd_threshold)),

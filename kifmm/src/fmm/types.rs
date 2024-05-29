@@ -452,10 +452,10 @@ where
     pub domain: Option<Domain<Scalar::Real>>,
 
     /// Expansion order
-    pub expansion_order: Option<usize>,
+    pub expansion_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs: Option<usize>,
+    pub ncoeffs: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,

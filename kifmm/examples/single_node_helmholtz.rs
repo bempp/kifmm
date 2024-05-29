@@ -18,7 +18,7 @@ fn main() {
 
     // FMM parameters
     let n_crit = Some(150);
-    let expansion_order = 5;
+    let expansion_order = [5];
     let prune_empty = true;
 
     // Kernel parameter
@@ -32,11 +32,11 @@ fn main() {
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -65,11 +65,11 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let fmm_vec = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 BlasFieldTranslationIa::new(singular_value_threshold),
@@ -94,11 +94,11 @@ fn main() {
             });
 
         let fmm_mat = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 BlasFieldTranslationIa::new(singular_value_threshold),

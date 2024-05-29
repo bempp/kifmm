@@ -604,7 +604,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
 
         // Charge data
@@ -614,11 +614,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -630,11 +630,11 @@ mod test {
 
         let svd_threshold = Some(1e-5);
         let fmm_svd = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 BlasFieldTranslationSaRcmp::new(svd_threshold),
@@ -663,7 +663,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -674,11 +674,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -718,7 +718,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let threshold_pot = 1e-5;
         let threshold_deriv = 1e-4;
@@ -735,11 +735,11 @@ mod test {
         {
             // Evaluate potentials
             let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
                     FftFieldTranslation::new(),
@@ -760,11 +760,11 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::ValueDeriv,
                     FftFieldTranslation::new(),
@@ -790,11 +790,11 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(singular_value_threshold),
@@ -815,11 +815,11 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(singular_value_threshold),
@@ -849,7 +849,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
 
         // Charge data
@@ -861,11 +861,11 @@ mod test {
         let wavenumber = 2.5;
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -891,7 +891,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let wavenumber = 2.5;
 
@@ -905,11 +905,11 @@ mod test {
         {
             // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
                     BlasFieldTranslationIa::new(None),
@@ -927,11 +927,11 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None),
@@ -955,11 +955,11 @@ mod test {
         {
             // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
                     FftFieldTranslation::new(),
@@ -977,11 +977,11 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
                     FftFieldTranslation::new(),
@@ -1014,7 +1014,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
         // FMM parameters
         let n_crit = Some(10);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
@@ -1034,11 +1034,11 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(singular_value_threshold),
@@ -1056,11 +1056,11 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(singular_value_threshold),
@@ -1093,7 +1093,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(10);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
@@ -1114,11 +1114,11 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
                     BlasFieldTranslationIa::new(singular_value_threshold),
@@ -1136,11 +1136,11 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, prune_empty)
+                .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    expansion_order,
+                    &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
                     BlasFieldTranslationIa::new(singular_value_threshold),

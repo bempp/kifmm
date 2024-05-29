@@ -2028,7 +2028,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
 
         // Charge data
@@ -2038,11 +2038,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 BlasFieldTranslationSaRcmp::new(Some(1e-5)),
@@ -2089,12 +2089,14 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = transfer_vector
-            .source
-            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
-        let targets = transfer_vector
-            .target
-            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let sources =
+            transfer_vector
+                .source
+                .surface_grid(expansion_order[0], &fmm.tree.domain, alpha);
+        let targets =
+            transfer_vector
+                .target
+                .surface_grid(expansion_order[0], &fmm.tree.domain, alpha);
 
         let mut direct = vec![0f64; ncoeffs];
 
@@ -2127,7 +2129,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let wavenumber = 2.5;
 
@@ -2138,11 +2140,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 BlasFieldTranslationIa::new(None),
@@ -2195,8 +2197,8 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = source.surface_grid(expansion_order, &fmm.tree.domain, alpha);
-        let targets = target.surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let sources = source.surface_grid(expansion_order[0], &fmm.tree.domain, alpha);
+        let targets = target.surface_grid(expansion_order[0], &fmm.tree.domain, alpha);
 
         let mut direct = vec![c64::zero(); ncoeffs];
 
@@ -2291,7 +2293,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
 
         // Charge data
@@ -2301,11 +2303,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -2330,19 +2332,20 @@ mod test {
         let transfer_vector = &all_transfer_vectors[idx];
 
         // Compute FFT of the representative signal
-        let mut signal = fmm.evaluate_charges_convolution_grid(expansion_order, multipole.data());
+        let mut signal =
+            fmm.evaluate_charges_convolution_grid(expansion_order[0], multipole.data());
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
 
         let _ = f64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
 
         let source_equivalent_surface = transfer_vector.source.surface_grid(
-            expansion_order,
+            expansion_order[0],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
         let target_check_surface = transfer_vector.target.surface_grid(
-            expansion_order,
+            expansion_order[0],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
@@ -2358,7 +2361,7 @@ mod test {
         ];
 
         let (conv_grid, _) = transfer_vector.source.convolution_grid(
-            expansion_order,
+            expansion_order[0],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -2374,7 +2377,7 @@ mod test {
 
         // Compute kernel
         let kernel =
-            fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
+            fmm.evaluate_greens_fct_convolution_grid(expansion_order[0], &conv_grid, kernel_point);
         let [m, n, o] = kernel.shape();
 
         let mut kernel = flip3(&kernel);
@@ -2435,7 +2438,7 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let expansion_order = [6];
         let prune_empty = true;
         let wavenumber = 1.0;
 
@@ -2446,11 +2449,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, None, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -2483,16 +2486,23 @@ mod test {
         let target = v_list[0];
 
         // Compute FFT of the representative signal
-        let mut signal = fmm.evaluate_charges_convolution_grid(expansion_order, multipole.data());
+        let mut signal =
+            fmm.evaluate_charges_convolution_grid(expansion_order[0], multipole.data());
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
 
         let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
 
-        let source_equivalent_surface =
-            source.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
-        let target_check_surface =
-            target.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
+        let source_equivalent_surface = source.surface_grid(
+            expansion_order[0],
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+        );
+        let target_check_surface = target.surface_grid(
+            expansion_order[0],
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+        );
         let ntargets = target_check_surface.len() / 3;
 
         // Compute conv grid
@@ -2505,7 +2515,7 @@ mod test {
         ];
 
         let (conv_grid, _) = source.convolution_grid(
-            expansion_order,
+            expansion_order[0],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -2521,7 +2531,7 @@ mod test {
 
         // Compute kernel
         let kernel =
-            fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
+            fmm.evaluate_greens_fct_convolution_grid(expansion_order[0], &conv_grid, kernel_point);
         let [m, n, o] = kernel.shape();
 
         let mut kernel = flip3(&kernel);

@@ -1,10 +1,10 @@
 //! Builder objects to construct FMMs
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use itertools::Itertools;
 use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
 
 use crate::{
     fmm::{
-        constants::DEFAULT_NCRIT,
         helpers::{map_charges, ncoeffs_kifmm},
         types::{FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
@@ -61,6 +61,7 @@ where
         sources: &[Scalar::Real],
         targets: &[Scalar::Real],
         n_crit: Option<u64>,
+        depth: Option<u64>,
         prune_empty: bool,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
@@ -89,14 +90,28 @@ where
             let domain = source_domain.union(&target_domain);
             self.domain = Some(domain);
 
-            // If not specified estimate from point data estimate critical value
-            let n_crit = n_crit.unwrap_or(DEFAULT_NCRIT);
+            let source_depth;
+            let target_depth;
+            if n_crit.is_none() && depth.is_none() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Must specify either `n_crit` or `depth`",
+                ));
+            } else if n_crit.is_none() && depth.is_some() {
+                source_depth = depth.unwrap();
+                target_depth = depth.unwrap();
+            } else if n_crit.is_some() && depth.is_none() {
+                source_depth =
+                    SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit.unwrap());
+                target_depth =
+                    SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit.unwrap());
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Must specify one of `n_crit` or `depth`",
+                ));
+            }
 
-            // Estimate depth based on a uniform distribution
-            let source_depth =
-                SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit);
-            let target_depth =
-                SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit);
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
             let source_tree = SingleNodeTree::new(sources, depth, prune_empty, self.domain)?;
@@ -124,7 +139,7 @@ where
     pub fn parameters(
         mut self,
         charges: &[Scalar],
-        expansion_order: usize,
+        expansion_order: &[usize],
         kernel: Kernel,
         eval_type: EvalType,
         source_to_target: SourceToTargetData,
@@ -160,8 +175,23 @@ where
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
-            self.expansion_order = Some(expansion_order);
-            self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
+
+            let depth = self.tree.as_ref().unwrap().source_tree.depth() as usize;
+
+            if !(expansion_order.len() == 1 || expansion_order.len() == (depth + 1)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Either a single expansion order, or a slice of expansion orders matching the specified depth of the source/target trees must be provided",
+                ));
+            }
+
+            self.expansion_order = Some(expansion_order.to_vec());
+            self.ncoeffs = Some(
+                expansion_order
+                    .iter()
+                    .map(|&e| ncoeffs_kifmm(e))
+                    .collect_vec(),
+            );
             self.isa = Some(Isa::new());
 
             self.kernel = Some(kernel);
@@ -187,8 +217,8 @@ where
             let mut result = KiFmm {
                 isa: self.isa.unwrap(),
                 tree: self.tree.unwrap(),
-                expansion_order: vec![self.expansion_order.unwrap()],
-                ncoeffs: vec![self.ncoeffs.unwrap()],
+                expansion_order: self.expansion_order.unwrap(),
+                ncoeffs: self.ncoeffs.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
