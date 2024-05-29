@@ -107,7 +107,7 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::
 /// Find the corners of a box discretising the surface of a box described by a Morton Key. The coordinates
 /// are expected in column major order [x_1, x_2...x_N, y_1, y_2....y_N, z_1, z_2...z_N]
 ///
-/// # Arguements:
+/// # Arguments:
 /// * `coordinates` - points on the surface of a box.
 pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
     let n = coordinates.len() / 3;
@@ -163,7 +163,7 @@ mod mpi_helpers {
         Count, Rank,
     };
 
-    /// Prune_empty MPI_AllToAllV, i.e. each process only communicates
+    /// Sparse MPI_AllToAllV, i.e. each process only communicates
     /// to a subset of the communicator.
     ///
     /// For Example, you may have four processes in a communicator
@@ -173,7 +173,7 @@ mod mpi_helpers {
     /// This function expects these packets to be separated in a
     /// `Vec<Vec<T>>`, their destination ranks, as well as the number of
     /// packets this process expects to receive overall `recv_count`.
-    pub fn all_to_allv_prune_empty<T, C: Communicator>(
+    pub fn all_to_allv_sparse<T, C: Communicator>(
         comm: &C,
         packets: &[Vec<T>],
         packet_destinations: &[Rank],

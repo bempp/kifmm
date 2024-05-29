@@ -156,21 +156,22 @@ fn main() {
         println!("\t ... test_n_points passed on uniform tree");
     }
 
-    let prune_empty = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
+    let prune_empty = true;
+    let sparse = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
 
-    test_no_overlaps(&comm, &prune_empty);
+    test_no_overlaps(&comm, &sparse);
     if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on prune_empty tree");
+        println!("\t ... test_no_overlaps passed on sparse tree");
     }
 
     test_global_bounds::<f32>(&comm);
     if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on prune_empty tree");
+        println!("\t ... test_global_bounds passed on sparse tree");
     }
 
-    test_n_points(&comm, &prune_empty, n_points);
+    test_n_points(&comm, &sparse, n_points);
     if world.rank() == 0 {
-        println!("\t ... test_n_points passed on prune_empty tree");
+        println!("\t ... test_n_points passed on sparse tree");
     }
 }
 
