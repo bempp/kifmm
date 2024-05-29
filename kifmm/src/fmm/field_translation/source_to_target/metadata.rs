@@ -27,7 +27,7 @@ use crate::{
         pinv::pinv,
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
-            Charges, FftFieldTranslation, FftMetadata,
+            FftFieldTranslation, FftMetadata,
         },
         KiFmm,
     },
@@ -1839,7 +1839,7 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>) {
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
 
         // Check if computing potentials, or potentials and derivatives
@@ -1849,8 +1849,10 @@ where
         };
 
         // Check if we are computing matvec or matmul
-        let [_ncharges, nmatvecs] = charges.shape();
+
         let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
+        let nsource_points = self.tree.source_tree.all_coordinates().unwrap().len() / self.dim;
+        let nmatvecs = charges.len() / nsource_points;
         let nsource_keys = self.tree.source_tree.n_keys_tot().unwrap();
         let ntarget_keys = self.tree.target_tree.n_keys_tot().unwrap();
         let ntarget_leaves = self.tree.target_tree.n_leaves().unwrap();
@@ -1939,7 +1941,7 @@ where
         self.potentials_send_pointers = potentials_send_pointers;
         self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
         self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
-        self.charges = charges.data().to_vec();
+        self.charges = charges.to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
         self.leaf_scales_sources = source_leaf_scales;
@@ -2056,10 +2058,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -2156,10 +2158,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
@@ -2318,10 +2320,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -2461,10 +2463,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, sparse)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
