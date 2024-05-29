@@ -84,7 +84,7 @@ macro_rules! laplace_fft_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
@@ -110,7 +110,7 @@ macro_rules! laplace_fft_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
-                        sparse,
+                        prune_empty,
                     )
                     .unwrap()
                     .parameters(
@@ -180,7 +180,7 @@ macro_rules! laplace_blas_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 svd_threshold: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
@@ -199,7 +199,7 @@ macro_rules! laplace_blas_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
-                        sparse,
+                        prune_empty,
                     )
                     .unwrap()
                     .parameters(
@@ -281,7 +281,7 @@ macro_rules! helmholtz_fft_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
             ) -> PyResult<Self> {
@@ -308,7 +308,7 @@ macro_rules! helmholtz_fft_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
-                        sparse,
+                        prune_empty,
                     )
                     .unwrap()
                     .parameters(
@@ -378,7 +378,7 @@ macro_rules! helmholtz_blas_constructors {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
                 svd_threshold: <$type as RlstScalar>::Real,
@@ -408,7 +408,7 @@ macro_rules! helmholtz_blas_constructors {
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
                         Some(n_crit),
-                        sparse,
+                        prune_empty,
                     )
                     .unwrap()
                     .parameters(
