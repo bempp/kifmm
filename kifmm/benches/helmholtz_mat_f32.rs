@@ -7,7 +7,7 @@ use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use kifmm::BlasFieldTranslationIa;
 use num::{Complex, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccessMut};
+use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -22,7 +22,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     // FMM parameters
     let n_crit = Some(400);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
     let wavenumber = 1.0;
 
@@ -33,10 +33,10 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
+            charges.data(),
             expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
@@ -52,10 +52,10 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
+            charges.data(),
             expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
@@ -91,7 +91,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     // FMM parameters
     let n_crit = Some(400);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
     let wavenumber = 1.0;
 
@@ -102,10 +102,10 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
+            charges.data(),
             expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
@@ -121,10 +121,10 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
+            charges.data(),
             expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,

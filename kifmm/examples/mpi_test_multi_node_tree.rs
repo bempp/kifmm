@@ -126,7 +126,7 @@ fn main() {
     let comm = world.duplicate();
 
     // Setup tree parameters
-    let sparse = false;
+    let prune_empty = false;
     let depth = 5;
     let n_points = 10000;
 
@@ -134,7 +134,7 @@ fn main() {
     let points = points_fixture::<f32>(n_points, None, None, None);
 
     // Create a uniform tree
-    let uniform = MultiNodeTree::new(points.data(), depth, sparse, None, &comm).unwrap();
+    let uniform = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
 
     test_no_overlaps(&comm, &uniform);
     if world.rank() == 0 {
@@ -156,7 +156,8 @@ fn main() {
         println!("\t ... test_n_points passed on uniform tree");
     }
 
-    let sparse = MultiNodeTree::new(points.data(), depth, sparse, None, &comm).unwrap();
+    let prune_empty = true;
+    let sparse = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
 
     test_no_overlaps(&comm, &sparse);
     if world.rank() == 0 {

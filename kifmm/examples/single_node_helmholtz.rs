@@ -4,7 +4,7 @@ use kifmm::{FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccessMut};
+use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -19,7 +19,7 @@ fn main() {
     // FMM parameters
     let n_crit = Some(150);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
 
     // Kernel parameter
     let wavenumber = 2.5;
@@ -32,10 +32,10 @@ fn main() {
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
@@ -65,10 +65,10 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let fmm_vec = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
@@ -94,10 +94,10 @@ fn main() {
             });
 
         let fmm_mat = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,

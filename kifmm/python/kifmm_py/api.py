@@ -47,10 +47,10 @@ class KiFmm:
         targets,
         charges,
         n_crit,
-        sparse,
         kernel_eval_type,
         kernel,
         field_translation,
+        prune_empty=True,
         timed=False,
         svd_threshold=None,
         wavenumber=None,
@@ -63,10 +63,10 @@ class KiFmm:
             targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
             charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
             n_crit (int):  Maximum number of particles per leaf box, must be less than number of particles in domain.
-            sparse (bool): Optionally drop empty leaf boxes for performance in FMM.
             kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
             kernel (str): Either 'laplace' or 'helmholtz' supported.
             field_translation (str): Either 'fft' or 'blas'.
+            prune_empty (bool, optional): Optionally drop empty leaf boxes for performance in FMM.
             timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
             svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
@@ -120,10 +120,10 @@ class KiFmm:
 
         # Check for valid tree
         try:
-            assert isinstance(sparse, bool)
+            assert isinstance(prune_empty, bool)
 
         except:
-            raise TypeError(f"'sparse' must be a boolean")
+            raise TypeError(f"'prune_empty' must be a boolean")
 
         # Check for valid kernel
         try:
@@ -169,7 +169,7 @@ class KiFmm:
         self.targets = targets
         self.charges = charges
         self.n_crit = n_crit
-        self.sparse = sparse
+        self.prune_empty = prune_empty
         self.kernel_eval_type = KERNEL_EVAL_TYPES[kernel_eval_type]
         self.kernel_eval_size = KERNEL_EVAL_SIZE[kernel_eval_type]
         self.kernel = kernel
@@ -202,7 +202,7 @@ class KiFmm:
                     self.targets,
                     self.charges,
                     self.n_crit,
-                    self.sparse,
+                    self.prune_empty,
                     self.kernel_eval_type,
                 )
 
@@ -213,7 +213,7 @@ class KiFmm:
                     self.targets,
                     self.charges,
                     self.n_crit,
-                    self.sparse,
+                    self.prune_empty,
                     self.kernel_eval_type,
                     self.svd_threshold,
                 )
@@ -226,7 +226,7 @@ class KiFmm:
                     self.targets,
                     self.charges,
                     self.n_crit,
-                    self.sparse,
+                    self.prune_empty,
                     self.kernel_eval_type,
                     self.wavenumber,
                 )
@@ -238,7 +238,7 @@ class KiFmm:
                     self.targets,
                     self.charges,
                     self.n_crit,
-                    self.sparse,
+                    self.prune_empty,
                     self.kernel_eval_type,
                     self.wavenumber,
                     self.svd_threshold,
