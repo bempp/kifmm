@@ -49,6 +49,7 @@ where
         let m2l_operator_index = self.m2l_operator_index(level);
         let c2e_operator_index = self.c2e_operator_index(level);
         let displacement_index = self.displacement_index(level);
+        let ncoeffs = self.ncoeffs[0];
 
         let sentinel = sources.len();
 
@@ -94,10 +95,10 @@ where
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            self.ncoeffs * nsources,
+                            ncoeffs * nsources,
                         )
                     },
-                    [self.ncoeffs, nsources]
+                    [ncoeffs, nsources]
                 );
 
                 // Allocate buffer to store compressed check potentials
@@ -221,7 +222,7 @@ where
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals =
-                        unsafe { std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs) };
+                        unsafe { std::slice::from_raw_parts_mut(ptr, ntargets * ncoeffs) };
                     all_locals
                         .iter_mut()
                         .zip(locals.data().iter())
@@ -236,10 +237,10 @@ where
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            self.ncoeffs * nsources * nmatvecs,
+                            ncoeffs * nsources * nmatvecs,
                         )
                     },
-                    [self.ncoeffs, nsources * nmatvecs]
+                    [ncoeffs, nsources * nmatvecs]
                 );
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
@@ -408,7 +409,7 @@ where
                     rlst::threading::disable_threading();
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
-                        std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)
+                        std::slice::from_raw_parts_mut(ptr, ntargets * ncoeffs * nmatvecs)
                     };
                     all_locals
                         .iter_mut()
@@ -459,6 +460,7 @@ where
         let m2l_operator_index = self.m2l_operator_index(level);
         let c2e_operator_index = self.c2e_operator_index(level);
         let displacement_index = self.displacement_index(level);
+        let ncoeffs = self.ncoeffs[0];
         let sentinel = sources.len();
 
         // Compute the displacements
@@ -503,20 +505,19 @@ where
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            self.ncoeffs * nsources,
+                            ncoeffs * nsources,
                         )
                     },
-                    [self.ncoeffs, nsources]
+                    [ncoeffs, nsources]
                 );
 
                 // Allocate buffer to store check potentials
-                let check_potentials = rlst_dynamic_array2!(Scalar, [self.ncoeffs, ntargets]);
+                let check_potentials = rlst_dynamic_array2!(Scalar, [ncoeffs, ntargets]);
                 let mut check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
-                    let raw = unsafe {
-                        check_potentials.data().as_ptr().add(i * self.ncoeffs) as *mut Scalar
-                    };
+                    let raw =
+                        unsafe { check_potentials.data().as_ptr().add(i * ncoeffs) as *mut Scalar };
                     let send_ptr = SendPtrMut { raw };
                     check_potentials_ptrs.push(send_ptr);
                 }
@@ -535,16 +536,16 @@ where
                             let vt = &self.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
                             let mut multipoles_subset =
-                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, multipole_idxs.len()]);
+                                rlst_dynamic_array2!(Scalar, [ncoeffs, multipole_idxs.len()]);
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
-                                multipoles_subset.data_mut()[local_multipole_idx * self.ncoeffs
-                                    ..(local_multipole_idx + 1) * self.ncoeffs]
+                                multipoles_subset.data_mut()[local_multipole_idx * ncoeffs
+                                    ..(local_multipole_idx + 1) * ncoeffs]
                                     .copy_from_slice(
-                                        &multipoles.data()[global_multipole_idx * self.ncoeffs
-                                            ..(global_multipole_idx + 1) * self.ncoeffs],
+                                        &multipoles.data()[global_multipole_idx * ncoeffs
+                                            ..(global_multipole_idx + 1) * ncoeffs],
                                     );
                             }
 
@@ -558,17 +559,14 @@ where
                                 );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                                let tmp = &check_potential.data()[multipole_idx * self.ncoeffs
-                                    ..(multipole_idx + 1) * self.ncoeffs];
+                                let tmp = &check_potential.data()
+                                    [multipole_idx * ncoeffs..(multipole_idx + 1) * ncoeffs];
 
                                 let check_potential_lock =
                                     level_check_potentials[local_idx].lock().unwrap();
                                 let check_potential_ptr = check_potential_lock.raw;
                                 let global_check_potential = unsafe {
-                                    std::slice::from_raw_parts_mut(
-                                        check_potential_ptr,
-                                        self.ncoeffs,
-                                    )
+                                    std::slice::from_raw_parts_mut(check_potential_ptr, ncoeffs)
                                 };
 
                                 global_check_potential
@@ -595,7 +593,7 @@ where
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals =
-                        unsafe { std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs) };
+                        unsafe { std::slice::from_raw_parts_mut(ptr, ntargets * ncoeffs) };
                     all_locals
                         .iter_mut()
                         .zip(locals.data().iter())
@@ -610,22 +608,21 @@ where
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            self.ncoeffs * nsources * nmatvecs,
+                            ncoeffs * nsources * nmatvecs,
                         )
                     },
-                    [self.ncoeffs, nsources * nmatvecs]
+                    [ncoeffs, nsources * nmatvecs]
                 );
 
-                let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [self.ncoeffs, nsources * nmatvecs]);
+                let check_potentials = rlst_dynamic_array2!(Scalar, [ncoeffs, nsources * nmatvecs]);
 
                 let mut check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {
-                    let key_displacement = i * self.ncoeffs * nmatvecs;
+                    let key_displacement = i * ncoeffs * nmatvecs;
                     let mut tmp = Vec::new();
                     for charge_vec_idx in 0..nmatvecs {
-                        let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
+                        let charge_vec_displacement = charge_vec_idx * ncoeffs;
 
                         let raw = unsafe {
                             check_potentials
@@ -655,32 +652,32 @@ where
 
                             let mut multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
-                                [self.ncoeffs, multipole_idxs.len() * nmatvecs]
+                                [ncoeffs, multipole_idxs.len() * nmatvecs]
                             );
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
                                 let key_displacement_global =
-                                    global_multipole_idx * self.ncoeffs * nmatvecs;
+                                    global_multipole_idx * ncoeffs * nmatvecs;
 
                                 let key_displacement_local =
-                                    local_multipole_idx * self.ncoeffs * nmatvecs;
+                                    local_multipole_idx * ncoeffs * nmatvecs;
 
                                 for charge_vec_idx in 0..nmatvecs {
-                                    let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
+                                    let charge_vec_displacement = charge_vec_idx * ncoeffs;
 
                                     multipoles_subset.data_mut()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
-                                            + self.ncoeffs]
+                                            + ncoeffs]
                                         .copy_from_slice(
                                             &multipoles.data()[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
-                                                    + self.ncoeffs],
+                                                    + ncoeffs],
                                         );
                                 }
                             }
@@ -701,23 +698,17 @@ where
                                     level_check_potentials[global_local_idx].lock().unwrap();
 
                                 for charge_vec_idx in 0..nmatvecs {
-                                    let key_displacement =
-                                        local_multipole_idx * self.ncoeffs * nmatvecs;
-                                    let charge_vec_displacement = charge_vec_idx * self.ncoeffs;
+                                    let key_displacement = local_multipole_idx * ncoeffs * nmatvecs;
+                                    let charge_vec_displacement = charge_vec_idx * ncoeffs;
 
                                     let tmp = &check_potential.data()[key_displacement
                                         + charge_vec_displacement
-                                        ..key_displacement
-                                            + charge_vec_displacement
-                                            + self.ncoeffs];
+                                        ..key_displacement + charge_vec_displacement + ncoeffs];
 
                                     let check_potential_ptr =
                                         check_potential_lock[charge_vec_idx].raw;
                                     let check_potential = unsafe {
-                                        std::slice::from_raw_parts_mut(
-                                            check_potential_ptr,
-                                            self.ncoeffs,
-                                        )
+                                        std::slice::from_raw_parts_mut(check_potential_ptr, ncoeffs)
                                     };
 
                                     check_potential
@@ -745,7 +736,7 @@ where
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
-                        std::slice::from_raw_parts_mut(ptr, ntargets * self.ncoeffs * nmatvecs)
+                        std::slice::from_raw_parts_mut(ptr, ntargets * ncoeffs * nmatvecs)
                     };
                     all_locals
                         .iter_mut()

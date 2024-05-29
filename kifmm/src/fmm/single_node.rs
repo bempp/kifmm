@@ -39,8 +39,12 @@ where
         self.dim
     }
 
-    fn expansion_order(&self) -> usize {
-        self.expansion_order
+    fn expansion_order(&self, level: u64) -> usize {
+        self.expansion_order[0]
+    }
+
+    fn ncoeffs(&self, level: u64) -> usize {
+        self.ncoeffs[0]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -56,13 +60,14 @@ where
         key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree().source_tree().index(key) {
+            let ncoeffs = self.ncoeffs[0];
+
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
-                    Some(&self.multipoles[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                    Some(&self.multipoles[index * ncoeffs..(index + 1) * ncoeffs])
                 }
                 FmmEvalType::Matrix(nmatvecs) => Some(
-                    &self.multipoles
-                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
+                    &self.multipoles[index * ncoeffs * nmatvecs..(index + 1) * ncoeffs * nmatvecs],
                 ),
             }
         } else {
@@ -75,14 +80,12 @@ where
         key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(index) = self.tree.target_tree().index(key) {
+            let ncoeffs = self.ncoeffs[0];
             match self.fmm_eval_type {
-                FmmEvalType::Vector => {
-                    Some(&self.locals[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                FmmEvalType::Vector => Some(&self.locals[index * ncoeffs..(index + 1) * ncoeffs]),
+                FmmEvalType::Matrix(nmatvecs) => {
+                    Some(&self.locals[index * ncoeffs * nmatvecs..(index + 1) * ncoeffs * nmatvecs])
                 }
-                FmmEvalType::Matrix(nmatvecs) => Some(
-                    &self.locals
-                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
-                ),
             }
         } else {
             None
@@ -195,6 +198,8 @@ where
     }
 
     fn clear(&mut self, charges: &[Self::Scalar]) {
+        let ncoeffs = self.ncoeffs[0];
+
         let ntarget_points = self.tree().target_tree().n_coordinates_tot().unwrap();
         let nsource_points = self.tree().source_tree().n_coordinates_tot().unwrap();
         let nmatvecs = charges.len() / nsource_points;
@@ -219,7 +224,7 @@ where
 
         let leaf_multipoles = leaf_expansion_pointers(
             self.tree().source_tree(),
-            self.ncoeffs,
+            ncoeffs,
             nmatvecs,
             nsource_leaves,
             &self.multipoles,
@@ -227,21 +232,17 @@ where
 
         let level_multipoles = level_expansion_pointers(
             self.tree().source_tree(),
-            self.ncoeffs,
+            ncoeffs,
             nmatvecs,
             &self.multipoles,
         );
 
-        let level_locals = level_expansion_pointers(
-            self.tree().target_tree(),
-            self.ncoeffs,
-            nmatvecs,
-            &self.locals,
-        );
+        let level_locals =
+            level_expansion_pointers(self.tree().target_tree(), ncoeffs, nmatvecs, &self.locals);
 
         let leaf_locals = leaf_expansion_pointers(
             self.tree().target_tree(),
-            self.ncoeffs,
+            ncoeffs,
             nmatvecs,
             ntarget_leaves,
             &self.locals,
@@ -514,7 +515,7 @@ mod test {
 
         let multipole = fmm.multipole(&root).unwrap();
         let upward_equivalent_surface = root.surface_grid(
-            fmm.expansion_order(),
+            fmm.expansion_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );
@@ -559,7 +560,7 @@ mod test {
         let multipole = fmm.multipole(&root).unwrap();
 
         let upward_equivalent_surface = root.surface_grid(
-            fmm.expansion_order(),
+            fmm.expansion_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );

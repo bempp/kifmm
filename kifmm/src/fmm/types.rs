@@ -186,11 +186,11 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
-    /// The expansion order of the FMM
-    pub expansion_order: usize,
+    /// The expansion order of the FMM, indexed by level
+    pub expansion_order: Vec<usize>,
 
-    /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs: usize,
+    /// The number of coefficients, corresponding to points discretising the equivalent surface, indexed by level
+    pub ncoeffs: Vec<usize>,
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -287,12 +287,12 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
-            expansion_order: 0,
+            expansion_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
-            dim: 0,
-            ncoeffs: 0,
+            dim: 3,
+            ncoeffs: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),

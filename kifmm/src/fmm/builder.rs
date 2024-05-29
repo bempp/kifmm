@@ -187,8 +187,8 @@ where
             let mut result = KiFmm {
                 isa: self.isa.unwrap(),
                 tree: self.tree.unwrap(),
-                expansion_order: self.expansion_order.unwrap(),
-                ncoeffs: self.ncoeffs.unwrap(),
+                expansion_order: vec![self.expansion_order.unwrap()],
+                ncoeffs: vec![self.ncoeffs.unwrap()],
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),

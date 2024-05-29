@@ -65,6 +65,9 @@ where
                 let c2e_operator_index = self.c2e_operator_index(level);
                 let displacement_index = self.displacement_index(level);
 
+                let ncoeffs = self.ncoeffs[0];
+                let expansion_order = self.expansion_order[0];
+
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
                 let nsources = sources.len();
@@ -81,11 +84,11 @@ where
                 let nsources_parents = sources_parents.len();
 
                 // Size of input FFT sequence
-                let shape_in = <Scalar as Dft>::shape_in(self.expansion_order);
-                let size_in: usize = <Scalar as Dft>::size_in(self.expansion_order);
+                let shape_in = <Scalar as Dft>::shape_in(expansion_order);
+                let size_in: usize = <Scalar as Dft>::size_in(expansion_order);
 
                 // Size of transformed FFT sequence
-                let size_out = <Scalar as Dft>::size_out(self.expansion_order);
+                let size_out = <Scalar as Dft>::size_out(expansion_order);
 
                 // Calculate displacements of multipole data with respect to source tree
                 let all_displacements = &self.source_to_target.displacements[displacement_index];
@@ -95,8 +98,7 @@ where
                 let max = &sources[nsources - 1];
                 let min_idx = self.tree().source_tree().index(min).unwrap();
                 let max_idx = self.tree().source_tree().index(max).unwrap();
-                let multipoles =
-                    &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
+                let multipoles = &self.multipoles[min_idx * ncoeffs..(max_idx + 1) * ncoeffs];
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
@@ -164,7 +166,7 @@ where
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 {
                     multipoles
-                        .par_chunks_exact(self.ncoeffs * NSIBLINGS * chunk_size_pre_proc)
+                        .par_chunks_exact(ncoeffs * NSIBLINGS * chunk_size_pre_proc)
                         .enumerate()
                         .for_each(|(i, multipole_chunk)| {
                             // Place Signal on convolution grid
@@ -172,8 +174,7 @@ where
                                 vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
-                                let multipole =
-                                    &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
+                                let multipole = &multipole_chunk[i * ncoeffs..(i + 1) * ncoeffs];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
                                 for (surf_idx, &conv_idx) in
                                     self.source_to_target.surf_to_conv_map.iter().enumerate()
@@ -346,7 +347,7 @@ where
                         .for_each(|(check_potential_chunk, local_ptrs)| {
                             // Map to surface grid
                             let mut potential_chunk =
-                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, NSIBLINGS]);
+                                rlst_dynamic_array2!(Scalar, [ncoeffs, NSIBLINGS]);
 
                             for i in 0..NSIBLINGS {
                                 for (surf_idx, &conv_idx) in
@@ -368,11 +369,11 @@ where
 
                             local_chunk
                                 .data()
-                                .chunks_exact(self.ncoeffs)
+                                .chunks_exact(ncoeffs)
                                 .zip(local_ptrs)
                                 .for_each(|(result, local)| {
                                     let local = unsafe {
-                                        std::slice::from_raw_parts_mut(local[0].raw, self.ncoeffs)
+                                        std::slice::from_raw_parts_mut(local[0].raw, ncoeffs)
                                     };
                                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                                 });

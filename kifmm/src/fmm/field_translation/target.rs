@@ -39,6 +39,8 @@ where
             )));
         };
 
+        let ncoeffs = self.ncoeffs[0];
+
         let parent_sources: HashSet<MortonKey<_>> =
             child_targets.iter().map(|source| source.parent()).collect();
         let mut parent_sources = parent_sources.into_iter().collect_vec();
@@ -71,19 +73,18 @@ where
                     .par_chunks_exact(chunk_size)
                     .zip(child_locals.par_chunks_exact(NSIBLINGS * chunk_size))
                     .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-                        let mut parent_locals =
-                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
+                        let mut parent_locals = rlst_dynamic_array2!(Scalar, [ncoeffs, chunk_size]);
                         for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
                             .iter()
                             .enumerate()
                             .take(chunk_size)
                         {
                             parent_locals.data_mut()
-                                [chunk_idx * self.ncoeffs..(chunk_idx + 1) * self.ncoeffs]
+                                [chunk_idx * ncoeffs..(chunk_idx + 1) * ncoeffs]
                                 .copy_from_slice(unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_local_pointer.raw,
-                                        self.ncoeffs,
+                                        ncoeffs,
                                     )
                                 });
                         }
@@ -100,12 +101,12 @@ where
                                 let child_local = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         child_local_pointers_chunk[child_displacement][0].raw,
-                                        self.ncoeffs,
+                                        ncoeffs,
                                     )
                                 };
                                 child_local
                                     .iter_mut()
-                                    .zip(&tmp.data()[j * self.ncoeffs..(j + 1) * self.ncoeffs])
+                                    .zip(&tmp.data()[j * ncoeffs..(j + 1) * ncoeffs])
                                     .for_each(|(l, t)| *l += *t);
                             }
                         }
@@ -132,17 +133,16 @@ where
                     .into_par_iter()
                     .zip(child_locals.par_chunks_exact(NSIBLINGS))
                     .for_each(|(parent_local_pointers, child_locals_pointers)| {
-                        let mut parent_locals =
-                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
+                        let mut parent_locals = rlst_dynamic_array2!(Scalar, [ncoeffs, nmatvecs]);
 
                         for (charge_vec_idx, parent_local_pointer) in
                             parent_local_pointers.iter().enumerate().take(nmatvecs)
                         {
                             let tmp = unsafe {
-                                std::slice::from_raw_parts(parent_local_pointer.raw, self.ncoeffs)
+                                std::slice::from_raw_parts(parent_local_pointer.raw, ncoeffs)
                             };
-                            parent_locals.data_mut()[charge_vec_idx * self.ncoeffs
-                                ..(charge_vec_idx + 1) * self.ncoeffs]
+                            parent_locals.data_mut()
+                                [charge_vec_idx * ncoeffs..(charge_vec_idx + 1) * ncoeffs]
                                 .copy_from_slice(tmp);
                         }
 
@@ -158,13 +158,9 @@ where
                                 child_locals_i.iter().enumerate().take(nmatvecs)
                             {
                                 let child_locals_ij = unsafe {
-                                    std::slice::from_raw_parts_mut(
-                                        child_locals_ij.raw,
-                                        self.ncoeffs,
-                                    )
+                                    std::slice::from_raw_parts_mut(child_locals_ij.raw, ncoeffs)
                                 };
-                                let result_ij =
-                                    &result_i.data()[j * self.ncoeffs..(j + 1) * self.ncoeffs];
+                                let result_ij = &result_i.data()[j * ncoeffs..(j + 1) * ncoeffs];
                                 child_locals_ij
                                     .iter_mut()
                                     .zip(result_ij.iter())
@@ -185,8 +181,10 @@ where
             ));
         };
 
+        let ncoeffs = self.ncoeffs[0];
+
         let coordinates = self.tree.target_tree().all_coordinates().unwrap();
-        let surface_size = self.ncoeffs * self.dim;
+        let surface_size = ncoeffs * self.dim;
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -229,10 +227,7 @@ where
                                     leaf_downward_equivalent_surface,
                                     target_coordinates_col_major.data(),
                                     unsafe {
-                                        std::slice::from_raw_parts_mut(
-                                            leaf_locals[0].raw,
-                                            self.ncoeffs,
-                                        )
+                                        std::slice::from_raw_parts_mut(leaf_locals[0].raw, ncoeffs)
                                     },
                                     result,
                                 );
@@ -277,10 +272,7 @@ where
 
                                     let local_expansion_ptr = leaf_locals[i].raw;
                                     let local_expansion = unsafe {
-                                        std::slice::from_raw_parts(
-                                            local_expansion_ptr,
-                                            self.ncoeffs,
-                                        )
+                                        std::slice::from_raw_parts(local_expansion_ptr, ncoeffs)
                                     };
                                     let result = unsafe {
                                         std::slice::from_raw_parts_mut(
