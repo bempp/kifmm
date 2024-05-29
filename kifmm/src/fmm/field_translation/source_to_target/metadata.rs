@@ -2049,7 +2049,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
 
         // Charge data
         let nvecs = 1;
@@ -2058,7 +2058,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -2148,7 +2148,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let wavenumber = 2.5;
 
         // Charge data
@@ -2158,7 +2158,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -2311,7 +2311,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
 
         // Charge data
         let nvecs = 1;
@@ -2320,7 +2320,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -2453,7 +2453,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let wavenumber = 1.0;
 
         // Charge data
@@ -2463,7 +2463,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),

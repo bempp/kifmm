@@ -19,7 +19,7 @@ fn main() {
     // FMM parameters
     let n_crit = Some(150);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
 
     // Kernel parameter
     let wavenumber = 2.5;
@@ -32,7 +32,7 @@ fn main() {
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -65,7 +65,7 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let fmm_vec = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -94,7 +94,7 @@ fn main() {
             });
 
         let fmm_mat = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),

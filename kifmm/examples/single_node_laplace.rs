@@ -17,7 +17,7 @@ fn main() {
     // FMM parameters
     let n_crit = Some(150);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
 
     // FFT based M2L for a vector of charges
     {
@@ -27,7 +27,7 @@ fn main() {
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -56,7 +56,7 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let fmm_vec = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -81,7 +81,7 @@ fn main() {
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
         let fmm_mat = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),

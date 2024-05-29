@@ -163,7 +163,7 @@ mod mpi_helpers {
         Count, Rank,
     };
 
-    /// Sparse MPI_AllToAllV, i.e. each process only communicates
+    /// Prune_empty MPI_AllToAllV, i.e. each process only communicates
     /// to a subset of the communicator.
     ///
     /// For Example, you may have four processes in a communicator
@@ -173,7 +173,7 @@ mod mpi_helpers {
     /// This function expects these packets to be separated in a
     /// `Vec<Vec<T>>`, their destination ranks, as well as the number of
     /// packets this process expects to receive overall `recv_count`.
-    pub fn all_to_allv_sparse<T, C: Communicator>(
+    pub fn all_to_allv_prune_empty<T, C: Communicator>(
         comm: &C,
         packets: &[Vec<T>],
         packet_destinations: &[Rank],

@@ -22,7 +22,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     // FMM parameters
     let n_crit = Some(400);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
 
     // FFT based M2L for a vector of charges
@@ -34,7 +34,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
@@ -48,7 +48,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
@@ -87,7 +87,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     // FMM parameters
     let n_crit = Some(150);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
 
     // FFT based M2L for a vector of charges
@@ -99,7 +99,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
@@ -113,7 +113,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),

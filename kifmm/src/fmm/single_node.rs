@@ -604,7 +604,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
 
         // Charge data
         let nvecs = 1;
@@ -613,7 +613,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -629,7 +629,7 @@ mod test {
 
         let svd_threshold = Some(1e-5);
         let fmm_svd = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -663,7 +663,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let threshold_pot = 1e-5;
 
         // Set charge data and evaluate an FMM
@@ -673,7 +673,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -718,7 +718,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let threshold_pot = 1e-5;
         let threshold_deriv = 1e-4;
         let threshold_deriv_blas = 1e-3;
@@ -734,7 +734,7 @@ mod test {
         {
             // Evaluate potentials
             let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -759,7 +759,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -789,7 +789,7 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -814,7 +814,7 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -849,7 +849,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
 
         // Charge data
         let nvecs = 1;
@@ -860,7 +860,7 @@ mod test {
         let wavenumber = 2.5;
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
@@ -891,7 +891,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let wavenumber = 2.5;
 
         // Charge data
@@ -904,7 +904,7 @@ mod test {
         {
             // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -926,7 +926,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -954,7 +954,7 @@ mod test {
         {
             // Evaluate potentials
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -976,7 +976,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let fmm = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -1014,7 +1014,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(10);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
         let singular_value_threshold = Some(1e-2);
@@ -1033,7 +1033,7 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -1055,7 +1055,7 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -1093,7 +1093,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(10);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
         let singular_value_threshold = Some(1e-2);
@@ -1113,7 +1113,7 @@ mod test {
             // Evaluate potentials
             let eval_type = EvalType::Value;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),
@@ -1135,7 +1135,7 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
             let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, sparse)
+                .tree(sources.data(), targets.data(), n_crit, prune_empty)
                 .unwrap()
                 .parameters(
                     charges.data(),

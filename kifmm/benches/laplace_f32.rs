@@ -20,7 +20,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     // FMM parameters
     let n_crit = Some(150);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
     let svd_threshold = Some(2e-1);
 
     // FFT based M2L for a vector of charges
@@ -30,7 +30,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
@@ -44,7 +44,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
@@ -81,7 +81,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     // FMM parameters
     let n_crit = Some(150);
     let expansion_order = 5;
-    let sparse = true;
+    let prune_empty = true;
     let svd_threshold = Some(2e-1);
 
     // FFT based M2L for a vector of charges
@@ -91,7 +91,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
@@ -105,7 +105,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),

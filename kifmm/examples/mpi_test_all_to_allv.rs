@@ -9,7 +9,7 @@ use rand::Rng;
 use mpi::{collective::SystemOperation, environment::Universe, traits::*, Rank};
 
 #[cfg(feature = "mpi")]
-use kifmm::tree::helpers::all_to_allv_sparse;
+use kifmm::tree::helpers::all_to_allv_prune_empty;
 
 #[cfg(feature = "mpi")]
 fn main() {
@@ -59,7 +59,7 @@ fn main() {
 
     let recv_count = to_receive[rank as usize];
 
-    let received = all_to_allv_sparse(&comm, &packets, &packet_destinations, &recv_count);
+    let received = all_to_allv_prune_empty(&comm, &packets, &packet_destinations, &recv_count);
 
     // Test that the correct number of packets were received.
     let unique: Vec<i32> = received.iter().unique().cloned().collect();
