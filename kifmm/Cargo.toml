@@ -38,6 +38,9 @@ pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethod
 pulp = "0.18.12"
 bytemuck = "1.16.0"
 
+[build-dependencies]
+cbindgen = "0.26.0"
+
 [target.aarch64-apple-darwin.dependencies]
 rlst = { version = "0.1", features=["metal"]}
 blas-src = { version = "0.10", features = ["accelerate"]}
@@ -81,3 +84,7 @@ lapack-src = { version = "0.10", features = ["netlib"]}
 
 [lints.clippy]
 wildcard_imports = "forbid"
+
+[package.metadata.maturin]
+name = "kifmm"
+bindings = "cffi"

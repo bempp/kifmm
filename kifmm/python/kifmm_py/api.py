@@ -21,15 +21,33 @@ CONSTRUCTORS = {
     np.dtypes.Float32DType: {
         "laplace": {"blas": kifmm_rust.lib.laplace_blas_f32, "fft": kifmm_rust.lib.laplace_fft_f32},
         "helmholtz": {
-            "blas":  kifmm_rust.lib.helmholtz_blas_f32
+            "blas":  kifmm_rust.lib.helmholtz_blas_f32,
             "fft": kifmm_rust.lib.helmholtz_fft_f32,
         },
     },
     np.dtypes.Float64DType: {
         "laplace": {"blas": kifmm_rust.lib.laplace_blas_f64, "fft": kifmm_rust.lib.laplace_fft_f64},
         "helmholtz": {
-            "blas":  kifmm_rust.lib.helmholtz_blas_f64
+            "blas":  kifmm_rust.lib.helmholtz_blas_f64,
             "fft": kifmm_rust.lib.helmholtz_fft_f64,
+        },
+    },
+}
+
+
+EVALUATORS = {
+    np.dtypes.Float32DType: {
+        "laplace": {"blas": kifmm_rust.lib.evaluate_laplace_blas_f32, "fft": kifmm_rust.lib.evaluate_laplace_fft_f32},
+        "helmholtz": {
+            "blas":  kifmm_rust.lib.evaluate_helmholtz_blas_f32,
+            "fft": kifmm_rust.lib.evaluate_helmholtz_fft_f32,
+        },
+    },
+    np.dtypes.Float64DType: {
+        "laplace": {"blas": kifmm_rust.lib.evaluate_laplace_blas_f64, "fft": kifmm_rust.lib.evaluate_laplace_fft_f64},
+        "helmholtz": {
+            "blas":  kifmm_rust.lib.evaluate_helmholtz_blas_f64,
+            "fft": kifmm_rust.lib.evaluate_helmholtz_fft_f64,
         },
     },
 }
@@ -49,7 +67,7 @@ class KiFmm:
         kernel_eval_type,
         kernel,
         field_translation,
-        sparse=True,
+        prune_empty=True,
         timed=False,
         svd_threshold=None,
         wavenumber=None,
@@ -105,12 +123,6 @@ class KiFmm:
                 f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
             )
 
-        # Check that arrays are in Fortran order
-        try:
-            assert np.isfortran(sources) and np.isfortran(targets)
-        except:
-            raise TypeError(f"sources, targets expected in Fortran order")
-
         # Check for valid n_crit
         try:
             assert n_crit < sources.shape[0] and n_crit < targets.shape[0]
@@ -119,10 +131,10 @@ class KiFmm:
 
         # Check for valid tree
         try:
-            assert isinstance(sparse, bool)
+            assert isinstance(prune_empty, bool)
 
         except:
-            raise TypeError(f"'sparse' must be a boolean")
+            raise TypeError(f"'prune_empty' must be a boolean")
 
         # Check for valid kernel
         try:
@@ -171,12 +183,13 @@ class KiFmm:
         self.targets = targets
         self.charges = charges
         self.n_crit = n_crit
-        self.sparse = sparse
+        self.prune_empty = prune_empty
         self.kernel_eval_type = KERNEL_EVAL_TYPES[kernel_eval_type]
         self.kernel_eval_size = KERNEL_EVAL_SIZE[kernel_eval_type]
         self.kernel = kernel
         self.field_translation = field_translation
         self.constructor = CONSTRUCTORS[self.dtype][self.kernel][self.field_translation]
+        self.evaluator = EVALUATORS[self.dtype][self.kernel][self.field_translation]
 
         if self.field_translation == "blas":
             try:
@@ -197,13 +210,13 @@ class KiFmm:
         self.wavenumber = wavenumber
 
         if self.dtype == np.dtypes.Float32DType:
-            self.sources_raw = ffi.from_buffer('float *', self.sources)
-            self.targets_raw = ffi.from_buffer('float *', self.targets)
-            self.charges_raw = ffi.from_buffer('float *', self.charges)
-        elif self.dtype == np.dtypes.Float64Dtype:
-            self.sources_raw = ffi.from_buffer('double *', self.sources)
-            self.targets_raw = ffi.from_buffer('double *', self.targets)
-            self.charges_raw = ffi.from_buffer('double *', self.charges)
+            self.sources_raw = kifmm_rust.ffi.from_buffer('float *', self.sources)
+            self.targets_raw = kifmm_rust.ffi.from_buffer('float *', self.targets)
+            self.charges_raw = kifmm_rust.ffi.from_buffer('float *', self.charges)
+        elif self.dtype == np.dtypes.Float64DType:
+            self.sources_raw = kifmm_rust.ffi.from_buffer('double *', self.sources)
+            self.targets_raw = kifmm_rust.ffi.from_buffer('double *', self.targets)
+            self.charges_raw = kifmm_rust.ffi.from_buffer('double *', self.charges)
 
         if kernel == "laplace":
             if self.field_translation == "fft":
@@ -222,10 +235,10 @@ class KiFmm:
             elif self.field_translation == "blas":
                 self.fmm = self.constructor(
                     self.expansion_order,
-                    self.charges,
-                    self.sources,
+                    self.charges_raw,
+                    self.sources_raw,
                     self.nsources,
-                    self.targets,
+                    self.targets_raw,
                     self.ntargets,
                     self.n_crit,
                     self.prune_empty,
@@ -237,10 +250,10 @@ class KiFmm:
             if self.field_translation == "fft":
                 self.fmm = self.constructor(
                     self.expansion_order,
-                    self.charges,
-                    self.sources,
+                    self.charges_raw,
+                    self.sources_raw,
                     self.nsources,
-                    self.targets,
+                    self.targets_raw,
                     self.ntargets,
                     self.n_crit,
                     self.prune_empty,
@@ -251,10 +264,10 @@ class KiFmm:
             elif self.field_translation == "blas":
                 self.fmm = self.constructor(
                     self.expansion_order,
-                    self.charges,
-                    self.sources,
+                    self.charges_raw,
+                    self.sources_raw,
                     self.nsources,
-                    self.targets,
+                    self.targets_raw,
                     self.ntargets,
                     self.n_crit,
                     self.prune_empty,
@@ -262,6 +275,8 @@ class KiFmm:
                     self.wavenumber,
                     self.svd_threshold,
                 )
+
+        self.timed = timed
 
 #         self.source_keys = self.fmm.source_keys
 #         self.source_keys_set = set(self.source_keys)
@@ -275,12 +290,11 @@ class KiFmm:
 #         self.target_tree_depth = self.fmm.target_tree_depth
 #         self.source_global_indices = self.fmm.source_global_indices
 #         self.target_global_indices = self.fmm.target_global_indices
-#         self.timed = timed
 #         self.times = None
 
-#     def evaluate(self):
-#         """Run the FMM."""
-#         self.times = self.fmm.evaluate(self.timed)
+    def evaluate(self):
+        """Run the FMM."""
+        self.times = self.evaluator(self.fmm, self.timed)
 
 #     def clear(self, charges):
 #         """Clear currently assigned charges, assign new charges
@@ -444,12 +458,6 @@ class KiFmm:
 #                 f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
 #             )
 
-#         # Check that arrays are in Fortran order
-#         try:
-#             assert np.isfortran(sources) and np.isfortran(targets)
-#         except:
-#             raise TypeError(f"sources, targets expected in Fortran order")
-
 #         expected_dtypes = KERNEL_DTYPE[self.kernel]
 #         try:
 #             assert type(charges[0].dtype) in expected_dtypes
@@ -461,9 +469,10 @@ class KiFmm:
 #         return self.fmm.evaluate_kernel_st(sources, targets, charges)
 
     def __repr__(self):
-        _type = match = re.search(r"'builtins\.([^']+)'", str(self.constructor)).group(
-            1
-        )
+        pattern = r"'struct\s+([^*]+)\*"
+
+        _type = re.search(pattern, str(self.constructor)).group(1).strip()
+
         res = f"type={_type}, expansion_order={self.expansion_order}, eval_type={self.kernel_eval_type}"
 
         if self.field_translation == "blas":
