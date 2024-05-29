@@ -66,7 +66,7 @@ class KiFmm:
             kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
             kernel (str): Either 'laplace' or 'helmholtz' supported.
             field_translation (str): Either 'fft' or 'blas'.
-            prune_empty (bool, optional): Optionally drop empty leaf boxes for performance in FMM, defaults to True.
+            prune_empty (bool, optional): Optionally drop empty leaf boxes for performance in FMM.
             timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
             svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.

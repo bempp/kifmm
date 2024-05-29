@@ -5,7 +5,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
-use rlst::{rlst_dynamic_array2, RawAccessMut};
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -30,10 +30,10 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, sparse)
         .unwrap()
         .parameters(
-            &charges,
+            charges.data(),
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
@@ -44,10 +44,10 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, sparse)
         .unwrap()
         .parameters(
-            &charges,
+            charges.data(),
             expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,

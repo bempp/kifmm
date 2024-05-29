@@ -27,7 +27,7 @@ use crate::{
         pinv::pinv,
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
-            Charges, FftFieldTranslation, FftMetadata,
+            FftFieldTranslation, FftMetadata,
         },
         KiFmm,
     },
@@ -1840,7 +1840,7 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>) {
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
 
         // Check if computing potentials, or potentials and derivatives
@@ -1850,8 +1850,10 @@ where
         };
 
         // Check if we are computing matvec or matmul
-        let [_ncharges, nmatvecs] = charges.shape();
+
         let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
+        let nsource_points = self.tree.source_tree.all_coordinates().unwrap().len() / self.dim;
+        let nmatvecs = charges.len() / nsource_points;
         let nsource_keys = self.tree.source_tree.n_keys_tot().unwrap();
         let ntarget_keys = self.tree.target_tree.n_keys_tot().unwrap();
         let ntarget_leaves = self.tree.target_tree.n_leaves().unwrap();
@@ -1940,7 +1942,7 @@ where
         self.potentials_send_pointers = potentials_send_pointers;
         self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
         self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
-        self.charges = charges.data().to_vec();
+        self.charges = charges.to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
         self.leaf_scales_sources = source_leaf_scales;
@@ -2048,7 +2050,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let expansion_order = 6;
-        let sparse = true;
+        let prune_empty = true;
 
         // Charge data
         let nvecs = 1;
@@ -2057,10 +2059,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -2144,11 +2146,11 @@ mod test {
     //     let sources = points_fixture::<f64>(nsources, None, None, Some(1));
     //     let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
-    //     // FMM parameters
-    //     let n_crit = Some(100);
-    //     let expansion_order = 6;
-    //     let sparse = true;
-    //     let wavenumber = 2.5;
+        // // FMM parameters
+        // let n_crit = Some(100);
+        // let expansion_order = 6;
+        // let prune_empty = true;
+        // let wavenumber = 2.5;
 
     //     // Charge data
     //     let nvecs = 1;
@@ -2156,19 +2158,19 @@ mod test {
     //     let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
     //     charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-    //     let fmm = SingleNodeBuilder::new()
-    //         .tree(&sources, &targets, n_crit, sparse)
-    //         .unwrap()
-    //         .parameters(
-    //             &charges,
-    //             expansion_order,
-    //             Helmholtz3dKernel::new(wavenumber),
-    //             EvalType::Value,
-    //             BlasFieldTranslationIa::new(None),
-    //         )
-    //         .unwrap()
-    //         .build()
-    //         .unwrap();
+        // let fmm = SingleNodeBuilder::new()
+        //     .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        //     .unwrap()
+        //     .parameters(
+        //         charges.data(),
+        //         expansion_order,
+        //         Helmholtz3dKernel::new(wavenumber),
+        //         EvalType::Value,
+        //         BlasFieldTranslationIa::new(None),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
 
     //     let level = 2;
 
@@ -2309,8 +2311,8 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 2;
-        let sparse = true;
+        let expansion_order = 6;
+        let prune_empty = true;
 
         // Charge data
         let nvecs = 1;
@@ -2319,10 +2321,10 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
+                charges.data(),
                 expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
@@ -2438,10 +2440,154 @@ mod test {
             .sum();
         let rel_error: f64 = abs_error / (direct.iter().sum::<f64>());
 
-        println!("rel error {:?} \n {:?}", &result[0..5], &direct[0..5]);
-
         assert!(rel_error < 1e-15);
     }
+
+    // #[test]
+    // fn test_fft_field_translation_helmholtz() {
+    //     // Setup random sources and targets
+    //     let nsources = 10000;
+    //     let ntargets = 10000;
+    //     let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+    //     let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+    //     // FMM parameters
+    //     let n_crit = Some(100);
+    //     let expansion_order = 6;
+    //     let prune_empty = true;
+    //     let wavenumber = 1.0;
+
+    //     // Charge data
+    //     let nvecs = 1;
+    //     let mut rng = StdRng::seed_from_u64(0);
+    //     let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+    //     charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+    //     let fmm = SingleNodeBuilder::new()
+    //         .tree(sources.data(), targets.data(), n_crit, prune_empty)
+    //         .unwrap()
+    //         .parameters(
+    //             charges.data(),
+    //             expansion_order,
+    //             Helmholtz3dKernel::new(wavenumber),
+    //             EvalType::Value,
+    //             FftFieldTranslation::new(),
+    //         )
+    //         .unwrap()
+    //         .build()
+    //         .unwrap();
+
+    //     let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
+
+    //     for i in 0..fmm.ncoeffs {
+    //         *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
+    //     }
+
+    //     let level = 2;
+    //     let source = fmm.tree().source_tree().keys(level).unwrap()[0];
+
+    //     let v_list: HashSet<MortonKey<_>> = source
+    //         .parent()
+    //         .neighbors()
+    //         .iter()
+    //         .flat_map(|pn| pn.children())
+    //         .filter(|pnc| {
+    //             !source.is_adjacent(pnc) && fmm.tree().source_tree().keys_set.contains(pnc)
+    //         })
+    //         .collect();
+
+    //     let v_list = v_list.into_iter().collect_vec();
+    //     let target = v_list[0];
+
+    //     // Compute FFT of the representative signal
+    //     let mut signal = fmm.evaluate_charges_convolution_grid(expansion_order, multipole.data());
+    //     let [m, n, o] = signal.shape();
+    //     let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+
+    //     let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
+
+    //     let source_equivalent_surface =
+    //         source.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
+    //     let target_check_surface =
+    //         target.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
+    //     let ntargets = target_check_surface.len() / 3;
+
+    //     // Compute conv grid
+    //     let conv_point_corner_index = 7;
+    //     let corners = find_corners(&source_equivalent_surface[..]);
+    //     let conv_point_corner = [
+    //         corners[conv_point_corner_index],
+    //         corners[8 + conv_point_corner_index],
+    //         corners[16 + conv_point_corner_index],
+    //     ];
+
+    //     let (conv_grid, _) = source.convolution_grid(
+    //         expansion_order,
+    //         &fmm.tree.source_tree.domain,
+    //         ALPHA_INNER,
+    //         &conv_point_corner,
+    //         conv_point_corner_index,
+    //     );
+
+    //     let kernel_point_index = 0;
+    //     let kernel_point = [
+    //         target_check_surface[kernel_point_index],
+    //         target_check_surface[ntargets + kernel_point_index],
+    //         target_check_surface[2 * ntargets + kernel_point_index],
+    //     ];
+
+    //     // Compute kernel
+    //     let kernel =
+    //         fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
+    //     let [m, n, o] = kernel.shape();
+
+    //     let mut kernel = flip3(&kernel);
+
+    //     // Compute FFT of padded kernel
+    //     let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+    //     let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
+
+    //     let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+    //     for k in 0..o {
+    //         for j in 0..n {
+    //             for i in 0..m {
+    //                 *hadamard_product.get_mut([i, j, k]).unwrap() =
+    //                     kernel_hat.get([i, j, k]).unwrap() * signal_hat.get([i, j, k]).unwrap();
+    //             }
+    //         }
+    //     }
+    //     let mut potentials = rlst_dynamic_array3!(c64, [m, n, o]);
+
+    //     let _ = c64::backward_dft(
+    //         hadamard_product.data_mut(),
+    //         potentials.data_mut(),
+    //         &[m, n, o],
+    //     );
+
+    //     let mut result = vec![c64::zero(); ntargets];
+    //     for (i, &idx) in fmm.source_to_target.conv_to_surf_map.iter().enumerate() {
+    //         result[i] = potentials.data()[idx];
+    //     }
+
+    //     // Get direct evaluations for testing
+    //     let mut direct = vec![c64::zero(); fmm.ncoeffs];
+    //     fmm.kernel.evaluate_st(
+    //         EvalType::Value,
+    //         &source_equivalent_surface[..],
+    //         &target_check_surface[..],
+    //         multipole.data(),
+    //         &mut direct[..],
+    //     );
+
+    //     let abs_error: f64 = result
+    //         .iter()
+    //         .zip(direct.iter())
+    //         .map(|(a, b)| (a - b).abs())
+    //         .sum();
+    //     let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
+
+    //     assert!(rel_error < 1e-15);
+    // }
 
     // #[test]
     // fn test_fft_field_translation_helmholtz() {
