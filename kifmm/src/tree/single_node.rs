@@ -128,7 +128,6 @@ where
         }
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
-
         // Return tree in sorted order, by level and then by Morton key
         for l in 0..=depth {
             let &(l, r) = levels_to_keys.get(&l).unwrap();

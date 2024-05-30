@@ -73,7 +73,7 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
-{
+ {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
 
@@ -287,7 +287,7 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
-{
+ {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
 
@@ -580,7 +580,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default,
     <Scalar as RlstScalar>::Real: Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
-{
+ {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -764,7 +764,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-{
+ {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -1277,7 +1277,7 @@ where
     Scalar: RlstScalar + Default,
     <Scalar as RlstScalar>::Real: Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
-{
+ {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -1348,7 +1348,13 @@ where
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
 
-        for &expansion_order in self.expansion_order.iter() {
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        } else {
+            self.expansion_order.clone()
+        };
+
+        for expansion_order in iterator {
             let nrows = ncoeffs_kifmm(expansion_order);
             let ncols = ncoeffs_kifmm(expansion_order);
 
@@ -1525,7 +1531,7 @@ where
     Scalar: RlstScalar + AsComplex + Default + Dft,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-{
+ {
     /// Computes the unique Green's function evaluations and places them on a convolution grid on the source box wrt to a given
     /// target point on the target box surface grid.
     ///
@@ -1659,7 +1665,7 @@ where
         + Default
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-{
+ {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -1950,7 +1956,7 @@ where
     Scalar: RlstScalar + Default,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-{
+ {
     fn c2e_operator_index(&self, level: u64) -> usize {
         if self.expansion_order.len() > 1 {
             level as usize
@@ -1994,7 +2000,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-{
+ {
     fn c2e_operator_index(&self, level: u64) -> usize {
         level as usize
     }
@@ -2022,7 +2028,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-{
+ {
     type Scalar = Scalar;
 
     fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
@@ -2045,7 +2051,6 @@ where
         let nsource_leaves = self.tree.source_tree.n_leaves().unwrap();
 
         // Buffers to store all multipole and local data
-
         let nmultipole_coeffs;
         let nlocal_coeffs;
         if self.expansion_order.len() > 1 {
@@ -2064,6 +2069,7 @@ where
             nmultipole_coeffs = nsource_keys * self.ncoeffs.last().unwrap();
             nlocal_coeffs = ntarget_keys * self.ncoeffs.last().unwrap();
         }
+
 
         let multipoles = vec![Scalar::default(); nmultipole_coeffs * nmatvecs];
         let locals = vec![Scalar::default(); nlocal_coeffs * nmatvecs];

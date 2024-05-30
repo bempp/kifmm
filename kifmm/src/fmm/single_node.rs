@@ -60,12 +60,13 @@ where
         &self,
         key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
-
         if let Some(key_idx) = self.tree().source_tree().level_index(key) {
             let iterator = if self.expansion_order.len() > 1 {
                 (0..key.level()).zip(&self.ncoeffs).collect_vec()
             } else {
-                (0..key.level()).zip(vec![self.ncoeffs.last().unwrap()]).collect_vec()
+                (0..key.level())
+                    .zip(vec![self.ncoeffs.last().unwrap()])
+                    .collect_vec()
             };
 
             let mut level_displacement = 0;
@@ -76,11 +77,17 @@ where
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     let ncoeffs = self.ncoeffs(key.level());
-                    Some(&self.multipoles[level_displacement+key_idx*ncoeffs..level_displacement+(key_idx+1)*ncoeffs])
+                    Some(
+                        &self.multipoles[level_displacement + key_idx * ncoeffs
+                            ..level_displacement + (key_idx + 1) * ncoeffs],
+                    )
                 }
                 FmmEvalType::Matrix(nmatvecs) => {
                     let ncoeffs = self.ncoeffs(key.level());
-                    Some(&self.multipoles[nmatvecs*(level_displacement+key_idx*ncoeffs)..nmatvecs*(level_displacement+(key_idx+1)*ncoeffs)])
+                    Some(
+                        &self.multipoles[nmatvecs * (level_displacement + key_idx * ncoeffs)
+                            ..nmatvecs * (level_displacement + (key_idx + 1) * ncoeffs)],
+                    )
                 }
             }
         } else {
@@ -93,11 +100,12 @@ where
         key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(key_idx) = self.tree.target_tree().level_index(key) {
-
             let iterator = if self.expansion_order.len() > 1 {
                 (0..key.level()).zip(&self.ncoeffs).collect_vec()
             } else {
-                (0..key.level()).zip(vec![self.ncoeffs.last().unwrap()]).collect_vec()
+                (0..key.level())
+                    .zip(vec![self.ncoeffs.last().unwrap()])
+                    .collect_vec()
             };
 
             let mut level_displacement = 0;
@@ -108,11 +116,17 @@ where
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     let ncoeffs = self.ncoeffs(key.level());
-                    Some(&self.locals[level_displacement+key_idx*ncoeffs..level_displacement+(key_idx+1)*ncoeffs])
+                    Some(
+                        &self.locals[level_displacement + key_idx * ncoeffs
+                            ..level_displacement + (key_idx + 1) * ncoeffs],
+                    )
                 }
                 FmmEvalType::Matrix(nmatvecs) => {
                     let ncoeffs = self.ncoeffs(key.level());
-                    Some(&self.locals[nmatvecs*(level_displacement+key_idx*ncoeffs)..nmatvecs*(level_displacement+(key_idx+1)*ncoeffs)])
+                    Some(
+                        &self.locals[nmatvecs * (level_displacement + key_idx * ncoeffs)
+                            ..nmatvecs * (level_displacement + (key_idx + 1) * ncoeffs)],
+                    )
                 }
             }
         } else {
