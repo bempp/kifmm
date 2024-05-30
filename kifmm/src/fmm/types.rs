@@ -187,10 +187,10 @@ where
     pub charges: Vec<Scalar>,
 
     /// The expansion order of the FMM
-    pub expansion_order: usize,
+    pub expansion_order: Vec<usize>, // Index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs: usize,
+    pub ncoeffs: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -287,12 +287,12 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
-            expansion_order: 0,
+            expansion_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
-            ncoeffs: 0,
+            ncoeffs: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),
@@ -452,10 +452,10 @@ where
     pub domain: Option<Domain<Scalar::Real>>,
 
     /// Expansion order
-    pub expansion_order: Option<usize>,
+    pub expansion_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs: Option<usize>,
+    pub ncoeffs: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,

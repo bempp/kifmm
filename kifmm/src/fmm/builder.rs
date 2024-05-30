@@ -1,5 +1,6 @@
 //! Builder objects to construct FMMs
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use itertools::Itertools;
 use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
 
 use crate::{
@@ -61,6 +62,7 @@ where
         sources: &[Scalar::Real],
         targets: &[Scalar::Real],
         n_crit: Option<u64>,
+        depth: Option<u64>,
         prune_empty: bool,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
@@ -89,14 +91,25 @@ where
             let domain = source_domain.union(&target_domain);
             self.domain = Some(domain);
 
-            // If not specified estimate from point data estimate critical value
-            let n_crit = n_crit.unwrap_or(DEFAULT_NCRIT);
+            let source_depth;
+            let target_depth;
 
-            // Estimate depth based on a uniform distribution
-            let source_depth =
-                SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit);
-            let target_depth =
-                SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit);
+            if depth.is_some() && n_crit.is_none() {
+                source_depth = depth.unwrap();
+                target_depth = depth.unwrap();
+            } else if depth.is_none() && n_crit.is_some() {
+                // Estimate depth based on a uniform distribution
+                source_depth =
+                    SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit.unwrap());
+                target_depth =
+                    SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit.unwrap());
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Either of `ncrit` or `depth` must be supplied, not both or neither.",
+                ))
+            }
+
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
             let source_tree = SingleNodeTree::new(sources, depth, prune_empty, self.domain)?;
@@ -124,7 +137,7 @@ where
     pub fn parameters(
         mut self,
         charges: &[Scalar],
-        expansion_order: usize,
+        expansion_order: &[usize],
         kernel: Kernel,
         eval_type: EvalType,
         source_to_target: SourceToTargetData,
@@ -160,8 +173,17 @@ where
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
-            self.expansion_order = Some(expansion_order);
-            self.ncoeffs = Some(ncoeffs_kifmm(expansion_order));
+
+            let depth = self.tree.as_ref().unwrap().source_tree().depth();
+            if !(self.expansion_order.as_ref().unwrap().len() == 1 || self.expansion_order.as_ref().unwrap().len() == (depth + 1) as usize) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "Number of expansion orders must either be 1, or match the depth of the tree",
+                ))
+            }
+
+            self.expansion_order = Some(expansion_order.to_vec());
+            self.ncoeffs = Some(expansion_order.iter().map(|&e| ncoeffs_kifmm(e)).collect_vec());
             self.isa = Some(Isa::new());
 
             self.kernel = Some(kernel);
