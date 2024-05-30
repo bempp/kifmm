@@ -73,82 +73,98 @@ where
     Self: SourceToTargetTranslation,
 {
     fn source(&mut self) {
+
         let root = MortonKey::<Scalar::Real>::root();
-        let expansion_order = self.expansion_order[0];
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let domain = self.tree.domain;
 
-        // Compute required surfaces
-        let upward_equivalent_surface = root.surface_grid(expansion_order, &domain, alpha_inner);
-        let upward_check_surface = root.surface_grid(expansion_order, &domain, alpha_outer);
-
-        let nequiv_surface = upward_equivalent_surface.len() / self.dim;
-        let ncheck_surface = upward_check_surface.len() / self.dim;
-
-        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
-        // As well as estimating their inverses using SVD
-        let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
-        self.kernel.assemble_st(
-            EvalType::Value,
-            &upward_equivalent_surface[..],
-            &upward_check_surface[..],
-            uc2e_t.data_mut(),
-        );
-
-        // Need to transpose so that rows correspond to targets and columns to sources
-        let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-        uc2e.fill_from(uc2e_t.transpose());
-
-        let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = Scalar::from_real(s[i]);
-        }
-
-        let uc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
-        let uc2e_inv_2 = vec![ut];
-
         // Calculate M2M operator matrices
         let children = root.children();
-        let mut m2m = vec![rlst_dynamic_array2!(
-            Scalar,
-            [nequiv_surface, 8 * nequiv_surface]
-        )];
-        let mut m2m_vec = vec![Vec::new()];
+        let mut m2m = Vec::new();
+        let mut m2m_vec = Vec::new();
+        let mut uc2e_inv_1 = Vec::new();
+        let mut uc2e_inv_2 = Vec::new();
 
-        for (i, child) in children.iter().enumerate() {
-            let child_upward_equivalent_surface =
-                child.surface_grid(expansion_order, &domain, alpha_inner);
+        for level in 0..self.expansion_order.len() {
 
-            let mut pc2ce_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            let expansion_order = self.expansion_order[level];
+            // Compute required surfaces
+            let upward_equivalent_surface = root.surface_grid(expansion_order, &domain, alpha_inner);
+            let upward_check_surface = root.surface_grid(expansion_order, &domain, alpha_outer);
 
+            let nequiv_surface = upward_equivalent_surface.len() / self.dim;
+            let ncheck_surface = upward_check_surface.len() / self.dim;
+
+            let mut m2m_level = rlst_dynamic_array2!(
+                Scalar,
+                [nequiv_surface, 8 * nequiv_surface]
+            );
+            let mut m2m_vec_level = Vec::new();
+
+            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+            // As well as estimating their inverses using SVD
+            let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &child_upward_equivalent_surface,
-                &upward_check_surface,
-                pc2ce_t.data_mut(),
+                &upward_equivalent_surface[..],
+                &upward_check_surface[..],
+                uc2e_t.data_mut(),
             );
 
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut pc2ce = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            pc2ce.fill_from(pc2ce_t.transpose());
+            // Need to transpose so that rows correspond to targets and columns to sources
+            let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+            uc2e.fill_from(uc2e_t.transpose());
 
-            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
-            );
-            let l = i * nequiv_surface * nequiv_surface;
-            let r = l + nequiv_surface * nequiv_surface;
+            let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
 
-            m2m[0].data_mut()[l..r].copy_from_slice(tmp.data());
-            m2m_vec[0].push(tmp);
+            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            for i in 0..s.len() {
+                mat_s[[i, i]] = Scalar::from_real(s[i]);
+            }
+
+            let uc2e_inv_1_level = empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view());
+            let uc2e_inv_2_level = ut;
+
+
+            for (i, child) in children.iter().enumerate() {
+                let child_upward_equivalent_surface =
+                    child.surface_grid(expansion_order, &domain, alpha_inner);
+
+                let mut pc2ce_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+
+                self.kernel.assemble_st(
+                    EvalType::Value,
+                    &child_upward_equivalent_surface,
+                    &upward_check_surface,
+                    pc2ce_t.data_mut(),
+                );
+
+                // Need to transpose so that rows correspond to targets, and columns to sources
+                let mut pc2ce = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+                pc2ce.fill_from(pc2ce_t.transpose());
+
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    uc2e_inv_1_level.view(),
+                    empty_array::<Scalar, 2>()
+                        .simple_mult_into_resize(uc2e_inv_2_level.view(), pc2ce.view()),
+                );
+                let l = i * nequiv_surface * nequiv_surface;
+                let r = l + nequiv_surface * nequiv_surface;
+
+                m2m_level.data_mut()[l..r].copy_from_slice(tmp.data());
+                m2m_vec_level.push(tmp);
+            }
+
+            uc2e_inv_1.push(uc2e_inv_1_level);
+            uc2e_inv_2.push(uc2e_inv_2_level);
+            m2m.push(m2m_level);
+            m2m_vec.push(m2m_vec_level);
         }
+
+        println!("HERE {:?} {:?} {:?}", m2m, uc2e_inv_1, uc2e_inv_2);
 
         self.source = m2m;
         self.source_vec = m2m_vec;
@@ -246,7 +262,6 @@ where
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
-        let expansion_order = self.expansion_order[0];
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -255,12 +270,20 @@ where
 
         let depth = self.tree.source_tree().depth();
 
+        let iterator;
+        if self.expansion_order.len() > 1 {
+            iterator = (0..=depth).zip(self.expansion_order.clone()).collect_vec();
+        } else {
+            iterator = (0..=depth).zip(vec![self.expansion_order[0]; (depth as usize)+1]).collect_vec();
+        }
+
         let mut curr = root;
         let mut uc2e_inv_1 = Vec::new();
         let mut uc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        for _level in 0..=depth {
+        for &(_level, expansion_order) in &iterator {
+
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(expansion_order, &domain, alpha_inner);
@@ -301,7 +324,7 @@ where
         let mut source = Vec::new();
         let mut source_vec = Vec::new();
 
-        for level in 0..depth {
+        for &(level, expansion_order) in &iterator {
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(expansion_order, &domain, alpha_inner);
@@ -1762,20 +1785,36 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn c2e_operator_index(&self, _level: u64) -> usize {
-        0
+    fn c2e_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            level as usize
+        } else {
+            0
+        }
     }
 
-    fn m2m_operator_index(&self, _level: u64) -> usize {
-        0
+    fn m2m_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 1) as usize
+        } else {
+            0
+        }
     }
 
-    fn l2l_operator_index(&self, _level: u64) -> usize {
-        0
+    fn l2l_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 1) as usize
+        } else {
+            0
+        }
     }
 
-    fn m2l_operator_index(&self, _level: u64) -> usize {
-        0
+    fn m2l_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 2) as usize
+        } else {
+            0
+        }
     }
 
     fn displacement_index(&self, level: u64) -> usize {
@@ -2580,5 +2619,44 @@ mod test {
         let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
 
         assert!(rel_error < 1e-15);
+    }
+
+    #[test]
+    fn test_variable_expansion_order() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        // let n_crit = Some(100);
+        let n_crit = None;
+        let depth = Some(4);
+        let expansion_order = [6, 5, 4, 3, 2];
+        // let expansion_order = [6];
+        let prune_empty = true;
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                FftFieldTranslation::new(),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        assert!(false);
     }
 }
