@@ -175,7 +175,6 @@ where
             m2m.push(m2m_level);
         }
 
-
         self.source = m2m;
         self.source_vec = m2m_vec;
         self.uc2e_inv_1 = uc2e_inv_1;

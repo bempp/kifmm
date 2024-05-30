@@ -106,7 +106,7 @@ pub fn leaf_surfaces<T>(
     tree: &SingleNodeTree<T>,
     ncoeffs_leaf: usize,
     alpha: T,
-    expansion_order: usize,
+    expansion_order_leaf: usize,
 ) -> Vec<T>
 where
     T: RlstScalar + Float + Default,
@@ -118,7 +118,7 @@ where
     for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
         let l = i * ncoeffs_leaf * dim;
         let r = l + ncoeffs_leaf * dim;
-        let surface = key.surface_grid(expansion_order, tree.domain(), alpha);
+        let surface = key.surface_grid(expansion_order_leaf, tree.domain(), alpha);
 
         result[l..r].copy_from_slice(&surface);
     }
