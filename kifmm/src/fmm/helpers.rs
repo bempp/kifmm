@@ -76,7 +76,11 @@ pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
 /// # Arguments
 /// * `tree`- Single node tree
 /// * `ncoeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales<T>(tree: &SingleNodeTree<T::Real>, homogenous: bool, ncoeffs_leaf: usize) -> Vec<T>
+pub fn leaf_scales<T>(
+    tree: &SingleNodeTree<T::Real>,
+    homogenous: bool,
+    ncoeffs_leaf: usize,
+) -> Vec<T>
 where
     T: RlstScalar + Default,
 {
@@ -88,8 +92,9 @@ where
             let l = i * ncoeffs_leaf;
             let r = l + ncoeffs_leaf;
 
-            result[l..r]
-                .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); ncoeffs_leaf].as_slice());
+            result[l..r].copy_from_slice(
+                vec![homogenous_kernel_scale(leaf.level()); ncoeffs_leaf].as_slice(),
+            );
         }
     }
     result
@@ -208,7 +213,7 @@ where
         }
         result[level as usize] = tmp_multipoles;
 
-        level_displacement += nkeys_level*ncoeffs;
+        level_displacement += nkeys_level * ncoeffs;
     }
 
     result
@@ -227,15 +232,16 @@ where
 {
     let mut result = vec![Vec::new(); n_leaves];
 
-    let level_displacement = (0..tree.depth()).zip(ncoeffs).fold(0usize, |acc, (level, &ncoeffs)|  {
-        acc + tree.n_keys(level).unwrap()*ncoeffs
-    });
+    let level_displacement = (0..tree.depth())
+        .zip(ncoeffs)
+        .fold(0usize, |acc, (level, &ncoeffs)| {
+            acc + tree.n_keys(level).unwrap() * ncoeffs
+        });
 
     let &ncoeffs_leaf = ncoeffs.last().unwrap();
 
     for (leaf_idx, _leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-
-        let key_displacement = level_displacement+leaf_idx*ncoeffs_leaf;
+        let key_displacement = level_displacement + leaf_idx * ncoeffs_leaf;
 
         for eval_idx in 0..nmatvecs {
             let eval_displacement = ncoeffs_leaf * eval_idx;

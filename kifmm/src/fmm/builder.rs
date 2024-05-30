@@ -107,7 +107,7 @@ where
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
                     "Either of `ncrit` or `depth` must be supplied, not both or neither.",
-                ))
+                ));
             }
 
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
@@ -175,15 +175,22 @@ where
             }
 
             let depth = self.tree.as_ref().unwrap().source_tree().depth();
-            if !(self.expansion_order.as_ref().unwrap().len() == 1 || self.expansion_order.as_ref().unwrap().len() == (depth + 1) as usize) {
+            if !(self.expansion_order.as_ref().unwrap().len() == 1
+                || self.expansion_order.as_ref().unwrap().len() == (depth + 1) as usize)
+            {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     "Number of expansion orders must either be 1, or match the depth of the tree",
-                ))
+                ));
             }
 
             self.expansion_order = Some(expansion_order.to_vec());
-            self.ncoeffs = Some(expansion_order.iter().map(|&e| ncoeffs_kifmm(e)).collect_vec());
+            self.ncoeffs = Some(
+                expansion_order
+                    .iter()
+                    .map(|&e| ncoeffs_kifmm(e))
+                    .collect_vec(),
+            );
             self.isa = Some(Isa::new());
 
             self.kernel = Some(kernel);

@@ -535,10 +535,10 @@ where
     Scalar: RlstScalar + AsComplex + Default + Dft,
 {
     /// Map between indices of surface convolution grid points.
-    pub surf_to_conv_map: Vec<usize>,
+    pub surf_to_conv_map: Vec<Vec<usize>>, // Indexed by level
 
     /// Map between indices of convolution and surface grid points.
-    pub conv_to_surf_map: Vec<usize>,
+    pub conv_to_surf_map: Vec<Vec<usize>>, // Indexed by level
 
     /// Precomputed data required for FFT compressed M2L interaction.
     pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
@@ -580,16 +580,16 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>,
+    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>, // Indexed by level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
     /// Cutoff rank
-    pub cutoff_rank: usize,
+    pub cutoff_rank: Vec<usize>, // Indexed by level
 
     /// Directional cutoff ranks
-    pub directional_cutoff_ranks: Vec<usize>,
+    pub directional_cutoff_ranks: Vec<Vec<usize>>,
 
     /// The map between sources/targets in
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
