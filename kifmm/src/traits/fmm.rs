@@ -101,7 +101,10 @@ where
     ) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get the expansion order associated with this FMM
-    fn expansion_order(&self) -> usize;
+    fn expansion_order(&self, level: u64) -> usize;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn ncoeffs(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;

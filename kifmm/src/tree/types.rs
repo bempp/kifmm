@@ -284,6 +284,9 @@ where
     /// Map between a key and its index
     pub key_to_index: HashMap<MortonKey<T>, usize>,
 
+    /// Map between a key and its index at a level
+    pub key_to_level_index: HashMap<MortonKey<T>, usize>,
+
     /// Map between a leaf and its index
     pub leaf_to_index: HashMap<MortonKey<T>, usize>,
 

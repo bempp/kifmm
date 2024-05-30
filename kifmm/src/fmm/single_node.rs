@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
+use itertools::Itertools;
 use rlst::RlstScalar;
 
 use crate::{
@@ -39,8 +40,12 @@ where
         self.dim
     }
 
-    fn expansion_order(&self) -> usize {
-        self.expansion_order
+    fn expansion_order(&self, level: u64) -> usize {
+        self.expansion_order[self.c2e_operator_index(level)]
+    }
+
+    fn ncoeffs(&self, level: u64) -> usize {
+        self.ncoeffs[self.c2e_operator_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -55,15 +60,28 @@ where
         &self,
         key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
-        if let Some(index) = self.tree().source_tree().index(key) {
+
+        if let Some(key_idx) = self.tree().source_tree().level_index(key) {
+            let iterator = if self.expansion_order.len() > 1 {
+                (0..key.level()).zip(&self.ncoeffs).collect_vec()
+            } else {
+                (0..key.level()).zip(vec![self.ncoeffs.last().unwrap()]).collect_vec()
+            };
+
+            let mut level_displacement = 0;
+            for (level, &ncoeffs) in iterator {
+                level_displacement += self.tree().source_tree().n_keys(level).unwrap() * ncoeffs;
+            }
+
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
-                    Some(&self.multipoles[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                    let ncoeffs = self.ncoeffs(key.level());
+                    Some(&self.multipoles[level_displacement+key_idx*ncoeffs..level_displacement+(key_idx+1)*ncoeffs])
                 }
-                FmmEvalType::Matrix(nmatvecs) => Some(
-                    &self.multipoles
-                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
-                ),
+                FmmEvalType::Matrix(nmatvecs) => {
+                    let ncoeffs = self.ncoeffs(key.level());
+                    Some(&self.multipoles[nmatvecs*(level_displacement+key_idx*ncoeffs)..nmatvecs*(level_displacement+(key_idx+1)*ncoeffs)])
+                }
             }
         } else {
             None
@@ -74,15 +92,28 @@ where
         &self,
         key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
-        if let Some(index) = self.tree.target_tree().index(key) {
+        if let Some(key_idx) = self.tree.target_tree().level_index(key) {
+
+            let iterator = if self.expansion_order.len() > 1 {
+                (0..key.level()).zip(&self.ncoeffs).collect_vec()
+            } else {
+                (0..key.level()).zip(vec![self.ncoeffs.last().unwrap()]).collect_vec()
+            };
+
+            let mut level_displacement = 0;
+            for (level, &ncoeffs) in iterator {
+                level_displacement += self.tree().target_tree().n_keys(level).unwrap() * ncoeffs;
+            }
+
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
-                    Some(&self.locals[index * self.ncoeffs..(index + 1) * self.ncoeffs])
+                    let ncoeffs = self.ncoeffs(key.level());
+                    Some(&self.locals[level_displacement+key_idx*ncoeffs..level_displacement+(key_idx+1)*ncoeffs])
                 }
-                FmmEvalType::Matrix(nmatvecs) => Some(
-                    &self.locals
-                        [index * self.ncoeffs * nmatvecs..(index + 1) * self.ncoeffs * nmatvecs],
-                ),
+                FmmEvalType::Matrix(nmatvecs) => {
+                    let ncoeffs = self.ncoeffs(key.level());
+                    Some(&self.locals[nmatvecs*(level_displacement+key_idx*ncoeffs)..nmatvecs*(level_displacement+(key_idx+1)*ncoeffs)])
+                }
             }
         } else {
             None
@@ -514,7 +545,7 @@ mod test {
 
         let multipole = fmm.multipole(&root).unwrap();
         let upward_equivalent_surface = root.surface_grid(
-            fmm.expansion_order(),
+            fmm.expansion_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );
@@ -559,7 +590,7 @@ mod test {
         let multipole = fmm.multipole(&root).unwrap();
 
         let upward_equivalent_surface = root.surface_grid(
-            fmm.expansion_order(),
+            fmm.expansion_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );

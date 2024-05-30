@@ -2296,8 +2296,8 @@ mod test {
         let c_u = &fmm.source_to_target.metadata[0].c_u[c_idx];
         let c_vt = &fmm.source_to_target.metadata[0].c_vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs[coeff_idx], 1]);
-        for i in 0..fmm.ncoeffs[coeff_idx] {
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs(level), 1]);
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2319,17 +2319,18 @@ mod test {
         let alpha = ALPHA_INNER;
 
         let sources = transfer_vector.source.surface_grid(
-            expansion_order[coeff_idx],
-            &fmm.tree.domain,
-            alpha,
-        );
-        let targets = transfer_vector.target.surface_grid(
-            expansion_order[coeff_idx],
+            fmm.expansion_order(level),
             &fmm.tree.domain,
             alpha,
         );
 
-        let mut direct = vec![0f64; fmm.ncoeffs[coeff_idx]];
+        let targets = transfer_vector.target.surface_grid(
+            fmm.expansion_order(level),
+            &fmm.tree.domain,
+            alpha,
+        );
+
+        let mut direct = vec![0f64; fmm.ncoeffs(level)];
 
         fmm.kernel.evaluate_st(
             EvalType::Value,
@@ -2406,7 +2407,6 @@ mod test {
         let transfer_vectors = compute_transfer_vectors_at_level::<f64>(level).unwrap();
 
         let m2l_operator_index = fmm.m2l_operator_index(level);
-        let coeff_idx = fmm.c2e_operator_index(level);
 
         // Lookup correct components of SVD compressed M2L operator matrix
         let c_idx = transfer_vectors
@@ -2417,8 +2417,8 @@ mod test {
         let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
         let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs[coeff_idx], 1]);
-        for i in 0..fmm.ncoeffs[coeff_idx] {
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -2429,10 +2429,10 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = source.surface_grid(expansion_order[coeff_idx], &fmm.tree.domain, alpha);
-        let targets = target.surface_grid(expansion_order[coeff_idx], &fmm.tree.domain, alpha);
+        let sources = source.surface_grid(fmm.expansion_order(level), &fmm.tree.domain, alpha);
+        let targets = target.surface_grid(fmm.expansion_order(level), &fmm.tree.domain, alpha);
 
-        let mut direct = vec![c64::zero(); fmm.ncoeffs[coeff_idx]];
+        let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
 
         fmm.kernel.evaluate_st(
             EvalType::Value,
@@ -2552,9 +2552,9 @@ mod test {
         let level = 3;
         let coeff_idx = fmm.c2e_operator_index(level);
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs[coeff_idx], 1]);
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs(level), 1]);
 
-        for i in 0..fmm.ncoeffs[coeff_idx] {
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2652,7 +2652,7 @@ mod test {
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![0f64; fmm.ncoeffs[coeff_idx]];
+        let mut direct = vec![0f64; fmm.ncoeffs(level)];
         fmm.kernel.evaluate_st(
             EvalType::Value,
             &source_equivalent_surface[..],
@@ -2708,9 +2708,9 @@ mod test {
 
         let level = 2;
         let coeff_index = fmm.c2e_operator_index(level);
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs[coeff_index], 1]);
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
 
-        for i in 0..fmm.ncoeffs[coeff_index] {
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -2816,7 +2816,7 @@ mod test {
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![c64::zero(); fmm.ncoeffs[coeff_index]];
+        let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
         fmm.kernel.evaluate_st(
             EvalType::Value,
             &source_equivalent_surface[..],
