@@ -395,8 +395,6 @@ where
                 .collect_vec()
         };
 
-        println!("ITERATOR {:?}", iterator);
-
         // Calculate M2M operator matrices on each level
         for (level, (expansion_order_parent, expansion_order_child)) in iterator {
             // Compute required surfaces
@@ -1544,6 +1542,7 @@ where
                 .directional_cutoff_ranks
                 .push(directional_cutoff_ranks);
         }
+
     }
 }
 

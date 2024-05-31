@@ -226,16 +226,16 @@ where
 
             // Downward pass
             {
-                // for level in 2..=self.tree().target_tree().depth() {
-                //     if level > 2 {
-                //         self.l2l(level)?;
-                //     }
-                //     self.m2l(level)?;
-                // }
+                for level in 2..=self.tree().target_tree().depth() {
+                    if level > 2 {
+                        self.l2l(level)?;
+                    }
+                    self.m2l(level)?;
+                }
 
                 // Leaf level computation
-                // self.p2p()?;
-                // self.l2p()?;
+                self.p2p()?;
+                self.l2p()?;
             }
         }
 
@@ -593,8 +593,10 @@ mod test {
         let abs_error = RlstScalar::abs(expected[0] - found[0]);
         let rel_error = abs_error / expected[0];
 
-        println!("rel error {:?}", rel_error);
-
+        println!(
+            "abs {:?} rel {:?} \n expected {:?} found {:?}",
+            abs_error, rel_error, expected, found
+        );
         assert!(rel_error <= threshold);
     }
 
@@ -655,13 +657,13 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
-        // let n_crit = Some(100);
-        // let depth = None;
-        // let expansion_order = [6];
+        let n_crit = Some(100);
+        let depth = None;
+        let expansion_order = [6];
 
-        let n_crit = None;
-        let depth = Some(3);
-        let expansion_order = [5, 6, 5, 6];
+        // let n_crit = None;
+        // let depth = Some(3);
+        // let expansion_order = [5, 6, 5, 6];
 
         let prune_empty = true;
 
@@ -779,11 +781,17 @@ mod test {
         let n_crit = Some(100);
         let depth = None;
         let expansion_order = [6];
+
+        // let n_crit = None;
+        // let depth = Some(3);
+        // let expansion_order = [5, 6, 5, 6];
+
         let prune_empty = true;
         let threshold_pot = 1e-5;
         let threshold_deriv = 1e-4;
         let threshold_deriv_blas = 1e-3;
         let singular_value_threshold = Some(1e-2);
+
 
         // Charge data
         let nvecs = 1;

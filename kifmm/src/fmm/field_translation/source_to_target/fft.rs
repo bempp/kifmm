@@ -260,9 +260,9 @@ where
                 // 2. Compute the Hadamard product
                 {
                     (0..size_out)
-                        .into_iter()
-                        .zip(signals_hat_f.chunks_exact(nsources + nzeros))
-                        .zip(check_potentials_hat_f.chunks_exact_mut(ntargets))
+                        .into_par_iter()
+                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
+                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
                         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
                                 |chunk_start| {
