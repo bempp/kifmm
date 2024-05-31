@@ -214,7 +214,7 @@ where
         }
         result[level as usize] = tmp_multipoles;
 
-        level_displacement += nkeys_level * ncoeffs;
+        level_displacement += nkeys_level * ncoeffs * nmatvecs;
     }
 
     result
@@ -245,13 +245,13 @@ where
     };
 
     let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
-        acc + tree.n_keys(level).unwrap() * ncoeffs
+        acc + tree.n_keys(level).unwrap() * ncoeffs * nmatvecs
     });
 
     let &ncoeffs_leaf = ncoeffs.last().unwrap();
 
     for (leaf_idx, _leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let key_displacement = level_displacement + leaf_idx * ncoeffs_leaf;
+        let key_displacement = level_displacement + (leaf_idx * ncoeffs_leaf) * nmatvecs;
 
         for eval_idx in 0..nmatvecs {
             let eval_displacement = ncoeffs_leaf * eval_idx;

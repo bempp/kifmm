@@ -142,7 +142,7 @@ where
                                 .for_each(|(m, t)| *m += *t);
                         }
                     });
-
+                let multipole = self.multipoles(depth).unwrap();
                 Ok(())
             }
 
@@ -230,6 +230,7 @@ where
                                 ),
                             )
                         };
+                        assert!(multipole_ptrs.len() == 2);
 
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(nmatvecs) {
                             let multipole = unsafe {
@@ -241,6 +242,8 @@ where
                                 .for_each(|(m, t)| *m += *t);
                         }
                     });
+
+                let multipole = self.multipoles(depth).unwrap();
                 Ok(())
             }
         }
@@ -267,6 +270,9 @@ where
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
+                let multipole = self.multipoles(level).unwrap();
+                println!("HERE VEC {:?} {:?}", &multipole[0..5], multipole.len());
+
                 let mut parent_multipoles = Vec::new();
                 for parent in parent_targets.iter() {
                     let &parent_index_pointer = self.level_index_pointer_multipoles
@@ -377,6 +383,7 @@ where
                             }
                         }
                     });
+
                 Ok(())
             }
         }
