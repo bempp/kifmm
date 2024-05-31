@@ -661,7 +661,7 @@ mod test {
 
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [5, 5, 5, 6];
+        let expansion_order = [6, 6, 6, 6];
 
         let prune_empty = true;
 
