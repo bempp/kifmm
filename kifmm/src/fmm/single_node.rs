@@ -227,14 +227,14 @@ where
             // Downward pass
             {
                 for level in 2..=self.tree().target_tree().depth() {
-                    // if level > 2 {
-                    //     self.l2l(level)?;
-                    // }
+                    if level > 2 {
+                        self.l2l(level)?;
+                    }
                     self.m2l(level)?;
                 }
 
                 // Leaf level computation
-                // self.p2p()?;
+                self.p2p()?;
                 self.l2p()?;
             }
         }

@@ -230,8 +230,6 @@ where
                                 ),
                             )
                         };
-                        assert!(multipole_ptrs.len() == 2);
-
                         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(nmatvecs) {
                             let multipole = unsafe {
                                 std::slice::from_raw_parts_mut(multipole_ptr.raw, ncoeffs)
@@ -243,7 +241,6 @@ where
                         }
                     });
 
-                let multipole = self.multipoles(depth).unwrap();
                 Ok(())
             }
         }
@@ -271,7 +268,6 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let multipole = self.multipoles(level).unwrap();
-                println!("HERE VEC {:?} {:?}", &multipole[0..5], multipole.len());
 
                 let mut parent_multipoles = Vec::new();
                 for parent in parent_targets.iter() {
