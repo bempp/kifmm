@@ -461,7 +461,6 @@ where
         let mut dc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-
         let iterator;
         if self.expansion_order.len() > 1 {
             iterator = self.expansion_order.iter().cloned().collect_vec();
@@ -552,24 +551,20 @@ where
                     child.surface_grid(expansion_order_child, &domain, alpha_inner);
                 // Need to transpose so that rows correspond to targets, and columns to sources
 
-                let mut cc2pe_t =
+                let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
                 self.kernel.assemble_st(
                     EvalType::Value,
-                    &parent_downward_equivalent_surface,
                     &child_downward_check_surface,
-                    cc2pe_t.data_mut(),
+                    &parent_downward_equivalent_surface,
+                    pe2cc.data_mut(),
                 );
 
-                // Need to transpose so that rows correspond to targets, and columns to sources
-                let mut cc2pe =
-                    rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, ncheck_surface_child]);
-                cc2pe.fill_from(cc2pe_t.transpose());
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     dc2e_inv_1[(level + 1) as usize].view(),
                     empty_array::<Scalar, 2>().simple_mult_into_resize(
                         dc2e_inv_2[(level + 1) as usize].view(),
-                        cc2pe.view(),
+                        pe2cc.view(),
                     ),
                 );
 
@@ -2768,7 +2763,7 @@ mod test {
             .unwrap();
 
         let level = 2;
-        let coeff_index = fmm.c2e_operator_index(level);
+        let coeff_index = fmm.expansion_index(level);
         let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
 
         for i in 0..fmm.ncoeffs(level) {

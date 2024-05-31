@@ -395,7 +395,8 @@ pub enum FmmEvalType {
 ///
 /// // FMM parameters
 /// let n_crit = Some(150);
-/// let expansion_order = 10;
+/// let depth = None;
+/// let expansion_order = [10];
 /// let prune_empty = true;
 ///
 /// /// Charge data
@@ -406,14 +407,14 @@ pub enum FmmEvalType {
 ///
 /// /// Create a new builder, and attach a tree
 /// let fmm = SingleNodeBuilder::new()
-///     .tree(sources.data(), targets.data(), n_crit, prune_empty)
+///     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 ///     .unwrap();
 ///
 /// /// Specify the FMM parameters, such as the kernel , the kernel evaluation mode, expansion order and charge data
 /// let fmm = fmm
 ///     .parameters(
 ///         charges.data(),
-///         expansion_order,
+///         &expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
 ///         FftFieldTranslation::new(),
