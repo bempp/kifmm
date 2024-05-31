@@ -5,7 +5,6 @@ use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
 
 use crate::{
     fmm::{
-        constants::DEFAULT_NCRIT,
         helpers::{map_charges, ncoeffs_kifmm},
         types::{FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
@@ -175,9 +174,7 @@ where
             }
 
             let depth = self.tree.as_ref().unwrap().source_tree().depth();
-            if !(self.expansion_order.as_ref().unwrap().len() == 1
-                || self.expansion_order.as_ref().unwrap().len() == (depth + 1) as usize)
-            {
+            if !(expansion_order.len() == 1 || expansion_order.len() == (depth + 1) as usize) {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     "Number of expansion orders must either be 1, or match the depth of the tree",

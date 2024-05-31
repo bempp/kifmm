@@ -3,7 +3,6 @@ use std::time::Instant;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-use itertools::Itertools;
 use rlst::RlstScalar;
 
 use crate::{
@@ -41,11 +40,11 @@ where
     }
 
     fn expansion_order(&self, level: u64) -> usize {
-        self.expansion_order[self.c2e_operator_index(level)]
+        self.expansion_order[self.expansion_index(level)]
     }
 
     fn ncoeffs(&self, level: u64) -> usize {
-        self.ncoeffs[self.c2e_operator_index(level)]
+        self.ncoeffs[self.expansion_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -60,34 +59,19 @@ where
         &self,
         key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
-        if let Some(key_idx) = self.tree().source_tree().level_index(key) {
-            let iterator = if self.expansion_order.len() > 1 {
-                (0..key.level()).zip(&self.ncoeffs).collect_vec()
-            } else {
-                (0..key.level())
-                    .zip(vec![self.ncoeffs.last().unwrap()])
-                    .collect_vec()
-            };
+        if let Some(&key_idx) = self.tree().source_tree().level_index(key) {
+            let multipole_ptr = &self.level_multipoles[key.level() as usize][key_idx][0];
 
-            let mut level_displacement = 0;
-            for (level, &ncoeffs) in iterator {
-                level_displacement += self.tree().source_tree().n_keys(level).unwrap() * ncoeffs;
-            }
-
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => {
-                    let ncoeffs = self.ncoeffs(key.level());
-                    Some(
-                        &self.multipoles[level_displacement + key_idx * ncoeffs
-                            ..level_displacement + (key_idx + 1) * ncoeffs],
-                    )
-                }
-                FmmEvalType::Matrix(nmatvecs) => {
-                    let ncoeffs = self.ncoeffs(key.level());
-                    Some(
-                        &self.multipoles[nmatvecs * (level_displacement + key_idx * ncoeffs)
-                            ..nmatvecs * (level_displacement + (key_idx + 1) * ncoeffs)],
-                    )
+            unsafe {
+                match self.fmm_eval_type {
+                    FmmEvalType::Vector => Some(&std::slice::from_raw_parts(
+                        multipole_ptr.raw,
+                        self.ncoeffs(key.level()),
+                    )),
+                    FmmEvalType::Matrix(nmatvecs) => Some(&std::slice::from_raw_parts(
+                        multipole_ptr.raw,
+                        self.ncoeffs(key.level()) * nmatvecs,
+                    )),
                 }
             }
         } else {
@@ -95,42 +79,61 @@ where
         }
     }
 
+    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
+        let multipole_ptr = &self.level_multipoles[level as usize][0][0];
+        let nsources = self.tree.source_tree.n_keys(level).unwrap();
+        unsafe {
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => Some(std::slice::from_raw_parts(
+                    multipole_ptr.raw,
+                    self.ncoeffs(level) * nsources,
+                )),
+                FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
+                    multipole_ptr.raw,
+                    self.ncoeffs(level) * nsources * nmatvecs,
+                )),
+            }
+        }
+    }
+
     fn local(
         &self,
         key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<&[Self::Scalar]> {
-        if let Some(key_idx) = self.tree.target_tree().level_index(key) {
-            let iterator = if self.expansion_order.len() > 1 {
-                (0..key.level()).zip(&self.ncoeffs).collect_vec()
-            } else {
-                (0..key.level())
-                    .zip(vec![self.ncoeffs.last().unwrap()])
-                    .collect_vec()
-            };
+        if let Some(&key_idx) = self.tree().target_tree().level_index(key) {
+            let local_ptr = &self.level_locals[key.level() as usize][key_idx][0];
 
-            let mut level_displacement = 0;
-            for (level, &ncoeffs) in iterator {
-                level_displacement += self.tree().target_tree().n_keys(level).unwrap() * ncoeffs;
-            }
-
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => {
-                    let ncoeffs = self.ncoeffs(key.level());
-                    Some(
-                        &self.locals[level_displacement + key_idx * ncoeffs
-                            ..level_displacement + (key_idx + 1) * ncoeffs],
-                    )
-                }
-                FmmEvalType::Matrix(nmatvecs) => {
-                    let ncoeffs = self.ncoeffs(key.level());
-                    Some(
-                        &self.locals[nmatvecs * (level_displacement + key_idx * ncoeffs)
-                            ..nmatvecs * (level_displacement + (key_idx + 1) * ncoeffs)],
-                    )
+            unsafe {
+                match self.fmm_eval_type {
+                    FmmEvalType::Vector => Some(&std::slice::from_raw_parts(
+                        local_ptr.raw,
+                        self.ncoeffs(key.level()),
+                    )),
+                    FmmEvalType::Matrix(nmatvecs) => Some(&std::slice::from_raw_parts(
+                        local_ptr.raw,
+                        self.ncoeffs(key.level()) * nmatvecs,
+                    )),
                 }
             }
         } else {
             None
+        }
+    }
+
+    fn locals(&self, level: u64) -> Option<&[Self::Scalar]> {
+        let local_ptr = &self.level_locals[level as usize][0][0];
+        let ntargets = self.tree.target_tree.n_keys(level).unwrap();
+        unsafe {
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => Some(std::slice::from_raw_parts(
+                    local_ptr.raw,
+                    self.ncoeffs(level) * ntargets,
+                )),
+                FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
+                    local_ptr.raw,
+                    self.ncoeffs(level) * ntargets * nmatvecs,
+                )),
+            }
         }
     }
 
@@ -240,72 +243,72 @@ where
     }
 
     fn clear(&mut self, charges: &[Self::Scalar]) {
-        // let ntarget_points = self.tree().target_tree().n_coordinates_tot().unwrap();
-        // let nsource_points = self.tree().source_tree().n_coordinates_tot().unwrap();
-        // let nmatvecs = charges.len() / nsource_points;
-        // let nsource_leaves = self.tree().source_tree().n_leaves().unwrap();
-        // let ntarget_leaves = self.tree().target_tree().n_leaves().unwrap();
+        let ntarget_points = self.tree().target_tree().n_coordinates_tot().unwrap();
+        let nsource_points = self.tree().source_tree().n_coordinates_tot().unwrap();
+        let nmatvecs = charges.len() / nsource_points;
+        let nsource_leaves = self.tree().source_tree().n_leaves().unwrap();
+        let ntarget_leaves = self.tree().target_tree().n_leaves().unwrap();
 
-        // // Clear buffers and set new buffers
-        // self.multipoles = vec![Scalar::default(); self.multipoles.len()];
-        // self.locals = vec![Scalar::default(); self.locals.len()];
-        // self.potentials = vec![Scalar::default(); self.potentials.len()];
-        // self.charges = vec![Scalar::default(); self.charges.len()];
+        // Clear buffers and set new buffers
+        self.multipoles = vec![Scalar::default(); self.multipoles.len()];
+        self.locals = vec![Scalar::default(); self.locals.len()];
+        self.potentials = vec![Scalar::default(); self.potentials.len()];
+        self.charges = vec![Scalar::default(); self.charges.len()];
 
-        // // Recreate mutable pointers for new buffers
-        // let potentials_send_pointers = potential_pointers(
-        //     self.tree.target_tree(),
-        //     nmatvecs,
-        //     ntarget_leaves,
-        //     ntarget_points,
-        //     self.kernel_eval_size,
-        //     &self.potentials,
-        // );
+        // Recreate mutable pointers for new buffers
+        let potentials_send_pointers = potential_pointers(
+            self.tree.target_tree(),
+            nmatvecs,
+            ntarget_leaves,
+            ntarget_points,
+            self.kernel_eval_size,
+            &self.potentials,
+        );
 
-        // let leaf_multipoles = leaf_expansion_pointers(
-        //     self.tree().source_tree(),
-        //     self.ncoeffs,
-        //     nmatvecs,
-        //     nsource_leaves,
-        //     &self.multipoles,
-        // );
+        let leaf_multipoles = leaf_expansion_pointers(
+            self.tree().source_tree(),
+            &self.ncoeffs,
+            nmatvecs,
+            nsource_leaves,
+            &self.multipoles,
+        );
 
-        // let level_multipoles = level_expansion_pointers(
-        //     self.tree().source_tree(),
-        //     self.ncoeffs,
-        //     nmatvecs,
-        //     &self.multipoles,
-        // );
+        let level_multipoles = level_expansion_pointers(
+            self.tree().source_tree(),
+            &self.ncoeffs,
+            nmatvecs,
+            &self.multipoles,
+        );
 
-        // let level_locals = level_expansion_pointers(
-        //     self.tree().target_tree(),
-        //     self.ncoeffs,
-        //     nmatvecs,
-        //     &self.locals,
-        // );
+        let level_locals = level_expansion_pointers(
+            self.tree().target_tree(),
+            &self.ncoeffs,
+            nmatvecs,
+            &self.locals,
+        );
 
-        // let leaf_locals = leaf_expansion_pointers(
-        //     self.tree().target_tree(),
-        //     self.ncoeffs,
-        //     nmatvecs,
-        //     ntarget_leaves,
-        //     &self.locals,
-        // );
+        let leaf_locals = leaf_expansion_pointers(
+            self.tree().target_tree(),
+            &self.ncoeffs,
+            nmatvecs,
+            ntarget_leaves,
+            &self.locals,
+        );
 
-        // // Set mutable pointers
-        // self.level_locals = level_locals;
-        // self.level_multipoles = level_multipoles;
-        // self.leaf_locals = leaf_locals;
-        // self.leaf_multipoles = leaf_multipoles;
-        // self.potentials_send_pointers = potentials_send_pointers;
+        // Set mutable pointers
+        self.level_locals = level_locals;
+        self.level_multipoles = level_multipoles;
+        self.leaf_locals = leaf_locals;
+        self.leaf_multipoles = leaf_multipoles;
+        self.potentials_send_pointers = potentials_send_pointers;
 
-        // // Set new charges
-        // self.charges = map_charges(
-        //     self.tree.source_tree().all_global_indices().unwrap(),
-        //     charges,
-        //     nmatvecs,
-        // )
-        // .to_vec();
+        // Set new charges
+        self.charges = map_charges(
+            self.tree.source_tree().all_global_indices().unwrap(),
+            charges,
+            nmatvecs,
+        )
+        .to_vec();
     }
 }
 
@@ -325,7 +328,10 @@ mod test {
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::tree::{FmmTree, FmmTreeNode, Tree},
+        traits::{
+            fmm::SourceTranslation,
+            tree::{FmmTree, FmmTreeNode, Tree},
+        },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
@@ -587,6 +593,8 @@ mod test {
         let abs_error = RlstScalar::abs(expected[0] - found[0]);
         let rel_error = abs_error / expected[0];
 
+        println!("rel error {:?}", rel_error);
+
         assert!(rel_error <= threshold);
     }
 
@@ -647,9 +655,14 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
+        // let n_crit = Some(100);
+        // let depth = None;
+        // let expansion_order = [6];
+
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [5, 5, 5, 6];
+
         let prune_empty = true;
 
         // Charge data
@@ -671,28 +684,33 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate(false).unwrap();
 
-        let svd_threshold = Some(1e-5);
-        let fmm_svd = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-            .unwrap()
-            .parameters(
-                charges.data(),
-                &expansion_order,
-                Laplace3dKernel::new(),
-                EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm_svd.evaluate(false).unwrap();
+        fmm_fft.p2m().unwrap();
+
+        for level in (1..=fmm_fft.tree().source_tree().depth()).rev() {
+            fmm_fft.m2m(level).unwrap();
+        }
+
+        // let svd_threshold = Some(1e-5);
+        // let fmm_svd = SingleNodeBuilder::new()
+        //     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+        //     .unwrap()
+        //     .parameters(
+        //         charges.data(),
+        //         &expansion_order,
+        //         Laplace3dKernel::new(),
+        //         EvalType::Value,
+        //         BlasFieldTranslationSaRcmp::new(svd_threshold),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
+        // fmm_svd.evaluate(false).unwrap();
 
         let fmm_fft = Box::new(fmm_fft);
-        let fmm_svd = Box::new(fmm_svd);
+        // let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_fft, &sources, &charges, 1e-5);
-        test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
+        // test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
     #[test]

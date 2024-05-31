@@ -91,12 +91,7 @@ where
                 let all_displacements = &self.source_to_target.displacements[displacement_index];
 
                 // Lookup multipole data from source tree
-                let min = &sources[0];
-                let max = &sources[nsources - 1];
-                let min_idx = self.tree().source_tree().index(min).unwrap();
-                let max_idx = self.tree().source_tree().index(max).unwrap();
-                let multipoles =
-                    &self.multipoles[min_idx * self.ncoeffs(level)..(max_idx + 1) * self.ncoeffs(level)];
+                let multipoles = self.multipoles(level).unwrap();
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
@@ -172,11 +167,13 @@ where
                                 vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
-                                let multipole =
-                                    &multipole_chunk[i * self.ncoeffs(level)..(i + 1) * self.ncoeffs(level)];
+                                let multipole = &multipole_chunk
+                                    [i * self.ncoeffs(level)..(i + 1) * self.ncoeffs(level)];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
-                                for (surf_idx, &conv_idx) in
-                                    self.source_to_target.surf_to_conv_map[m2l_operator_index].iter().enumerate()
+                                for (surf_idx, &conv_idx) in self.source_to_target.surf_to_conv_map
+                                    [m2l_operator_index]
+                                    .iter()
+                                    .enumerate()
                                 {
                                     signal[conv_idx] = multipole[surf_idx]
                                 }
@@ -349,8 +346,10 @@ where
                                 rlst_dynamic_array2!(Scalar, [self.ncoeffs(level), NSIBLINGS]);
 
                             for i in 0..NSIBLINGS {
-                                for (surf_idx, &conv_idx) in
-                                    self.source_to_target.conv_to_surf_map[m2l_operator_index].iter().enumerate()
+                                for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
+                                    [m2l_operator_index]
+                                    .iter()
+                                    .enumerate()
                                 {
                                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
                                         check_potential_chunk[i * size_in + conv_idx];
@@ -372,7 +371,10 @@ where
                                 .zip(local_ptrs)
                                 .for_each(|(result, local)| {
                                     let local = unsafe {
-                                        std::slice::from_raw_parts_mut(local[0].raw, self.ncoeffs(level))
+                                        std::slice::from_raw_parts_mut(
+                                            local[0].raw,
+                                            self.ncoeffs(level),
+                                        )
                                     };
                                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                                 });

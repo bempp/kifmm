@@ -33,7 +33,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData + Fmm,
+    Self: FmmOperatorData + Fmm<Scalar = Scalar>,
 {
     fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {
@@ -254,11 +254,6 @@ where
             )));
         };
 
-        let nchild_sources = self.tree.source_tree().n_keys(level).unwrap();
-        let min = &child_sources[0];
-        let max = &child_sources[nchild_sources - 1];
-        let min_idx = self.tree.source_tree.index(min).unwrap();
-        let max_idx = self.tree.source_tree.index(max).unwrap();
         let operator_index = self.m2m_operator_index(level);
 
         let parent_targets: HashSet<_> =
@@ -268,6 +263,7 @@ where
 
         parent_targets.sort();
         let nparents = parent_targets.len();
+        let child_multipoles = self.multipoles(level).unwrap();
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -281,9 +277,6 @@ where
                         &self.level_multipoles[(level - 1) as usize][parent_index_pointer][0];
                     parent_multipoles.push(parent_multipole);
                 }
-
-                let child_multipoles = &self.multipoles
-                    [min_idx * self.ncoeffs(level)..(max_idx + 1) * self.ncoeffs(level)];
 
                 let mut max_chunk_size = nparents;
                 if max_chunk_size > M2M_MAX_CHUNK_SIZE {
@@ -350,11 +343,6 @@ where
                     }
                 }
 
-                let min_key_displacement = min_idx * self.ncoeffs(level) * nmatvecs;
-                let max_key_displacement = (max_idx + 1) * self.ncoeffs(level) * nmatvecs;
-
-                let child_multipoles = &self.multipoles[min_key_displacement..max_key_displacement];
-
                 child_multipoles
                     .par_chunks_exact(nmatvecs * self.ncoeffs(level) * NSIBLINGS)
                     .zip(parent_multipoles.into_par_iter())
@@ -377,10 +365,11 @@ where
                                 parent_multipole_pointers.iter().enumerate().take(nmatvecs)
                             {
                                 let raw = send_ptr.raw;
-                                let parent_multipole_j =
-                                    unsafe { std::slice::from_raw_parts_mut(raw, self.ncoeffs(level - 1)) };
-                                let result_ij =
-                                    &result_i.data()[j * self.ncoeffs(level - 1)..(j + 1) * self.ncoeffs(level - 1)];
+                                let parent_multipole_j = unsafe {
+                                    std::slice::from_raw_parts_mut(raw, self.ncoeffs(level - 1))
+                                };
+                                let result_ij = &result_i.data()[j * self.ncoeffs(level - 1)
+                                    ..(j + 1) * self.ncoeffs(level - 1)];
                                 parent_multipole_j
                                     .iter_mut()
                                     .zip(result_ij.iter())
