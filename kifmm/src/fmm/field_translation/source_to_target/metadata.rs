@@ -283,8 +283,6 @@ where
             l2l.push(l2l_level);
         }
 
-        // println!("L2L {:?} {:?}", l2l, l2l.len());
-        // assert!(false);
         self.target_vec = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
@@ -317,12 +315,19 @@ where
         // Calculate inverse upward check to equivalent matrices on each level
         let iterator;
         if self.expansion_order.len() > 1 {
-            iterator = self.expansion_order.iter().cloned().collect_vec();
+            iterator = (0..=depth)
+                .zip(self.expansion_order.iter().cloned())
+                .collect_vec();
         } else {
-            iterator = vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
+            iterator = (0..=depth)
+                .zip(vec![
+                    *self.expansion_order.last().unwrap();
+                    (depth + 1) as usize
+                ])
+                .collect_vec();
         };
 
-        for expansion_order in iterator {
+        for (level, expansion_order) in iterator {
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(expansion_order, &domain, alpha_inner);
@@ -390,6 +395,8 @@ where
                 .collect_vec()
         };
 
+        println!("ITERATOR {:?}", iterator);
+
         // Calculate M2M operator matrices on each level
         for (level, (expansion_order_parent, expansion_order_child)) in iterator {
             // Compute required surfaces
@@ -408,25 +415,20 @@ where
                 let child_upward_equivalent_surface =
                     child.surface_grid(expansion_order_child, &domain, alpha_inner);
 
-                let mut pc2ce_t =
+                let mut ce2pc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
 
                 self.kernel.assemble_st(
                     EvalType::Value,
-                    &child_upward_equivalent_surface,
                     &parent_upward_check_surface,
-                    pc2ce_t.data_mut(),
+                    &child_upward_equivalent_surface,
+                    ce2pc.data_mut(),
                 );
-
-                // Need to transpose so that rows correspond to targets, and columns to sources
-                let mut pc2ce =
-                    rlst_dynamic_array2!(Scalar, [nequiv_surface_child, ncheck_surface_parent]);
-                pc2ce.fill_from(pc2ce_t.transpose());
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     uc2e_inv_1[level as usize].view(),
                     empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), pc2ce.view()),
+                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), ce2pc.view()),
                 );
                 let l = i * nequiv_surface_child * ncheck_surface_parent;
                 let r = l + nequiv_surface_child * ncheck_surface_parent;
@@ -1071,8 +1073,9 @@ where
                 ])
                 .collect_vec();
         }
+
         // Rest of the levels
-        for (level, expansion_order) in iterator {
+        for &(level, expansion_order) in &iterator {
             let shape = <Scalar as Dft>::shape_in(expansion_order);
             let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
             let transform_size = <Scalar as Dft>::size_out(expansion_order);
@@ -1269,10 +1272,16 @@ where
         // Set operator data
         self.source_to_target.metadata = metadata;
 
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        } else {
+            self.expansion_order.clone()
+        };
+
         // Set required maps
         let mut tmp1 = Vec::new();
         let mut tmp2 = Vec::new();
-        for &expansion_order in self.expansion_order.iter().skip(2) {
+        for expansion_order in iterator {
             let (surf_to_conv_map, conv_to_surf_map) =
                 Self::compute_surf_to_conv_map(expansion_order);
             tmp1.push(surf_to_conv_map);

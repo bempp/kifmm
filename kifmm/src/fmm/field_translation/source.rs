@@ -143,6 +143,8 @@ where
                         }
                     });
 
+                let multipoles = self.multipoles(depth).unwrap();
+
                 Ok(())
             }
 

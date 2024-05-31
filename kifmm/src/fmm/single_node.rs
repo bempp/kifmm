@@ -226,12 +226,12 @@ where
 
             // Downward pass
             {
-                for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        self.l2l(level)?;
-                    }
-                    self.m2l(level)?;
-                }
+                // for level in 2..=self.tree().target_tree().depth() {
+                //     if level > 2 {
+                //         self.l2l(level)?;
+                //     }
+                //     self.m2l(level)?;
+                // }
 
                 // Leaf level computation
                 // self.p2p()?;
@@ -908,11 +908,15 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
-        let prune_empty = true;
+        // let n_crit = Some(100);
+        // let depth = None;
+        // let expansion_order = [6];
 
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [6, 6, 5, 6];
+
+        let prune_empty = true;
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
@@ -938,6 +942,7 @@ mod test {
         fmm_fft.evaluate(false).unwrap();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
+        // assert!(false);
     }
 
     #[test]
