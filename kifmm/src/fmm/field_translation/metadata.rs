@@ -19,6 +19,7 @@ use rlst::{
 
 use crate::{
     fmm::{
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
@@ -30,7 +31,6 @@ use crate::{
             FftFieldTranslation, FftMetadata,
         },
         KiFmm,
-        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
     },
     traits::{
         fftw::{Dft, DftType},
@@ -51,9 +51,7 @@ use crate::{
         types::MortonKey,
     },
     Fmm,
-
 };
-
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
