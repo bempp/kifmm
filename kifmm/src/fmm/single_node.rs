@@ -227,14 +227,14 @@ where
             // Downward pass
             {
                 for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        self.l2l(level)?;
-                    }
+                    // if level > 2 {
+                    //     self.l2l(level)?;
+                    // }
                     self.m2l(level)?;
                 }
 
                 // Leaf level computation
-                self.p2p()?;
+                // self.p2p()?;
                 self.l2p()?;
             }
         }
@@ -563,41 +563,52 @@ mod test {
     {
         let root = MortonKey::root();
 
-        let multipole = fmm.multipole(&root).unwrap();
+        let multipoles = fmm.multipole(&root).unwrap();
         let upward_equivalent_surface = root.surface_grid(
             fmm.expansion_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );
 
+        let ncoeffs = fmm.ncoeffs(0);
+
         let test_point = vec![T::real(100000.), T::Real::zero(), T::Real::zero()];
         let mut expected = vec![T::Real::zero()];
         let mut found = vec![T::Real::zero()];
 
-        fmm.kernel().evaluate_st(
-            EvalType::Value,
-            sources.data(),
-            &test_point,
-            charges.data(),
-            &mut expected,
-        );
+        let [nsources, nvecs] = charges.shape();
 
-        fmm.kernel().evaluate_st(
-            EvalType::Value,
-            &upward_equivalent_surface,
-            &test_point,
-            multipole,
-            &mut found,
-        );
+        for i in 0..1 {
 
-        let abs_error = RlstScalar::abs(expected[0] - found[0]);
-        let rel_error = abs_error / expected[0];
+            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
+            let multipole_i = &multipoles[ncoeffs*i..(i+1)*ncoeffs];
 
-        println!(
-            "abs {:?} rel {:?} \n expected {:?} found {:?}",
-            abs_error, rel_error, expected, found
-        );
-        assert!(rel_error <= threshold);
+            fmm.kernel().evaluate_st(
+                EvalType::Value,
+                sources.data(),
+                &test_point,
+                charges_i,
+                &mut expected,
+            );
+
+            fmm.kernel().evaluate_st(
+                EvalType::Value,
+                &upward_equivalent_surface,
+                &test_point,
+                multipole_i,
+                &mut found,
+            );
+
+            let abs_error = RlstScalar::abs(expected[0] - found[0]);
+            let rel_error = abs_error / expected[0];
+
+            println!(
+                "i {:?} abs {:?} rel {:?} \n expected {:?} found {:?}",
+                i, abs_error, rel_error, expected, found
+            );
+            assert!(rel_error <= threshold);
+
+        }
     }
 
     fn test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
@@ -710,6 +721,55 @@ mod test {
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
+
+    #[test]
+    fn test_upward_pass_matrix_laplace() {
+        // Setup random sources and targets
+        let nsources = 10000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+
+        // FMM parameters
+        // let n_crit = Some(100);
+        // let depth = None;
+        // let expansion_order = [6];
+
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [5, 6, 5, 6];
+
+        let prune_empty = true;
+
+        // Charge data
+        let nvecs = 2;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        // charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges.data_mut().iter_mut().for_each(|c| *c = 1f64 );
+
+
+        let svd_threshold = Some(1e-5);
+        let fmm_svd = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_svd.evaluate(false).unwrap();
+
+        let fmm_svd = Box::new(fmm_svd);
+        test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
+        assert!(false);
+    }
+
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
@@ -778,20 +838,19 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
+        // let n_crit = Some(100);
+        // let depth = None;
+        // let expansion_order = [6];
 
-        // let n_crit = None;
-        // let depth = Some(3);
-        // let expansion_order = [5, 6, 5, 6];
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [5, 6, 5, 6];
 
         let prune_empty = true;
         let threshold_pot = 1e-5;
         let threshold_deriv = 1e-4;
         let threshold_deriv_blas = 1e-3;
         let singular_value_threshold = Some(1e-2);
-
 
         // Charge data
         let nvecs = 1;
@@ -1168,9 +1227,14 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(10);
-        let depth = None;
-        let expansion_order = [6];
+        // let n_crit = Some(100);
+        // let depth = None;
+        // let expansion_order = [6];
+
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [6, 6, 6, 6];
+
         let prune_empty = true;
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;

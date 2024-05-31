@@ -71,8 +71,8 @@ where
                             let coordinates_row_major = &coordinates[charge_index_pointer.0
                                 * self.dim
                                 ..charge_index_pointer.1 * self.dim];
-
                             let nsources = coordinates_row_major.len() / self.dim;
+
                             if nsources > 0 {
                                 let coordinates_row_major = rlst_array_from_slice2!(
                                     coordinates_row_major,
@@ -142,8 +142,6 @@ where
                                 .for_each(|(m, t)| *m += *t);
                         }
                     });
-
-                let multipoles = self.multipoles(depth).unwrap();
 
                 Ok(())
             }

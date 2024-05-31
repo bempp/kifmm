@@ -244,9 +244,10 @@ where
                     Scalar,
                     [
                         self.source_to_target.cutoff_rank[m2l_operator_index],
-                        nsources * nmatvecs
+                        ntargets * nmatvecs
                     ]
                 );
+
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
                 for i in 0..ntargets {

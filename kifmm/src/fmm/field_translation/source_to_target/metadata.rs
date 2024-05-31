@@ -83,7 +83,7 @@ where
         let domain = self.tree.domain;
 
         let mut m2m = Vec::new();
-        let mut m2m_vec = vec![Vec::new()];
+        let mut m2m_vec = Vec::new();
         let mut uc2e_inv_1 = Vec::new();
         let mut uc2e_inv_2 = Vec::new();
 
@@ -1542,7 +1542,6 @@ where
                 .directional_cutoff_ranks
                 .push(directional_cutoff_ranks);
         }
-
     }
 }
 
