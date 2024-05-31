@@ -239,8 +239,8 @@ where
         };
 
         for parent_level in iterator {
-            let expansion_order_parent = self.expansion_order(parent_level as u64);
-            let expansion_order_child = self.expansion_order((parent_level + 1) as u64);
+            let expansion_order_parent = self.expansion_order(parent_level);
+            let expansion_order_child = self.expansion_order(parent_level + 1);
 
             let parent_downward_equivalent_surface =
                 root.surface_grid(expansion_order_parent, &domain, alpha_outer);
@@ -267,9 +267,9 @@ where
                 );
 
                 let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    dc2e_inv_1[self.expansion_index((parent_level + 1) as u64)].view(),
+                    dc2e_inv_1[self.expansion_index(parent_level + 1)].view(),
                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        dc2e_inv_2[self.expansion_index((parent_level + 1) as u64)].view(),
+                        dc2e_inv_2[self.expansion_index(parent_level + 1)].view(),
                         pe2cc.view(),
                     ),
                 );
@@ -313,21 +313,13 @@ where
         let mut uc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        let iterator;
-        if self.expansion_order.len() > 1 {
-            iterator = (0..=depth)
-                .zip(self.expansion_order.iter().cloned())
-                .collect_vec();
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().cloned().collect_vec()
         } else {
-            iterator = (0..=depth)
-                .zip(vec![
-                    *self.expansion_order.last().unwrap();
-                    (depth + 1) as usize
-                ])
-                .collect_vec();
+            vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
         };
 
-        for (level, expansion_order) in iterator {
+        for expansion_order in iterator {
             // Compute required surfaces
             let upward_equivalent_surface =
                 curr.surface_grid(expansion_order, &domain, alpha_inner);
@@ -368,9 +360,8 @@ where
         let mut source = Vec::new();
         let mut source_vec = Vec::new();
 
-        let iterator;
-        if self.expansion_order.len() > 1 {
-            iterator = (0..depth)
+        let iterator = if self.expansion_order.len() > 1 {
+            (0..depth)
                 .zip(
                     self.expansion_order
                         .iter()
@@ -384,9 +375,9 @@ where
                                 .take(depth as usize),
                         ),
                 )
-                .collect_vec();
+                .collect_vec()
         } else {
-            iterator = (0..depth)
+            (0..depth)
                 .zip(
                     vec![*self.expansion_order.last().unwrap(); depth as usize]
                         .into_iter()
@@ -461,11 +452,10 @@ where
         let mut dc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        let iterator;
-        if self.expansion_order.len() > 1 {
-            iterator = self.expansion_order.iter().cloned().collect_vec();
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().cloned().collect_vec()
         } else {
-            iterator = vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
+            vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
         };
 
         for expansion_order in iterator {
@@ -507,9 +497,9 @@ where
         let mut curr = root;
         let mut target_vec = Vec::new();
 
-        let iterator;
-        if self.expansion_order.len() > 1 {
-            iterator = (0..depth)
+        // TODO: test for shallow trees
+        let iterator = if self.expansion_order.len() > 1 {
+            (0..depth)
                 .zip(
                     self.expansion_order
                         .iter()
@@ -523,9 +513,9 @@ where
                                 .take(depth as usize),
                         ),
                 )
-                .collect_vec();
+                .collect_vec()
         } else {
-            iterator = (0..depth)
+            (0..depth)
                 .zip(
                     vec![*self.expansion_order.last().unwrap(); depth as usize]
                         .into_iter()
@@ -666,13 +656,13 @@ where
 
         let mut result = BlasFieldTranslationIa::<Scalar>::default();
 
-        let iterator;
-        if self.expansion_order.len() > 1 {
-            iterator = (2..=depth)
+        // TODO: Need to test what happens for very shallow trees.
+        let iterator = if self.expansion_order.len() > 1 {
+            (2..=depth)
                 .zip(self.expansion_order.iter().skip(2).cloned())
-                .collect_vec();
+                .collect_vec()
         } else {
-            iterator = (2..=depth)
+            (2..=depth)
                 .zip(vec![
                     *self.expansion_order.last().unwrap();
                     (depth - 1) as usize
@@ -877,12 +867,11 @@ where
 
         // Compute data for level 2 separately
         // TODO: check if this results in a bug for very shallow trees
-        let expansion_order;
-        if self.expansion_order.len() > 1 {
-            expansion_order = self.expansion_order[2]
+        let expansion_order = if self.expansion_order.len() > 1 {
+            self.expansion_order[2]
         } else {
-            expansion_order = *self.expansion_order.last().unwrap()
-        }
+            *self.expansion_order.last().unwrap()
+        };
 
         let shape = <Scalar as Dft>::shape_in(expansion_order);
         let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
@@ -1053,19 +1042,18 @@ where
             kernel_data_f: kernel_data_ft,
         });
 
-        let iterator;
-        if self.expansion_order.len() > 1 {
-            iterator = (3..=depth)
+        let iterator = if self.expansion_order.len() > 1 {
+            (3..=depth)
                 .zip(self.expansion_order.iter().cloned().skip(3))
-                .collect_vec();
+                .collect_vec()
         } else {
-            iterator = (3..=depth)
+            (3..=depth)
                 .zip(vec![
                     *self.expansion_order.last().unwrap();
                     (depth - 2) as usize
                 ])
-                .collect_vec();
-        }
+                .collect_vec()
+        };
 
         // Rest of the levels
         for &(level, expansion_order) in &iterator {
@@ -1362,6 +1350,7 @@ where
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
 
+        // TODO: Need to see what happens for very shallow trees
         let iterator = if self.expansion_order.len() > 1 {
             self.expansion_order.iter().skip(2).cloned().collect_vec()
         } else {

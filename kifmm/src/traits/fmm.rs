@@ -151,6 +151,7 @@ pub trait FmmOperatorData
 where
     Self: FmmMetadata,
 {
+    /// Lookup convolution grid map for FFT based M2L operator
     fn fft_map_index(&self, level: u64) -> usize;
 
     /// Lookup expansion order

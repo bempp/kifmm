@@ -254,6 +254,8 @@ where
         };
 
         let operator_index = self.m2m_operator_index(level);
+        let ncoeffs_level = self.ncoeffs(level);
+        let ncoeffs_parent_level = self.ncoeffs(level - 1);
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -266,8 +268,6 @@ where
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                let multipole = self.multipoles(level).unwrap();
-
                 let mut parent_multipoles = Vec::new();
                 for parent in parent_targets.iter() {
                     let &parent_index_pointer = self.level_index_pointer_multipoles
@@ -286,13 +286,13 @@ where
                 let chunk_size = chunk_size(nparents, max_chunk_size);
 
                 child_multipoles
-                    .par_chunks_exact(NSIBLINGS * self.ncoeffs(level) * chunk_size)
+                    .par_chunks_exact(NSIBLINGS * ncoeffs_level * chunk_size)
                     .zip(parent_multipoles.par_chunks_exact(chunk_size))
                     .for_each(
                         |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
                             let child_multipoles_chunk_mat = rlst_array_from_slice2!(
                                 child_multipoles_chunk,
-                                [self.ncoeffs(level) * NSIBLINGS, chunk_size]
+                                [ncoeffs_level * NSIBLINGS, chunk_size]
                             );
 
                             let parent_multipoles_chunk = empty_array::<Scalar, 2>()
@@ -310,7 +310,7 @@ where
                                 let parent_multipole = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_multipole_pointer.raw,
-                                        self.ncoeffs(level - 1),
+                                        ncoeffs_parent_level,
                                     )
                                 };
 
@@ -318,8 +318,8 @@ where
                                     .iter_mut()
                                     .zip(
                                         &parent_multipoles_chunk.data()[chunk_idx
-                                            * self.ncoeffs(level - 1)
-                                            ..(chunk_idx + 1) * self.ncoeffs(level - 1)],
+                                            * ncoeffs_parent_level
+                                            ..(chunk_idx + 1) * ncoeffs_parent_level],
                                     )
                                     .for_each(|(p, t)| *p += *t);
                             }
@@ -345,16 +345,16 @@ where
                 }
 
                 child_multipoles
-                    .par_chunks_exact(nmatvecs * self.ncoeffs(level) * NSIBLINGS)
+                    .par_chunks_exact(nmatvecs * ncoeffs_level * NSIBLINGS)
                     .zip(parent_multipoles.into_par_iter())
                     .for_each(|(child_multipoles, parent_multipole_pointers)| {
                         for i in 0..NSIBLINGS {
-                            let sibling_displacement = i * self.ncoeffs(level) * nmatvecs;
+                            let sibling_displacement = i * ncoeffs_level * nmatvecs;
 
                             let child_multipoles_i = rlst_array_from_slice2!(
                                 &child_multipoles[sibling_displacement
-                                    ..sibling_displacement + self.ncoeffs(level) * nmatvecs],
-                                [self.ncoeffs(level), nmatvecs]
+                                    ..sibling_displacement + ncoeffs_level * nmatvecs],
+                                [ncoeffs_level, nmatvecs]
                             );
 
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -367,10 +367,10 @@ where
                             {
                                 let raw = send_ptr.raw;
                                 let parent_multipole_j = unsafe {
-                                    std::slice::from_raw_parts_mut(raw, self.ncoeffs(level - 1))
+                                    std::slice::from_raw_parts_mut(raw, ncoeffs_parent_level)
                                 };
-                                let result_ij = &result_i.data()[j * self.ncoeffs(level - 1)
-                                    ..(j + 1) * self.ncoeffs(level - 1)];
+                                let result_ij = &result_i.data()
+                                    [j * ncoeffs_parent_level..(j + 1) * ncoeffs_parent_level];
                                 parent_multipole_j
                                     .iter_mut()
                                     .zip(result_ij.iter())

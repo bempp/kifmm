@@ -64,11 +64,11 @@ where
 
             unsafe {
                 match self.fmm_eval_type {
-                    FmmEvalType::Vector => Some(&std::slice::from_raw_parts(
+                    FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
                         self.ncoeffs(key.level()),
                     )),
-                    FmmEvalType::Matrix(nmatvecs) => Some(&std::slice::from_raw_parts(
+                    FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
                         self.ncoeffs(key.level()) * nmatvecs,
                     )),
@@ -105,11 +105,11 @@ where
 
             unsafe {
                 match self.fmm_eval_type {
-                    FmmEvalType::Vector => Some(&std::slice::from_raw_parts(
+                    FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
                         self.ncoeffs(key.level()),
                     )),
-                    FmmEvalType::Matrix(nmatvecs) => Some(&std::slice::from_raw_parts(
+                    FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
                         self.ncoeffs(key.level()) * nmatvecs,
                     )),
@@ -328,10 +328,7 @@ mod test {
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::{
-            fmm::SourceTranslation,
-            tree::{FmmTree, FmmTreeNode, Tree},
-        },
+        traits::tree::{FmmTree, FmmTreeNode, Tree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
@@ -617,7 +614,7 @@ mod test {
                 "i {:?} abs {:?} rel {:?} \n expected {:?} found {:?}",
                 i, abs_error, rel_error, expected, found
             );
-            // assert!(rel_error <= threshold);
+            assert!(rel_error <= threshold);
         }
     }
 
@@ -754,8 +751,7 @@ mod test {
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-        // charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
-        charges.data_mut().iter_mut().for_each(|c| *c = 1f64);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
         let fmm_svd = SingleNodeBuilder::new()

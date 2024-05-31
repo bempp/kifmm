@@ -233,15 +233,12 @@ where
 {
     let mut result = vec![Vec::new(); n_leaves];
 
-    let iterator;
-    if ncoeffs.len() > 1 {
-        iterator = (0..tree.depth())
-            .zip(ncoeffs.clone().to_vec())
-            .collect_vec();
+    let iterator = if ncoeffs.len() > 1 {
+        (0..tree.depth()).zip(ncoeffs.to_vec()).collect_vec()
     } else {
-        iterator = (0..tree.depth())
+        (0..tree.depth())
             .zip(vec![*ncoeffs.last().unwrap(); tree.depth() as usize])
-            .collect_vec();
+            .collect_vec()
     };
 
     let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
