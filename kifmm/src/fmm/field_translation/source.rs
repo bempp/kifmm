@@ -142,7 +142,6 @@ where
                                 .for_each(|(m, t)| *m += *t);
                         }
                     });
-                let multipole = self.multipoles(depth).unwrap();
                 Ok(())
             }
 

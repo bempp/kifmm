@@ -63,6 +63,7 @@ where
 
                 let m2l_operator_index = self.m2l_operator_index(level);
                 let expansion_index = self.expansion_index(level);
+                let fft_map_index = self.fft_map_index(level);
                 let c2e_operator_index = self.c2e_operator_index(level);
                 let displacement_index = self.displacement_index(level);
 
@@ -172,7 +173,7 @@ where
                                     [i * self.ncoeffs(level)..(i + 1) * self.ncoeffs(level)];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
                                 for (surf_idx, &conv_idx) in self.source_to_target.surf_to_conv_map
-                                    [m2l_operator_index]
+                                    [fft_map_index]
                                     .iter()
                                     .enumerate()
                                 {
@@ -348,7 +349,7 @@ where
 
                             for i in 0..NSIBLINGS {
                                 for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
-                                    [m2l_operator_index]
+                                    [fft_map_index]
                                     .iter()
                                     .enumerate()
                                 {

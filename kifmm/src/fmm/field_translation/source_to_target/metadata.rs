@@ -1982,6 +1982,14 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
+    fn fft_map_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 2) as usize
+        } else {
+            0
+        }
+    }
+
     fn expansion_index(&self, level: u64) -> usize {
         if self.expansion_order.len() > 1 {
             level as usize
@@ -2034,6 +2042,14 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
+    fn fft_map_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 2) as usize
+        } else {
+            0
+        }
+    }
+
     fn expansion_index(&self, level: u64) -> usize {
         if self.expansion_order.len() > 1 {
             level as usize

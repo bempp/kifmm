@@ -151,6 +151,8 @@ pub trait FmmOperatorData
 where
     Self: FmmMetadata,
 {
+    fn fft_map_index(&self, level: u64) -> usize;
+
     /// Lookup expansion order
     fn expansion_index(&self, level: u64) -> usize;
 
