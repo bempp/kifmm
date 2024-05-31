@@ -30,6 +30,7 @@ use crate::{
             FftFieldTranslation, FftMetadata,
         },
         KiFmm,
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
     },
     traits::{
         fftw::{Dft, DftType},
@@ -50,9 +51,9 @@ use crate::{
         types::MortonKey,
     },
     Fmm,
+
 };
 
-use super::transfer_vector::compute_transfer_vectors_at_level;
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
