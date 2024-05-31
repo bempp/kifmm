@@ -191,7 +191,7 @@ where
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let domain = self.tree.domain;
 
-        let mut l2l = vec![Vec::new()];
+        let mut l2l = Vec::new();
         let mut dc2e_inv_1 = Vec::new();
         let mut dc2e_inv_2 = Vec::new();
 
@@ -230,8 +230,10 @@ where
             dc2e_inv_2.push(ut);
         }
 
+        let depth = self.tree.target_tree().depth();
+
         let iterator = if self.expansion_order.len() > 1 {
-            0..self.expansion_order.len() - 1
+            0..depth
         } else {
             0..1
         };
@@ -264,10 +266,12 @@ where
                     pe2cc.data_mut(),
                 );
 
-                 let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     dc2e_inv_1[self.expansion_index((parent_level + 1) as u64)].view(),
-                    empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(dc2e_inv_2[self.expansion_index((parent_level + 1) as u64)].view(), pe2cc.view()),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                        dc2e_inv_2[self.expansion_index((parent_level + 1) as u64)].view(),
+                        pe2cc.view(),
+                    ),
                 );
                 tmp.data_mut()
                     .iter_mut()
@@ -279,6 +283,8 @@ where
             l2l.push(l2l_level);
         }
 
+        // println!("L2L {:?} {:?}", l2l, l2l.len());
+        // assert!(false);
         self.target_vec = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
@@ -1728,231 +1734,237 @@ where
     }
 
     fn source_to_target(&mut self) {
-        // // Compute the field translation operators
+        // Compute the field translation operators
 
-        // // Pick a point in the middle of the domain
-        // let two = Scalar::real(2.0);
-        // let midway = self
-        //     .tree
-        //     .source_tree()
-        //     .domain
-        //     .side_length
-        //     .iter()
-        //     .map(|d| *d / two)
-        //     .collect_vec();
-        // let point = midway
-        //     .iter()
-        //     .zip(self.tree.source_tree().domain().origin())
-        //     .map(|(m, o)| *m + *o)
-        //     .collect_vec();
-        // let point = [point[0], point[1], point[2]];
+        // Pick a point in the middle of the domain
+        let two = Scalar::real(2.0);
+        let midway = self
+            .tree
+            .source_tree()
+            .domain
+            .side_length
+            .iter()
+            .map(|d| *d / two)
+            .collect_vec();
+        let point = midway
+            .iter()
+            .zip(self.tree.source_tree().domain().origin())
+            .map(|(m, o)| *m + *o)
+            .collect_vec();
+        let point = [point[0], point[1], point[2]];
 
-        // // Encode point in centre of domain and compute halo of parent, and their resp. children
-        // let key = MortonKey::from_point(&point, self.tree.source_tree().domain(), 3);
-        // let siblings = key.siblings();
-        // let parent = key.parent();
-        // let halo = parent.neighbors();
-        // let halo_children = halo.iter().map(|h| h.children()).collect_vec();
+        // Encode point in centre of domain and compute halo of parent, and their resp. children
+        let key = MortonKey::from_point(&point, self.tree.source_tree().domain(), 3);
+        let siblings = key.siblings();
+        let parent = key.parent();
+        let halo = parent.neighbors();
+        let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
-        // // The child boxes in the halo of the sibling set
-        // let mut sources = vec![];
-        // // The sibling set
-        // let mut targets = vec![];
-        // // The transfer vectors corresponding to source->target translations
-        // let mut transfer_vectors = vec![];
-        // // Green's function evaluations for each source, target pair interaction
-        // let mut kernel_data_vec = vec![];
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        } else {
+            self.expansion_order.clone()
+        };
 
-        // for _ in &halo_children {
-        //     sources.push(vec![]);
-        //     targets.push(vec![]);
-        //     transfer_vectors.push(vec![]);
-        //     kernel_data_vec.push(vec![]);
-        // }
+        for &expansion_order in &iterator {
+            // The child boxes in the halo of the sibling set
+            let mut sources = vec![];
+            // The sibling set
+            let mut targets = vec![];
+            // The transfer vectors corresponding to source->target translations
+            let mut transfer_vectors = vec![];
+            // Green's function evaluations for each source, target pair interaction
+            let mut kernel_data_vec = vec![];
 
-        // // Each set of 64 M2L operators will correspond to a point in the halo
-        // // Computing transfer of potential from sibling set to halo
-        // for (i, halo_child_set) in halo_children.iter().enumerate() {
-        //     let mut tmp_transfer_vectors = vec![];
-        //     let mut tmp_targets = vec![];
-        //     let mut tmp_sources = vec![];
+            for _ in &halo_children {
+                sources.push(vec![]);
+                targets.push(vec![]);
+                transfer_vectors.push(vec![]);
+                kernel_data_vec.push(vec![]);
+            }
 
-        //     // Consider all halo children for a given sibling at a time
-        //     for sibling in siblings.iter() {
-        //         for halo_child in halo_child_set.iter() {
-        //             tmp_transfer_vectors.push(halo_child.find_transfer_vector(sibling));
-        //             tmp_targets.push(sibling);
-        //             tmp_sources.push(halo_child);
-        //         }
-        //     }
+            // Each set of 64 M2L operators will correspond to a point in the halo
+            // Computing transfer of potential from sibling set to halo
+            for (i, halo_child_set) in halo_children.iter().enumerate() {
+                let mut tmp_transfer_vectors = vec![];
+                let mut tmp_targets = vec![];
+                let mut tmp_sources = vec![];
 
-        //     // From source to target
-        //     transfer_vectors[i] = tmp_transfer_vectors;
-        //     targets[i] = tmp_targets;
-        //     sources[i] = tmp_sources;
-        // }
+                // Consider all halo children for a given sibling at a time
+                for sibling in siblings.iter() {
+                    for halo_child in halo_child_set.iter() {
+                        tmp_transfer_vectors.push(halo_child.find_transfer_vector(sibling));
+                        tmp_targets.push(sibling);
+                        tmp_sources.push(halo_child);
+                    }
+                }
 
-        // for &expansion_order in self.expansion_order.iter() {
-        //     let shape = <Scalar as Dft>::shape_in(expansion_order);
-        //     let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
-        //     let transform_size = <Scalar as Dft>::size_out(expansion_order);
-        //     let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
-        //     let n_target_check_surface = n_source_equivalent_surface;
-        //     let alpha = Scalar::real(ALPHA_INNER);
+                // From source to target
+                transfer_vectors[i] = tmp_transfer_vectors;
+                targets[i] = tmp_targets;
+                sources[i] = tmp_sources;
+            }
 
-        //     // Iterate over each set of convolutions in the halo (26)
-        //     for i in 0..transfer_vectors.len() {
-        //         // Iterate over each unique convolution between sibling set, and halo siblings (64)
-        //         for j in 0..transfer_vectors[i].len() {
-        //             // Translating from sibling set to boxes in its M2L halo
-        //             let target = targets[i][j];
-        //             let source = sources[i][j];
+            let shape = <Scalar as Dft>::shape_in(expansion_order);
+            let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
+            let transform_size = <Scalar as Dft>::size_out(expansion_order);
+            let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
+            let n_target_check_surface = n_source_equivalent_surface;
+            let alpha = Scalar::real(ALPHA_INNER);
 
-        //             let source_equivalent_surface = source.surface_grid(
-        //                 expansion_order,
-        //                 self.tree.source_tree().domain(),
-        //                 alpha,
-        //             );
-        //             let target_check_surface = target.surface_grid(
-        //                 expansion_order,
-        //                 self.tree.source_tree().domain(),
-        //                 alpha,
-        //             );
+            // Iterate over each set of convolutions in the halo (26)
+            for i in 0..transfer_vectors.len() {
+                // Iterate over each unique convolution between sibling set, and halo siblings (64)
+                for j in 0..transfer_vectors[i].len() {
+                    // Translating from sibling set to boxes in its M2L halo
+                    let target = targets[i][j];
+                    let source = sources[i][j];
 
-        //             let v_list: HashSet<MortonKey<_>> = target
-        //                 .parent()
-        //                 .neighbors()
-        //                 .iter()
-        //                 .flat_map(|pn| pn.children())
-        //                 .filter(|pnc| !target.is_adjacent(pnc))
-        //                 .collect();
+                    let source_equivalent_surface = source.surface_grid(
+                        expansion_order,
+                        self.tree.source_tree().domain(),
+                        alpha,
+                    );
+                    let target_check_surface = target.surface_grid(
+                        expansion_order,
+                        self.tree.source_tree().domain(),
+                        alpha,
+                    );
 
-        //             if v_list.contains(source) {
-        //                 // Compute convolution grid around the source box
-        //                 let conv_point_corner_index = 7;
-        //                 let corners = find_corners(&source_equivalent_surface[..]);
-        //                 let conv_point_corner = [
-        //                     corners[conv_point_corner_index],
-        //                     corners[NCORNERS + conv_point_corner_index],
-        //                     corners[2 * NCORNERS + conv_point_corner_index],
-        //                 ];
+                    let v_list: HashSet<MortonKey<_>> = target
+                        .parent()
+                        .neighbors()
+                        .iter()
+                        .flat_map(|pn| pn.children())
+                        .filter(|pnc| !target.is_adjacent(pnc))
+                        .collect();
 
-        //                 let (conv_grid, _) = source.convolution_grid(
-        //                     expansion_order,
-        //                     self.tree.source_tree().domain(),
-        //                     alpha,
-        //                     &conv_point_corner,
-        //                     conv_point_corner_index,
-        //                 );
+                    if v_list.contains(source) {
+                        // Compute convolution grid around the source box
+                        let conv_point_corner_index = 7;
+                        let corners = find_corners(&source_equivalent_surface[..]);
+                        let conv_point_corner = [
+                            corners[conv_point_corner_index],
+                            corners[NCORNERS + conv_point_corner_index],
+                            corners[2 * NCORNERS + conv_point_corner_index],
+                        ];
 
-        //                 // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
-        //                 let kernel_point_index = 0;
-        //                 let kernel_point = [
-        //                     target_check_surface[kernel_point_index],
-        //                     target_check_surface[n_target_check_surface + kernel_point_index],
-        //                     target_check_surface[2 * n_target_check_surface + kernel_point_index],
-        //                 ];
+                        let (conv_grid, _) = source.convolution_grid(
+                            expansion_order,
+                            self.tree.source_tree().domain(),
+                            alpha,
+                            &conv_point_corner,
+                            conv_point_corner_index,
+                        );
 
-        //                 // Compute Green's fct evaluations
-        //                 let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-        //                     expansion_order,
-        //                     &conv_grid,
-        //                     kernel_point,
-        //                 ));
+                        // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
+                        let kernel_point_index = 0;
+                        let kernel_point = [
+                            target_check_surface[kernel_point_index],
+                            target_check_surface[n_target_check_surface + kernel_point_index],
+                            target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                        ];
 
-        //                 // Compute FFT of padded kernel
-        //                 let mut kernel_hat =
-        //                     rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        // Compute Green's fct evaluations
+                        let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
+                            expansion_order,
+                            &conv_grid,
+                            kernel_point,
+                        ));
 
-        //                 let _ =
-        //                     Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                        // Compute FFT of padded kernel
+                        let mut kernel_hat =
+                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-        //                 kernel_data_vec[i].push(kernel_hat);
-        //             } else {
-        //                 // Fill with zeros when interaction doesn't exist
-        //                 let kernel_hat_zeros =
-        //                     rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
-        //                 kernel_data_vec[i].push(kernel_hat_zeros);
-        //             }
-        //         }
-        //     }
+                        let _ =
+                            Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
-        //     // Each element corresponds to all evaluations for each sibling (in order) at that halo position
-        //     let mut kernel_data = vec![
-        //         vec![
-        //             <Scalar as DftType>::OutputType::zero();
-        //             NSIBLINGS_SQUARED * transform_size
-        //         ];
-        //         halo_children.len()
-        //     ];
+                        kernel_data_vec[i].push(kernel_hat);
+                    } else {
+                        // Fill with zeros when interaction doesn't exist
+                        let kernel_hat_zeros =
+                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        kernel_data_vec[i].push(kernel_hat_zeros);
+                    }
+                }
+            }
 
-        //     // For each halo position
-        //     for i in 0..halo_children.len() {
-        //         // For each unique interaction
-        //         for j in 0..NSIBLINGS_SQUARED {
-        //             let offset = j * transform_size;
-        //             kernel_data[i][offset..offset + transform_size]
-        //                 .copy_from_slice(kernel_data_vec[i][j].data())
-        //         }
-        //     }
+            // Each element corresponds to all evaluations for each sibling (in order) at that halo position
+            let mut kernel_data = vec![
+                vec![
+                    <Scalar as DftType>::OutputType::zero();
+                    NSIBLINGS_SQUARED * transform_size
+                ];
+                halo_children.len()
+            ];
 
-        //     // We want to use this data by frequency in the implementation of FFT M2L
-        //     // Rearrangement: Grouping by frequency, then halo child, then sibling
-        //     let mut kernel_data_f = vec![];
-        //     for _ in &halo_children {
-        //         kernel_data_f.push(vec![]);
-        //     }
-        //     for i in 0..halo_children.len() {
-        //         let current_vector = &kernel_data[i];
-        //         for l in 0..transform_size {
-        //             // halo child
-        //             for k in 0..NSIBLINGS {
-        //                 // sibling
-        //                 for j in 0..NSIBLINGS {
-        //                     let index = j * transform_size * 8 + k * transform_size + l;
-        //                     kernel_data_f[i].push(current_vector[index]);
-        //                 }
-        //             }
-        //         }
-        //     }
+            // For each halo position
+            for i in 0..halo_children.len() {
+                // For each unique interaction
+                for j in 0..NSIBLINGS_SQUARED {
+                    let offset = j * transform_size;
+                    kernel_data[i][offset..offset + transform_size]
+                        .copy_from_slice(kernel_data_vec[i][j].data())
+                }
+            }
 
-        //     // Re-order
-        //     let mut kernel_data_ft = Vec::new();
-        //     for freq in 0..transform_size {
-        //         let frequency_offset = NSIBLINGS_SQUARED * freq;
-        //         for kernel_f in kernel_data_f.iter().take(NHALO) {
-        //             let k_f = &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
-        //                 .to_vec();
-        //             let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-        //             let mut k_ft = rlst_dynamic_array2!(
-        //                 <Scalar as DftType>::OutputType,
-        //                 [NSIBLINGS, NSIBLINGS]
-        //             );
-        //             k_ft.fill_from(k_f_.view());
-        //             kernel_data_ft.push(k_ft.data().to_vec());
-        //         }
-        //     }
+            // We want to use this data by frequency in the implementation of FFT M2L
+            // Rearrangement: Grouping by frequency, then halo child, then sibling
+            let mut kernel_data_f = vec![];
+            for _ in &halo_children {
+                kernel_data_f.push(vec![]);
+            }
+            for i in 0..halo_children.len() {
+                let current_vector = &kernel_data[i];
+                for l in 0..transform_size {
+                    // halo child
+                    for k in 0..NSIBLINGS {
+                        // sibling
+                        for j in 0..NSIBLINGS {
+                            let index = j * transform_size * 8 + k * transform_size + l;
+                            kernel_data_f[i].push(current_vector[index]);
+                        }
+                    }
+                }
+            }
 
-        //     let metadata = FftMetadata {
-        //         kernel_data,
-        //         kernel_data_f: kernel_data_ft,
-        //     };
+            // Re-order
+            let mut kernel_data_ft = Vec::new();
+            for freq in 0..transform_size {
+                let frequency_offset = NSIBLINGS_SQUARED * freq;
+                for kernel_f in kernel_data_f.iter().take(NHALO) {
+                    let k_f = &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
+                        .to_vec();
+                    let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                    let mut k_ft = rlst_dynamic_array2!(
+                        <Scalar as DftType>::OutputType,
+                        [NSIBLINGS, NSIBLINGS]
+                    );
+                    k_ft.fill_from(k_f_.view());
+                    kernel_data_ft.push(k_ft.data().to_vec());
+                }
+            }
 
-        //     // Set operator data
-        //     self.source_to_target.metadata.push(metadata);
-        // }
+            let metadata = FftMetadata {
+                kernel_data,
+                kernel_data_f: kernel_data_ft,
+            };
 
-        // // Set required maps
-        // let mut tmp1 = Vec::new();
-        // let mut tmp2 = Vec::new();
-        // for &expansion_order in self.expansion_order.iter().skip(2) {
-        //     let (surf_to_conv_map, conv_to_surf_map) =
-        //         Self::compute_surf_to_conv_map(expansion_order);
-        //     tmp1.push(surf_to_conv_map);
-        //     tmp2.push(conv_to_surf_map)
-        // }
-        // self.source_to_target.surf_to_conv_map = tmp1;
-        // self.source_to_target.conv_to_surf_map = tmp2;
+            // Set operator data
+            self.source_to_target.metadata.push(metadata);
+        }
+
+        // Set required maps
+        let mut tmp1 = Vec::new();
+        let mut tmp2 = Vec::new();
+        for &expansion_order in &iterator {
+            let (surf_to_conv_map, conv_to_surf_map) =
+                Self::compute_surf_to_conv_map(expansion_order);
+            tmp1.push(surf_to_conv_map);
+            tmp2.push(conv_to_surf_map)
+        }
+        self.source_to_target.surf_to_conv_map = tmp1;
+        self.source_to_target.conv_to_surf_map = tmp2;
     }
 }
 

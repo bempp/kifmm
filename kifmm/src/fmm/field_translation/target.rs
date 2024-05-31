@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    RawAccessMut, RlstScalar, Shape,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -94,6 +94,7 @@ where
                                 self.target_vec[operator_index][i].view(),
                                 parent_locals.view(),
                             );
+                            // println!("NCOEFFS {:?} {:?} {:?}", self.ncoeffs, tmp.shape(), parent_locals.shape());
 
                             for j in 0..chunk_size {
                                 let chunk_displacement = j * NSIBLINGS;

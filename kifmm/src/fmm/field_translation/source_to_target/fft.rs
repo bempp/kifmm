@@ -62,6 +62,7 @@ where
                 };
 
                 let m2l_operator_index = self.m2l_operator_index(level);
+                let expansion_index = self.expansion_index(level);
                 let c2e_operator_index = self.c2e_operator_index(level);
                 let displacement_index = self.displacement_index(level);
 
@@ -259,9 +260,9 @@ where
                 // 2. Compute the Hadamard product
                 {
                     (0..size_out)
-                        .into_par_iter()
-                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
-                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+                        .into_iter()
+                        .zip(signals_hat_f.chunks_exact(nsources + nzeros))
+                        .zip(check_potentials_hat_f.chunks_exact_mut(ntargets))
                         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
                                 |chunk_start| {

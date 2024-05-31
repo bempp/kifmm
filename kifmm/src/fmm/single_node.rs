@@ -234,8 +234,8 @@ where
                 }
 
                 // Leaf level computation
-                self.p2p()?;
-                self.l2p()?;
+                // self.p2p()?;
+                // self.l2p()?;
             }
         }
 
@@ -661,7 +661,7 @@ mod test {
 
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [6, 6, 6, 6];
+        let expansion_order = [5, 6, 5, 6];
 
         let prune_empty = true;
 
@@ -684,33 +684,28 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
+        fmm_fft.evaluate(false).unwrap();
 
-        fmm_fft.p2m().unwrap();
-
-        for level in (1..=fmm_fft.tree().source_tree().depth()).rev() {
-            fmm_fft.m2m(level).unwrap();
-        }
-
-        // let svd_threshold = Some(1e-5);
-        // let fmm_svd = SingleNodeBuilder::new()
-        //     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-        //     .unwrap()
-        //     .parameters(
-        //         charges.data(),
-        //         &expansion_order,
-        //         Laplace3dKernel::new(),
-        //         EvalType::Value,
-        //         BlasFieldTranslationSaRcmp::new(svd_threshold),
-        //     )
-        //     .unwrap()
-        //     .build()
-        //     .unwrap();
-        // fmm_svd.evaluate(false).unwrap();
+        let svd_threshold = Some(1e-5);
+        let fmm_svd = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+        fmm_svd.evaluate(false).unwrap();
 
         let fmm_fft = Box::new(fmm_fft);
-        // let fmm_svd = Box::new(fmm_svd);
+        let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_fft, &sources, &charges, 1e-5);
-        // test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
+        test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
     #[test]
