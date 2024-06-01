@@ -79,13 +79,14 @@ macro_rules! laplace_fft_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: PyReadonlyArrayDyn<'py, usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
                 prune_empty: bool,
                 kernel_eval_type: usize,
+                n_crit: Option<u64>,
+                depth: Option<u64>,
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -96,6 +97,20 @@ macro_rules! laplace_fft_constructors {
                         "Invalid Kernel Evaluation Mode",
                     ));
                 };
+
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
+                }
+
+                if expansion_order.as_slice().unwrap().len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
+                }
 
                 let shape = charges.shape();
 
@@ -109,13 +124,14 @@ macro_rules! laplace_fft_constructors {
                     .tree(
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
-                        Some(n_crit),
+                        depth,
+                        n_crit,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        expansion_order.as_slice().unwrap(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -175,14 +191,15 @@ macro_rules! laplace_blas_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: PyReadonlyArrayDyn<'py, usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
                 prune_empty: bool,
                 kernel_eval_type: usize,
                 svd_threshold: <$type as RlstScalar>::Real,
+                n_crit: Option<u64>,
+                depth: Option<u64>,
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -194,17 +211,32 @@ macro_rules! laplace_blas_constructors {
                     ));
                 };
 
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
+                }
+
+                if expansion_order.as_slice().unwrap().len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
+                }
+
                 let fmm = SingleNodeBuilder::new()
                     .tree(
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
-                        Some(n_crit),
+                        n_crit,
+                        depth,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        expansion_order.as_slice().unwrap(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         BlasFieldTranslationSaRcmp::new(Some(svd_threshold)),
@@ -255,13 +287,13 @@ macro_rules! laplace_blas_constructors {
 
             /// Cutoff rank
             #[getter]
-            pub fn cutoff_ranks(&self) -> PyResult<usize> {
-                Ok(self.fmm.source_to_target.cutoff_rank)
+            pub fn cutoff_ranks(&self) -> PyResult<Vec<usize>> {
+                Ok(self.fmm.source_to_target.cutoff_rank.clone())
             }
 
             /// Directional cutoff ranks
             #[getter]
-            pub fn directional_cutoff_ranks(&self) -> PyResult<Vec<usize>> {
+            pub fn directional_cutoff_ranks(&self) -> PyResult<Vec<Vec<usize>>> {
                 Ok(self.fmm.source_to_target.directional_cutoff_ranks.clone())
             }
         }
@@ -276,14 +308,15 @@ macro_rules! helmholtz_fft_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: PyReadonlyArrayDyn<'py, usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
                 prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
+                n_crit: Option<u64>,
+                depth: Option<u64>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -294,6 +327,20 @@ macro_rules! helmholtz_fft_constructors {
                         "Invalid Kernel Evaluation Mode",
                     ));
                 };
+
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
+                }
+
+                if expansion_order.as_slice().unwrap().len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
+                }
 
                 let shape = charges.shape();
 
@@ -307,13 +354,14 @@ macro_rules! helmholtz_fft_constructors {
                     .tree(
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
-                        Some(n_crit),
+                        n_crit,
+                        depth,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        expansion_order.as_slice().unwrap(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -373,15 +421,16 @@ macro_rules! helmholtz_blas_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order:  PyReadonlyArrayDyn<'py, usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
                 prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
                 svd_threshold: <$type as RlstScalar>::Real,
+                n_crit: Option<u64>,
+                depth: Option<u64>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -392,6 +441,20 @@ macro_rules! helmholtz_blas_constructors {
                         "Invalid Kernel Evaluation Mode",
                     ));
                 };
+
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
+                }
+
+                if expansion_order.as_slice().unwrap().len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
+                }
 
                 let shape = charges.shape();
                 let charges_slice =
@@ -407,13 +470,14 @@ macro_rules! helmholtz_blas_constructors {
                     .tree(
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
-                        Some(n_crit),
+                        n_crit,
+                        depth,
                         prune_empty,
                     )
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order,
+                        expansion_order.as_slice().unwrap(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         BlasFieldTranslationIa::new(Some(svd_threshold)),

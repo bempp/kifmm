@@ -6,7 +6,7 @@ use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
 use crate::{
     fmm::{
         helpers::{map_charges, ncoeffs_kifmm},
-        types::{FmmEvalType, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
+        types::{FmmEvalType, Isa, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
     traits::{
         field::{
@@ -19,8 +19,6 @@ use crate::{
     },
     tree::{types::Domain, SingleNodeTree},
 };
-
-use super::types::Isa;
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where

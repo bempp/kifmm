@@ -395,7 +395,7 @@ pub enum FmmEvalType {
 ///
 /// // FMM parameters
 /// let n_crit = Some(150);
-/// let depth = None;
+/// let depth = None;ca
 /// let expansion_order = [10];
 /// let prune_empty = true;
 ///

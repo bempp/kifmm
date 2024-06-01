@@ -46,10 +46,11 @@ class KiFmm:
         sources,
         targets,
         charges,
-        n_crit,
         kernel_eval_type,
         kernel,
         field_translation,
+        n_crit=None,
+        depth=None,
         prune_empty=True,
         timed=False,
         svd_threshold=None,
@@ -58,24 +59,50 @@ class KiFmm:
         """Constructor for Single Node FMMss.
 
         Args:
-            expansion_order (int): The expansion order of the FMM
-            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
-            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
-            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
-            n_crit (int):  Maximum number of particles per leaf box, must be less than number of particles in domain.
-            kernel_eval_type (str):  Either `eval_deriv` - to evaluate potentials and gradients, or `eval` to evaluate potentials alone
+            expansion_order (np.ndarray): The expansion order of the FMM, if specifying a depth expansion order must be specified for each tree level.
+            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
+            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions '[n_charges, n_vecs]' where each of 'n_vecs' is associated with 'n_charges'. 'n_vecs' > 1 only supported with BLAS field translations.
+            kernel_eval_type (str):  Either 'eval_deriv' - to evaluate potentials and gradients, or 'eval' to evaluate potentials alone
             kernel (str): Either 'laplace' or 'helmholtz' supported.
             field_translation (str): Either 'fft' or 'blas'.
+            n_crit (int, optional):  Maximum number of particles per leaf box, must be less than number of particles in domain. Must specify either n_crit or depth.
+            depth (int, optional):  Maximum depth of octree, must match the number of dimension of the specified expansion orders. Must specify either n_crit or depth.
             prune_empty (bool, optional): Optionally drop empty leaf boxes for performance in FMM.
             timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
             svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
         """
+
+        # Check valid tree spec
+        try:
+            assert (n_crit is None and depth is not None) or (
+                n_crit is not None and depth is None
+            )
+        except:
+            raise TypeError("Either of 'n_crit' or 'depth' must be supplied")
+
         # Check valid expansion order
         try:
-            assert expansion_order >= 2 and isinstance(expansion_order, int)
+            assert isinstance(expansion_order, np.ndarray)
         except:
-            raise TypeError(f"Invalid expansion order {expansion_order}")
+            raise TypeError(f"Expansion orders of type {type(expansion_order)}")
+
+        try:
+            for e in expansion_order:
+                assert e > 2
+        except:
+            raise TypeError(f"Expansion orders must be >= 2")
+
+        try:
+            if len(expansion_order) > 1:
+                assert (len(expansion_order) == depth + 1) and (
+                    n_crit is None and depth is not None
+                )
+        except:
+            raise TypeError(
+                "Dimension of expansion order must match tree depth if using variable expansion order"
+            )
 
         # Check that inputs are numpy arrays
         try:
@@ -114,9 +141,18 @@ class KiFmm:
 
         # Check for valid n_crit
         try:
-            assert n_crit < sources.shape[0] and n_crit < targets.shape[0]
+            if n_crit is not None:
+                assert n_crit < sources.shape[0] and n_crit < targets.shape[0]
         except:
             raise TypeError(f"ncrit={ncrit} is too large for these sources/targets")
+
+        try:
+            if n_crit is not None:
+                assert len(expansion_order) == 1
+        except:
+            raise TypeError(
+                f"Only a single expansion order must be specified if constructing a tree with 'n_crit'"
+            )
 
         # Check for valid tree
         try:
@@ -159,9 +195,7 @@ class KiFmm:
         try:
             assert isinstance(timed, bool)
         except:
-            raise TypeError(
-                f"Must specify 'True' or 'False' for timed"
-            )
+            raise TypeError(f"Must specify 'True' or 'False' for timed")
 
         self.dtype = type(sources[0].dtype)
         self.expansion_order = expansion_order
@@ -169,6 +203,7 @@ class KiFmm:
         self.targets = targets
         self.charges = charges
         self.n_crit = n_crit
+        self.depth = depth
         self.prune_empty = prune_empty
         self.kernel_eval_type = KERNEL_EVAL_TYPES[kernel_eval_type]
         self.kernel_eval_size = KERNEL_EVAL_SIZE[kernel_eval_type]
@@ -201,9 +236,10 @@ class KiFmm:
                     self.sources,
                     self.targets,
                     self.charges,
-                    self.n_crit,
                     self.prune_empty,
                     self.kernel_eval_type,
+                    self.n_crit,
+                    self.depth,
                 )
 
             elif self.field_translation == "blas":
@@ -212,10 +248,11 @@ class KiFmm:
                     self.sources,
                     self.targets,
                     self.charges,
-                    self.n_crit,
                     self.prune_empty,
                     self.kernel_eval_type,
                     self.svd_threshold,
+                    self.n_crit,
+                    self.depth,
                 )
 
         elif kernel == "helmholtz":
@@ -225,10 +262,11 @@ class KiFmm:
                     self.sources,
                     self.targets,
                     self.charges,
-                    self.n_crit,
                     self.prune_empty,
                     self.kernel_eval_type,
                     self.wavenumber,
+                    self.n_crit,
+                    self.depth,
                 )
 
             elif self.field_translation == "blas":
@@ -237,11 +275,12 @@ class KiFmm:
                     self.sources,
                     self.targets,
                     self.charges,
-                    self.n_crit,
                     self.prune_empty,
                     self.kernel_eval_type,
                     self.wavenumber,
                     self.svd_threshold,
+                    self.n_crit,
+                    self.depth,
                 )
 
         self.source_keys = self.fmm.source_keys
@@ -267,7 +306,7 @@ class KiFmm:
         """Clear currently assigned charges, assign new charges
 
         Args:
-            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions '[n_charges, n_vecs]' where each of 'n_vecs' is associated with 'n_charges'. 'n_vecs' > 1 only supported with BLAS field translations.
         """
         try:
             assert isinstance(charges, np.ndarray)
@@ -289,7 +328,9 @@ class KiFmm:
         try:
             assert self.field_translation == "blas"
         except:
-            raise TypeError("Cutoff ranks only available for FMMs with BLAS based field translations")
+            raise TypeError(
+                "Cutoff ranks only available for FMMs with BLAS based field translations"
+            )
 
         return self.fmm.cutoff_ranks
 
@@ -298,10 +339,11 @@ class KiFmm:
         try:
             assert self.field_translation == "blas" and self.kernel == "laplace"
         except:
-            raise TypeError("Directional cutoff ranks only available for FMMs with BLAS based field translations and Laplace kernels")
+            raise TypeError(
+                "Directional cutoff ranks only available for FMMs with BLAS based field translations and Laplace kernels"
+            )
 
         return self.fmm.directional_cutoff_ranks
-
 
     def source_key_to_anchor(self, key):
         """Convert a Morton key to its respective anchor representation for source tree keys.
@@ -389,9 +431,9 @@ class KiFmm:
         """Evaluate the kernel function associated with this FMM, evaluation mode set by FMM.
 
         Args:
-            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
-            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is `[n_coords, dim]`
-            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions `[n_charges, n_vecs]` where each of `n_vecs` is associated with `n_charges`. `n_vecs` > 1 only supported with BLAS field translations.
+            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
+            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
+            charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions '[n_charges, n_vecs]' where each of 'n_vecs' is associated with 'n_charges'. 'n_vecs' > 1 only supported with BLAS field translations.
 
         Returns:
             np.ndarray: Potentials/potential gradients associated with target coordinates.
