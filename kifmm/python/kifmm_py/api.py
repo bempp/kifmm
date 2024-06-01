@@ -59,7 +59,7 @@ class KiFmm:
         """Constructor for Single Node FMMss.
 
         Args:
-            expansion_order (np.ndarray): The expansion order of the FMM, if specifying a depth expansion order must be specified for each tree level.
+            expansion_order (list[int], int): The expansion order of the FMM, if specifying a depth expansion order must be specified for each tree level in a list
             sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
             targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
             charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions '[n_charges, n_vecs]' where each of 'n_vecs' is associated with 'n_charges'. 'n_vecs' > 1 only supported with BLAS field translations.
@@ -84,18 +84,21 @@ class KiFmm:
 
         # Check valid expansion order
         try:
-            assert isinstance(expansion_order, np.ndarray)
+            assert isinstance(expansion_order, list) or isinstance(expansion_order, int)
         except:
             raise TypeError(f"Expansion orders of type {type(expansion_order)}")
 
         try:
-            for e in expansion_order:
-                assert e > 2
+            if isinstance(expansion_order, list):
+                for e in expansion_order:
+                    assert e > 2
+            else:
+                assert expansion_order > 2
         except:
-            raise TypeError(f"Expansion orders must be >= 2")
+            raise TypeError(f"Expansion orders must be > 2")
 
         try:
-            if len(expansion_order) > 1:
+            if isinstance(expansion_order, list):
                 assert (len(expansion_order) == depth + 1) and (
                     n_crit is None and depth is not None
                 )
@@ -148,7 +151,7 @@ class KiFmm:
 
         try:
             if n_crit is not None:
-                assert len(expansion_order) == 1
+                assert isinstance(expansion_order, int)
         except:
             raise TypeError(
                 f"Only a single expansion order must be specified if constructing a tree with 'n_crit'"
@@ -198,7 +201,12 @@ class KiFmm:
             raise TypeError(f"Must specify 'True' or 'False' for timed")
 
         self.dtype = type(sources[0].dtype)
-        self.expansion_order = expansion_order
+
+        if isinstance(expansion_order, list):
+            self.expansion_order = expansion_order
+        else:
+            self.expansion_order = [expansion_order]
+
         self.sources = sources
         self.targets = targets
         self.charges = charges

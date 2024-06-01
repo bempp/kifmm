@@ -79,7 +79,7 @@ macro_rules! laplace_fft_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: PyReadonlyArrayDyn<'py, usize>,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
@@ -104,7 +104,7 @@ macro_rules! laplace_fft_constructors {
                     ));
                 }
 
-                if expansion_order.as_slice().unwrap().len() > 1 {
+                if expansion_order.len() > 1 {
                     if depth.is_none() || n_crit.is_some() {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Expansion orders must be explicitly specified for each level when using variable expansion order.",
@@ -131,7 +131,7 @@ macro_rules! laplace_fft_constructors {
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -191,7 +191,7 @@ macro_rules! laplace_blas_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: PyReadonlyArrayDyn<'py, usize>,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
@@ -217,7 +217,7 @@ macro_rules! laplace_blas_constructors {
                     ));
                 }
 
-                if expansion_order.as_slice().unwrap().len() > 1 {
+                if expansion_order.len() > 1 {
                     if depth.is_none() || n_crit.is_some() {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Expansion orders must be explicitly specified for each level when using variable expansion order.",
@@ -236,7 +236,7 @@ macro_rules! laplace_blas_constructors {
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         BlasFieldTranslationSaRcmp::new(Some(svd_threshold)),
@@ -308,7 +308,7 @@ macro_rules! helmholtz_fft_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: PyReadonlyArrayDyn<'py, usize>,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
@@ -334,7 +334,7 @@ macro_rules! helmholtz_fft_constructors {
                     ));
                 }
 
-                if expansion_order.as_slice().unwrap().len() > 1 {
+                if expansion_order.len() > 1 {
                     if depth.is_none() || n_crit.is_some() {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Expansion orders must be explicitly specified for each level when using variable expansion order.",
@@ -361,7 +361,7 @@ macro_rules! helmholtz_fft_constructors {
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -421,7 +421,7 @@ macro_rules! helmholtz_blas_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order:  PyReadonlyArrayDyn<'py, usize>,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
@@ -448,7 +448,7 @@ macro_rules! helmholtz_blas_constructors {
                     ));
                 }
 
-                if expansion_order.as_slice().unwrap().len() > 1 {
+                if expansion_order.as_slice().len() > 1 {
                     if depth.is_none() || n_crit.is_some() {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Expansion orders must be explicitly specified for each level when using variable expansion order.",
@@ -477,7 +477,7 @@ macro_rules! helmholtz_blas_constructors {
                     .unwrap()
                     .parameters(
                         charges.as_slice().unwrap(),
-                        expansion_order.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         BlasFieldTranslationIa::new(Some(svd_threshold)),
