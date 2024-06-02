@@ -48,7 +48,6 @@ where
         let mut s = vec![T::zero().re(); k];
         let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
 
-        // TODO: work out why it fails without this copy and remove this copy
         let mut mat_copy = rlst_dynamic_array2!(T, shape);
         mat_copy.fill_from(mat.view());
         mat_copy

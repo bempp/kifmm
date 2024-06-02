@@ -86,11 +86,21 @@ where
         key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<&[Self::Scalar]>;
 
+    /// Get the multipole expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
+
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
     fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node)
         -> Option<&[Self::Scalar]>;
+
+    /// Get the local expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn locals(&self, level: u64) -> Option<&[Self::Scalar]>;
 
     /// Get the potential data associated with the particles contained at a given node
     /// # Arguments
@@ -101,7 +111,10 @@ where
     ) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get the expansion order associated with this FMM
-    fn expansion_order(&self) -> usize;
+    fn expansion_order(&self, level: u64) -> usize;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn ncoeffs(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;
@@ -138,6 +151,12 @@ pub trait FmmOperatorData
 where
     Self: FmmMetadata,
 {
+    /// Lookup convolution grid map for FFT based M2L operator
+    fn fft_map_index(&self, level: u64) -> usize;
+
+    /// Lookup expansion order
+    fn expansion_index(&self, level: u64) -> usize;
+
     /// Lookup c2e operator
     fn c2e_operator_index(&self, level: u64) -> usize;
 

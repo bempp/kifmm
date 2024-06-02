@@ -187,10 +187,10 @@ where
     pub charges: Vec<Scalar>,
 
     /// The expansion order of the FMM
-    pub expansion_order: usize,
+    pub expansion_order: Vec<usize>, // Index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs: usize,
+    pub ncoeffs: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -287,12 +287,12 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
-            expansion_order: 0,
+            expansion_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
-            ncoeffs: 0,
+            ncoeffs: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),
@@ -394,8 +394,9 @@ pub enum FmmEvalType {
 /// let targets = points_fixture::<f64>(ntargets, None, None, Some(3));
 ///
 /// // FMM parameters
-/// let n_crit = Some(150);
-/// let expansion_order = 10;
+/// let n_crit = Some(150); // Constructed from data, using `n_crit` parameter
+/// let depth = None; // Must not specify a depth in this case
+/// let expansion_order = [10]; // Constructed with `n_crit`, therefore can only use a single expansion order.
 /// let prune_empty = true;
 ///
 /// /// Charge data
@@ -406,14 +407,14 @@ pub enum FmmEvalType {
 ///
 /// /// Create a new builder, and attach a tree
 /// let fmm = SingleNodeBuilder::new()
-///     .tree(sources.data(), targets.data(), n_crit, prune_empty)
+///     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 ///     .unwrap();
 ///
 /// /// Specify the FMM parameters, such as the kernel , the kernel evaluation mode, expansion order and charge data
 /// let fmm = fmm
 ///     .parameters(
 ///         charges.data(),
-///         expansion_order,
+///         &expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
 ///         FftFieldTranslation::new(),
@@ -452,16 +453,19 @@ where
     pub domain: Option<Domain<Scalar::Real>>,
 
     /// Expansion order
-    pub expansion_order: Option<usize>,
+    pub expansion_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs: Option<usize>,
+    pub ncoeffs: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,
 
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
+
+    /// Has depth or ncrit been set
+    pub depth_set: Option<bool>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -535,10 +539,10 @@ where
     Scalar: RlstScalar + AsComplex + Default + Dft,
 {
     /// Map between indices of surface convolution grid points.
-    pub surf_to_conv_map: Vec<usize>,
+    pub surf_to_conv_map: Vec<Vec<usize>>, // Indexed by level
 
     /// Map between indices of convolution and surface grid points.
-    pub conv_to_surf_map: Vec<usize>,
+    pub conv_to_surf_map: Vec<Vec<usize>>, // Indexed by level
 
     /// Precomputed data required for FFT compressed M2L interaction.
     pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
@@ -580,16 +584,16 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>,
+    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>, // Indexed by level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
     /// Cutoff rank
-    pub cutoff_rank: usize,
+    pub cutoff_rank: Vec<usize>, // Indexed by level
 
     /// Directional cutoff ranks
-    pub directional_cutoff_ranks: Vec<usize>,
+    pub directional_cutoff_ranks: Vec<Vec<usize>>,
 
     /// The map between sources/targets in
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,

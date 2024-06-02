@@ -19,6 +19,7 @@ use rlst::{
 
 use crate::{
     fmm::{
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
@@ -49,9 +50,8 @@ use crate::{
         helpers::find_corners,
         types::MortonKey,
     },
+    Fmm,
 };
-
-use super::transfer_vector::compute_transfer_vectors_at_level;
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
@@ -81,74 +81,99 @@ where
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let domain = self.tree.domain;
 
-        // Compute required surfaces
-        let upward_equivalent_surface =
-            root.surface_grid(self.expansion_order, &domain, alpha_inner);
-        let upward_check_surface = root.surface_grid(self.expansion_order, &domain, alpha_outer);
+        let mut m2m = Vec::new();
+        let mut m2m_vec = Vec::new();
+        let mut uc2e_inv_1 = Vec::new();
+        let mut uc2e_inv_2 = Vec::new();
 
-        let nequiv_surface = upward_equivalent_surface.len() / self.dim;
-        let ncheck_surface = upward_check_surface.len() / self.dim;
+        for &expansion_order in self.expansion_order.iter() {
+            // Compute required surfaces
+            let upward_equivalent_surface =
+                root.surface_grid(expansion_order, &domain, alpha_inner);
+            let upward_check_surface = root.surface_grid(expansion_order, &domain, alpha_outer);
 
-        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
-        // As well as estimating their inverses using SVD
-        let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
-        self.kernel.assemble_st(
-            EvalType::Value,
-            &upward_equivalent_surface[..],
-            &upward_check_surface[..],
-            uc2e_t.data_mut(),
-        );
+            let nequiv_surface = upward_equivalent_surface.len() / self.dim;
+            let ncheck_surface = upward_check_surface.len() / self.dim;
 
-        // Need to transpose so that rows correspond to targets and columns to sources
-        let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-        uc2e.fill_from(uc2e_t.transpose());
-
-        let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = Scalar::from_real(s[i]);
-        }
-
-        let uc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
-        let uc2e_inv_2 = vec![ut];
-
-        // Calculate M2M operator matrices
-        let children = root.children();
-        let mut m2m = vec![rlst_dynamic_array2!(
-            Scalar,
-            [nequiv_surface, 8 * nequiv_surface]
-        )];
-        let mut m2m_vec = vec![Vec::new()];
-
-        for (i, child) in children.iter().enumerate() {
-            let child_upward_equivalent_surface =
-                child.surface_grid(self.expansion_order, &domain, alpha_inner);
-
-            let mut pc2ce_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
-
+            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+            // As well as estimating their inverses using SVD
+            let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &child_upward_equivalent_surface,
-                &upward_check_surface,
-                pc2ce_t.data_mut(),
+                &upward_equivalent_surface[..],
+                &upward_check_surface[..],
+                uc2e_t.data_mut(),
             );
 
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut pc2ce = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            pc2ce.fill_from(pc2ce_t.transpose());
+            // Need to transpose so that rows correspond to targets and columns to sources
+            let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+            uc2e.fill_from(uc2e_t.transpose());
 
-            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), pc2ce.view()),
-            );
-            let l = i * nequiv_surface * nequiv_surface;
-            let r = l + nequiv_surface * nequiv_surface;
+            let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
 
-            m2m[0].data_mut()[l..r].copy_from_slice(tmp.data());
-            m2m_vec[0].push(tmp);
+            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            for i in 0..s.len() {
+                mat_s[[i, i]] = Scalar::from_real(s[i]);
+            }
+
+            uc2e_inv_1
+                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            uc2e_inv_2.push(ut);
+        }
+
+        let iterator = if self.expansion_order.len() > 1 {
+            0..self.expansion_order.len() - 1
+        } else {
+            0..1
+        };
+
+        // Calculate M2M operator matrices on each level, if required
+        for parent_level in iterator {
+            let expansion_order_parent = self.expansion_order(parent_level as u64);
+            let expansion_order_child = self.expansion_order((parent_level + 1) as u64);
+
+            let parent_upward_check_surface =
+                root.surface_grid(expansion_order_parent, &domain, alpha_outer);
+
+            let children = root.children();
+            let ncheck_surface_parent = ncoeffs_kifmm(expansion_order_parent);
+            let nequiv_surface_child = ncoeffs_kifmm(expansion_order_child);
+
+            let mut m2m_level =
+                rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, 8 * nequiv_surface_child]);
+            let mut m2m_vec_level = Vec::new();
+
+            for (i, child) in children.iter().enumerate() {
+                let child_upward_equivalent_surface =
+                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
+
+                let mut ce2pc =
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
+
+                // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
+                self.kernel.assemble_st(
+                    EvalType::Value,
+                    &parent_upward_check_surface,
+                    &child_upward_equivalent_surface,
+                    ce2pc.data_mut(),
+                );
+
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    uc2e_inv_1[self.expansion_index(parent_level as u64)].view(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                        uc2e_inv_2[self.expansion_index(parent_level as u64)].view(),
+                        ce2pc.view(),
+                    ),
+                );
+                let l = i * nequiv_surface_child * ncheck_surface_parent;
+                let r = l + nequiv_surface_child * ncheck_surface_parent;
+
+                m2m_level.data_mut()[l..r].copy_from_slice(tmp.data());
+                m2m_vec_level.push(tmp);
+            }
+
+            m2m_vec.push(m2m_vec_level);
+            m2m.push(m2m_level);
         }
 
         self.source = m2m;
@@ -165,69 +190,96 @@ where
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let domain = self.tree.domain;
 
-        // Compute required surfaces
-        let downward_equivalent_surface =
-            root.surface_grid(self.expansion_order, &domain, alpha_outer);
-        let downward_check_surface = root.surface_grid(self.expansion_order, &domain, alpha_inner);
+        let mut l2l = Vec::new();
+        let mut dc2e_inv_1 = Vec::new();
+        let mut dc2e_inv_2 = Vec::new();
 
-        let nequiv_surface = downward_equivalent_surface.len() / self.dim;
-        let ncheck_surface = downward_check_surface.len() / self.dim;
+        for &expansion_order in self.expansion_order.iter() {
+            // Compute required surfaces
+            let downward_equivalent_surface =
+                root.surface_grid(expansion_order, &domain, alpha_outer);
+            let downward_check_surface = root.surface_grid(expansion_order, &domain, alpha_inner);
 
-        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
-        // As well as estimating their inverses using SVD
-        let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
-        self.kernel.assemble_st(
-            EvalType::Value,
-            &downward_equivalent_surface[..],
-            &downward_check_surface[..],
-            dc2e_t.data_mut(),
-        );
+            let nequiv_surface = downward_equivalent_surface.len() / self.dim;
+            let ncheck_surface = downward_check_surface.len() / self.dim;
 
-        // Need to transpose so that rows correspond to targets and columns to sources
-        let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-        dc2e.fill_from(dc2e_t.transpose());
-
-        let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = Scalar::from_real(s[i]);
-        }
-
-        let dc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
-        let dc2e_inv_2 = vec![ut];
-
-        // Calculate M2M and L2L operator matrices
-        let children = root.children();
-        let mut l2l = vec![Vec::new()];
-
-        for child in children.iter() {
-            let child_downward_check_surface =
-                child.surface_grid(self.expansion_order, &domain, alpha_inner);
-            // Need to transpose so that rows correspond to targets, and columns to sources
-
-            let mut cc2pe_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+            // As well as estimating their inverses using SVD
+            let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &downward_equivalent_surface,
-                &child_downward_check_surface,
-                cc2pe_t.data_mut(),
+                &downward_equivalent_surface[..],
+                &downward_check_surface[..],
+                dc2e_t.data_mut(),
             );
 
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut cc2pe = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            cc2pe.fill_from(cc2pe_t.transpose());
-            let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                dc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(dc2e_inv_2[0].view(), cc2pe.view()),
-            );
-            tmp.data_mut()
-                .iter_mut()
-                .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+            // Need to transpose so that rows correspond to targets and columns to sources
+            let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
+            dc2e.fill_from(dc2e_t.transpose());
 
-            l2l[0].push(tmp);
+            let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
+
+            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            for i in 0..s.len() {
+                mat_s[[i, i]] = Scalar::from_real(s[i]);
+            }
+
+            dc2e_inv_1
+                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            dc2e_inv_2.push(ut);
+        }
+
+        let depth = self.tree.target_tree().depth();
+
+        let iterator = if self.expansion_order.len() > 1 {
+            0..depth
+        } else {
+            0..1
+        };
+
+        for parent_level in iterator {
+            let expansion_order_parent = self.expansion_order(parent_level);
+            let expansion_order_child = self.expansion_order(parent_level + 1);
+
+            let parent_downward_equivalent_surface =
+                root.surface_grid(expansion_order_parent, &domain, alpha_outer);
+
+            // Calculate L2L operator matrices
+            let children = root.children();
+            let ncheck_surface_child = ncoeffs_kifmm(expansion_order_child);
+            let nequiv_surface_parent = ncoeffs_kifmm(expansion_order_parent);
+
+            let mut l2l_level = Vec::new();
+
+            for child in children.iter() {
+                let child_downward_check_surface =
+                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
+
+                // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
+                let mut pe2cc =
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
+                self.kernel.assemble_st(
+                    EvalType::Value,
+                    &child_downward_check_surface,
+                    &parent_downward_equivalent_surface,
+                    pe2cc.data_mut(),
+                );
+
+                let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    dc2e_inv_1[self.expansion_index(parent_level + 1)].view(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                        dc2e_inv_2[self.expansion_index(parent_level + 1)].view(),
+                        pe2cc.view(),
+                    ),
+                );
+                tmp.data_mut()
+                    .iter_mut()
+                    .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+
+                l2l_level.push(tmp);
+            }
+
+            l2l.push(l2l_level);
         }
 
         self.target_vec = l2l;
@@ -260,12 +312,17 @@ where
         let mut uc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        for _level in 0..=depth {
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().cloned().collect_vec()
+        } else {
+            vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
+        };
+
+        for expansion_order in iterator {
             // Compute required surfaces
             let upward_equivalent_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_inner);
-            let upward_check_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+                curr.surface_grid(expansion_order, &domain, alpha_inner);
+            let upward_check_surface = curr.surface_grid(expansion_order, &domain, alpha_outer);
 
             let nequiv_surface = upward_equivalent_surface.len() / self.dim;
             let ncheck_surface = upward_check_surface.len() / self.dim;
@@ -302,45 +359,67 @@ where
         let mut source = Vec::new();
         let mut source_vec = Vec::new();
 
-        for level in 0..depth {
+        let iterator = if self.expansion_order.len() > 1 {
+            (0..depth)
+                .zip(
+                    self.expansion_order
+                        .iter()
+                        .cloned()
+                        .take(depth as usize)
+                        .zip(
+                            self.expansion_order
+                                .iter()
+                                .skip(1)
+                                .cloned()
+                                .take(depth as usize),
+                        ),
+                )
+                .collect_vec()
+        } else {
+            (0..depth)
+                .zip(
+                    vec![*self.expansion_order.last().unwrap(); depth as usize]
+                        .into_iter()
+                        .zip(vec![*self.expansion_order.last().unwrap(); depth as usize]),
+                )
+                .collect_vec()
+        };
+
+        // Calculate M2M operator matrices on each level
+        for (level, (expansion_order_parent, expansion_order_child)) in iterator {
             // Compute required surfaces
-            let upward_equivalent_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_inner);
-            let upward_check_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
+            let parent_upward_check_surface =
+                curr.surface_grid(expansion_order_parent, &domain, alpha_outer);
 
-            let nequiv_surface = upward_equivalent_surface.len() / self.dim;
-            let ncheck_surface = upward_check_surface.len() / self.dim;
+            let ncheck_surface_parent = ncoeffs_kifmm(expansion_order_parent);
+            let nequiv_surface_child = ncoeffs_kifmm(expansion_order_child);
 
-            // Calculate M2M operator matrices on each level
             let children = curr.children();
-            let mut m2m = rlst_dynamic_array2!(Scalar, [nequiv_surface, 8 * nequiv_surface]);
+            let mut m2m =
+                rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, 8 * nequiv_surface_child]);
             let mut m2m_vec = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
                 let child_upward_equivalent_surface =
-                    child.surface_grid(self.expansion_order, &domain, alpha_inner);
+                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
 
-                let mut pc2ce_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+                let mut ce2pc =
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
 
                 self.kernel.assemble_st(
                     EvalType::Value,
+                    &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
-                    &upward_check_surface,
-                    pc2ce_t.data_mut(),
+                    ce2pc.data_mut(),
                 );
-
-                // Need to transpose so that rows correspond to targets, and columns to sources
-                let mut pc2ce = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-                pc2ce.fill_from(pc2ce_t.transpose());
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     uc2e_inv_1[level as usize].view(),
                     empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), pc2ce.view()),
+                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), ce2pc.view()),
                 );
-                let l = i * nequiv_surface * nequiv_surface;
-                let r = l + nequiv_surface * nequiv_surface;
+                let l = i * nequiv_surface_child * ncheck_surface_parent;
+                let r = l + nequiv_surface_child * ncheck_surface_parent;
 
                 m2m.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec.push(tmp);
@@ -372,12 +451,17 @@ where
         let mut dc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        for _level in 0..=depth {
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().cloned().collect_vec()
+        } else {
+            vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
+        };
+
+        for expansion_order in iterator {
             // Compute required surfaces
             let downward_equivalent_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
-            let downward_check_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_inner);
+                curr.surface_grid(expansion_order, &domain, alpha_outer);
+            let downward_check_surface = curr.surface_grid(expansion_order, &domain, alpha_inner);
 
             let nequiv_surface = downward_equivalent_surface.len() / self.dim;
             let ncheck_surface = downward_check_surface.len() / self.dim;
@@ -410,17 +494,42 @@ where
         }
 
         let mut curr = root;
-        let mut target = Vec::new();
+        let mut target_vec = Vec::new();
 
-        for level in 0..depth {
+        // TODO: test for shallow trees
+        let iterator = if self.expansion_order.len() > 1 {
+            (0..depth)
+                .zip(
+                    self.expansion_order
+                        .iter()
+                        .cloned()
+                        .take(depth as usize)
+                        .zip(
+                            self.expansion_order
+                                .iter()
+                                .skip(1)
+                                .cloned()
+                                .take(depth as usize),
+                        ),
+                )
+                .collect_vec()
+        } else {
+            (0..depth)
+                .zip(
+                    vec![*self.expansion_order.last().unwrap(); depth as usize]
+                        .into_iter()
+                        .zip(vec![*self.expansion_order.last().unwrap(); depth as usize]),
+                )
+                .collect_vec()
+        };
+
+        for (level, (expansion_order_parent, expansion_order_child)) in iterator {
             // Compute required surfaces
-            let downward_equivalent_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_outer);
-            let downard_check_surface =
-                curr.surface_grid(self.expansion_order, &domain, alpha_inner);
+            let parent_downward_equivalent_surface =
+                curr.surface_grid(expansion_order_parent, &domain, alpha_outer);
 
-            let nequiv_surface = downward_equivalent_surface.len() / self.dim;
-            let ncheck_surface = downard_check_surface.len() / self.dim;
+            let ncheck_surface_child = ncoeffs_kifmm(expansion_order_child);
+            let nequiv_surface_parent = ncoeffs_kifmm(expansion_order_parent);
 
             // Calculate l2l operator matrices on each level
             let children = curr.children();
@@ -428,39 +537,36 @@ where
 
             for child in children.iter() {
                 let child_downward_check_surface =
-                    child.surface_grid(self.expansion_order, &domain, alpha_inner);
+                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
                 // Need to transpose so that rows correspond to targets, and columns to sources
 
-                let mut cc2pe_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+                let mut pe2cc =
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
                 self.kernel.assemble_st(
                     EvalType::Value,
-                    &downward_equivalent_surface,
                     &child_downward_check_surface,
-                    cc2pe_t.data_mut(),
+                    &parent_downward_equivalent_surface,
+                    pe2cc.data_mut(),
                 );
 
-                // Need to transpose so that rows correspond to targets, and columns to sources
-                let mut cc2pe = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-                cc2pe.fill_from(cc2pe_t.transpose());
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     dc2e_inv_1[(level + 1) as usize].view(),
                     empty_array::<Scalar, 2>().simple_mult_into_resize(
                         dc2e_inv_2[(level + 1) as usize].view(),
-                        cc2pe.view(),
+                        pe2cc.view(),
                     ),
                 );
 
                 l2l.push(tmp);
             }
 
-            target.push(l2l);
+            target_vec.push(l2l);
             curr = curr.first_child();
         }
 
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
-
-        self.target_vec = target;
+        self.target_vec = target_vec;
     }
 }
 
@@ -549,7 +655,21 @@ where
 
         let mut result = BlasFieldTranslationIa::<Scalar>::default();
 
-        for level in 2..=depth {
+        // TODO: Need to test what happens for very shallow trees.
+        let iterator = if self.expansion_order.len() > 1 {
+            (2..=depth)
+                .zip(self.expansion_order.iter().skip(2).cloned())
+                .collect_vec()
+        } else {
+            (2..=depth)
+                .zip(vec![
+                    *self.expansion_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .collect_vec()
+        };
+
+        for (level, expansion_order) in iterator {
             let transfer_vectors =
                 compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
 
@@ -558,18 +678,14 @@ where
             let mut level_cutoff_rank = Vec::new();
 
             for t in transfer_vectors.iter() {
-                let source_equivalent_surface = t.source.surface_grid(
-                    self.expansion_order,
-                    self.tree.source_tree().domain(),
-                    alpha,
-                );
+                let source_equivalent_surface =
+                    t.source
+                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
                 let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
-                let target_check_surface = t.target.surface_grid(
-                    self.expansion_order,
-                    self.tree.source_tree().domain(),
-                    alpha,
-                );
+                let target_check_surface =
+                    t.target
+                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
                 let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
                 let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
@@ -702,9 +818,6 @@ where
 
     fn source_to_target(&mut self) {
         // Compute the field translation operators
-        let shape = <Scalar as Dft>::shape_in(self.expansion_order);
-        let transform_shape = <Scalar as Dft>::shape_out(self.expansion_order);
-        let transform_size = <Scalar as Dft>::size_out(self.expansion_order);
 
         // Pick a point in the middle of the domain
         let two = Scalar::real(2.0);
@@ -752,6 +865,17 @@ where
         }
 
         // Compute data for level 2 separately
+        // TODO: check if this results in a bug for very shallow trees
+        let expansion_order = if self.expansion_order.len() > 2 {
+            self.expansion_order[2]
+        } else {
+            *self.expansion_order.last().unwrap()
+        };
+
+        let shape = <Scalar as Dft>::shape_in(expansion_order);
+        let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
+        let transform_size = <Scalar as Dft>::size_out(expansion_order);
+
         // Need to find valid source/target pairs at this level with matching transfer vectors;
         let all_keys = MortonKey::<Scalar::Real>::root().descendants(2).unwrap();
 
@@ -786,7 +910,7 @@ where
             }
         }
 
-        let n_source_equivalent_surface = 6 * (self.expansion_order - 1).pow(2) + 2;
+        let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
         let n_target_check_surface = n_source_equivalent_surface;
         let alpha = Scalar::real(ALPHA_INNER);
 
@@ -797,17 +921,11 @@ where
                 let tv = transfer_vector_index[i][j];
                 let (source, target) = tv_source_target_pair_map.get(&tv).unwrap();
 
-                let source_equivalent_surface = source.surface_grid(
-                    self.expansion_order,
-                    self.tree.source_tree().domain(),
-                    alpha,
-                );
+                let source_equivalent_surface =
+                    source.surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
 
-                let target_check_surface = target.surface_grid(
-                    self.expansion_order,
-                    self.tree.source_tree().domain(),
-                    alpha,
-                );
+                let target_check_surface =
+                    target.surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
 
                 let v_list: HashSet<MortonKey<_>> = target
                     .parent()
@@ -828,7 +946,7 @@ where
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
-                        self.expansion_order,
+                        expansion_order,
                         self.tree.source_tree().domain(),
                         alpha,
                         &conv_point_corner,
@@ -845,7 +963,7 @@ where
 
                     // Compute Green's fct evaluations
                     let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-                        self.expansion_order,
+                        expansion_order,
                         &conv_grid,
                         kernel_point,
                     ));
@@ -923,8 +1041,25 @@ where
             kernel_data_f: kernel_data_ft,
         });
 
+        let iterator = if self.expansion_order.len() > 1 {
+            (3..=depth)
+                .zip(self.expansion_order.iter().cloned().skip(3))
+                .collect_vec()
+        } else {
+            (3..=depth)
+                .zip(vec![
+                    *self.expansion_order.last().unwrap();
+                    (depth - 2) as usize
+                ])
+                .collect_vec()
+        };
+
         // Rest of the levels
-        for level in 3..=depth {
+        for &(level, expansion_order) in &iterator {
+            let shape = <Scalar as Dft>::shape_in(expansion_order);
+            let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
+            let transform_size = <Scalar as Dft>::size_out(expansion_order);
+
             // Encode point in centre of domain and compute halo of parent, and their resp. children
             let key = MortonKey::from_point(&point, domain, level);
             let siblings = key.siblings();
@@ -971,7 +1106,7 @@ where
                 sources[i] = tmp_sources;
             }
 
-            let n_source_equivalent_surface = 6 * (self.expansion_order - 1).pow(2) + 2;
+            let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
             let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
@@ -984,12 +1119,12 @@ where
                     let source = sources[i][j];
 
                     let source_equivalent_surface = source.surface_grid(
-                        self.expansion_order,
+                        expansion_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
                     let target_check_surface = target.surface_grid(
-                        self.expansion_order,
+                        expansion_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
@@ -1013,7 +1148,7 @@ where
                         ];
 
                         let (conv_grid, _) = source.convolution_grid(
-                            self.expansion_order,
+                            expansion_order,
                             self.tree.source_tree().domain(),
                             alpha,
                             &conv_point_corner,
@@ -1030,7 +1165,7 @@ where
 
                         // Compute Green's fct evaluations
                         let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-                            self.expansion_order,
+                            expansion_order,
                             &conv_grid,
                             kernel_point,
                         ));
@@ -1117,11 +1252,23 @@ where
         // Set operator data
         self.source_to_target.metadata = metadata;
 
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        } else {
+            self.expansion_order.clone()
+        };
+
         // Set required maps
-        (
-            self.source_to_target.surf_to_conv_map,
-            self.source_to_target.conv_to_surf_map,
-        ) = Self::compute_surf_to_conv_map(self.expansion_order);
+        let mut tmp1 = Vec::new();
+        let mut tmp2 = Vec::new();
+        for expansion_order in iterator {
+            let (surf_to_conv_map, conv_to_surf_map) =
+                Self::compute_surf_to_conv_map(expansion_order);
+            tmp1.push(surf_to_conv_map);
+            tmp2.push(conv_to_surf_map)
+        }
+        self.source_to_target.surf_to_conv_map = tmp1;
+        self.source_to_target.conv_to_surf_map = tmp2;
     }
 }
 
@@ -1201,167 +1348,183 @@ where
     fn source_to_target(&mut self) {
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
-        let nrows = ncoeffs_kifmm(self.expansion_order);
-        let ncols = ncoeffs_kifmm(self.expansion_order);
 
-        let mut se2tc_fat = rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
-        let mut se2tc_thin = rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        // TODO: Need to see what happens for very shallow trees
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        } else {
+            self.expansion_order.clone()
+        };
 
-        let alpha = Scalar::real(ALPHA_INNER);
+        for expansion_order in iterator {
+            let nrows = ncoeffs_kifmm(expansion_order);
+            let ncols = ncoeffs_kifmm(expansion_order);
 
-        for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
-            let source_equivalent_surface = t.source.surface_grid(
-                self.expansion_order,
-                self.tree.source_tree().domain(),
-                alpha,
-            );
-            let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
+            let mut se2tc_fat =
+                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+            let mut se2tc_thin =
+                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+            let alpha = Scalar::real(ALPHA_INNER);
 
-            let target_check_surface = t.target.surface_grid(
-                self.expansion_order,
-                self.tree.source_tree().domain(),
-                alpha,
-            );
-            let ntargets = target_check_surface.len() / self.kernel.space_dimension();
+            for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
+                let source_equivalent_surface =
+                    t.source
+                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
+                let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
 
-            let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
+                let target_check_surface =
+                    t.target
+                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
+                let ntargets = target_check_surface.len() / self.kernel.space_dimension();
 
-            self.kernel.assemble_st(
-                EvalType::Value,
-                &source_equivalent_surface[..],
-                &target_check_surface[..],
-                tmp_gram_t.data_mut(),
-            );
+                let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
 
-            // Need to transpose so that rows correspond to targets, and columns to sources
-            let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
-            tmp_gram.fill_from(tmp_gram_t.transpose());
+                self.kernel.assemble_st(
+                    EvalType::Value,
+                    &source_equivalent_surface[..],
+                    &target_check_surface[..],
+                    tmp_gram_t.data_mut(),
+                );
 
-            let mut block = se2tc_fat
-                .view_mut()
-                .into_subview([0, i * ncols], [nrows, ncols]);
-            block.fill_from(tmp_gram.view());
+                // Need to transpose so that rows correspond to targets, and columns to sources
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
+                tmp_gram.fill_from(tmp_gram_t.transpose());
 
-            let mut block_column = se2tc_thin
-                .view_mut()
-                .into_subview([i * nrows, 0], [nrows, ncols]);
-            block_column.fill_from(tmp_gram.view());
-        }
+                let mut block = se2tc_fat
+                    .view_mut()
+                    .into_subview([0, i * ncols], [nrows, ncols]);
+                block.fill_from(tmp_gram.view());
 
-        let mu = se2tc_fat.shape()[0];
-        let nvt = se2tc_fat.shape()[1];
-        let k = std::cmp::min(mu, nvt);
-
-        let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
-        let mut sigma = vec![Scalar::zero().re(); k];
-        let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
-
-        se2tc_fat
-            .into_svd_alloc(
-                u_big.view_mut(),
-                vt_big.view_mut(),
-                &mut sigma[..],
-                SvdMode::Reduced,
-            )
-            .unwrap();
-        let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
-        let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
-        let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-        let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
-
-        u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
-        vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
-        for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
-            unsafe {
-                *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                let mut block_column = se2tc_thin
+                    .view_mut()
+                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                block_column.fill_from(tmp_gram.view());
             }
-        }
 
-        // Store compressed M2L operators
-        let thin_nrows = se2tc_thin.shape()[0];
-        let nst = se2tc_thin.shape()[1];
-        let k = std::cmp::min(thin_nrows, nst);
-        let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
-        let mut _r = vec![Scalar::zero().re(); k];
-        let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
+            let mu = se2tc_fat.shape()[0];
+            let nvt = se2tc_fat.shape()[1];
+            let k = std::cmp::min(mu, nvt);
 
-        se2tc_thin
-            .into_svd_alloc(
-                _gamma.view_mut(),
-                st.view_mut(),
-                &mut _r[..],
-                SvdMode::Reduced,
-            )
-            .unwrap();
+            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut sigma = vec![Scalar::zero().re(); k];
+            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
-        let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
-        for j in 0..cutoff_rank {
-            for i in 0..nst {
-                unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
-            }
-        }
-
-        let mut c_u = Vec::new();
-        let mut c_vt = Vec::new();
-        let mut directional_cutoff_ranks = Vec::new();
-
-        for i in 0..self.source_to_target.transfer_vectors.len() {
-            let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
-
-            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                sigma_mat.view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
-            );
-
-            let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-            let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
-            let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
-
-            tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+            se2tc_fat
+                .into_svd_alloc(
+                    u_big.view_mut(),
+                    vt_big.view_mut(),
+                    &mut sigma[..],
+                    SvdMode::Reduced,
+                )
                 .unwrap();
+            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
+            let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
+            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+            let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
 
-            let directional_cutoff_rank =
-                find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
-
-            let mut u_i_compressed =
-                rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
-            let mut vt_i_compressed_ =
-                rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
-
-            let mut sigma_mat_i_compressed =
-                rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, directional_cutoff_rank]);
-
-            u_i_compressed
-                .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
-            vt_i_compressed_
-                .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
-
-            for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+            u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
+            vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
+            for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
                 unsafe {
-                    *sigma_mat_i_compressed.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                    *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
                 }
             }
 
-            let vt_i_compressed = empty_array::<Scalar, 2>()
-                .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
+            // Store compressed M2L operators
+            let thin_nrows = se2tc_thin.shape()[0];
+            let nst = se2tc_thin.shape()[1];
+            let k = std::cmp::min(thin_nrows, nst);
+            let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
+            let mut _r = vec![Scalar::zero().re(); k];
+            let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
 
-            c_u.push(u_i_compressed);
-            c_vt.push(vt_i_compressed);
-            directional_cutoff_ranks.push(directional_cutoff_rank);
+            se2tc_thin
+                .into_svd_alloc(
+                    _gamma.view_mut(),
+                    st.view_mut(),
+                    &mut _r[..],
+                    SvdMode::Reduced,
+                )
+                .unwrap();
+
+            let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
+            for j in 0..cutoff_rank {
+                for i in 0..nst {
+                    unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
+                }
+            }
+
+            let mut c_u = Vec::new();
+            let mut c_vt = Vec::new();
+            let mut directional_cutoff_ranks = Vec::new();
+
+            for i in 0..self.source_to_target.transfer_vectors.len() {
+                let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat.view(),
+                    empty_array::<Scalar, 2>()
+                        .simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+                );
+
+                let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+                let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
+                let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+
+                tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+                    .unwrap();
+
+                let directional_cutoff_rank =
+                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
+
+                let mut u_i_compressed =
+                    rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
+                let mut vt_i_compressed_ =
+                    rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
+
+                let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
+                    Scalar,
+                    [directional_cutoff_rank, directional_cutoff_rank]
+                );
+
+                u_i_compressed
+                    .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
+                vt_i_compressed_
+                    .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
+
+                for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+                    unsafe {
+                        *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
+                            Scalar::from(*s).unwrap();
+                    }
+                }
+
+                let vt_i_compressed = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat_i_compressed.view(),
+                    vt_i_compressed_.view(),
+                );
+
+                c_u.push(u_i_compressed);
+                c_vt.push(vt_i_compressed);
+                directional_cutoff_ranks.push(directional_cutoff_rank);
+            }
+
+            let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
+            st_trunc.fill_from(s_trunc.transpose());
+
+            let result = BlasMetadataSaRcmp {
+                u,
+                st: st_trunc,
+                c_u,
+                c_vt,
+            };
+
+            self.source_to_target.metadata.push(result);
+            self.source_to_target.cutoff_rank.push(cutoff_rank);
+            self.source_to_target
+                .directional_cutoff_ranks
+                .push(directional_cutoff_ranks);
         }
-
-        let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
-        st_trunc.fill_from(s_trunc.transpose());
-
-        let result = BlasMetadataSaRcmp {
-            u,
-            st: st_trunc,
-            c_u,
-            c_vt,
-        };
-        self.source_to_target.metadata = vec![result];
-        self.source_to_target.cutoff_rank = cutoff_rank;
-        self.source_to_target.directional_cutoff_ranks = directional_cutoff_ranks;
     }
 }
 
@@ -1420,14 +1583,16 @@ where
     pub fn evaluate_charges_convolution_grid(
         &self,
         expansion_order: usize,
+        expansion_order_index: usize,
         charges: &[Scalar],
     ) -> Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 3>, 3> {
         let n = 2 * expansion_order - 1;
         let npad = n + 1;
-
         let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
-
-        for (i, &j) in self.source_to_target.surf_to_conv_map.iter().enumerate() {
+        for (i, &j) in self.source_to_target.surf_to_conv_map[expansion_order_index]
+            .iter()
+            .enumerate()
+        {
             result.data_mut()[j] = charges[i];
         }
 
@@ -1560,9 +1725,6 @@ where
 
     fn source_to_target(&mut self) {
         // Compute the field translation operators
-        let shape = <Scalar as Dft>::shape_in(self.expansion_order);
-        let transform_shape = <Scalar as Dft>::shape_out(self.expansion_order);
-        let transform_size = <Scalar as Dft>::size_out(self.expansion_order);
 
         // Pick a point in the middle of the domain
         let two = Scalar::real(2.0);
@@ -1588,189 +1750,211 @@ where
         let halo = parent.neighbors();
         let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
-        // The child boxes in the halo of the sibling set
-        let mut sources = vec![];
-        // The sibling set
-        let mut targets = vec![];
-        // The transfer vectors corresponding to source->target translations
-        let mut transfer_vectors = vec![];
-        // Green's function evaluations for each source, target pair interaction
-        let mut kernel_data_vec = vec![];
+        let iterator = if self.expansion_order.len() > 1 {
+            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        } else {
+            self.expansion_order.clone()
+        };
 
-        for _ in &halo_children {
-            sources.push(vec![]);
-            targets.push(vec![]);
-            transfer_vectors.push(vec![]);
-            kernel_data_vec.push(vec![]);
-        }
+        for &expansion_order in &iterator {
+            // The child boxes in the halo of the sibling set
+            let mut sources = vec![];
+            // The sibling set
+            let mut targets = vec![];
+            // The transfer vectors corresponding to source->target translations
+            let mut transfer_vectors = vec![];
+            // Green's function evaluations for each source, target pair interaction
+            let mut kernel_data_vec = vec![];
 
-        // Each set of 64 M2L operators will correspond to a point in the halo
-        // Computing transfer of potential from sibling set to halo
-        for (i, halo_child_set) in halo_children.iter().enumerate() {
-            let mut tmp_transfer_vectors = vec![];
-            let mut tmp_targets = vec![];
-            let mut tmp_sources = vec![];
-
-            // Consider all halo children for a given sibling at a time
-            for sibling in siblings.iter() {
-                for halo_child in halo_child_set.iter() {
-                    tmp_transfer_vectors.push(halo_child.find_transfer_vector(sibling));
-                    tmp_targets.push(sibling);
-                    tmp_sources.push(halo_child);
-                }
+            for _ in &halo_children {
+                sources.push(vec![]);
+                targets.push(vec![]);
+                transfer_vectors.push(vec![]);
+                kernel_data_vec.push(vec![]);
             }
 
-            // From source to target
-            transfer_vectors[i] = tmp_transfer_vectors;
-            targets[i] = tmp_targets;
-            sources[i] = tmp_sources;
-        }
+            // Each set of 64 M2L operators will correspond to a point in the halo
+            // Computing transfer of potential from sibling set to halo
+            for (i, halo_child_set) in halo_children.iter().enumerate() {
+                let mut tmp_transfer_vectors = vec![];
+                let mut tmp_targets = vec![];
+                let mut tmp_sources = vec![];
 
-        let n_source_equivalent_surface = 6 * (self.expansion_order - 1).pow(2) + 2;
-        let n_target_check_surface = n_source_equivalent_surface;
-        let alpha = Scalar::real(ALPHA_INNER);
+                // Consider all halo children for a given sibling at a time
+                for sibling in siblings.iter() {
+                    for halo_child in halo_child_set.iter() {
+                        tmp_transfer_vectors.push(halo_child.find_transfer_vector(sibling));
+                        tmp_targets.push(sibling);
+                        tmp_sources.push(halo_child);
+                    }
+                }
 
-        // Iterate over each set of convolutions in the halo (26)
-        for i in 0..transfer_vectors.len() {
-            // Iterate over each unique convolution between sibling set, and halo siblings (64)
-            for j in 0..transfer_vectors[i].len() {
-                // Translating from sibling set to boxes in its M2L halo
-                let target = targets[i][j];
-                let source = sources[i][j];
+                // From source to target
+                transfer_vectors[i] = tmp_transfer_vectors;
+                targets[i] = tmp_targets;
+                sources[i] = tmp_sources;
+            }
 
-                let source_equivalent_surface = source.surface_grid(
-                    self.expansion_order,
-                    self.tree.source_tree().domain(),
-                    alpha,
-                );
-                let target_check_surface = target.surface_grid(
-                    self.expansion_order,
-                    self.tree.source_tree().domain(),
-                    alpha,
-                );
+            let shape = <Scalar as Dft>::shape_in(expansion_order);
+            let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
+            let transform_size = <Scalar as Dft>::size_out(expansion_order);
+            let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
+            let n_target_check_surface = n_source_equivalent_surface;
+            let alpha = Scalar::real(ALPHA_INNER);
 
-                let v_list: HashSet<MortonKey<_>> = target
-                    .parent()
-                    .neighbors()
-                    .iter()
-                    .flat_map(|pn| pn.children())
-                    .filter(|pnc| !target.is_adjacent(pnc))
-                    .collect();
+            // Iterate over each set of convolutions in the halo (26)
+            for i in 0..transfer_vectors.len() {
+                // Iterate over each unique convolution between sibling set, and halo siblings (64)
+                for j in 0..transfer_vectors[i].len() {
+                    // Translating from sibling set to boxes in its M2L halo
+                    let target = targets[i][j];
+                    let source = sources[i][j];
 
-                if v_list.contains(source) {
-                    // Compute convolution grid around the source box
-                    let conv_point_corner_index = 7;
-                    let corners = find_corners(&source_equivalent_surface[..]);
-                    let conv_point_corner = [
-                        corners[conv_point_corner_index],
-                        corners[NCORNERS + conv_point_corner_index],
-                        corners[2 * NCORNERS + conv_point_corner_index],
-                    ];
-
-                    let (conv_grid, _) = source.convolution_grid(
-                        self.expansion_order,
+                    let source_equivalent_surface = source.surface_grid(
+                        expansion_order,
                         self.tree.source_tree().domain(),
                         alpha,
-                        &conv_point_corner,
-                        conv_point_corner_index,
+                    );
+                    let target_check_surface = target.surface_grid(
+                        expansion_order,
+                        self.tree.source_tree().domain(),
+                        alpha,
                     );
 
-                    // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
-                    let kernel_point_index = 0;
-                    let kernel_point = [
-                        target_check_surface[kernel_point_index],
-                        target_check_surface[n_target_check_surface + kernel_point_index],
-                        target_check_surface[2 * n_target_check_surface + kernel_point_index],
-                    ];
+                    let v_list: HashSet<MortonKey<_>> = target
+                        .parent()
+                        .neighbors()
+                        .iter()
+                        .flat_map(|pn| pn.children())
+                        .filter(|pnc| !target.is_adjacent(pnc))
+                        .collect();
 
-                    // Compute Green's fct evaluations
-                    let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-                        self.expansion_order,
-                        &conv_grid,
-                        kernel_point,
-                    ));
+                    if v_list.contains(source) {
+                        // Compute convolution grid around the source box
+                        let conv_point_corner_index = 7;
+                        let corners = find_corners(&source_equivalent_surface[..]);
+                        let conv_point_corner = [
+                            corners[conv_point_corner_index],
+                            corners[NCORNERS + conv_point_corner_index],
+                            corners[2 * NCORNERS + conv_point_corner_index],
+                        ];
 
-                    // Compute FFT of padded kernel
-                    let mut kernel_hat =
-                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        let (conv_grid, _) = source.convolution_grid(
+                            expansion_order,
+                            self.tree.source_tree().domain(),
+                            alpha,
+                            &conv_point_corner,
+                            conv_point_corner_index,
+                        );
 
-                    let _ = Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                        // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
+                        let kernel_point_index = 0;
+                        let kernel_point = [
+                            target_check_surface[kernel_point_index],
+                            target_check_surface[n_target_check_surface + kernel_point_index],
+                            target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                        ];
 
-                    kernel_data_vec[i].push(kernel_hat);
-                } else {
-                    // Fill with zeros when interaction doesn't exist
-                    let kernel_hat_zeros =
-                        rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
-                    kernel_data_vec[i].push(kernel_hat_zeros);
-                }
-            }
-        }
+                        // Compute Green's fct evaluations
+                        let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
+                            expansion_order,
+                            &conv_grid,
+                            kernel_point,
+                        ));
 
-        // Each element corresponds to all evaluations for each sibling (in order) at that halo position
-        let mut kernel_data =
-            vec![
-                vec![<Scalar as DftType>::OutputType::zero(); NSIBLINGS_SQUARED * transform_size];
-                halo_children.len()
-            ];
+                        // Compute FFT of padded kernel
+                        let mut kernel_hat =
+                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-        // For each halo position
-        for i in 0..halo_children.len() {
-            // For each unique interaction
-            for j in 0..NSIBLINGS_SQUARED {
-                let offset = j * transform_size;
-                kernel_data[i][offset..offset + transform_size]
-                    .copy_from_slice(kernel_data_vec[i][j].data())
-            }
-        }
+                        let _ =
+                            Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
-        // We want to use this data by frequency in the implementation of FFT M2L
-        // Rearrangement: Grouping by frequency, then halo child, then sibling
-        let mut kernel_data_f = vec![];
-        for _ in &halo_children {
-            kernel_data_f.push(vec![]);
-        }
-        for i in 0..halo_children.len() {
-            let current_vector = &kernel_data[i];
-            for l in 0..transform_size {
-                // halo child
-                for k in 0..NSIBLINGS {
-                    // sibling
-                    for j in 0..NSIBLINGS {
-                        let index = j * transform_size * 8 + k * transform_size + l;
-                        kernel_data_f[i].push(current_vector[index]);
+                        kernel_data_vec[i].push(kernel_hat);
+                    } else {
+                        // Fill with zeros when interaction doesn't exist
+                        let kernel_hat_zeros =
+                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        kernel_data_vec[i].push(kernel_hat_zeros);
                     }
                 }
             }
-        }
 
-        // Re-order
-        let mut kernel_data_ft = Vec::new();
-        for freq in 0..transform_size {
-            let frequency_offset = NSIBLINGS_SQUARED * freq;
-            for kernel_f in kernel_data_f.iter().take(NHALO) {
-                let k_f =
-                    &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)].to_vec();
-                let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-                let mut k_ft =
-                    rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
-                k_ft.fill_from(k_f_.view());
-                kernel_data_ft.push(k_ft.data().to_vec());
+            // Each element corresponds to all evaluations for each sibling (in order) at that halo position
+            let mut kernel_data = vec![
+                vec![
+                    <Scalar as DftType>::OutputType::zero();
+                    NSIBLINGS_SQUARED * transform_size
+                ];
+                halo_children.len()
+            ];
+
+            // For each halo position
+            for i in 0..halo_children.len() {
+                // For each unique interaction
+                for j in 0..NSIBLINGS_SQUARED {
+                    let offset = j * transform_size;
+                    kernel_data[i][offset..offset + transform_size]
+                        .copy_from_slice(kernel_data_vec[i][j].data())
+                }
             }
+
+            // We want to use this data by frequency in the implementation of FFT M2L
+            // Rearrangement: Grouping by frequency, then halo child, then sibling
+            let mut kernel_data_f = vec![];
+            for _ in &halo_children {
+                kernel_data_f.push(vec![]);
+            }
+            for i in 0..halo_children.len() {
+                let current_vector = &kernel_data[i];
+                for l in 0..transform_size {
+                    // halo child
+                    for k in 0..NSIBLINGS {
+                        // sibling
+                        for j in 0..NSIBLINGS {
+                            let index = j * transform_size * 8 + k * transform_size + l;
+                            kernel_data_f[i].push(current_vector[index]);
+                        }
+                    }
+                }
+            }
+
+            // Re-order
+            let mut kernel_data_ft = Vec::new();
+            for freq in 0..transform_size {
+                let frequency_offset = NSIBLINGS_SQUARED * freq;
+                for kernel_f in kernel_data_f.iter().take(NHALO) {
+                    let k_f = &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
+                        .to_vec();
+                    let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                    let mut k_ft = rlst_dynamic_array2!(
+                        <Scalar as DftType>::OutputType,
+                        [NSIBLINGS, NSIBLINGS]
+                    );
+                    k_ft.fill_from(k_f_.view());
+                    kernel_data_ft.push(k_ft.data().to_vec());
+                }
+            }
+
+            let metadata = FftMetadata {
+                kernel_data,
+                kernel_data_f: kernel_data_ft,
+            };
+
+            // Set operator data
+            self.source_to_target.metadata.push(metadata);
         }
-
-        let metadata = FftMetadata {
-            kernel_data,
-            kernel_data_f: kernel_data_ft,
-        };
-
-        // Set operator data
-        self.source_to_target.metadata = vec![metadata];
 
         // Set required maps
-        (
-            self.source_to_target.surf_to_conv_map,
-            self.source_to_target.conv_to_surf_map,
-        ) = Self::compute_surf_to_conv_map(self.expansion_order);
+        let mut tmp1 = Vec::new();
+        let mut tmp2 = Vec::new();
+        for &expansion_order in &iterator {
+            let (surf_to_conv_map, conv_to_surf_map) =
+                Self::compute_surf_to_conv_map(expansion_order);
+            tmp1.push(surf_to_conv_map);
+            tmp2.push(conv_to_surf_map)
+        }
+        self.source_to_target.surf_to_conv_map = tmp1;
+        self.source_to_target.conv_to_surf_map = tmp2;
     }
 }
 
@@ -1781,20 +1965,52 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn c2e_operator_index(&self, _level: u64) -> usize {
-        0
+    fn fft_map_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 2) as usize
+        } else {
+            0
+        }
     }
 
-    fn m2m_operator_index(&self, _level: u64) -> usize {
-        0
+    fn expansion_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            level as usize
+        } else {
+            0
+        }
     }
 
-    fn l2l_operator_index(&self, _level: u64) -> usize {
-        0
+    fn c2e_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            level as usize
+        } else {
+            0
+        }
     }
 
-    fn m2l_operator_index(&self, _level: u64) -> usize {
-        0
+    fn m2m_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 1) as usize
+        } else {
+            0
+        }
+    }
+
+    fn l2l_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 1) as usize
+        } else {
+            0
+        }
+    }
+
+    fn m2l_operator_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 2) as usize
+        } else {
+            0
+        }
     }
 
     fn displacement_index(&self, level: u64) -> usize {
@@ -1809,6 +2025,22 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
+    fn fft_map_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            (level - 2) as usize
+        } else {
+            0
+        }
+    }
+
+    fn expansion_index(&self, level: u64) -> usize {
+        if self.expansion_order.len() > 1 {
+            level as usize
+        } else {
+            0
+        }
+    }
+
     fn c2e_operator_index(&self, level: u64) -> usize {
         level as usize
     }
@@ -1859,8 +2091,27 @@ where
         let nsource_leaves = self.tree.source_tree.n_leaves().unwrap();
 
         // Buffers to store all multipole and local data
-        let multipoles = vec![Scalar::default(); self.ncoeffs * nsource_keys * nmatvecs];
-        let locals = vec![Scalar::default(); self.ncoeffs * ntarget_keys * nmatvecs];
+        let nmultipole_coeffs;
+        let nlocal_coeffs;
+        if self.expansion_order.len() > 1 {
+            nmultipole_coeffs = (0..=self.tree.source_tree().depth())
+                .zip(self.ncoeffs.iter())
+                .fold(0usize, |acc, (level, &ncoeffs)| {
+                    acc + self.tree.source_tree().n_keys(level).unwrap() * ncoeffs
+                });
+
+            nlocal_coeffs = (0..=self.tree.target_tree().depth())
+                .zip(self.ncoeffs.iter())
+                .fold(0usize, |acc, (level, &ncoeffs)| {
+                    acc + self.tree.target_tree().n_keys(level).unwrap() * ncoeffs
+                })
+        } else {
+            nmultipole_coeffs = nsource_keys * self.ncoeffs.last().unwrap();
+            nlocal_coeffs = ntarget_keys * self.ncoeffs.last().unwrap();
+        }
+
+        let multipoles = vec![Scalar::default(); nmultipole_coeffs * nmatvecs];
+        let locals = vec![Scalar::default(); nlocal_coeffs * nmatvecs];
 
         // Index pointers of multipole and local data, indexed by level
         let level_index_pointer_multipoles = level_index_pointer(&self.tree.source_tree);
@@ -1873,34 +2124,35 @@ where
         let source_leaf_scales = leaf_scales::<Scalar>(
             &self.tree.source_tree,
             self.kernel.is_homogenous(),
-            self.ncoeffs,
+            *self.ncoeffs.last().unwrap(),
         );
 
         // Pre compute check surfaces
         let leaf_upward_surfaces_sources = leaf_surfaces(
             &self.tree.source_tree,
-            self.ncoeffs,
+            *self.ncoeffs.last().unwrap(),
             alpha_outer,
-            self.expansion_order,
+            *self.expansion_order.last().unwrap(),
         );
+
         let leaf_upward_surfaces_targets = leaf_surfaces(
             &self.tree.target_tree,
-            self.ncoeffs,
+            *self.ncoeffs.last().unwrap(),
             alpha_outer,
-            self.expansion_order,
+            *self.expansion_order.last().unwrap(),
         );
 
         // Mutable pointers to multipole and local data, indexed by level
         let level_multipoles =
-            level_expansion_pointers(&self.tree.source_tree, self.ncoeffs, nmatvecs, &multipoles);
+            level_expansion_pointers(&self.tree.source_tree, &self.ncoeffs, nmatvecs, &multipoles);
 
         let level_locals =
-            level_expansion_pointers(&self.tree.source_tree, self.ncoeffs, nmatvecs, &locals);
+            level_expansion_pointers(&self.tree.source_tree, &self.ncoeffs, nmatvecs, &locals);
 
         // Mutable pointers to multipole and local data only at leaf level
         let leaf_multipoles = leaf_expansion_pointers(
             &self.tree.source_tree,
-            self.ncoeffs,
+            &self.ncoeffs,
             nmatvecs,
             nsource_leaves,
             &multipoles,
@@ -1908,7 +2160,7 @@ where
 
         let leaf_locals = leaf_expansion_pointers(
             &self.tree.target_tree,
-            self.ncoeffs,
+            &self.ncoeffs,
             nmatvecs,
             ntarget_leaves,
             &locals,
@@ -2048,7 +2300,8 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let depth = None;
+        let expansion_order = [6];
         let prune_empty = true;
 
         // Charge data
@@ -2058,11 +2311,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 BlasFieldTranslationSaRcmp::new(Some(1e-5)),
@@ -2072,8 +2325,8 @@ mod test {
             .unwrap();
 
         let idx = 123;
-
-        let transfer_vectors = compute_transfer_vectors_at_level::<f64>(3).unwrap();
+        let level = 3;
+        let transfer_vectors = compute_transfer_vectors_at_level::<f64>(level).unwrap();
         let transfer_vector = &transfer_vectors[idx];
 
         // Lookup correct components of SVD compressed M2L operator matrix
@@ -2087,8 +2340,8 @@ mod test {
         let c_u = &fmm.source_to_target.metadata[0].c_u[c_idx];
         let c_vt = &fmm.source_to_target.metadata[0].c_vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs, 1]);
-        for i in 0..fmm.ncoeffs {
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs(level), 1]);
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2109,14 +2362,19 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = transfer_vector
-            .source
-            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
-        let targets = transfer_vector
-            .target
-            .surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let sources = transfer_vector.source.surface_grid(
+            fmm.expansion_order(level),
+            &fmm.tree.domain,
+            alpha,
+        );
 
-        let mut direct = vec![0f64; fmm.ncoeffs];
+        let targets = transfer_vector.target.surface_grid(
+            fmm.expansion_order(level),
+            &fmm.tree.domain,
+            alpha,
+        );
+
+        let mut direct = vec![0f64; fmm.ncoeffs(level)];
 
         fmm.kernel.evaluate_st(
             EvalType::Value,
@@ -2147,7 +2405,8 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let depth = None;
+        let expansion_order = [6];
         let prune_empty = true;
         let wavenumber = 2.5;
 
@@ -2158,11 +2417,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 BlasFieldTranslationIa::new(None),
@@ -2202,8 +2461,8 @@ mod test {
         let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
         let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
-        for i in 0..fmm.ncoeffs {
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -2214,10 +2473,10 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = source.surface_grid(expansion_order, &fmm.tree.domain, alpha);
-        let targets = target.surface_grid(expansion_order, &fmm.tree.domain, alpha);
+        let sources = source.surface_grid(fmm.expansion_order(level), &fmm.tree.domain, alpha);
+        let targets = target.surface_grid(fmm.expansion_order(level), &fmm.tree.domain, alpha);
 
-        let mut direct = vec![c64::zero(); fmm.ncoeffs];
+        let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
 
         fmm.kernel.evaluate_st(
             EvalType::Value,
@@ -2310,7 +2569,8 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let depth = None;
+        let expansion_order = [6];
         let prune_empty = true;
 
         // Charge data
@@ -2320,11 +2580,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -2333,33 +2593,40 @@ mod test {
             .build()
             .unwrap();
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs, 1]);
+        let level = 3;
+        let coeff_idx = fmm.c2e_operator_index(level);
 
-        for i in 0..fmm.ncoeffs {
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs(level), 1]);
+
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
         // Compute all M2L operators
         // Pick a random source/target pair
         let idx = 123;
-        let all_transfer_vectors = compute_transfer_vectors_at_level::<f64>(3).unwrap();
+        let all_transfer_vectors = compute_transfer_vectors_at_level::<f64>(level).unwrap();
 
         let transfer_vector = &all_transfer_vectors[idx];
 
         // Compute FFT of the representative signal
-        let mut signal = fmm.evaluate_charges_convolution_grid(expansion_order, multipole.data());
+        let mut signal = fmm.evaluate_charges_convolution_grid(
+            expansion_order[coeff_idx],
+            coeff_idx,
+            multipole.data(),
+        );
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
 
         let _ = f64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
 
         let source_equivalent_surface = transfer_vector.source.surface_grid(
-            expansion_order,
+            expansion_order[coeff_idx],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
         let target_check_surface = transfer_vector.target.surface_grid(
-            expansion_order,
+            expansion_order[coeff_idx],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
@@ -2375,7 +2642,7 @@ mod test {
         ];
 
         let (conv_grid, _) = transfer_vector.source.convolution_grid(
-            expansion_order,
+            expansion_order[coeff_idx],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -2390,8 +2657,11 @@ mod test {
         ];
 
         // Compute kernel
-        let kernel =
-            fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
+        let kernel = fmm.evaluate_greens_fct_convolution_grid(
+            expansion_order[coeff_idx],
+            &conv_grid,
+            kernel_point,
+        );
         let [m, n, o] = kernel.shape();
 
         let mut kernel = flip3(&kernel);
@@ -2418,12 +2688,15 @@ mod test {
         );
 
         let mut result = vec![0f64; ntargets];
-        for (i, &idx) in fmm.source_to_target.conv_to_surf_map.iter().enumerate() {
+        for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_idx]
+            .iter()
+            .enumerate()
+        {
             result[i] = potentials.data()[idx];
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![0f64; fmm.ncoeffs];
+        let mut direct = vec![0f64; fmm.ncoeffs(level)];
         fmm.kernel.evaluate_st(
             EvalType::Value,
             &source_equivalent_surface[..],
@@ -2452,7 +2725,8 @@ mod test {
 
         // FMM parameters
         let n_crit = Some(100);
-        let expansion_order = 6;
+        let depth = None;
+        let expansion_order = [6];
         let prune_empty = true;
         let wavenumber = 1.0;
 
@@ -2463,11 +2737,11 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, prune_empty)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -2476,13 +2750,14 @@ mod test {
             .build()
             .unwrap();
 
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs, 1]);
+        let level = 2;
+        let coeff_index = fmm.expansion_index(level);
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
 
-        for i in 0..fmm.ncoeffs {
+        for i in 0..fmm.ncoeffs(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
-        let level = 2;
         let source = fmm.tree().source_tree().keys(level).unwrap()[0];
 
         let v_list: HashSet<MortonKey<_>> = source
@@ -2499,16 +2774,26 @@ mod test {
         let target = v_list[0];
 
         // Compute FFT of the representative signal
-        let mut signal = fmm.evaluate_charges_convolution_grid(expansion_order, multipole.data());
+        let mut signal = fmm.evaluate_charges_convolution_grid(
+            expansion_order[coeff_index],
+            coeff_index,
+            multipole.data(),
+        );
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
 
         let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
 
-        let source_equivalent_surface =
-            source.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
-        let target_check_surface =
-            target.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
+        let source_equivalent_surface = source.surface_grid(
+            expansion_order[coeff_index],
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+        );
+        let target_check_surface = target.surface_grid(
+            expansion_order[coeff_index],
+            &fmm.tree.source_tree.domain,
+            ALPHA_INNER,
+        );
         let ntargets = target_check_surface.len() / 3;
 
         // Compute conv grid
@@ -2521,7 +2806,7 @@ mod test {
         ];
 
         let (conv_grid, _) = source.convolution_grid(
-            expansion_order,
+            expansion_order[coeff_index],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -2536,8 +2821,11 @@ mod test {
         ];
 
         // Compute kernel
-        let kernel =
-            fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
+        let kernel = fmm.evaluate_greens_fct_convolution_grid(
+            expansion_order[coeff_index],
+            &conv_grid,
+            kernel_point,
+        );
         let [m, n, o] = kernel.shape();
 
         let mut kernel = flip3(&kernel);
@@ -2564,12 +2852,15 @@ mod test {
         );
 
         let mut result = vec![c64::zero(); ntargets];
-        for (i, &idx) in fmm.source_to_target.conv_to_surf_map.iter().enumerate() {
+        for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_index]
+            .iter()
+            .enumerate()
+        {
             result[i] = potentials.data()[idx];
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![c64::zero(); fmm.ncoeffs];
+        let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
         fmm.kernel.evaluate_st(
             EvalType::Value,
             &source_equivalent_surface[..],

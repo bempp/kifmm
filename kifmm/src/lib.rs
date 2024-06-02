@@ -31,7 +31,8 @@
 //!
 //! // FMM parameters
 //! let n_crit = Some(150); // Threshold for number of particles in a leaf box
-//! let expansion_order = 5; // Expansion order of multipole/local expansions
+//! let depth = None; //
+//! let expansion_order = [5]; // Expansion order of multipole/local expansions
 //! let prune_empty = true; // Whether to exclude empty boxes in octrees
 //!
 //! // FFT based Field Translation
@@ -43,11 +44,11 @@
 //!
 //!     // Build FMM object, with a given kernel and field translation
 //!     let mut fmm_fft = SingleNodeBuilder::new()
-//!         .tree(sources.data(), targets.data(), n_crit, prune_empty)
+//!         .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 //!         .unwrap()
 //!         .parameters(
 //!             charges.data(),
-//!             expansion_order,
+//!             &expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
 //!             FftFieldTranslation::new(), // Choose a field translation method, could replace with BLAS field translation

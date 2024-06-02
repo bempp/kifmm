@@ -87,6 +87,12 @@ pub trait Tree {
     /// - `key` - Node being query.
     fn index(&self, key: &Self::Node) -> Option<&usize>;
 
+    /// Map from the key to index position in sorted keys at a given level
+    ///
+    /// # Arguments
+    /// - `key` - Node being query.
+    fn level_index(&self, key: &Self::Node) -> Option<&usize>;
+
     /// Map from the leaf to its index position in sorted leaves
     ///
     /// # Arguments
