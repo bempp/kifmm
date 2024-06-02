@@ -168,6 +168,16 @@ where
             subset.sort();
         }
 
+        let mut key_to_level_index = HashMap::new();
+        // Compute key to level index
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let keys = &keys[l..r];
+            for (i, key) in keys.iter().enumerate() {
+                key_to_level_index.insert(*key, i);
+            }
+        }
+
         // Collect coordinates in row-major order, for ease of lookup
         let coordinates_row_major = points
             .iter()
@@ -201,6 +211,7 @@ where
             keys,
             leaves_to_coordinates,
             key_to_index,
+            key_to_level_index,
             leaf_to_index,
             levels_to_keys,
             leaves_set,
@@ -366,6 +377,16 @@ where
             subset.sort();
         }
 
+        let mut key_to_level_index = HashMap::new();
+        // Compute key to level index
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let keys = &keys[l..r];
+            for (i, key) in keys.iter().enumerate() {
+                key_to_level_index.insert(*key, i);
+            }
+        }
+
         // Collect coordinates in row-major order, for ease of lookup
         let coordinates_row_major = points
             .iter()
@@ -399,6 +420,7 @@ where
             keys,
             leaves_to_coordinates,
             key_to_index,
+            key_to_level_index,
             leaf_to_index,
             levels_to_keys,
             leaves_set,
@@ -723,6 +745,10 @@ where
 
     fn index(&self, key: &Self::Node) -> Option<&usize> {
         self.key_to_index.get(key)
+    }
+
+    fn level_index(&self, key: &Self::Node) -> Option<&usize> {
+        self.key_to_level_index.get(key)
     }
 
     fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize> {

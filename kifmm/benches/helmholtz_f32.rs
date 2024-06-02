@@ -21,7 +21,8 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(400);
-    let expansion_order = 5;
+    let depth = None;
+    let expansion_order = [5];
     let prune_empty = true;
     let svd_threshold = Some(1e-2);
 
@@ -34,11 +35,11 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
             FftFieldTranslation::new(),
@@ -48,11 +49,11 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
             BlasFieldTranslationIa::new(svd_threshold),
@@ -86,7 +87,8 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(150);
-    let expansion_order = 5;
+    let depth = None;
+    let expansion_order = [5];
     let prune_empty = true;
     let svd_threshold = Some(1e-2);
 
@@ -99,11 +101,11 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
             FftFieldTranslation::new(),
@@ -113,11 +115,11 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(sources.data(), targets.data(), n_crit, prune_empty)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
             charges.data(),
-            expansion_order,
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
             BlasFieldTranslationIa::new(svd_threshold),

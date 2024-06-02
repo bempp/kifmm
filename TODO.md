@@ -1,11 +1,6 @@
 Code
 ----
-2. Check potential bug for shallow trees
 3. Think about how to add different expansion orders for check/equivalent surfaces
-4. Update docstrings to reflect ability to use variable expansion orders.
-5. Update distributed tree with new trait constraints for key to level index.
-6. Fix benches, add new benches for variable expansion order?
-1. Python bindings and docs
 7. Merge, and fixup SIMD branch - probably easier to just create a new branch?
 8. Test SIMD branch for Helmholtz.
 
@@ -33,7 +28,9 @@ SIMD benchmarks
 
 Paper (ii)
 ----------
-- New framework for developing kernel independent FMMs, with flexible design to mix and match
+- New framework for developing kernel independent FMMs, with flexible design to mix and match field translation, kernel implementations.
+- Rust enables easy deployment to multiple architectures.
+- Python bindings with PyO3, enabled by C ABI compatiblity of Rust
 - Designed in Rust, demonstrating the versatility of Rust for scientific computing.
 - How have we implemented data oriented design, and used traits to do so?
 - Demonstrate benchmark performance with respect to key softwares on a single node

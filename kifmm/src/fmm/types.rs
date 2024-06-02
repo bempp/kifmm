@@ -394,9 +394,9 @@ pub enum FmmEvalType {
 /// let targets = points_fixture::<f64>(ntargets, None, None, Some(3));
 ///
 /// // FMM parameters
-/// let n_crit = Some(150);
-/// let depth = None;ca
-/// let expansion_order = [10];
+/// let n_crit = Some(150); // Constructed from data, using `n_crit` parameter
+/// let depth = None; // Must not specify a depth in this case
+/// let expansion_order = [10]; // Constructed with `n_crit`, therefore can only use a single expansion order.
 /// let prune_empty = true;
 ///
 /// /// Charge data
@@ -463,6 +463,9 @@ where
 
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
+
+    /// Has depth or ncrit been set
+    pub depth_set: Option<bool>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.

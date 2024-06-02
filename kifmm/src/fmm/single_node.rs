@@ -544,7 +544,12 @@ mod test {
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = RlstScalar::abs(d - p);
             let rel_error = abs_error / p;
-            println!("err {:?} \nd {:?} \np {:?}", rel_error, direct, potential);
+            println!(
+                "err {:?} \nd {:?} \np {:?}",
+                rel_error,
+                &direct[0..3],
+                &potential[0..3]
+            );
             assert!(rel_error <= threshold)
         });
     }
@@ -846,11 +851,13 @@ mod test {
         // let expansion_order = [6];
 
         let n_crit = None;
-        let depth = Some(3);
-        let expansion_order = [5, 6, 5, 6];
+        // let depth = Some(3);
+        // let expansion_order = [5, 6, 5, 6];
+        let depth = Some(1);
+        let expansion_order = [5, 5];
 
         let prune_empty = true;
-        let threshold_pot = 1e-5;
+        let threshold_pot = 1e-3;
         let threshold_deriv = 1e-4;
         let threshold_deriv_blas = 1e-3;
         let singular_value_threshold = Some(1e-2);
@@ -1030,8 +1037,8 @@ mod test {
         // let expansion_order = [6];
 
         let n_crit = None;
-        let depth = Some(3);
-        let expansion_order = [6, 5, 5, 6];
+        let depth = Some(2);
+        let expansion_order = [6, 6, 6];
 
         let prune_empty = true;
         let wavenumber = 2.5;

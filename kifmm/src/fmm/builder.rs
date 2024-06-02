@@ -44,6 +44,7 @@ where
             ncoeffs: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
+            depth_set: None,
         }
     }
 
@@ -94,12 +95,14 @@ where
             if depth.is_some() && n_crit.is_none() {
                 source_depth = depth.unwrap();
                 target_depth = depth.unwrap();
+                self.depth_set = Some(true);
             } else if depth.is_none() && n_crit.is_some() {
                 // Estimate depth based on a uniform distribution
                 source_depth =
                     SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit.unwrap());
                 target_depth =
                     SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit.unwrap());
+                self.depth_set = Some(false);
             } else {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -172,7 +175,11 @@ where
             }
 
             let depth = self.tree.as_ref().unwrap().source_tree().depth();
-            if !(expansion_order.len() == 1 || expansion_order.len() == (depth + 1) as usize) {
+            let depth_set = self.depth_set.unwrap();
+
+            let expected_len = if depth_set { (depth + 1) as usize } else { 1 };
+
+            if expansion_order.len() != expected_len {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidInput,
                     "Number of expansion orders must either be 1, or match the depth of the tree",

@@ -866,7 +866,7 @@ where
 
         // Compute data for level 2 separately
         // TODO: check if this results in a bug for very shallow trees
-        let expansion_order = if self.expansion_order.len() > 1 {
+        let expansion_order = if self.expansion_order.len() > 2 {
             self.expansion_order[2]
         } else {
             *self.expansion_order.last().unwrap()

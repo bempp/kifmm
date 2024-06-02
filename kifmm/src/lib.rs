@@ -31,7 +31,7 @@
 //!
 //! // FMM parameters
 //! let n_crit = Some(150); // Threshold for number of particles in a leaf box
-//! let depth = None;
+//! let depth = None; //
 //! let expansion_order = [5]; // Expansion order of multipole/local expansions
 //! let prune_empty = true; // Whether to exclude empty boxes in octrees
 //!
