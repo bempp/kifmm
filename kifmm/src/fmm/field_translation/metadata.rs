@@ -863,7 +863,7 @@ where
             .tree
             .source_tree()
             .domain()
-            .side_length
+            .side_length()
             .iter()
             .map(|d| *d / two)
             .collect_vec();
@@ -1787,7 +1787,7 @@ where
             .tree
             .source_tree()
             .domain
-            .side_length
+            .side_length()
             .iter()
             .map(|d| *d / two)
             .collect_vec();

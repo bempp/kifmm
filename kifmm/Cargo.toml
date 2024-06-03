@@ -29,7 +29,7 @@ approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
 kifmm-fftw-sys = { path = "../fftw-sys" }
-green-kernels = { version = "0.1" }
+green-kernels = { git = "https://github.com/skailasa/green-kernels.git", branch = "simd"}
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
@@ -41,10 +41,10 @@ pulp = "0.18.12"
 bytemuck = "1.16.0"
 
 [target.aarch64-apple-darwin.dependencies]
-rlst = { version = "0.1", features=["metal"]}
+rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd", features = ["metal"]}
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-rlst = { version = "0.1", features=["blis"]}
+rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd", features = ["blis"]}
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}

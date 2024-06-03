@@ -103,7 +103,7 @@ where
 {
     type Scalar = T;
 
-    fn diameter(&self) -> &[T; 3] {
+    fn side_length(&self) -> &[T; 3] {
         &self.side_length
     }
 

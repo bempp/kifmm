@@ -23,32 +23,31 @@ where
     /// Constructor for uniform trees on a single node refined to a user defined depth.
     ///
     /// # Arguments
-    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order.
-    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
+    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
+    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree(
-        coordinates_col_major: &[T],
+        coordinates_row_major: &[T],
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
-        let n_coords = coordinates_col_major.len() / dim;
+        let n_coords = coordinates_row_major.len() / dim;
 
         // Convert column major coordinate into `Point`, containing Morton encoding
         let mut points: Vec<Point<T>> = Points::default();
         for i in 0..n_coords {
-            let coord: [T; 3] = [
-                coordinates_col_major[i],
-                coordinates_col_major[i + n_coords],
-                coordinates_col_major[i + 2 * n_coords],
-            ];
-            let base_key = MortonKey::<T>::from_point(&coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::<T>::from_point(&coord, &domain, depth);
+            let coord: &[T; 3] = &coordinates_row_major[i * dim..(i + 1) * dim]
+                .try_into()
+                .unwrap();
+
+            let base_key = MortonKey::<T>::from_point(coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::<T>::from_point(coord, &domain, depth);
             points.push(Point {
-                coordinate: coord,
+                coordinate: *coord,
                 base_key,
                 encoded_key,
                 global_index: global_indices[i],
@@ -146,7 +145,7 @@ where
         }
 
         // Collect coordinates in row-major order, for ease of lookup
-        let coordinates_row_major = points
+        let coordinates = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
@@ -170,7 +169,7 @@ where
 
         Ok(SingleNodeTree {
             depth,
-            coordinates: coordinates_row_major,
+            coordinates,
             global_indices,
             domain,
             leaves,
@@ -189,32 +188,31 @@ where
     /// empty nodes which don't contain particles and their ancestors.
     ///
     /// # Arguments
-    /// * `coordinates_col_major` - A slice of point coordinates, expected in column major order
-    /// \[x1, x2, ... xn, y1, y2, ..., yn, z1, z2, ..., zn\].
+    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
+    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree_pruned(
-        coordinates_col_major: &[T],
+        coordinates_row_major: &[T],
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
-        let n_coords = coordinates_col_major.len() / dim;
+        let n_coords = coordinates_row_major.len() / dim;
 
         // Convert column major coordinate into `Point`, containing Morton encoding
         let mut points = Points::default();
         for i in 0..n_coords {
-            let point = [
-                coordinates_col_major[i],
-                coordinates_col_major[i + n_coords],
-                coordinates_col_major[i + 2 * n_coords],
-            ];
-            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(&point, &domain, depth);
+            let coord: &[T; 3] = &coordinates_row_major[i * dim..(i + 1) * dim]
+                .try_into()
+                .unwrap();
+
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth);
             points.push(Point {
-                coordinate: point,
+                coordinate: *coord,
                 base_key,
                 encoded_key,
                 global_index: global_indices[i],
@@ -305,7 +303,7 @@ where
         }
 
         // Collect coordinates in row-major order, for ease of lookup
-        let coordinates_row_major = points
+        let coordinates = points
             .iter()
             .map(|p| p.coordinate)
             .flat_map(|[x, y, z]| vec![x, y, z])
@@ -329,7 +327,7 @@ where
 
         Ok(SingleNodeTree {
             depth,
-            coordinates: coordinates_row_major,
+            coordinates,
             global_indices,
             domain,
             leaves,
@@ -378,9 +376,9 @@ where
     ///
     /// # Arguments
     ///
-    /// - `coordinates_col_major` - A slice of coordinates in column major order, structured as
-    ///   [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N]. This ordering facilitates
-    ///   efficient spatial indexing and operations within the tree.
+    /// - `coordinates_row_major` - A slice of coordinates in column major order, structured as
+    ///   [x_1, y_1, z_1,...x_N, y_N, z_N]. This ordering facilitates efficient spatial indexing
+    ///   and operations within the tree.
     ///
     /// - `depth` - Defines the maximum recursion level of the tree, determining the granularity of
     ///   spatial division. A greater depth results in a finer partitioning of the spatial domain.
@@ -394,26 +392,26 @@ where
     ///   all points.
     ///
     pub fn new(
-        coordinates_col_major: &[T],
+        coordinates_row_major: &[T],
         depth: u64,
         prune_empty: bool,
         domain: Option<Domain<T>>,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
-        let coords_len = coordinates_col_major.len();
 
-        let valid_len = !coordinates_col_major.is_empty();
+        let valid_len = !coordinates_row_major.is_empty();
+        let coords_len = coordinates_row_major.len();
         let valid_dim = coords_len % dim == 0;
         let valid_depth = depth <= DEEPEST_LEVEL;
 
         match (valid_depth, valid_dim, valid_len, prune_empty) {
             (true, true, true, true) => {
                 let n_coords = coords_len / dim;
-                let domain = domain.unwrap_or(Domain::from_local_points(coordinates_col_major));
+                let domain = domain.unwrap_or(Domain::from_local_points(coordinates_row_major));
                 let global_indices = (0..n_coords).collect_vec();
 
                 SingleNodeTree::uniform_tree_pruned(
-                    coordinates_col_major,
+                    coordinates_row_major,
                     &domain,
                     depth,
                     &global_indices,
@@ -421,10 +419,10 @@ where
             }
             (true, true, true, false) => {
                 let n_coords = coords_len / dim;
-                let domain = domain.unwrap_or(Domain::from_local_points(coordinates_col_major));
+                let domain = domain.unwrap_or(Domain::from_local_points(coordinates_row_major));
                 let global_indices = (0..n_coords).collect_vec();
 
-                SingleNodeTree::uniform_tree(coordinates_col_major, &domain, depth, &global_indices)
+                SingleNodeTree::uniform_tree(coordinates_row_major, &domain, depth, &global_indices)
             }
 
             (false, _, _, _) => {
@@ -847,7 +845,7 @@ mod test {
 
         let mut tmp = Points::default();
         for i in 0..n_points {
-            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+            let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
             tmp.push(Point {
                 coordinate: point,
@@ -896,7 +894,7 @@ mod test {
         let mut tmp = Points::default();
 
         for i in 0..n_points {
-            let point = [points[[i, 0]], points[[i, 1]], points[[i, 2]]];
+            let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
             let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
             tmp.push(Point {
                 coordinate: point,

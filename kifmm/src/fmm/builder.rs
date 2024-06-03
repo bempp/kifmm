@@ -53,8 +53,8 @@ where
     /// Associate FMM builder with an FMM Tree
     ///
     /// # Arguments
-    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
-    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
+    /// * `sources` - Source coordinates, data expected in row major order such that the shape is [dim, n_coords]
+    /// * `target` - Target coordinates,  data expected in row major order such that the shape is [dim, n_coords]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
     /// * `prune_empty` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
