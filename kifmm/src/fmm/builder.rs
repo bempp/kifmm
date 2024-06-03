@@ -40,7 +40,8 @@ where
             charges: None,
             source_to_target: None,
             domain: None,
-            expansion_order: None,
+            equivalent_surface_order: None,
+            check_surface_order: None,
             ncoeffs: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
@@ -186,7 +187,19 @@ where
                 ));
             }
 
-            self.expansion_order = Some(expansion_order.to_vec());
+            self.equivalent_surface_order = Some(expansion_order.to_vec());
+
+            if source_to_target.overdetermined() {
+                self.check_surface_order = Some(
+                    expansion_order
+                        .iter()
+                        .map(|&e| e + source_to_target.surface_diff())
+                        .collect(),
+                )
+            } else {
+                self.check_surface_order = Some(expansion_order.to_vec())
+            }
+
             self.ncoeffs = Some(
                 expansion_order
                     .iter()
@@ -218,7 +231,7 @@ where
             let mut result = KiFmm {
                 isa: self.isa.unwrap(),
                 tree: self.tree.unwrap(),
-                expansion_order: self.expansion_order.unwrap(),
+                equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 ncoeffs: self.ncoeffs.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),

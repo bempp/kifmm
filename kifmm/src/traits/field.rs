@@ -4,6 +4,11 @@ pub trait SourceToTargetData {
     /// Metadata for applying each to source to target translation, depends on both the kernel
     /// and translation method
     type Metadata;
+
+    /// Can check and equivalent surfaces be overdetermined?
+    fn overdetermined(&self) -> bool;
+
+    fn surface_diff(&self) -> usize;
 }
 
 /// Set M2M and L2L metadata associated with a kernel

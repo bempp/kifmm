@@ -73,7 +73,7 @@ fn main() {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslationIa::new(singular_value_threshold),
+                BlasFieldTranslationIa::new(singular_value_threshold, None),
             )
             .unwrap()
             .build()
@@ -102,7 +102,7 @@ fn main() {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslationIa::new(singular_value_threshold),
+                BlasFieldTranslationIa::new(singular_value_threshold, None),
             )
             .unwrap()
             .build()

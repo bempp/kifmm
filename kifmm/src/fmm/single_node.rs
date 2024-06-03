@@ -40,7 +40,7 @@ where
     }
 
     fn expansion_order(&self, level: u64) -> usize {
-        self.expansion_order[self.expansion_index(level)]
+        self.equivalent_surface_order[self.expansion_index(level)]
     }
 
     fn ncoeffs(&self, level: u64) -> usize {
@@ -720,7 +720,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold),
+                BlasFieldTranslationSaRcmp::new(svd_threshold, None),
             )
             .unwrap()
             .build()
@@ -767,7 +767,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold),
+                BlasFieldTranslationSaRcmp::new(svd_threshold, None),
             )
             .unwrap()
             .build()
@@ -928,7 +928,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -953,7 +953,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -1064,7 +1064,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -1089,7 +1089,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -1186,7 +1186,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    BlasFieldTranslationIa::new(None),
+                    BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
                 .build()
@@ -1208,7 +1208,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None),
+                    BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
                 .build()
@@ -1311,7 +1311,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    BlasFieldTranslationIa::new(None),
+                    BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
                 .build()
@@ -1333,7 +1333,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None),
+                    BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
                 .build()
@@ -1447,7 +1447,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -1469,7 +1469,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -1533,7 +1533,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold),
+                    BlasFieldTranslationIa::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()
@@ -1555,7 +1555,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold),
+                    BlasFieldTranslationIa::new(singular_value_threshold, None),
                 )
                 .unwrap()
                 .build()

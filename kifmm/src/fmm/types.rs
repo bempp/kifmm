@@ -186,8 +186,11 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
-    /// The expansion order of the FMM
-    pub expansion_order: Vec<usize>, // Index corresponds to level
+    /// The expansion order of the FMM, used to construct equivalent surfaces.
+    pub equivalent_surface_order: Vec<usize>, // Index corresponds to level
+
+    /// The expansion order used to construct check surfaces
+    pub check_surface_order: Vec<usize>, // index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
     pub ncoeffs: Vec<usize>, // Index corresponds to level
@@ -287,7 +290,8 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
-            expansion_order: Vec::default(),
+            equivalent_surface_order: Vec::default(),
+            check_surface_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
@@ -453,7 +457,9 @@ where
     pub domain: Option<Domain<Scalar::Real>>,
 
     /// Expansion order
-    pub expansion_order: Option<Vec<usize>>,
+    pub equivalent_surface_order: Option<Vec<usize>>,
+
+    pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
     pub ncoeffs: Option<Vec<usize>>,
@@ -597,6 +603,9 @@ where
 
     /// The map between sources/targets in
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -634,6 +643,9 @@ where
 
     /// The map between sources/targets in
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.

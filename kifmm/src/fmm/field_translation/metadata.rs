@@ -86,14 +86,14 @@ where
         let mut uc2e_inv_1 = Vec::new();
         let mut uc2e_inv_2 = Vec::new();
 
-        for &expansion_order in self.expansion_order.iter() {
+        for &expansion_order in self.equivalent_surface_order.iter() {
             // Compute required surfaces
             let upward_equivalent_surface =
                 root.surface_grid(expansion_order, &domain, alpha_inner);
             let upward_check_surface = root.surface_grid(expansion_order, &domain, alpha_outer);
 
-            let nequiv_surface = upward_equivalent_surface.len() / self.dim;
-            let ncheck_surface = upward_check_surface.len() / self.dim;
+            let nequiv_surface = ncoeffs_kifmm(expansion_order);
+            let ncheck_surface = ncoeffs_kifmm(expansion_order);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
@@ -121,8 +121,8 @@ where
             uc2e_inv_2.push(ut);
         }
 
-        let iterator = if self.expansion_order.len() > 1 {
-            0..self.expansion_order.len() - 1
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            0..self.equivalent_surface_order.len() - 1
         } else {
             0..1
         };
@@ -194,7 +194,7 @@ where
         let mut dc2e_inv_1 = Vec::new();
         let mut dc2e_inv_2 = Vec::new();
 
-        for &expansion_order in self.expansion_order.iter() {
+        for &expansion_order in self.equivalent_surface_order.iter() {
             // Compute required surfaces
             let downward_equivalent_surface =
                 root.surface_grid(expansion_order, &domain, alpha_outer);
@@ -231,7 +231,7 @@ where
 
         let depth = self.tree.target_tree().depth();
 
-        let iterator = if self.expansion_order.len() > 1 {
+        let iterator = if self.equivalent_surface_order.len() > 1 {
             0..depth
         } else {
             0..1
@@ -312,10 +312,10 @@ where
         let mut uc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        let iterator = if self.expansion_order.len() > 1 {
-            self.expansion_order.iter().cloned().collect_vec()
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            self.equivalent_surface_order.iter().cloned().collect_vec()
         } else {
-            vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
+            vec![*self.equivalent_surface_order.last().unwrap(); (depth + 1) as usize]
         };
 
         for expansion_order in iterator {
@@ -359,15 +359,15 @@ where
         let mut source = Vec::new();
         let mut source_vec = Vec::new();
 
-        let iterator = if self.expansion_order.len() > 1 {
+        let iterator = if self.equivalent_surface_order.len() > 1 {
             (0..depth)
                 .zip(
-                    self.expansion_order
+                    self.equivalent_surface_order
                         .iter()
                         .cloned()
                         .take(depth as usize)
                         .zip(
-                            self.expansion_order
+                            self.equivalent_surface_order
                                 .iter()
                                 .skip(1)
                                 .cloned()
@@ -378,9 +378,12 @@ where
         } else {
             (0..depth)
                 .zip(
-                    vec![*self.expansion_order.last().unwrap(); depth as usize]
+                    vec![*self.equivalent_surface_order.last().unwrap(); depth as usize]
                         .into_iter()
-                        .zip(vec![*self.expansion_order.last().unwrap(); depth as usize]),
+                        .zip(vec![
+                            *self.equivalent_surface_order.last().unwrap();
+                            depth as usize
+                        ]),
                 )
                 .collect_vec()
         };
@@ -451,10 +454,10 @@ where
         let mut dc2e_inv_2 = Vec::new();
 
         // Calculate inverse upward check to equivalent matrices on each level
-        let iterator = if self.expansion_order.len() > 1 {
-            self.expansion_order.iter().cloned().collect_vec()
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            self.equivalent_surface_order.iter().cloned().collect_vec()
         } else {
-            vec![*self.expansion_order.last().unwrap(); (depth + 1) as usize]
+            vec![*self.equivalent_surface_order.last().unwrap(); (depth + 1) as usize]
         };
 
         for expansion_order in iterator {
@@ -497,15 +500,15 @@ where
         let mut target_vec = Vec::new();
 
         // TODO: test for shallow trees
-        let iterator = if self.expansion_order.len() > 1 {
+        let iterator = if self.equivalent_surface_order.len() > 1 {
             (0..depth)
                 .zip(
-                    self.expansion_order
+                    self.equivalent_surface_order
                         .iter()
                         .cloned()
                         .take(depth as usize)
                         .zip(
-                            self.expansion_order
+                            self.equivalent_surface_order
                                 .iter()
                                 .skip(1)
                                 .cloned()
@@ -516,9 +519,12 @@ where
         } else {
             (0..depth)
                 .zip(
-                    vec![*self.expansion_order.last().unwrap(); depth as usize]
+                    vec![*self.equivalent_surface_order.last().unwrap(); depth as usize]
                         .into_iter()
-                        .zip(vec![*self.expansion_order.last().unwrap(); depth as usize]),
+                        .zip(vec![
+                            *self.equivalent_surface_order.last().unwrap();
+                            depth as usize
+                        ]),
                 )
                 .collect_vec()
         };
@@ -656,14 +662,14 @@ where
         let mut result = BlasFieldTranslationIa::<Scalar>::default();
 
         // TODO: Need to test what happens for very shallow trees.
-        let iterator = if self.expansion_order.len() > 1 {
+        let iterator = if self.equivalent_surface_order.len() > 1 {
             (2..=depth)
-                .zip(self.expansion_order.iter().skip(2).cloned())
+                .zip(self.equivalent_surface_order.iter().skip(2).cloned())
                 .collect_vec()
         } else {
             (2..=depth)
                 .zip(vec![
-                    *self.expansion_order.last().unwrap();
+                    *self.equivalent_surface_order.last().unwrap();
                     (depth - 1) as usize
                 ])
                 .collect_vec()
@@ -866,10 +872,10 @@ where
 
         // Compute data for level 2 separately
         // TODO: check if this results in a bug for very shallow trees
-        let expansion_order = if self.expansion_order.len() > 2 {
-            self.expansion_order[2]
+        let expansion_order = if self.equivalent_surface_order.len() > 2 {
+            self.equivalent_surface_order[2]
         } else {
-            *self.expansion_order.last().unwrap()
+            *self.equivalent_surface_order.last().unwrap()
         };
 
         let shape = <Scalar as Dft>::shape_in(expansion_order);
@@ -1041,14 +1047,14 @@ where
             kernel_data_f: kernel_data_ft,
         });
 
-        let iterator = if self.expansion_order.len() > 1 {
+        let iterator = if self.equivalent_surface_order.len() > 1 {
             (3..=depth)
-                .zip(self.expansion_order.iter().cloned().skip(3))
+                .zip(self.equivalent_surface_order.iter().cloned().skip(3))
                 .collect_vec()
         } else {
             (3..=depth)
                 .zip(vec![
-                    *self.expansion_order.last().unwrap();
+                    *self.equivalent_surface_order.last().unwrap();
                     (depth - 2) as usize
                 ])
                 .collect_vec()
@@ -1252,10 +1258,14 @@ where
         // Set operator data
         self.source_to_target.metadata = metadata;
 
-        let iterator = if self.expansion_order.len() > 1 {
-            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            self.equivalent_surface_order
+                .iter()
+                .skip(2)
+                .cloned()
+                .collect_vec()
         } else {
-            self.expansion_order.clone()
+            self.equivalent_surface_order.clone()
         };
 
         // Set required maps
@@ -1350,10 +1360,14 @@ where
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
 
         // TODO: Need to see what happens for very shallow trees
-        let iterator = if self.expansion_order.len() > 1 {
-            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            self.equivalent_surface_order
+                .iter()
+                .skip(2)
+                .cloned()
+                .collect_vec()
         } else {
-            self.expansion_order.clone()
+            self.equivalent_surface_order.clone()
         };
 
         for expansion_order in iterator {
@@ -1750,10 +1764,14 @@ where
         let halo = parent.neighbors();
         let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
-        let iterator = if self.expansion_order.len() > 1 {
-            self.expansion_order.iter().skip(2).cloned().collect_vec()
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            self.equivalent_surface_order
+                .iter()
+                .skip(2)
+                .cloned()
+                .collect_vec()
         } else {
-            self.expansion_order.clone()
+            self.equivalent_surface_order.clone()
         };
 
         for &expansion_order in &iterator {
@@ -1966,7 +1984,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             (level - 2) as usize
         } else {
             0
@@ -1974,7 +1992,7 @@ where
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             level as usize
         } else {
             0
@@ -1982,7 +2000,7 @@ where
     }
 
     fn c2e_operator_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             level as usize
         } else {
             0
@@ -1990,7 +2008,7 @@ where
     }
 
     fn m2m_operator_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             (level - 1) as usize
         } else {
             0
@@ -1998,7 +2016,7 @@ where
     }
 
     fn l2l_operator_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             (level - 1) as usize
         } else {
             0
@@ -2006,7 +2024,7 @@ where
     }
 
     fn m2l_operator_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             (level - 2) as usize
         } else {
             0
@@ -2026,7 +2044,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             (level - 2) as usize
         } else {
             0
@@ -2034,7 +2052,7 @@ where
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             level as usize
         } else {
             0
@@ -2093,7 +2111,7 @@ where
         // Buffers to store all multipole and local data
         let nmultipole_coeffs;
         let nlocal_coeffs;
-        if self.expansion_order.len() > 1 {
+        if self.equivalent_surface_order.len() > 1 {
             nmultipole_coeffs = (0..=self.tree.source_tree().depth())
                 .zip(self.ncoeffs.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
@@ -2132,14 +2150,14 @@ where
             &self.tree.source_tree,
             *self.ncoeffs.last().unwrap(),
             alpha_outer,
-            *self.expansion_order.last().unwrap(),
+            *self.equivalent_surface_order.last().unwrap(),
         );
 
         let leaf_upward_surfaces_targets = leaf_surfaces(
             &self.tree.target_tree,
             *self.ncoeffs.last().unwrap(),
             alpha_outer,
-            *self.expansion_order.last().unwrap(),
+            *self.equivalent_surface_order.last().unwrap(),
         );
 
         // Mutable pointers to multipole and local data, indexed by level
@@ -2221,6 +2239,14 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
     type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
+
+    fn overdetermined(&self) -> bool {
+        false
+    }
+
+    fn surface_diff(&self) -> usize {
+        0
+    }
 }
 
 impl<Scalar> BlasFieldTranslationSaRcmp<Scalar>
@@ -2230,12 +2256,13 @@ where
 {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
-    pub fn new(threshold: Option<Scalar::Real>) -> Self {
+    pub fn new(threshold: Option<Scalar::Real>, surface_diff: Option<usize>) -> Self {
         let tmp = Scalar::epsilon().re();
 
         Self {
             threshold: threshold.unwrap_or(tmp),
             transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
+            surface_diff: surface_diff.unwrap_or_default(),
             ..Default::default()
         }
     }
@@ -2246,6 +2273,14 @@ where
     Scalar: RlstScalar,
 {
     type Metadata = BlasMetadataSaRcmp<Scalar>;
+
+    fn overdetermined(&self) -> bool {
+        true
+    }
+
+    fn surface_diff(&self) -> usize {
+        self.surface_diff
+    }
 }
 
 impl<Scalar> BlasFieldTranslationIa<Scalar>
@@ -2255,11 +2290,12 @@ where
 {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
-    pub fn new(threshold: Option<Scalar::Real>) -> Self {
+    pub fn new(threshold: Option<Scalar::Real>, surface_diff: Option<usize>) -> Self {
         let tmp = Scalar::epsilon().re();
 
         Self {
             threshold: threshold.unwrap_or(tmp),
+            surface_diff: surface_diff.unwrap_or_default(),
             ..Default::default()
         }
     }
@@ -2270,6 +2306,14 @@ where
     Scalar: RlstScalar,
 {
     type Metadata = BlasFieldTranslationIa<Scalar>;
+
+    fn overdetermined(&self) -> bool {
+        true
+    }
+
+    fn surface_diff(&self) -> usize {
+        self.surface_diff
+    }
 }
 
 #[cfg(test)]
@@ -2318,7 +2362,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(Some(1e-5)),
+                BlasFieldTranslationSaRcmp::new(Some(1e-5), None),
             )
             .unwrap()
             .build()
@@ -2424,7 +2468,7 @@ mod test {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslationIa::new(None),
+                BlasFieldTranslationIa::new(None, None),
             )
             .unwrap()
             .build()
