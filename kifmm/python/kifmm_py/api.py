@@ -55,6 +55,7 @@ class KiFmm:
         timed=False,
         svd_threshold=None,
         wavenumber=None,
+        surface_diff=None
     ):
         """Constructor for Single Node FMMss.
 
@@ -70,8 +71,11 @@ class KiFmm:
             depth (int, optional):  Maximum depth of octree, must match the number of dimension of the specified expansion orders. Must specify either n_crit or depth.
             prune_empty (bool, optional): Optionally drop empty leaf boxes for performance in FMM.
             timed (bool, optional): Whether or not to store operator runtimes in the 'times' attribute. Defaults to False.
-            svd_threshold (float, optional): Must specify a threshold defining the SVD compression of M2L operators when using BLAS field translations. Defaults to None for FFT field translations.
+            svd_threshold (float, optional): Defines a threshold for the SVD compression of M2L operators when using BLAS field translations, derived from machine precision if not set.
+            Defaults to None for FFT field translations.
             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
+            surface_diff (int, optional): Calculated as check_expansion_order-equivalent_expansion_order, used to provide more stability when using BLAS based field translations.
+            Defaults to 0 if not specified for BLAS based field translations.
         """
 
         # Check valid tree spec
@@ -218,16 +222,8 @@ class KiFmm:
         self.kernel = kernel
         self.field_translation = field_translation
         self.constructor = CONSTRUCTORS[self.dtype][self.kernel][self.field_translation]
-
-        if self.field_translation == "blas":
-            try:
-                assert svd_threshold is not None
-            except:
-                raise TypeError(
-                    "svd threshold must be set for BLAS based field translations"
-                )
-
         self.svd_threshold = svd_threshold
+        self.surface_diff = surface_diff
 
         if self.kernel == "helmholtz":
             try:
@@ -261,6 +257,7 @@ class KiFmm:
                     self.svd_threshold,
                     self.n_crit,
                     self.depth,
+                    self.surface_diff
                 )
 
         elif kernel == "helmholtz":
@@ -289,6 +286,7 @@ class KiFmm:
                     self.svd_threshold,
                     self.n_crit,
                     self.depth,
+                    self.surface_diff
                 )
 
         self.source_keys = self.fmm.source_keys
