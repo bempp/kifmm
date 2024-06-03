@@ -214,10 +214,13 @@ where
     pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_surfaces_sources: Vec<Scalar::Real>,
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Scalar::Real>,
+
+    /// Upward surfaces associated with source leaves
+    pub leaf_upward_check_surfaces_sources: Vec<Scalar::Real>,
 
     /// Upward surfaces associated with target leaves
-    pub leaf_upward_surfaces_targets: Vec<Scalar::Real>,
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
 
     /// Scales of each source leaf box
     pub leaf_scales_sources: Vec<Scalar>,
@@ -318,8 +321,9 @@ where
             level_index_pointer_multipoles: Vec::default(),
             potentials: Vec::default(),
             potentials_send_pointers: Vec::default(),
-            leaf_upward_surfaces_sources: Vec::default(),
-            leaf_upward_surfaces_targets: Vec::default(),
+            leaf_upward_equivalent_surfaces_sources: Vec::default(),
+            leaf_upward_check_surfaces_sources: Vec::default(),
+            leaf_downward_equivalent_surfaces_targets: Vec::default(),
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),

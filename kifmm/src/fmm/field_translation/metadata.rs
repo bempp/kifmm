@@ -55,14 +55,20 @@ use crate::{
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
-fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(singular_values: &[T], threshold: T) -> usize {
-    for (i, &s) in singular_values.iter().enumerate() {
+fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
+    singular_values: &[T],
+    threshold: T,
+    max_rank: usize,
+) -> usize {
+    let len = singular_values.len().min(max_rank);
+
+    for (i, &s) in singular_values.iter().take(len).enumerate() {
         if s <= threshold {
             return i;
         }
     }
 
-    singular_values.len() - 1
+    len - 1
 }
 impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
@@ -130,6 +136,8 @@ where
         // Calculate M2M operator matrices on each level, if required
         for parent_level in iterator {
             let check_surface_order_parent = self.check_surface_order(parent_level as u64);
+            let equivalent_surface_order_parent =
+                self.equivalent_surface_order(parent_level as u64);
             let equivalent_surface_order_child =
                 self.equivalent_surface_order((parent_level + 1) as u64);
 
@@ -139,9 +147,10 @@ where
             let children = root.children();
             let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
             let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut m2m_level =
-                rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, 8 * nequiv_surface_child]);
+                rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, 8 * nequiv_surface_child]);
             let mut m2m_vec_level = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -166,8 +175,9 @@ where
                         ce2pc.view(),
                     ),
                 );
-                let l = i * nequiv_surface_child * ncheck_surface_parent;
-                let r = l + nequiv_surface_child * ncheck_surface_parent;
+
+                let l = i * nequiv_surface_child * nequiv_surface_parent;
+                let r = l + nequiv_surface_child * nequiv_surface_parent;
 
                 m2m_level.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec_level.push(tmp);
@@ -242,6 +252,7 @@ where
         for parent_level in iterator {
             let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
             let check_surface_order_child = self.check_surface_order(parent_level + 1);
+            let equivalent_surface_order_child = self.equivalent_surface_order(parent_level + 1);
 
             let parent_downward_equivalent_surface =
                 root.surface_grid(equivalent_surface_order_parent, &domain, alpha_outer);
@@ -249,6 +260,7 @@ where
             // Calculate L2L operator matrices
             let children = root.children();
             let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
+            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
             let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut l2l_level = Vec::new();
@@ -757,7 +769,8 @@ where
                 let vt =
                     empty_array::<Scalar, 2>().simple_mult_into_resize(sigma_mat.view(), vt.view());
 
-                let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
+                let cutoff_rank =
+                    find_cutoff_rank(&sigma, self.source_to_target.threshold, nsources);
 
                 let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
                 let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
@@ -1461,7 +1474,8 @@ where
                     SvdMode::Reduced,
                 )
                 .unwrap();
-            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold);
+            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols);
+
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
             let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
@@ -1519,7 +1533,7 @@ where
                     .unwrap();
 
                 let directional_cutoff_rank =
-                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold);
+                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold, cutoff_rank);
 
                 let mut u_i_compressed =
                     rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
@@ -2121,6 +2135,7 @@ where
 
     fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
+        let alpha_inner = Scalar::real(ALPHA_INNER);
 
         // Check if computing potentials, or potentials and derivatives
         let eval_size = match eval_type {
@@ -2170,18 +2185,25 @@ where
         let source_leaf_scales = leaf_scales::<Scalar>(
             &self.tree.source_tree,
             self.kernel.is_homogenous(),
-            *self.ncoeffs_equivalent_surface.last().unwrap(),
+            *self.ncoeffs_check_surface.last().unwrap(),
         );
 
         // Pre compute check surfaces
-        let leaf_upward_surfaces_sources = leaf_surfaces(
+        let leaf_upward_equivalent_surfaces_sources = leaf_surfaces(
             &self.tree.source_tree,
             *self.ncoeffs_equivalent_surface.last().unwrap(),
-            alpha_outer,
+            alpha_inner,
             *self.equivalent_surface_order.last().unwrap(),
         );
 
-        let leaf_upward_surfaces_targets = leaf_surfaces(
+        let leaf_upward_check_surfaces_sources = leaf_surfaces(
+            &self.tree.source_tree,
+            *self.ncoeffs_check_surface.last().unwrap(),
+            alpha_outer,
+            *self.check_surface_order.last().unwrap(),
+        );
+
+        let leaf_downward_equivalent_surfaces_targets = leaf_surfaces(
             &self.tree.target_tree,
             *self.ncoeffs_equivalent_surface.last().unwrap(),
             alpha_outer,
@@ -2245,8 +2267,9 @@ where
         self.level_index_pointer_multipoles = level_index_pointer_multipoles;
         self.potentials = potentials;
         self.potentials_send_pointers = potentials_send_pointers;
-        self.leaf_upward_surfaces_sources = leaf_upward_surfaces_sources;
-        self.leaf_upward_surfaces_targets = leaf_upward_surfaces_targets;
+        self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
+        self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
+        self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
         self.charges = charges.to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
@@ -2420,8 +2443,8 @@ mod test {
         let c_u = &fmm.source_to_target.metadata[0].c_u[c_idx];
         let c_vt = &fmm.source_to_target.metadata[0].c_vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs(level), 1]);
-        for i in 0..fmm.ncoeffs(level) {
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs_equivalent_surface(level), 1]);
+        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2454,7 +2477,7 @@ mod test {
             alpha,
         );
 
-        let mut direct = vec![0f64; fmm.ncoeffs(level)];
+        let mut direct = vec![0f64; fmm.ncoeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
             EvalType::Value,
@@ -2541,8 +2564,8 @@ mod test {
         let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
         let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
-        for i in 0..fmm.ncoeffs(level) {
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs_equivalent_surface(level), 1]);
+        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -2555,10 +2578,9 @@ mod test {
 
         let sources =
             source.surface_grid(fmm.equivalent_surface_order(level), &fmm.tree.domain, alpha);
-        let targets =
-            target.surface_grid(fmm.equivalent_surface_order(level), &fmm.tree.domain, alpha);
+        let targets = target.surface_grid(fmm.check_surface_order(level), &fmm.tree.domain, alpha);
 
-        let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
+        let mut direct = vec![c64::zero(); fmm.ncoeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
             EvalType::Value,
@@ -2678,9 +2700,9 @@ mod test {
         let level = 3;
         let coeff_idx = fmm.c2e_operator_index(level);
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs(level), 1]);
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs_equivalent_surface(level), 1]);
 
-        for i in 0..fmm.ncoeffs(level) {
+        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2778,7 +2800,7 @@ mod test {
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![0f64; fmm.ncoeffs(level)];
+        let mut direct = vec![0f64; fmm.ncoeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
             EvalType::Value,
             &source_equivalent_surface[..],
@@ -2834,9 +2856,9 @@ mod test {
 
         let level = 2;
         let coeff_index = fmm.expansion_index(level);
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs(level), 1]);
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs_equivalent_surface(level), 1]);
 
-        for i in 0..fmm.ncoeffs(level) {
+        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -2942,7 +2964,7 @@ mod test {
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
+        let mut direct = vec![c64::zero(); fmm.ncoeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
             EvalType::Value,
             &source_equivalent_surface[..],

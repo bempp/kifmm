@@ -191,7 +191,7 @@ where
             let check_surface_order = if source_to_target.overdetermined() {
                 expansion_order
                     .iter()
-                    .map(|&e| e - source_to_target.surface_diff())
+                    .map(|&e| e + source_to_target.surface_diff())
                     .collect_vec()
             } else {
                 expansion_order.to_vec()
@@ -240,6 +240,7 @@ where
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
                 ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
+                ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),

@@ -47,7 +47,11 @@ where
         self.check_surface_order[self.expansion_index(level)]
     }
 
-    fn ncoeffs(&self, level: u64) -> usize {
+    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize {
+        self.ncoeffs_equivalent_surface[self.expansion_index(level)]
+    }
+
+    fn ncoeffs_check_surface(&self, level: u64) -> usize {
         self.ncoeffs_equivalent_surface[self.expansion_index(level)]
     }
 
@@ -70,11 +74,11 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.ncoeffs(key.level()),
+                        self.ncoeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.ncoeffs(key.level()) * nmatvecs,
+                        self.ncoeffs_equivalent_surface(key.level()) * nmatvecs,
                     )),
                 }
             }
@@ -90,11 +94,11 @@ where
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                     multipole_ptr.raw,
-                    self.ncoeffs(level) * nsources,
+                    self.ncoeffs_equivalent_surface(level) * nsources,
                 )),
                 FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
                     multipole_ptr.raw,
-                    self.ncoeffs(level) * nsources * nmatvecs,
+                    self.ncoeffs_equivalent_surface(level) * nsources * nmatvecs,
                 )),
             }
         }
@@ -111,11 +115,11 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.ncoeffs(key.level()),
+                        self.ncoeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.ncoeffs(key.level()) * nmatvecs,
+                        self.ncoeffs_equivalent_surface(key.level()) * nmatvecs,
                     )),
                 }
             }
@@ -131,11 +135,11 @@ where
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                     local_ptr.raw,
-                    self.ncoeffs(level) * ntargets,
+                    self.ncoeffs_equivalent_surface(level) * ntargets,
                 )),
                 FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
                     local_ptr.raw,
-                    self.ncoeffs(level) * ntargets * nmatvecs,
+                    self.ncoeffs_equivalent_surface(level) * ntargets * nmatvecs,
                 )),
             }
         }
@@ -526,6 +530,7 @@ mod test {
         let leaf_idx = 0;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
+        let multipole = fmm.multipole(&leaf).unwrap()[0];
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
@@ -581,7 +586,7 @@ mod test {
             T::from(ALPHA_INNER).unwrap().re(),
         );
 
-        let ncoeffs = fmm.ncoeffs(0);
+        let ncoeffs = fmm.ncoeffs_equivalent_surface(0);
 
         let test_point = vec![T::real(100000.), T::Real::zero(), T::Real::zero()];
         let mut expected = vec![T::Real::zero()];
@@ -1075,6 +1080,170 @@ mod test {
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
             let fmm_blas = Box::new(fmm_blas);
+            test_single_node_laplace_fmm_vector_helper::<f64>(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_pot,
+            );
+
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate(false).unwrap();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_laplace_fmm_vector_helper::<f64>(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv_blas,
+            );
+        }
+    }
+
+    #[test]
+    fn test_laplace_fmm_vector_variable_surfaces() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = Some(150);
+        let depth = None;
+        let expansion_order = [6];
+        let surface_diff = Some(1);
+        let prune_empty = true;
+        let threshold_pot = 1e-6;
+        let threshold_deriv_blas = 1e-4;
+        let singular_value_threshold = None;
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        // BLAS based field translations allow variable check/equiv surfaces
+        {
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate(false).unwrap();
+            let fmm_blas = Box::new(fmm_blas);
+
+            test_single_node_laplace_fmm_vector_helper::<f64>(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_pot,
+            );
+
+            // Evaluate potentials + derivatives
+            let eval_type = EvalType::ValueDeriv;
+            let fmm_blas = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate(false).unwrap();
+            let fmm_blas = Box::new(fmm_blas);
+            test_single_node_laplace_fmm_vector_helper::<f64>(
+                fmm_blas,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv_blas,
+            );
+        }
+    }
+
+    #[test]
+    fn test_laplace_fmm_vector_variable_surfaces_variable_expansion_order() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
+        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [6, 5, 6, 5];
+        let surface_diff = Some(1);
+        let prune_empty = true;
+        let threshold_pot = 1e-5;
+        let threshold_deriv_blas = 1e-3;
+        let singular_value_threshold = None;
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        // BLAS based field translations allow variable check/equiv surfaces
+        {
+            // Evaluate potentials
+            let eval_type = EvalType::Value;
+            let fmm_blas = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm_blas.evaluate(false).unwrap();
+            let fmm_blas = Box::new(fmm_blas);
+
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,

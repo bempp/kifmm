@@ -117,7 +117,10 @@ where
     fn check_surface_order(&self, level: u64) -> usize;
 
     /// Get the number of multipole/local coefficients associated with this FMM
-    fn ncoeffs(&self, level: u64) -> usize;
+    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn ncoeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;
