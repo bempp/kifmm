@@ -8,6 +8,7 @@ pub trait SourceToTargetData {
     /// Can check and equivalent surfaces be overdetermined?
     fn overdetermined(&self) -> bool;
 
+    /// Calculated as equivalent_surface_order - check_surface_order = surface_diff
     fn surface_diff(&self) -> usize;
 }
 

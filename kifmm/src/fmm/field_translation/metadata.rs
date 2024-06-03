@@ -86,28 +86,28 @@ where
         let mut uc2e_inv_1 = Vec::new();
         let mut uc2e_inv_2 = Vec::new();
 
-        for &expansion_order in self.equivalent_surface_order.iter() {
+        for (&equivalent_surface_order, &check_surface_order) in self
+            .equivalent_surface_order
+            .iter()
+            .zip(self.check_surface_order.iter())
+        {
             // Compute required surfaces
             let upward_equivalent_surface =
-                root.surface_grid(expansion_order, &domain, alpha_inner);
-            let upward_check_surface = root.surface_grid(expansion_order, &domain, alpha_outer);
+                root.surface_grid(equivalent_surface_order, &domain, alpha_inner);
+            let upward_check_surface = root.surface_grid(check_surface_order, &domain, alpha_outer);
 
-            let nequiv_surface = ncoeffs_kifmm(expansion_order);
-            let ncheck_surface = ncoeffs_kifmm(expansion_order);
+            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
+            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
-            let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &upward_equivalent_surface[..],
                 &upward_check_surface[..],
-                uc2e_t.data_mut(),
+                &upward_equivalent_surface[..],
+                uc2e.data_mut(),
             );
-
-            // Need to transpose so that rows correspond to targets and columns to sources
-            let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            uc2e.fill_from(uc2e_t.transpose());
 
             let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
 
@@ -129,15 +129,16 @@ where
 
         // Calculate M2M operator matrices on each level, if required
         for parent_level in iterator {
-            let expansion_order_parent = self.expansion_order(parent_level as u64);
-            let expansion_order_child = self.expansion_order((parent_level + 1) as u64);
+            let check_surface_order_parent = self.check_surface_order(parent_level as u64);
+            let equivalent_surface_order_child =
+                self.equivalent_surface_order((parent_level + 1) as u64);
 
             let parent_upward_check_surface =
-                root.surface_grid(expansion_order_parent, &domain, alpha_outer);
+                root.surface_grid(check_surface_order_parent, &domain, alpha_outer);
 
             let children = root.children();
-            let ncheck_surface_parent = ncoeffs_kifmm(expansion_order_parent);
-            let nequiv_surface_child = ncoeffs_kifmm(expansion_order_child);
+            let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
 
             let mut m2m_level =
                 rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, 8 * nequiv_surface_child]);
@@ -145,7 +146,7 @@ where
 
             for (i, child) in children.iter().enumerate() {
                 let child_upward_equivalent_surface =
-                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
+                    child.surface_grid(equivalent_surface_order_child, &domain, alpha_inner);
 
                 let mut ce2pc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
@@ -194,28 +195,29 @@ where
         let mut dc2e_inv_1 = Vec::new();
         let mut dc2e_inv_2 = Vec::new();
 
-        for &expansion_order in self.equivalent_surface_order.iter() {
+        for (&equivalent_surface_order, &check_surface_order) in self
+            .equivalent_surface_order
+            .iter()
+            .zip(self.check_surface_order.iter())
+        {
             // Compute required surfaces
             let downward_equivalent_surface =
-                root.surface_grid(expansion_order, &domain, alpha_outer);
-            let downward_check_surface = root.surface_grid(expansion_order, &domain, alpha_inner);
+                root.surface_grid(equivalent_surface_order, &domain, alpha_outer);
+            let downward_check_surface =
+                root.surface_grid(check_surface_order, &domain, alpha_inner);
 
-            let nequiv_surface = downward_equivalent_surface.len() / self.dim;
-            let ncheck_surface = downward_check_surface.len() / self.dim;
+            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
+            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
-            let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            let mut dc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &downward_equivalent_surface[..],
                 &downward_check_surface[..],
-                dc2e_t.data_mut(),
+                &downward_equivalent_surface[..],
+                dc2e.data_mut(),
             );
-
-            // Need to transpose so that rows correspond to targets and columns to sources
-            let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            dc2e.fill_from(dc2e_t.transpose());
 
             let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
 
@@ -238,22 +240,22 @@ where
         };
 
         for parent_level in iterator {
-            let expansion_order_parent = self.expansion_order(parent_level);
-            let expansion_order_child = self.expansion_order(parent_level + 1);
+            let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
+            let check_surface_order_child = self.check_surface_order(parent_level + 1);
 
             let parent_downward_equivalent_surface =
-                root.surface_grid(expansion_order_parent, &domain, alpha_outer);
+                root.surface_grid(equivalent_surface_order_parent, &domain, alpha_outer);
 
             // Calculate L2L operator matrices
             let children = root.children();
-            let ncheck_surface_child = ncoeffs_kifmm(expansion_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(expansion_order_parent);
+            let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
+            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut l2l_level = Vec::new();
 
             for child in children.iter() {
                 let child_downward_check_surface =
-                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
+                    child.surface_grid(check_surface_order_child, &domain, alpha_inner);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 let mut pe2cc =
@@ -272,6 +274,7 @@ where
                         pe2cc.view(),
                     ),
                 );
+
                 tmp.data_mut()
                     .iter_mut()
                     .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
@@ -313,19 +316,29 @@ where
 
         // Calculate inverse upward check to equivalent matrices on each level
         let iterator = if self.equivalent_surface_order.len() > 1 {
-            self.equivalent_surface_order.iter().cloned().collect_vec()
+            self.equivalent_surface_order
+                .iter()
+                .cloned()
+                .zip(self.check_surface_order.iter().cloned())
+                .collect_vec()
         } else {
-            vec![*self.equivalent_surface_order.last().unwrap(); (depth + 1) as usize]
+            vec![
+                (
+                    *self.equivalent_surface_order.last().unwrap(),
+                    *self.check_surface_order.last().unwrap()
+                );
+                (depth + 1) as usize
+            ]
         };
 
-        for expansion_order in iterator {
+        for (equivalent_surface_order, check_surface_order) in iterator {
             // Compute required surfaces
             let upward_equivalent_surface =
-                curr.surface_grid(expansion_order, &domain, alpha_inner);
-            let upward_check_surface = curr.surface_grid(expansion_order, &domain, alpha_outer);
+                curr.surface_grid(equivalent_surface_order, &domain, alpha_inner);
+            let upward_check_surface = curr.surface_grid(check_surface_order, &domain, alpha_outer);
 
-            let nequiv_surface = upward_equivalent_surface.len() / self.dim;
-            let ncheck_surface = upward_check_surface.len() / self.dim;
+            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
+            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
@@ -362,7 +375,7 @@ where
         let iterator = if self.equivalent_surface_order.len() > 1 {
             (0..depth)
                 .zip(
-                    self.equivalent_surface_order
+                    self.check_surface_order
                         .iter()
                         .cloned()
                         .take(depth as usize)
@@ -378,7 +391,7 @@ where
         } else {
             (0..depth)
                 .zip(
-                    vec![*self.equivalent_surface_order.last().unwrap(); depth as usize]
+                    vec![*self.check_surface_order.last().unwrap(); depth as usize]
                         .into_iter()
                         .zip(vec![
                             *self.equivalent_surface_order.last().unwrap();
@@ -389,13 +402,13 @@ where
         };
 
         // Calculate M2M operator matrices on each level
-        for (level, (expansion_order_parent, expansion_order_child)) in iterator {
+        for (level, (check_surface_order_parent, equivalent_surface_order_child)) in iterator {
             // Compute required surfaces
             let parent_upward_check_surface =
-                curr.surface_grid(expansion_order_parent, &domain, alpha_outer);
+                curr.surface_grid(check_surface_order_parent, &domain, alpha_outer);
 
-            let ncheck_surface_parent = ncoeffs_kifmm(expansion_order_parent);
-            let nequiv_surface_child = ncoeffs_kifmm(expansion_order_child);
+            let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
 
             let children = curr.children();
             let mut m2m =
@@ -404,7 +417,7 @@ where
 
             for (i, child) in children.iter().enumerate() {
                 let child_upward_equivalent_surface =
-                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
+                    child.surface_grid(equivalent_surface_order_child, &domain, alpha_inner);
 
                 let mut ce2pc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
@@ -455,33 +468,40 @@ where
 
         // Calculate inverse upward check to equivalent matrices on each level
         let iterator = if self.equivalent_surface_order.len() > 1 {
-            self.equivalent_surface_order.iter().cloned().collect_vec()
+            self.equivalent_surface_order
+                .iter()
+                .cloned()
+                .zip(self.check_surface_order.iter().cloned())
+                .collect_vec()
         } else {
-            vec![*self.equivalent_surface_order.last().unwrap(); (depth + 1) as usize]
+            vec![
+                (
+                    *self.equivalent_surface_order.last().unwrap(),
+                    *self.check_surface_order.last().unwrap()
+                );
+                (depth + 1) as usize
+            ]
         };
 
-        for expansion_order in iterator {
+        for (equivalent_surface_order, check_surface_order) in iterator {
             // Compute required surfaces
             let downward_equivalent_surface =
-                curr.surface_grid(expansion_order, &domain, alpha_outer);
-            let downward_check_surface = curr.surface_grid(expansion_order, &domain, alpha_inner);
+                curr.surface_grid(equivalent_surface_order, &domain, alpha_outer);
+            let downward_check_surface =
+                curr.surface_grid(check_surface_order, &domain, alpha_inner);
 
             let nequiv_surface = downward_equivalent_surface.len() / self.dim;
             let ncheck_surface = downward_check_surface.len() / self.dim;
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
-            let mut dc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            let mut dc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &downward_equivalent_surface[..],
                 &downward_check_surface[..],
-                dc2e_t.data_mut(),
+                &downward_equivalent_surface[..],
+                dc2e.data_mut(),
             );
-
-            // Need to transpose so that rows correspond to targets and columns to sources
-            let mut dc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            dc2e.fill_from(dc2e_t.transpose());
 
             let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
 
@@ -499,7 +519,6 @@ where
         let mut curr = root;
         let mut target_vec = Vec::new();
 
-        // TODO: test for shallow trees
         let iterator = if self.equivalent_surface_order.len() > 1 {
             (0..depth)
                 .zip(
@@ -508,7 +527,7 @@ where
                         .cloned()
                         .take(depth as usize)
                         .zip(
-                            self.equivalent_surface_order
+                            self.check_surface_order
                                 .iter()
                                 .skip(1)
                                 .cloned()
@@ -522,20 +541,20 @@ where
                     vec![*self.equivalent_surface_order.last().unwrap(); depth as usize]
                         .into_iter()
                         .zip(vec![
-                            *self.equivalent_surface_order.last().unwrap();
+                            *self.check_surface_order.last().unwrap();
                             depth as usize
                         ]),
                 )
                 .collect_vec()
         };
 
-        for (level, (expansion_order_parent, expansion_order_child)) in iterator {
+        for (level, (equivalent_surface_order_parent, check_surface_order_child)) in iterator {
             // Compute required surfaces
             let parent_downward_equivalent_surface =
-                curr.surface_grid(expansion_order_parent, &domain, alpha_outer);
+                curr.surface_grid(equivalent_surface_order_parent, &domain, alpha_outer);
 
-            let ncheck_surface_child = ncoeffs_kifmm(expansion_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(expansion_order_parent);
+            let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
+            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             // Calculate l2l operator matrices on each level
             let children = curr.children();
@@ -543,8 +562,7 @@ where
 
             for child in children.iter() {
                 let child_downward_check_surface =
-                    child.surface_grid(expansion_order_child, &domain, alpha_inner);
-                // Need to transpose so that rows correspond to targets, and columns to sources
+                    child.surface_grid(check_surface_order_child, &domain, alpha_inner);
 
                 let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
@@ -661,10 +679,10 @@ where
 
         let mut result = BlasFieldTranslationIa::<Scalar>::default();
 
-        // TODO: Need to test what happens for very shallow trees.
         let iterator = if self.equivalent_surface_order.len() > 1 {
             (2..=depth)
                 .zip(self.equivalent_surface_order.iter().skip(2).cloned())
+                .zip(self.check_surface_order.iter().skip(2).cloned())
                 .collect_vec()
         } else {
             (2..=depth)
@@ -672,10 +690,14 @@ where
                     *self.equivalent_surface_order.last().unwrap();
                     (depth - 1) as usize
                 ])
+                .zip(vec![
+                    *self.check_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
                 .collect_vec()
         };
 
-        for (level, expansion_order) in iterator {
+        for ((level, equivalent_surface_order), check_surface_order) in iterator {
             let transfer_vectors =
                 compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
 
@@ -684,28 +706,28 @@ where
             let mut level_cutoff_rank = Vec::new();
 
             for t in transfer_vectors.iter() {
-                let source_equivalent_surface =
-                    t.source
-                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
-                let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
+                let source_equivalent_surface = t.source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+                let nsources = ncoeffs_kifmm(equivalent_surface_order);
 
-                let target_check_surface =
-                    t.target
-                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
-                let ntargets = target_check_surface.len() / self.kernel.space_dimension();
+                let target_check_surface = t.target.surface_grid(
+                    check_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+                let ntargets = ncoeffs_kifmm(check_surface_order);
 
-                let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
 
                 self.kernel.assemble_st(
                     EvalType::Value,
-                    &source_equivalent_surface[..],
                     &target_check_surface[..],
-                    tmp_gram_t.data_mut(),
+                    &source_equivalent_surface[..],
+                    tmp_gram.data_mut(),
                 );
-
-                // Need to transpose so that rows correspond to targets, and columns to sources
-                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
-                tmp_gram.fill_from(tmp_gram_t.transpose());
 
                 let mu = tmp_gram.shape()[0];
                 let nvt = tmp_gram.shape()[1];
@@ -871,16 +893,15 @@ where
         }
 
         // Compute data for level 2 separately
-        // TODO: check if this results in a bug for very shallow trees
-        let expansion_order = if self.equivalent_surface_order.len() > 2 {
+        let equivalent_surface_order = if self.equivalent_surface_order.len() > 2 {
             self.equivalent_surface_order[2]
         } else {
             *self.equivalent_surface_order.last().unwrap()
         };
 
-        let shape = <Scalar as Dft>::shape_in(expansion_order);
-        let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
-        let transform_size = <Scalar as Dft>::size_out(expansion_order);
+        let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
+        let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
+        let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
 
         // Need to find valid source/target pairs at this level with matching transfer vectors;
         let all_keys = MortonKey::<Scalar::Real>::root().descendants(2).unwrap();
@@ -916,7 +937,7 @@ where
             }
         }
 
-        let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
+        let n_source_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
         let n_target_check_surface = n_source_equivalent_surface;
         let alpha = Scalar::real(ALPHA_INNER);
 
@@ -927,11 +948,17 @@ where
                 let tv = transfer_vector_index[i][j];
                 let (source, target) = tv_source_target_pair_map.get(&tv).unwrap();
 
-                let source_equivalent_surface =
-                    source.surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
+                let source_equivalent_surface = source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
 
-                let target_check_surface =
-                    target.surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
+                let target_check_surface = target.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
 
                 let v_list: HashSet<MortonKey<_>> = target
                     .parent()
@@ -952,7 +979,7 @@ where
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
-                        expansion_order,
+                        equivalent_surface_order,
                         self.tree.source_tree().domain(),
                         alpha,
                         &conv_point_corner,
@@ -969,7 +996,7 @@ where
 
                     // Compute Green's fct evaluations
                     let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-                        expansion_order,
+                        equivalent_surface_order,
                         &conv_grid,
                         kernel_point,
                     ));
@@ -1061,10 +1088,10 @@ where
         };
 
         // Rest of the levels
-        for &(level, expansion_order) in &iterator {
-            let shape = <Scalar as Dft>::shape_in(expansion_order);
-            let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
-            let transform_size = <Scalar as Dft>::size_out(expansion_order);
+        for &(level, equivalent_surface_order) in &iterator {
+            let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
+            let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
+            let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
 
             // Encode point in centre of domain and compute halo of parent, and their resp. children
             let key = MortonKey::from_point(&point, domain, level);
@@ -1112,7 +1139,7 @@ where
                 sources[i] = tmp_sources;
             }
 
-            let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
+            let n_source_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
             let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
@@ -1125,12 +1152,12 @@ where
                     let source = sources[i][j];
 
                     let source_equivalent_surface = source.surface_grid(
-                        expansion_order,
+                        equivalent_surface_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
                     let target_check_surface = target.surface_grid(
-                        expansion_order,
+                        equivalent_surface_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
@@ -1154,7 +1181,7 @@ where
                         ];
 
                         let (conv_grid, _) = source.convolution_grid(
-                            expansion_order,
+                            equivalent_surface_order,
                             self.tree.source_tree().domain(),
                             alpha,
                             &conv_point_corner,
@@ -1171,7 +1198,7 @@ where
 
                         // Compute Green's fct evaluations
                         let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-                            expansion_order,
+                            equivalent_surface_order,
                             &conv_grid,
                             kernel_point,
                         ));
@@ -1271,9 +1298,9 @@ where
         // Set required maps
         let mut tmp1 = Vec::new();
         let mut tmp2 = Vec::new();
-        for expansion_order in iterator {
+        for equivalent_surface_order in iterator {
             let (surf_to_conv_map, conv_to_surf_map) =
-                Self::compute_surf_to_conv_map(expansion_order);
+                Self::compute_surf_to_conv_map(equivalent_surface_order);
             tmp1.push(surf_to_conv_map);
             tmp2.push(conv_to_surf_map)
         }
@@ -1365,14 +1392,19 @@ where
                 .iter()
                 .skip(2)
                 .cloned()
+                .zip(self.check_surface_order.iter().skip(2).cloned())
                 .collect_vec()
         } else {
-            self.equivalent_surface_order.clone()
+            self.equivalent_surface_order
+                .iter()
+                .cloned()
+                .zip(self.check_surface_order.iter().cloned())
+                .collect_vec()
         };
 
-        for expansion_order in iterator {
-            let nrows = ncoeffs_kifmm(expansion_order);
-            let ncols = ncoeffs_kifmm(expansion_order);
+        for (equivalent_surface_order, check_surface_order) in iterator {
+            let nrows = ncoeffs_kifmm(check_surface_order);
+            let ncols = ncoeffs_kifmm(equivalent_surface_order);
 
             let mut se2tc_fat =
                 rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
@@ -1381,28 +1413,26 @@ where
             let alpha = Scalar::real(ALPHA_INNER);
 
             for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
-                let source_equivalent_surface =
-                    t.source
-                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
-                let nsources = source_equivalent_surface.len() / self.kernel.space_dimension();
+                let source_equivalent_surface = t.source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
 
-                let target_check_surface =
-                    t.target
-                        .surface_grid(expansion_order, self.tree.source_tree().domain(), alpha);
-                let ntargets = target_check_surface.len() / self.kernel.space_dimension();
+                let target_check_surface = t.target.surface_grid(
+                    check_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
 
-                let mut tmp_gram_t = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
 
                 self.kernel.assemble_st(
                     EvalType::Value,
-                    &source_equivalent_surface[..],
                     &target_check_surface[..],
-                    tmp_gram_t.data_mut(),
+                    &source_equivalent_surface[..],
+                    tmp_gram.data_mut(),
                 );
-
-                // Need to transpose so that rows correspond to targets, and columns to sources
-                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nsources, ntargets]);
-                tmp_gram.fill_from(tmp_gram_t.transpose());
 
                 let mut block = se2tc_fat
                     .view_mut()
@@ -1774,7 +1804,7 @@ where
             self.equivalent_surface_order.clone()
         };
 
-        for &expansion_order in &iterator {
+        for &equivalent_surface_order in &iterator {
             // The child boxes in the halo of the sibling set
             let mut sources = vec![];
             // The sibling set
@@ -1813,10 +1843,10 @@ where
                 sources[i] = tmp_sources;
             }
 
-            let shape = <Scalar as Dft>::shape_in(expansion_order);
-            let transform_shape = <Scalar as Dft>::shape_out(expansion_order);
-            let transform_size = <Scalar as Dft>::size_out(expansion_order);
-            let n_source_equivalent_surface = ncoeffs_kifmm(expansion_order);
+            let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
+            let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
+            let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
+            let n_source_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
             let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
@@ -1829,12 +1859,12 @@ where
                     let source = sources[i][j];
 
                     let source_equivalent_surface = source.surface_grid(
-                        expansion_order,
+                        equivalent_surface_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
                     let target_check_surface = target.surface_grid(
-                        expansion_order,
+                        equivalent_surface_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
@@ -1858,7 +1888,7 @@ where
                         ];
 
                         let (conv_grid, _) = source.convolution_grid(
-                            expansion_order,
+                            equivalent_surface_order,
                             self.tree.source_tree().domain(),
                             alpha,
                             &conv_point_corner,
@@ -1875,7 +1905,7 @@ where
 
                         // Compute Green's fct evaluations
                         let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
-                            expansion_order,
+                            equivalent_surface_order,
                             &conv_grid,
                             kernel_point,
                         ));
@@ -2098,8 +2128,6 @@ where
             EvalType::ValueDeriv => self.dim + 1,
         };
 
-        // Check if we are computing matvec or matmul
-
         let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
         let nsource_points = self.tree.source_tree.all_coordinates().unwrap().len() / self.dim;
         let nmatvecs = charges.len() / nsource_points;
@@ -2113,19 +2141,19 @@ where
         let nlocal_coeffs;
         if self.equivalent_surface_order.len() > 1 {
             nmultipole_coeffs = (0..=self.tree.source_tree().depth())
-                .zip(self.ncoeffs.iter())
+                .zip(self.ncoeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
                     acc + self.tree.source_tree().n_keys(level).unwrap() * ncoeffs
                 });
 
             nlocal_coeffs = (0..=self.tree.target_tree().depth())
-                .zip(self.ncoeffs.iter())
+                .zip(self.ncoeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
                     acc + self.tree.target_tree().n_keys(level).unwrap() * ncoeffs
                 })
         } else {
-            nmultipole_coeffs = nsource_keys * self.ncoeffs.last().unwrap();
-            nlocal_coeffs = ntarget_keys * self.ncoeffs.last().unwrap();
+            nmultipole_coeffs = nsource_keys * self.ncoeffs_equivalent_surface.last().unwrap();
+            nlocal_coeffs = ntarget_keys * self.ncoeffs_equivalent_surface.last().unwrap();
         }
 
         let multipoles = vec![Scalar::default(); nmultipole_coeffs * nmatvecs];
@@ -2142,35 +2170,43 @@ where
         let source_leaf_scales = leaf_scales::<Scalar>(
             &self.tree.source_tree,
             self.kernel.is_homogenous(),
-            *self.ncoeffs.last().unwrap(),
+            *self.ncoeffs_equivalent_surface.last().unwrap(),
         );
 
         // Pre compute check surfaces
         let leaf_upward_surfaces_sources = leaf_surfaces(
             &self.tree.source_tree,
-            *self.ncoeffs.last().unwrap(),
+            *self.ncoeffs_equivalent_surface.last().unwrap(),
             alpha_outer,
             *self.equivalent_surface_order.last().unwrap(),
         );
 
         let leaf_upward_surfaces_targets = leaf_surfaces(
             &self.tree.target_tree,
-            *self.ncoeffs.last().unwrap(),
+            *self.ncoeffs_equivalent_surface.last().unwrap(),
             alpha_outer,
             *self.equivalent_surface_order.last().unwrap(),
         );
 
         // Mutable pointers to multipole and local data, indexed by level
-        let level_multipoles =
-            level_expansion_pointers(&self.tree.source_tree, &self.ncoeffs, nmatvecs, &multipoles);
+        let level_multipoles = level_expansion_pointers(
+            &self.tree.source_tree,
+            &self.ncoeffs_equivalent_surface,
+            nmatvecs,
+            &multipoles,
+        );
 
-        let level_locals =
-            level_expansion_pointers(&self.tree.source_tree, &self.ncoeffs, nmatvecs, &locals);
+        let level_locals = level_expansion_pointers(
+            &self.tree.source_tree,
+            &self.ncoeffs_equivalent_surface,
+            nmatvecs,
+            &locals,
+        );
 
         // Mutable pointers to multipole and local data only at leaf level
         let leaf_multipoles = leaf_expansion_pointers(
             &self.tree.source_tree,
-            &self.ncoeffs,
+            &self.ncoeffs_equivalent_surface,
             nmatvecs,
             nsource_leaves,
             &multipoles,
@@ -2178,7 +2214,7 @@ where
 
         let leaf_locals = leaf_expansion_pointers(
             &self.tree.target_tree,
-            &self.ncoeffs,
+            &self.ncoeffs_equivalent_surface,
             nmatvecs,
             ntarget_leaves,
             &locals,
@@ -2407,13 +2443,13 @@ mod test {
         let alpha = ALPHA_INNER;
 
         let sources = transfer_vector.source.surface_grid(
-            fmm.expansion_order(level),
+            fmm.equivalent_surface_order(level),
             &fmm.tree.domain,
             alpha,
         );
 
         let targets = transfer_vector.target.surface_grid(
-            fmm.expansion_order(level),
+            fmm.equivalent_surface_order(level),
             &fmm.tree.domain,
             alpha,
         );
@@ -2517,8 +2553,10 @@ mod test {
 
         let alpha = ALPHA_INNER;
 
-        let sources = source.surface_grid(fmm.expansion_order(level), &fmm.tree.domain, alpha);
-        let targets = target.surface_grid(fmm.expansion_order(level), &fmm.tree.domain, alpha);
+        let sources =
+            source.surface_grid(fmm.equivalent_surface_order(level), &fmm.tree.domain, alpha);
+        let targets =
+            target.surface_grid(fmm.equivalent_surface_order(level), &fmm.tree.domain, alpha);
 
         let mut direct = vec![c64::zero(); fmm.ncoeffs(level)];
 

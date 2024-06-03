@@ -42,7 +42,7 @@ where
             ));
         };
 
-        let &ncoeffs = self.ncoeffs.last().unwrap();
+        let &ncoeffs = self.ncoeffs_equivalent_surface.last().unwrap();
         let n_leaves = self.tree.source_tree().n_leaves().unwrap();
         let surface_size = ncoeffs * self.dim;
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();

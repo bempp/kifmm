@@ -83,11 +83,11 @@ where
                 let nsources_parents = sources_parents.len();
 
                 // Size of input FFT sequence
-                let shape_in = <Scalar as Dft>::shape_in(self.expansion_order(level));
-                let size_in: usize = <Scalar as Dft>::size_in(self.expansion_order(level));
+                let shape_in = <Scalar as Dft>::shape_in(self.equivalent_surface_order(level));
+                let size_in: usize = <Scalar as Dft>::size_in(self.equivalent_surface_order(level));
 
                 // Size of transformed FFT sequence
-                let size_out = <Scalar as Dft>::size_out(self.expansion_order(level));
+                let size_out = <Scalar as Dft>::size_out(self.equivalent_surface_order(level));
 
                 // Calculate displacements of multipole data with respect to source tree
                 let all_displacements = &self.source_to_target.displacements[displacement_index];

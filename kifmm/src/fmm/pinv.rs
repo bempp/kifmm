@@ -87,10 +87,10 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef};
+    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RawAccess};
 
     #[test]
-    fn test_pinv() {
+    fn test_pinv_square() {
         let dim: usize = 5;
         let mut mat = rlst_dynamic_array2!(f64, [dim, dim]);
         mat.fill_from_seed_equally_distributed(0);
@@ -108,6 +108,43 @@ mod test {
         );
 
         let actual = empty_array::<f64, 2>().simple_mult_into_resize(inv.view(), mat.view());
+
+        // Expect the identity matrix
+        let mut expected = rlst_dynamic_array2!(f64, actual.shape());
+        for i in 0..dim {
+            expected[[i, i]] = 1.0
+        }
+
+        for i in 0..actual.shape()[0] {
+            for j in 0..actual.shape()[1] {
+                assert_relative_eq!(
+                    *actual.get([i, j]).unwrap(),
+                    *expected.get([i, j]).unwrap(),
+                    epsilon = 1E-13
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_pinv_rectangle() {
+        let dim: usize = 5;
+        let mut mat = rlst_dynamic_array2!(f64, [dim, dim + 1]);
+        mat.fill_from_seed_equally_distributed(0);
+
+        let (s, ut, v) = pinv::<f64>(&mat, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = s[i];
+        }
+
+        let inv = empty_array::<f64, 2>().simple_mult_into_resize(
+            v.view(),
+            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.view(), ut.view()),
+        );
+
+        let actual = empty_array::<f64, 2>().simple_mult_into_resize(mat.view(), inv.view());
 
         // Expect the identity matrix
         let mut expected = rlst_dynamic_array2!(f64, actual.shape());

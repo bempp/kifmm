@@ -193,7 +193,10 @@ where
     pub check_surface_order: Vec<usize>, // index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs: Vec<usize>, // Index corresponds to level
+    pub ncoeffs_equivalent_surface: Vec<usize>, // Index corresponds to level
+
+    /// The number of coefficients, corresponding to points discretising the check surface
+    pub ncoeffs_check_surface: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -296,7 +299,8 @@ where
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
-            ncoeffs: Vec::default(),
+            ncoeffs_equivalent_surface: Vec::default(),
+            ncoeffs_check_surface: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),
@@ -456,13 +460,17 @@ where
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
 
-    /// Expansion order
+    /// Expansion order used to discretise equivalent surface
     pub equivalent_surface_order: Option<Vec<usize>>,
 
+    /// Expansion order used to discretise check surface
     pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs: Option<Vec<usize>>,
+    pub ncoeffs_equivalent_surface: Option<Vec<usize>>,
+
+    /// Number of coefficients
+    pub ncoeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,

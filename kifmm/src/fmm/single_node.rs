@@ -39,12 +39,16 @@ where
         self.dim
     }
 
-    fn expansion_order(&self, level: u64) -> usize {
+    fn equivalent_surface_order(&self, level: u64) -> usize {
         self.equivalent_surface_order[self.expansion_index(level)]
     }
 
+    fn check_surface_order(&self, level: u64) -> usize {
+        self.check_surface_order[self.expansion_index(level)]
+    }
+
     fn ncoeffs(&self, level: u64) -> usize {
-        self.ncoeffs[self.expansion_index(level)]
+        self.ncoeffs_equivalent_surface[self.expansion_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -267,7 +271,7 @@ where
 
         let leaf_multipoles = leaf_expansion_pointers(
             self.tree().source_tree(),
-            &self.ncoeffs,
+            &self.ncoeffs_equivalent_surface,
             nmatvecs,
             nsource_leaves,
             &self.multipoles,
@@ -275,21 +279,21 @@ where
 
         let level_multipoles = level_expansion_pointers(
             self.tree().source_tree(),
-            &self.ncoeffs,
+            &self.ncoeffs_equivalent_surface,
             nmatvecs,
             &self.multipoles,
         );
 
         let level_locals = level_expansion_pointers(
             self.tree().target_tree(),
-            &self.ncoeffs,
+            &self.ncoeffs_equivalent_surface,
             nmatvecs,
             &self.locals,
         );
 
         let leaf_locals = leaf_expansion_pointers(
             self.tree().target_tree(),
-            &self.ncoeffs,
+            &self.ncoeffs_equivalent_surface,
             nmatvecs,
             ntarget_leaves,
             &self.locals,
@@ -572,7 +576,7 @@ mod test {
 
         let multipoles = fmm.multipole(&root).unwrap();
         let upward_equivalent_surface = root.surface_grid(
-            fmm.expansion_order(0),
+            fmm.equivalent_surface_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );
@@ -637,7 +641,7 @@ mod test {
         let multipole = fmm.multipole(&root).unwrap();
 
         let upward_equivalent_surface = root.surface_grid(
-            fmm.expansion_order(0),
+            fmm.equivalent_surface_order(0),
             fmm.tree().domain(),
             T::from(ALPHA_INNER).unwrap().re(),
         );
