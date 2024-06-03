@@ -197,9 +197,10 @@ macro_rules! laplace_blas_constructors {
                 charges: PyReadonlyArrayDyn<'py, $type>,
                 prune_empty: bool,
                 kernel_eval_type: usize,
-                svd_threshold: <$type as RlstScalar>::Real,
+                svd_threshold: Option<<$type as RlstScalar>::Real>,
                 n_crit: Option<u64>,
                 depth: Option<u64>,
+                surface_diff: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -225,6 +226,7 @@ macro_rules! laplace_blas_constructors {
                     }
                 }
 
+
                 let fmm = SingleNodeBuilder::new()
                     .tree(
                         sources.as_slice().unwrap(),
@@ -239,7 +241,7 @@ macro_rules! laplace_blas_constructors {
                         expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        BlasFieldTranslationSaRcmp::new(Some(svd_threshold)),
+                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff),
                     )
                     .unwrap()
                     .build()
@@ -428,9 +430,10 @@ macro_rules! helmholtz_blas_constructors {
                 prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
-                svd_threshold: <$type as RlstScalar>::Real,
+                svd_threshold: Option<<$type as RlstScalar>::Real>,
                 n_crit: Option<u64>,
-                depth: Option<u64>
+                depth: Option<u64>,
+                surface_diff: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -480,7 +483,7 @@ macro_rules! helmholtz_blas_constructors {
                         expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
-                        BlasFieldTranslationIa::new(Some(svd_threshold)),
+                        BlasFieldTranslationIa::new(svd_threshold, surface_diff),
                     )
                     .unwrap()
                     .build()

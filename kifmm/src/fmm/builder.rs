@@ -40,8 +40,10 @@ where
             charges: None,
             source_to_target: None,
             domain: None,
-            expansion_order: None,
-            ncoeffs: None,
+            equivalent_surface_order: None,
+            check_surface_order: None,
+            ncoeffs_equivalent_surface: None,
+            ncoeffs_check_surface: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
             depth_set: None,
@@ -186,15 +188,32 @@ where
                 ));
             }
 
-            self.expansion_order = Some(expansion_order.to_vec());
-            self.ncoeffs = Some(
+            let check_surface_order = if source_to_target.overdetermined() {
+                expansion_order
+                    .iter()
+                    .map(|&e| e + source_to_target.surface_diff())
+                    .collect_vec()
+            } else {
+                expansion_order.to_vec()
+            };
+
+            self.ncoeffs_equivalent_surface = Some(
                 expansion_order
                     .iter()
                     .map(|&e| ncoeffs_kifmm(e))
                     .collect_vec(),
             );
-            self.isa = Some(Isa::new());
 
+            self.ncoeffs_check_surface = Some(
+                check_surface_order
+                    .iter()
+                    .map(|&c| ncoeffs_kifmm(c))
+                    .collect_vec(),
+            );
+
+            self.isa = Some(Isa::new());
+            self.equivalent_surface_order = Some(expansion_order.to_vec());
+            self.check_surface_order = Some(check_surface_order.to_vec());
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);
             self.source_to_target = Some(source_to_target);
@@ -218,8 +237,10 @@ where
             let mut result = KiFmm {
                 isa: self.isa.unwrap(),
                 tree: self.tree.unwrap(),
-                expansion_order: self.expansion_order.unwrap(),
-                ncoeffs: self.ncoeffs.unwrap(),
+                equivalent_surface_order: self.equivalent_surface_order.unwrap(),
+                check_surface_order: self.check_surface_order.unwrap(),
+                ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
+                ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),

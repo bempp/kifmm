@@ -110,11 +110,17 @@ where
         leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
 
-    /// Get the expansion order associated with this FMM
-    fn expansion_order(&self, level: u64) -> usize;
+    /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
+    fn equivalent_surface_order(&self, level: u64) -> usize;
+
+    /// Get the expansion order associated with this FMM, used to discretise the check surface.
+    fn check_surface_order(&self, level: u64) -> usize;
 
     /// Get the number of multipole/local coefficients associated with this FMM
-    fn ncoeffs(&self, level: u64) -> usize;
+    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn ncoeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;

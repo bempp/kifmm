@@ -186,11 +186,17 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
-    /// The expansion order of the FMM
-    pub expansion_order: Vec<usize>, // Index corresponds to level
+    /// The expansion order of the FMM, used to construct equivalent surfaces.
+    pub equivalent_surface_order: Vec<usize>, // Index corresponds to level
+
+    /// The expansion order used to construct check surfaces
+    pub check_surface_order: Vec<usize>, // index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs: Vec<usize>, // Index corresponds to level
+    pub ncoeffs_equivalent_surface: Vec<usize>, // Index corresponds to level
+
+    /// The number of coefficients, corresponding to points discretising the check surface
+    pub ncoeffs_check_surface: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -208,10 +214,13 @@ where
     pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_surfaces_sources: Vec<Scalar::Real>,
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Scalar::Real>,
+
+    /// Upward surfaces associated with source leaves
+    pub leaf_upward_check_surfaces_sources: Vec<Scalar::Real>,
 
     /// Upward surfaces associated with target leaves
-    pub leaf_upward_surfaces_targets: Vec<Scalar::Real>,
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
 
     /// Scales of each source leaf box
     pub leaf_scales_sources: Vec<Scalar>,
@@ -287,12 +296,14 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
-            expansion_order: Vec::default(),
+            equivalent_surface_order: Vec::default(),
+            check_surface_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
-            ncoeffs: Vec::default(),
+            ncoeffs_equivalent_surface: Vec::default(),
+            ncoeffs_check_surface: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),
@@ -310,8 +321,9 @@ where
             level_index_pointer_multipoles: Vec::default(),
             potentials: Vec::default(),
             potentials_send_pointers: Vec::default(),
-            leaf_upward_surfaces_sources: Vec::default(),
-            leaf_upward_surfaces_targets: Vec::default(),
+            leaf_upward_equivalent_surfaces_sources: Vec::default(),
+            leaf_upward_check_surfaces_sources: Vec::default(),
+            leaf_downward_equivalent_surfaces_targets: Vec::default(),
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),
@@ -452,11 +464,17 @@ where
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
 
-    /// Expansion order
-    pub expansion_order: Option<Vec<usize>>,
+    /// Expansion order used to discretise equivalent surface
+    pub equivalent_surface_order: Option<Vec<usize>>,
+
+    /// Expansion order used to discretise check surface
+    pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs: Option<Vec<usize>>,
+    pub ncoeffs_equivalent_surface: Option<Vec<usize>>,
+
+    /// Number of coefficients
+    pub ncoeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,
@@ -597,6 +615,9 @@ where
 
     /// The map between sources/targets in
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -634,6 +655,9 @@ where
 
     /// The map between sources/targets in
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.

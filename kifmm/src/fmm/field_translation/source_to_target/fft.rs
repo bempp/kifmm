@@ -65,7 +65,7 @@ where
                 let fft_map_index = self.fft_map_index(level);
                 let c2e_operator_index = self.c2e_operator_index(level);
                 let displacement_index = self.displacement_index(level);
-                let ncoeffs_level = self.ncoeffs(level);
+                let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -83,11 +83,11 @@ where
                 let nsources_parents = sources_parents.len();
 
                 // Size of input FFT sequence
-                let shape_in = <Scalar as Dft>::shape_in(self.expansion_order(level));
-                let size_in: usize = <Scalar as Dft>::size_in(self.expansion_order(level));
+                let shape_in = <Scalar as Dft>::shape_in(self.equivalent_surface_order(level));
+                let size_in: usize = <Scalar as Dft>::size_in(self.equivalent_surface_order(level));
 
                 // Size of transformed FFT sequence
-                let size_out = <Scalar as Dft>::size_out(self.expansion_order(level));
+                let size_out = <Scalar as Dft>::size_out(self.equivalent_surface_order(level));
 
                 // Calculate displacements of multipole data with respect to source tree
                 let all_displacements = &self.source_to_target.displacements[displacement_index];
@@ -161,7 +161,9 @@ where
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 {
                     multipoles
-                        .par_chunks_exact(ncoeffs_level * NSIBLINGS * chunk_size_pre_proc)
+                        .par_chunks_exact(
+                            ncoeffs_equivalent_surface * NSIBLINGS * chunk_size_pre_proc,
+                        )
                         .enumerate()
                         .for_each(|(i, multipole_chunk)| {
                             // Place Signal on convolution grid
@@ -169,8 +171,8 @@ where
                                 vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
-                                let multipole =
-                                    &multipole_chunk[i * ncoeffs_level..(i + 1) * ncoeffs_level];
+                                let multipole = &multipole_chunk[i * ncoeffs_equivalent_surface
+                                    ..(i + 1) * ncoeffs_equivalent_surface];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
                                 for (surf_idx, &conv_idx) in self.source_to_target.surf_to_conv_map
                                     [fft_map_index]
@@ -344,8 +346,10 @@ where
                         .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
                         .for_each(|(check_potential_chunk, local_ptrs)| {
                             // Map to surface grid
-                            let mut potential_chunk =
-                                rlst_dynamic_array2!(Scalar, [ncoeffs_level, NSIBLINGS]);
+                            let mut potential_chunk = rlst_dynamic_array2!(
+                                Scalar,
+                                [ncoeffs_equivalent_surface, NSIBLINGS]
+                            );
 
                             for i in 0..NSIBLINGS {
                                 for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
@@ -369,11 +373,14 @@ where
 
                             local_chunk
                                 .data()
-                                .chunks_exact(ncoeffs_level)
+                                .chunks_exact(ncoeffs_equivalent_surface)
                                 .zip(local_ptrs)
                                 .for_each(|(result, local)| {
                                     let local = unsafe {
-                                        std::slice::from_raw_parts_mut(local[0].raw, ncoeffs_level)
+                                        std::slice::from_raw_parts_mut(
+                                            local[0].raw,
+                                            ncoeffs_equivalent_surface,
+                                        )
                                     };
                                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                                 });

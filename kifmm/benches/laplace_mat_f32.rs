@@ -38,7 +38,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -57,7 +57,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -105,7 +105,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -124,7 +124,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None),
         )
         .unwrap()
         .build()
