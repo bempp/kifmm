@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    RawAccessMut, RlstScalar, Shape,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -604,7 +604,7 @@ where
                         });
                 }
 
-                // 3. Compute local expansions from compressed check potentials
+                // 2. Compute local expansions from compressed check potentials
                 {
                     #[cfg(target_os = "linux")]
                     rlst::threading::enable_threading();
@@ -669,7 +669,7 @@ where
                 let level_check_potentials =
                     check_potentials_ptrs.iter().map(Mutex::new).collect_vec();
 
-                // 2. Apply the BLAS operation
+                // 1. Apply the BLAS operation
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
@@ -757,7 +757,7 @@ where
                         });
                 }
 
-                // 3. Compute local expansions from compressed check potentials
+                // 2. Compute local expansions from compressed check potentials
                 {
                     #[cfg(target_os = "linux")]
                     rlst::threading::enable_threading();

@@ -52,7 +52,7 @@ where
     }
 
     fn ncoeffs_check_surface(&self, level: u64) -> usize {
-        self.ncoeffs_equivalent_surface[self.expansion_index(level)]
+        self.ncoeffs_check_surface[self.expansion_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -232,7 +232,7 @@ where
                 }
             }
 
-            // Downward pass
+            // // Downward pass
             {
                 for level in 2..=self.tree().target_tree().depth() {
                     if level > 2 {
@@ -1215,7 +1215,6 @@ mod test {
         let surface_diff = Some(1);
         let prune_empty = true;
         let threshold_pot = 1e-6;
-        let threshold_deriv_blas = 1e-4;
         let singular_value_threshold = None;
 
         // Charge data
@@ -1614,6 +1613,85 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
                     FftFieldTranslation::new(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate(false).unwrap();
+            let eval_type = fmm.kernel_eval_type;
+            let fmm = Box::new(fmm);
+            test_single_node_helmholtz_fmm_vector_helper::<c64>(
+                fmm,
+                eval_type,
+                &sources,
+                &charges,
+                threshold_deriv,
+            );
+        }
+    }
+
+    #[test]
+    fn test_helmholtz_fmm_variable_surfaces() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let threshold = 1e-5;
+        let threshold_deriv = 1e-3;
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let depth = None;
+        let surface_diff = Some(1);
+        let expansion_order = [6];
+
+        let prune_empty = true;
+        let wavenumber = 2.5;
+
+        // Charge data
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        // BLAS based field translation
+        {
+            // Evaluate potentials
+            let fmm = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    EvalType::Value,
+                    BlasFieldTranslationIa::new(None, surface_diff),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate(false).unwrap();
+
+            let fmm: Box<_> = Box::new(fmm);
+            let eval_type = fmm.kernel_eval_type;
+            // test_root_multipole_helmholtz_single_node::<c64>(
+            //     fmm, &sources, &charges, threshold,
+            // );
+            test_single_node_helmholtz_fmm_vector_helper::<c64>(
+                fmm, eval_type, &sources, &charges, threshold,
+            );
+
+            // Evaluate potentials + derivatives
+            let fmm = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    EvalType::ValueDeriv,
+                    BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
                 .build()

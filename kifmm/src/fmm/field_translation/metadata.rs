@@ -252,7 +252,6 @@ where
         for parent_level in iterator {
             let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
             let check_surface_order_child = self.check_surface_order(parent_level + 1);
-            let equivalent_surface_order_child = self.equivalent_surface_order(parent_level + 1);
 
             let parent_downward_equivalent_surface =
                 root.surface_grid(equivalent_surface_order_parent, &domain, alpha_outer);
@@ -260,7 +259,6 @@ where
             // Calculate L2L operator matrices
             let children = root.children();
             let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
-            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
             let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut l2l_level = Vec::new();
@@ -354,17 +352,13 @@ where
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
-            let mut uc2e_t = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
                 EvalType::Value,
-                &upward_equivalent_surface[..],
                 &upward_check_surface[..],
-                uc2e_t.data_mut(),
+                &upward_equivalent_surface[..],
+                uc2e.data_mut(),
             );
-
-            // Need to transpose so that rows correspond to targets and columns to sources
-            let mut uc2e = rlst_dynamic_array2!(Scalar, [nequiv_surface, ncheck_surface]);
-            uc2e.fill_from(uc2e_t.transpose());
 
             let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
 
@@ -419,12 +413,15 @@ where
             let parent_upward_check_surface =
                 curr.surface_grid(check_surface_order_parent, &domain, alpha_outer);
 
+            let equivalent_surface_order_parent = self.equivalent_surface_order(level);
+
             let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
             let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let children = curr.children();
             let mut m2m =
-                rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, 8 * nequiv_surface_child]);
+                rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, 8 * nequiv_surface_child]);
             let mut m2m_vec = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -446,8 +443,8 @@ where
                     empty_array::<Scalar, 2>()
                         .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), ce2pc.view()),
                 );
-                let l = i * nequiv_surface_child * ncheck_surface_parent;
-                let r = l + nequiv_surface_child * ncheck_surface_parent;
+                let l = i * nequiv_surface_child * nequiv_surface_parent;
+                let r = l + nequiv_surface_child * nequiv_surface_parent;
 
                 m2m.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec.push(tmp);
@@ -502,8 +499,8 @@ where
             let downward_check_surface =
                 curr.surface_grid(check_surface_order, &domain, alpha_inner);
 
-            let nequiv_surface = downward_equivalent_surface.len() / self.dim;
-            let ncheck_surface = downward_check_surface.len() / self.dim;
+            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
+            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
@@ -526,6 +523,9 @@ where
                 .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
             dc2e_inv_2.push(ut);
             curr = curr.first_child();
+
+            // println!("HERE {:?} {:?} {:?} {:?}", nequiv_surface, ncheck_surface, dc2e_inv_1[0].shape(), dc2e_inv_2[0].shape());
+            // assert!(false);
         }
 
         let mut curr = root;
