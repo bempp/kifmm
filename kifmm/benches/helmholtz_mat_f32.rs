@@ -41,7 +41,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -60,7 +60,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -111,7 +111,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -130,7 +130,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()

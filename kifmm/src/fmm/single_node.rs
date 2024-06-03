@@ -530,7 +530,6 @@ mod test {
         let leaf_idx = 0;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
-        let multipole = fmm.multipole(&leaf).unwrap()[0];
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
@@ -1757,7 +1756,6 @@ mod test {
             );
         }
     }
-
 
     #[test]
     fn test_laplace_fmm_matrix() {

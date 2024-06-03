@@ -87,7 +87,7 @@ mod test {
 
     use super::*;
     use approx::assert_relative_eq;
-    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RawAccess};
+    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef};
 
     #[test]
     fn test_pinv_square() {
