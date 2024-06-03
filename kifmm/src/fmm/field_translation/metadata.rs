@@ -523,9 +523,6 @@ where
                 .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
             dc2e_inv_2.push(ut);
             curr = curr.first_child();
-
-            // println!("HERE {:?} {:?} {:?} {:?}", nequiv_surface, ncheck_surface, dc2e_inv_1[0].shape(), dc2e_inv_2[0].shape());
-            // assert!(false);
         }
 
         let mut curr = root;
