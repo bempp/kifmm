@@ -1631,7 +1631,7 @@ mod test {
     }
 
     #[test]
-    fn test_helmholtz_fmm_variable_surfaces() {
+    fn test_helmholtz_fmm_vector_variable_surfaces() {
         // Setup random sources and targets
         let nsources = 9000;
         let ntargets = 10000;
@@ -1675,9 +1675,7 @@ mod test {
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
-            // test_root_multipole_helmholtz_single_node::<c64>(
-            //     fmm, &sources, &charges, threshold,
-            // );
+
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, threshold,
             );
@@ -1710,6 +1708,58 @@ mod test {
     }
 
     #[test]
+    fn test_helmholtz_fmm_matrix_variable_surfaces() {
+        // Setup random sources and targets
+        let nsources = 9000;
+        let ntargets = 10000;
+        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
+        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let threshold = 1e-5;
+
+        // FMM parameters
+        let n_crit = Some(100);
+        let depth = None;
+        let surface_diff = Some(1);
+        let expansion_order = [6];
+
+        let prune_empty = true;
+        let wavenumber = 2.5;
+
+        // Charge data
+        let nvecs = 2;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        // BLAS based field translation
+        {
+            // Evaluate potentials
+            let fmm = SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    EvalType::Value,
+                    BlasFieldTranslationIa::new(None, surface_diff),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            fmm.evaluate(false).unwrap();
+
+            let fmm: Box<_> = Box::new(fmm);
+            let eval_type = fmm.kernel_eval_type;
+
+            test_single_node_helmholtz_fmm_matrix_helper::<c64>(
+                fmm, eval_type, &sources, &charges, threshold,
+            );
+        }
+    }
+
+
+    #[test]
     fn test_laplace_fmm_matrix() {
         // Setup random sources and targets
         let nsources = 9000;
@@ -1719,12 +1769,8 @@ mod test {
         let max = None;
         let sources = points_fixture::<f64>(nsources, min, max, Some(0));
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+
         // FMM parameters
-
-        // let n_crit = Some(10);
-        // let depth = None;
-        // let expansion_order = [6];
-
         let n_crit = None;
         let depth = Some(3);
         let expansion_order = [6, 5, 6, 5];
@@ -1806,10 +1852,6 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        // let n_crit = Some(100);
-        // let depth = None;
-        // let expansion_order = [6];
-
         let n_crit = None;
         let depth = Some(3);
         let expansion_order = [6, 6, 6, 6];
