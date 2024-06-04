@@ -330,7 +330,7 @@ mod test {
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
+        c64, rlst_dynamic_array2, Array, BaseArray, RawAccess,
         RawAccessMut, RlstScalar, Shape, VectorContainer,
     };
 
@@ -368,12 +368,6 @@ mod test {
 
         let ntargets = leaf_targets.len() / fmm.dim();
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         let [nsources, nmatvecs] = charges.shape();
 
         for i in 0..nmatvecs {
@@ -383,7 +377,7 @@ mod test {
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
-                leaf_coordinates_col_major.data(),
+                leaf_targets,
                 charges_i,
                 &mut direct_i,
             );
@@ -423,12 +417,6 @@ mod test {
 
         let ntargets = leaf_targets.len() / fmm.dim();
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         let [nsources, nmatvecs] = charges.shape();
 
         for i in 0..nmatvecs {
@@ -438,7 +426,7 @@ mod test {
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
-                leaf_coordinates_col_major.data(),
+                leaf_targets,
                 charges_i,
                 &mut direct_i,
             );
@@ -480,15 +468,10 @@ mod test {
         let ntargets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::zero(); ntargets * eval_size];
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         fmm.kernel().evaluate_st(
             eval_type,
             sources.data(),
-            leaf_coordinates_col_major.data(),
+            leaf_targets,
             charges.data(),
             &mut direct,
         );
@@ -536,15 +519,10 @@ mod test {
         let ntargets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::Real::zero(); ntargets * eval_size];
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         fmm.kernel().evaluate_st(
             eval_type,
             sources.data(),
-            leaf_coordinates_col_major.data(),
+            leaf_targets,
             charges.data(),
             &mut direct,
         );

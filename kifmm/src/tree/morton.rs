@@ -1,4 +1,5 @@
 //! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
+use crate::fmm::helpers::ncoeffs_kifmm;
 use crate::traits::tree::{FmmTreeNode, TreeNode};
 use crate::tree::{
     constants::{
@@ -904,23 +905,23 @@ where
 
 /// Compute surface grid for a given expansion order used in the kernel independent fast multipole method
 /// returns a tuple, the first element is an owned vector of the physical coordinates of the
-/// surface grid in column major order [x_1, x_2, ... x_n, y_1, y_2, ..., y_n, z_1, z_2, ..., z_n].
+/// surface grid in row major order [x_1, y_1, z_1,...x_N, y_N, z_N].
 /// the second element is a vector of indices corresponding to each of these coordinates.
 ///
 /// # Arguments
 /// * `expansion_order` - the expansion order of the fmm
 pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
     let dim = 3;
-    let n_coeffs = 6 * (expansion_order - 1).pow(2) + 2;
+    let n_coeffs = ncoeffs_kifmm(expansion_order);
 
-    // Implicitly in column major order
+    // Implicitly in row major order
     let mut surface: Vec<T> = vec![T::zero(); dim * n_coeffs];
 
     // Bounds of the surface grid
     let lower = 0;
     let upper = expansion_order - 1;
 
-    // Orders the surface grid, implicitly column major
+    // Orders the surface grid, implicitly row major
     let mut idx = 0;
 
     for k in 0..expansion_order {
@@ -930,9 +931,9 @@ pub fn surface_grid<T: RlstScalar + Float>(expansion_order: usize) -> Vec<T> {
                     || (j >= lower && k >= lower && (i == lower || i == upper))
                     || (k >= lower && i >= lower && (j == lower || j == upper))
                 {
-                    surface[idx] = T::from(i).unwrap();
-                    surface[(dim - 2) * n_coeffs + idx] = T::from(j).unwrap();
-                    surface[(dim - 1) * n_coeffs + idx] = T::from(k).unwrap();
+                    surface[dim * idx] = T::from(i).unwrap();
+                    surface[dim * idx + 1] = T::from(j).unwrap();
+                    surface[dim * idx + 2] = T::from(k).unwrap();
                     idx += 1;
                 }
             }
@@ -971,9 +972,9 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
             for j in 0..n {
                 for i in 0..n {
                     let conv_index = i + j * n + k * n * n;
-                    grid[conv_index] = T::from(i).unwrap();
-                    grid[(dim - 2) * ncoeffs + conv_index] = T::from(j).unwrap();
-                    grid[(dim - 1) * ncoeffs + conv_index] = T::from(k).unwrap();
+                    grid[dim * conv_index] = T::from(i).unwrap();
+                    grid[dim * conv_index + 1] = T::from(j).unwrap();
+                    grid[dim * conv_index + 2] = T::from(k).unwrap();
                 }
             }
         }
@@ -1003,9 +1004,9 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         let corners = find_corners(&grid);
 
         let surface_point = [
-            corners[conv_point_corner_index],
-            corners[8 + conv_point_corner_index],
-            corners[16 + conv_point_corner_index],
+            corners[dim * conv_point_corner_index],
+            corners[dim * conv_point_corner_index + 1],
+            corners[dim * conv_point_corner_index + 2],
         ];
 
         let diff = conv_point_corner
@@ -1014,11 +1015,12 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
             .map(|(a, b)| *a - b)
             .collect_vec();
 
-        for i in 0..dim {
-            grid[i * ncoeffs..(i + 1) * ncoeffs]
+        grid.chunks_exact_mut(dim).for_each(|coord| {
+            coord
                 .iter_mut()
-                .for_each(|value| *value += diff[i]);
-        }
+                .zip(diff.iter())
+                .for_each(|(c, d)| *c += *d)
+        });
 
         (grid, conv_idxs)
     }
@@ -1041,12 +1043,14 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         let two = T::from(2.0).unwrap();
         let ncoeffs = surface.len() / 3;
         for i in 0..ncoeffs {
-            scaled_surface[i] = (surface[i] * T::from(dilated_diameter[0] / two).unwrap())
+            let idx = i * dim;
+
+            scaled_surface[idx] = (surface[idx] * T::from(dilated_diameter[0] / two).unwrap())
                 + T::from(centre[0]).unwrap();
-            scaled_surface[(dim - 2) * ncoeffs + i] = (surface[(dim - 2) * ncoeffs + i]
+            scaled_surface[idx + 1] = (surface[idx + 1]
                 * T::from(dilated_diameter[1] / two).unwrap())
                 + T::from(centre[1]).unwrap();
-            scaled_surface[(dim - 1) * ncoeffs + i] = (surface[(dim - 1) * ncoeffs + i]
+            scaled_surface[idx + 2] = (surface[idx + 2]
                 * T::from(dilated_diameter[2] / two).unwrap())
                 + T::from(centre[2]).unwrap();
         }
@@ -1060,9 +1064,7 @@ impl<T: RlstScalar + Float> FmmTreeNode for MortonKey<T> {
         domain: &Domain<Self::Scalar>,
         alpha: Self::Scalar,
     ) -> Vec<Self::Scalar> {
-        let surface: Vec<T> = surface_grid(expansion_order);
-
-        self.scale_surface(surface, domain, alpha)
+        self.scale_surface(surface_grid(expansion_order), domain, alpha)
     }
 }
 
@@ -1829,7 +1831,7 @@ mod test {
         let expansion_order = 2;
         let alpha = 1.;
         let dim = 3;
-        let ncoeffs = 6 * (expansion_order - 1_usize).pow(2) + 2;
+        let ncoeffs = ncoeffs_kifmm(expansion_order);
 
         // Test lengths
         let surface = key.surface_grid(expansion_order, &domain, alpha);
@@ -1880,19 +1882,12 @@ mod test {
         let surface = key.surface_grid(expansion_order, &domain, alpha);
         let expected = key.centre(&domain);
 
-        let c_x = surface.iter().take(ncoeffs).fold(0f64, |a, &b| a + b) / (ncoeffs as f64);
-        let c_y = surface
-            .iter()
-            .skip(ncoeffs)
-            .take(ncoeffs)
-            .fold(0f64, |a, &b| a + b)
-            / (ncoeffs as f64);
-        let c_z = surface
-            .iter()
-            .skip(2 * ncoeffs)
-            .take(ncoeffs)
-            .fold(0f64, |a, &b| a + b)
-            / (ncoeffs as f64);
+        let xs = surface.iter().step_by(3).cloned().collect_vec();
+        let ys = surface.iter().skip(1).step_by(3).cloned().collect_vec();
+        let zs = surface.iter().skip(2).step_by(3).cloned().collect_vec();
+        let c_x = xs.iter().take(ncoeffs).fold(0f64, |a, b| a + b) / (ncoeffs as f64);
+        let c_y = ys.iter().take(ncoeffs).fold(0f64, |a, b| a + b) / (ncoeffs as f64);
+        let c_z = zs.iter().take(ncoeffs).fold(0f64, |a, b| a + b) / (ncoeffs as f64);
 
         let result = vec![c_x, c_y, c_z];
 
@@ -1909,6 +1904,7 @@ mod test {
 
         let expansion_order = 5;
         let alpha = 1.0;
+        let dim = 3;
 
         let key = MortonKey::from_point(&point, &domain, 0);
 
@@ -1916,13 +1912,12 @@ mod test {
 
         // Place convolution grid on max corner
         let corners = find_corners(&surface_grid);
-        let ncorners = corners.len() / 3;
         let conv_point_corner_index = 7;
 
         let conv_point = vec![
-            corners[conv_point_corner_index],
-            corners[ncorners + conv_point_corner_index],
-            corners[2 * ncorners + conv_point_corner_index],
+            corners[dim * conv_point_corner_index],
+            corners[dim * conv_point_corner_index + 1],
+            corners[dim * conv_point_corner_index + 2],
         ];
 
         let (conv_grid, _) = key.convolution_grid(
@@ -1937,17 +1932,19 @@ mod test {
         let mut surface = Vec::new();
         let nsurf = surface_grid.len() / 3;
         for i in 0..nsurf {
+            let idx = i * 3;
             surface.push([
-                surface_grid[i],
-                surface_grid[i + nsurf],
-                surface_grid[i + 2 * nsurf],
+                surface_grid[idx],
+                surface_grid[idx + 1],
+                surface_grid[idx + 2],
             ])
         }
 
         let mut convolution = Vec::new();
         let nconv = conv_grid.len() / 3;
         for i in 0..nconv {
-            convolution.push([conv_grid[i], conv_grid[i + nconv], conv_grid[i + 2 * nconv]])
+            let idx = i * 3;
+            convolution.push([conv_grid[idx], conv_grid[idx + 1], conv_grid[idx + 2]])
         }
         assert!(surface.iter().all(|point| convolution.contains(point)));
     }

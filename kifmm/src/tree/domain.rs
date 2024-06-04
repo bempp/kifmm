@@ -1,5 +1,6 @@
 //! Constructor for a single node Domain.
 use crate::{traits::tree::Domain as DomainTrait, tree::types::Domain};
+use itertools::Itertools;
 #[allow(unused_imports)]
 #[cfg(feature = "mpi")]
 pub use mpi_domain::*;
@@ -16,20 +17,18 @@ where
     ///
     /// # Arguments
     /// * `points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
-    pub fn from_local_points(points: &[T]) -> Domain<T> {
-        let dim = 3;
-        let n_points = points.len() / dim;
-        let x = points[0..n_points].to_vec();
-        let y = points[n_points..2 * n_points].to_vec();
-        let z = points[2 * n_points..].to_vec();
+    pub fn from_local_points(coordinates: &[T]) -> Domain<T> {
+        let xs = coordinates.iter().step_by(3).cloned().collect_vec();
+        let ys = coordinates.iter().skip(1).step_by(3).cloned().collect_vec();
+        let zs = coordinates.iter().skip(2).step_by(3).cloned().collect_vec();
 
-        let max_x = x.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let max_y = y.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let max_z = z.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_x = xs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_y = ys.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let max_z = zs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-        let min_x = x.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let min_y = y.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
-        let min_z = z.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let min_x = xs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let min_y = ys.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+        let min_z = zs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
         // Find maximum dimension, this will define the size of the boxes in the domain
         let diameter_x = Float::abs(*max_x - *min_x);

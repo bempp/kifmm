@@ -20,15 +20,15 @@ use crate::tree::types::MultiNodeTree;
 use mpi::traits::{Communicator, Equivalence};
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
-/// organized in column-major order.
+/// organized in row-major order.
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
-/// stored in column-major order.
+/// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
+/// stored in row-major order.
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
-/// stored in column-major order.
+/// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
+/// stored in row-major order.
 pub type CoordinatesSlice<'slc, T> = Array<T, BaseArray<T, SliceContainer<'slc, T>, 2>, 2>;
 
 /// Represents a threadsafe mutable raw pointer to`T`.
@@ -568,7 +568,7 @@ where
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// The map between sources/targets in
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
@@ -613,7 +613,7 @@ where
     /// Directional cutoff ranks
     pub directional_cutoff_ranks: Vec<Vec<usize>>,
 
-    /// The map between sources/targets in
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
@@ -653,7 +653,7 @@ where
     /// Cutoff ranks
     pub cutoff_ranks: Vec<Vec<usize>>,
 
-    /// The map between sources/targets in
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0

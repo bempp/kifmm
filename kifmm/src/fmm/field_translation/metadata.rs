@@ -44,7 +44,7 @@ use crate::{
     },
     tree::{
         constants::{
-            ALPHA_INNER, ALPHA_OUTER, NCORNERS, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
+            ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
             NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
@@ -85,7 +85,7 @@ where
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
-        let domain = self.tree.domain;
+        let domain = self.tree.domain();
 
         let mut m2m = Vec::new();
         let mut m2m_vec = Vec::new();
@@ -199,7 +199,7 @@ where
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
-        let domain = self.tree.domain;
+        let domain = self.tree.domain();
 
         let mut l2l = Vec::new();
         let mut dc2e_inv_1 = Vec::new();
@@ -316,7 +316,7 @@ where
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
-        let domain = self.tree.domain;
+        let domain = self.tree.domain();
 
         let depth = self.tree.source_tree().depth();
 
@@ -467,7 +467,7 @@ where
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
-        let domain = self.tree.domain;
+        let domain = self.tree.domain();
 
         let depth = self.tree.source_tree().depth();
 
@@ -867,11 +867,13 @@ where
             .iter()
             .map(|d| *d / two)
             .collect_vec();
+
         let point = midway
             .iter()
             .zip(self.tree.source_tree().domain().origin())
             .map(|(m, o)| *m + *o)
             .collect_vec();
+
         let point = [point[0], point[1], point[2]];
 
         let depth = self.tree.source_tree().depth();
@@ -947,8 +949,6 @@ where
             }
         }
 
-        let n_source_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
-        let n_target_check_surface = n_source_equivalent_surface;
         let alpha = Scalar::real(ALPHA_INNER);
 
         // Iterate over each set of convolutions in the halo (26)
@@ -983,9 +983,9 @@ where
                     let conv_point_corner_index = 7;
                     let corners = find_corners(&source_equivalent_surface[..]);
                     let conv_point_corner = [
-                        corners[conv_point_corner_index],
-                        corners[NCORNERS + conv_point_corner_index],
-                        corners[2 * NCORNERS + conv_point_corner_index],
+                        corners[self.dim * conv_point_corner_index],
+                        corners[self.dim * conv_point_corner_index + 1],
+                        corners[self.dim * conv_point_corner_index + 2],
                     ];
 
                     let (conv_grid, _) = source.convolution_grid(
@@ -999,9 +999,9 @@ where
                     // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                     let kernel_point_index = 0;
                     let kernel_point = [
-                        target_check_surface[kernel_point_index],
-                        target_check_surface[n_target_check_surface + kernel_point_index],
-                        target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                        target_check_surface[self.dim * kernel_point_index],
+                        target_check_surface[self.dim * kernel_point_index + 1],
+                        target_check_surface[self.dim * kernel_point_index + 2],
                     ];
 
                     // Compute Green's fct evaluations
@@ -1149,8 +1149,6 @@ where
                 sources[i] = tmp_sources;
             }
 
-            let n_source_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
-            let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
             // Iterate over each set of convolutions in the halo (26)
@@ -1185,9 +1183,9 @@ where
                         let conv_point_corner_index = 7;
                         let corners = find_corners(&source_equivalent_surface[..]);
                         let conv_point_corner = [
-                            corners[conv_point_corner_index],
-                            corners[NCORNERS + conv_point_corner_index],
-                            corners[2 * NCORNERS + conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index + 1],
+                            corners[self.dim * conv_point_corner_index + 2],
                         ];
 
                         let (conv_grid, _) = source.convolution_grid(
@@ -1201,11 +1199,10 @@ where
                         // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                         let kernel_point_index = 0;
                         let kernel_point = [
-                            target_check_surface[kernel_point_index],
-                            target_check_surface[n_target_check_surface + kernel_point_index],
-                            target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index + 1],
+                            target_check_surface[self.dim * kernel_point_index + 2],
                         ];
-
                         // Compute Green's fct evaluations
                         let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
                             equivalent_surface_order,
@@ -1594,7 +1591,7 @@ where
     ///
     /// # Arguments
     /// * `expansion_order` - The expansion order of the FMM
-    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in column major order.
+    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in row major order.
     /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn evaluate_greens_fct_convolution_grid(
         &self,
@@ -1612,7 +1609,7 @@ where
         self.kernel.assemble_st(
             EvalType::Value,
             convolution_grid,
-            &target_pt[..],
+            &target_pt,
             &mut kernel_evals[..],
         );
 
@@ -1786,16 +1783,18 @@ where
         let midway = self
             .tree
             .source_tree()
-            .domain
+            .domain()
             .side_length()
             .iter()
             .map(|d| *d / two)
             .collect_vec();
+
         let point = midway
             .iter()
             .zip(self.tree.source_tree().domain().origin())
             .map(|(m, o)| *m + *o)
             .collect_vec();
+
         let point = [point[0], point[1], point[2]];
 
         // Encode point in centre of domain and compute halo of parent, and their resp. children
@@ -1857,8 +1856,6 @@ where
             let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
             let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
             let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
-            let n_source_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
-            let n_target_check_surface = n_source_equivalent_surface;
             let alpha = Scalar::real(ALPHA_INNER);
 
             // Iterate over each set of convolutions in the halo (26)
@@ -1893,9 +1890,9 @@ where
                         let conv_point_corner_index = 7;
                         let corners = find_corners(&source_equivalent_surface[..]);
                         let conv_point_corner = [
-                            corners[conv_point_corner_index],
-                            corners[NCORNERS + conv_point_corner_index],
-                            corners[2 * NCORNERS + conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index + 1],
+                            corners[self.dim * conv_point_corner_index + 2],
                         ];
 
                         let (conv_grid, _) = source.convolution_grid(
@@ -1909,9 +1906,9 @@ where
                         // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
                         let kernel_point_index = 0;
                         let kernel_point = [
-                            target_check_surface[kernel_point_index],
-                            target_check_surface[n_target_check_surface + kernel_point_index],
-                            target_check_surface[2 * n_target_check_surface + kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index + 1],
+                            target_check_surface[self.dim * kernel_point_index + 2],
                         ];
 
                         // Compute Green's fct evaluations
@@ -2737,9 +2734,9 @@ mod test {
         let conv_point_corner_index = 7;
         let corners = find_corners(&source_equivalent_surface[..]);
         let conv_point_corner = [
-            corners[conv_point_corner_index],
-            corners[8 + conv_point_corner_index],
-            corners[16 + conv_point_corner_index],
+            corners[fmm.dim * conv_point_corner_index],
+            corners[fmm.dim * conv_point_corner_index + 1],
+            corners[fmm.dim * conv_point_corner_index + 2],
         ];
 
         let (conv_grid, _) = transfer_vector.source.convolution_grid(
@@ -2752,9 +2749,9 @@ mod test {
 
         let kernel_point_index = 0;
         let kernel_point = [
-            target_check_surface[kernel_point_index],
-            target_check_surface[ntargets + kernel_point_index],
-            target_check_surface[2 * ntargets + kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index + 1],
+            target_check_surface[fmm.dim() * kernel_point_index + 2],
         ];
 
         // Compute kernel
@@ -2901,9 +2898,9 @@ mod test {
         let conv_point_corner_index = 7;
         let corners = find_corners(&source_equivalent_surface[..]);
         let conv_point_corner = [
-            corners[conv_point_corner_index],
-            corners[8 + conv_point_corner_index],
-            corners[16 + conv_point_corner_index],
+            corners[fmm.dim * conv_point_corner_index],
+            corners[fmm.dim * conv_point_corner_index + 1],
+            corners[fmm.dim * conv_point_corner_index + 2],
         ];
 
         let (conv_grid, _) = source.convolution_grid(
@@ -2916,9 +2913,9 @@ mod test {
 
         let kernel_point_index = 0;
         let kernel_point = [
-            target_check_surface[kernel_point_index],
-            target_check_surface[ntargets + kernel_point_index],
-            target_check_surface[2 * ntargets + kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index],
+            target_check_surface[fmm.dim() * kernel_point_index + 1],
+            target_check_surface[fmm.dim() * kernel_point_index + 2],
         ];
 
         // Compute kernel
