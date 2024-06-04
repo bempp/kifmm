@@ -44,8 +44,7 @@ use crate::{
     },
     tree::{
         constants::{
-            ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED,
-            NTRANSFER_VECTORS_KIFMM,
+            ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
         types::MortonKey,
@@ -99,8 +98,8 @@ where
         {
             // Compute required surfaces
             let upward_equivalent_surface =
-                root.surface_grid(equivalent_surface_order, &domain, alpha_inner);
-            let upward_check_surface = root.surface_grid(check_surface_order, &domain, alpha_outer);
+                root.surface_grid(equivalent_surface_order, domain, alpha_inner);
+            let upward_check_surface = root.surface_grid(check_surface_order, domain, alpha_outer);
 
             let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
             let ncheck_surface = ncoeffs_kifmm(check_surface_order);
@@ -142,7 +141,7 @@ where
                 self.equivalent_surface_order((parent_level + 1) as u64);
 
             let parent_upward_check_surface =
-                root.surface_grid(check_surface_order_parent, &domain, alpha_outer);
+                root.surface_grid(check_surface_order_parent, domain, alpha_outer);
 
             let children = root.children();
             let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
@@ -155,7 +154,7 @@ where
 
             for (i, child) in children.iter().enumerate() {
                 let child_upward_equivalent_surface =
-                    child.surface_grid(equivalent_surface_order_child, &domain, alpha_inner);
+                    child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
@@ -212,9 +211,9 @@ where
         {
             // Compute required surfaces
             let downward_equivalent_surface =
-                root.surface_grid(equivalent_surface_order, &domain, alpha_outer);
+                root.surface_grid(equivalent_surface_order, domain, alpha_outer);
             let downward_check_surface =
-                root.surface_grid(check_surface_order, &domain, alpha_inner);
+                root.surface_grid(check_surface_order, domain, alpha_inner);
 
             let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
             let ncheck_surface = ncoeffs_kifmm(check_surface_order);
@@ -254,7 +253,7 @@ where
             let check_surface_order_child = self.check_surface_order(parent_level + 1);
 
             let parent_downward_equivalent_surface =
-                root.surface_grid(equivalent_surface_order_parent, &domain, alpha_outer);
+                root.surface_grid(equivalent_surface_order_parent, domain, alpha_outer);
 
             // Calculate L2L operator matrices
             let children = root.children();
@@ -265,7 +264,7 @@ where
 
             for child in children.iter() {
                 let child_downward_check_surface =
-                    child.surface_grid(check_surface_order_child, &domain, alpha_inner);
+                    child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 let mut pe2cc =
@@ -344,8 +343,8 @@ where
         for (equivalent_surface_order, check_surface_order) in iterator {
             // Compute required surfaces
             let upward_equivalent_surface =
-                curr.surface_grid(equivalent_surface_order, &domain, alpha_inner);
-            let upward_check_surface = curr.surface_grid(check_surface_order, &domain, alpha_outer);
+                curr.surface_grid(equivalent_surface_order, domain, alpha_inner);
+            let upward_check_surface = curr.surface_grid(check_surface_order, domain, alpha_outer);
 
             let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
             let ncheck_surface = ncoeffs_kifmm(check_surface_order);
@@ -411,7 +410,7 @@ where
         for (level, (check_surface_order_parent, equivalent_surface_order_child)) in iterator {
             // Compute required surfaces
             let parent_upward_check_surface =
-                curr.surface_grid(check_surface_order_parent, &domain, alpha_outer);
+                curr.surface_grid(check_surface_order_parent, domain, alpha_outer);
 
             let equivalent_surface_order_parent = self.equivalent_surface_order(level);
 
@@ -426,7 +425,7 @@ where
 
             for (i, child) in children.iter().enumerate() {
                 let child_upward_equivalent_surface =
-                    child.surface_grid(equivalent_surface_order_child, &domain, alpha_inner);
+                    child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
@@ -495,9 +494,9 @@ where
         for (equivalent_surface_order, check_surface_order) in iterator {
             // Compute required surfaces
             let downward_equivalent_surface =
-                curr.surface_grid(equivalent_surface_order, &domain, alpha_outer);
+                curr.surface_grid(equivalent_surface_order, domain, alpha_outer);
             let downward_check_surface =
-                curr.surface_grid(check_surface_order, &domain, alpha_inner);
+                curr.surface_grid(check_surface_order, domain, alpha_inner);
 
             let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
             let ncheck_surface = ncoeffs_kifmm(check_surface_order);
@@ -560,7 +559,7 @@ where
         for (level, (equivalent_surface_order_parent, check_surface_order_child)) in iterator {
             // Compute required surfaces
             let parent_downward_equivalent_surface =
-                curr.surface_grid(equivalent_surface_order_parent, &domain, alpha_outer);
+                curr.surface_grid(equivalent_surface_order_parent, domain, alpha_outer);
 
             let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
             let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
@@ -571,7 +570,7 @@ where
 
             for child in children.iter() {
                 let child_downward_check_surface =
-                    child.surface_grid(check_surface_order_child, &domain, alpha_inner);
+                    child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);

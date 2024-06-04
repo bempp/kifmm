@@ -330,8 +330,8 @@ mod test {
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_dynamic_array2, Array, BaseArray, RawAccess,
-        RawAccessMut, RlstScalar, Shape, VectorContainer,
+        c64, rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
+        VectorContainer,
     };
 
     use crate::{

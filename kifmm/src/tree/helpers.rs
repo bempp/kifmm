@@ -111,7 +111,6 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::
 /// # Arguments:
 /// * `coordinates` - points on the surface of a box.
 pub fn find_corners<T: Float>(coordinates: &[T]) -> Vec<T> {
-
     let xs = coordinates.iter().step_by(3).cloned().collect_vec();
     let ys = coordinates.iter().skip(1).step_by(3).cloned().collect_vec();
     let zs = coordinates.iter().skip(2).step_by(3).cloned().collect_vec();
