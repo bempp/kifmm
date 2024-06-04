@@ -1522,7 +1522,6 @@ mod test {
                 assert!(result[i + 1] >= result[i])
             }
         }
-        // assert!(false)
     }
 
     #[test]
