@@ -95,11 +95,11 @@ class KiFmm:
         try:
             if isinstance(expansion_order, list):
                 for e in expansion_order:
-                    assert e > 2
+                    assert e >= 2
             else:
-                assert expansion_order > 2
+                assert expansion_order >= 2
         except:
-            raise TypeError(f"Expansion orders must be > 2")
+            raise TypeError(f"Expansion orders must be >= 2")
 
         try:
             if isinstance(expansion_order, list):
