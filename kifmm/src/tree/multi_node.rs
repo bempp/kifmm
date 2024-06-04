@@ -464,7 +464,7 @@ where
         let dim = 3;
         let coords_len = coordinates_row_major.len();
 
-        if !coordinates_col_major.is_empty() && coords_len & dim == 0 {
+        if !coordinates_row_major.is_empty() && coords_len & dim == 0 {
             let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, world));
             let n_coords = coords_len / dim;
 
