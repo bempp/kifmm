@@ -530,14 +530,10 @@ mod test {
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = RlstScalar::abs(d - p);
             let rel_error = abs_error / p;
-            println!(
-                "err {:?} \nd {:?} \np {:?}",
-                rel_error,
-                &direct[0..3],
-                &potential[0..3]
-            );
+            println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
             assert!(rel_error <= threshold)
         });
+        assert!(false);
     }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
@@ -821,7 +817,7 @@ mod test {
     }
 
     #[test]
-    fn test_laplace_fmm_vector() {
+    fn foo() {
         // Setup random sources and targets
         let nsources = 9000;
         let ntargets = 10000;

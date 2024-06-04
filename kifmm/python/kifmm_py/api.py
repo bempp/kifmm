@@ -61,8 +61,8 @@ class KiFmm:
 
         Args:
             expansion_order (list[int], int): The expansion order of the FMM, if specifying a depth expansion order must be specified for each tree level in a list
-            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
-            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
+            sources (np.ndarray): Source coordinates, real data expected in C order with shape '[n_points, dim]'
+            targets (np.ndarray): Target coordinates, real data expected in C order with shape '[n_points, dim]'
             charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions '[n_charges, n_vecs]' where each of 'n_vecs' is associated with 'n_charges'. 'n_vecs' > 1 only supported with BLAS field translations.
             kernel_eval_type (str):  Either 'eval_deriv' - to evaluate potentials and gradients, or 'eval' to evaluate potentials alone
             kernel (str): Either 'laplace' or 'helmholtz' supported.
@@ -131,7 +131,7 @@ class KiFmm:
                 and targets.shape[1] == 3
             )
         except:
-            raise TypeError("sources and targets must be reals, and of shape [N, 3]")
+            raise TypeError("sources and targets must be reals, and of shape [3, N]")
 
         try:
             assert type(sources[0].dtype) == type(targets[0].dtype)
@@ -140,18 +140,12 @@ class KiFmm:
                 f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
             )
 
-        # Check that arrays are in Fortran order
-        try:
-            assert np.isfortran(sources) and np.isfortran(targets)
-        except:
-            raise TypeError(f"sources, targets expected in Fortran order")
-
         # Check for valid n_crit
         try:
             if n_crit is not None:
                 assert n_crit < sources.shape[0] and n_crit < targets.shape[0]
         except:
-            raise TypeError(f"ncrit={ncrit} is too large for these sources/targets")
+            raise TypeError(f"ncrit={ncrit} is too large for specified sources/targets")
 
         try:
             if n_crit is not None:
@@ -390,7 +384,8 @@ class KiFmm:
 
         Returns:
             np.ndarray: Potential data, returned as a list where the length corresponds to the number of evaluations/charge vectors,
-            and is stored in an order defined by 'global_indices'
+            and is stored in an order defined by 'global_indices'. Potential is of the shape '[kernel_eval_size, n_targets]',
+            kernel_eval_size \in [1, 4] depending on whether the user is evaluating potentials or gradients.
         """
         return self.fmm.potentials(leaf)
 
@@ -399,7 +394,8 @@ class KiFmm:
 
         Returns:
             np.ndarray: Potential data, returned as a list where the length corresponds to the number of evaluations/charge vectors,
-            and is stored in an order defined by 'global_indices'
+            and is stored in an order defined by 'global_indices'. Each potential is of the shape '[kernel_eval_size, n_targets]',
+            kernel_eval_size \in [1, 4] depending on whether the user is evaluating potentials or gradients.
         """
         return self.fmm.all_potentials()
 
@@ -437,12 +433,13 @@ class KiFmm:
         """Evaluate the kernel function associated with this FMM, evaluation mode set by FMM.
 
         Args:
-            sources (np.ndarray): Source coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
-            targets (np.ndarray): Target coordinates, real data expected in column major order such that the shape is '[n_coords, dim]'
+            sources (np.ndarray): Source coordinates, real data expected in C order with shape is '[n_coords, dim]'
+            targets (np.ndarray): Target coordinates, real data expected in C order with shape is '[n_coords, dim]'
             charges (np.ndarray): Charge data, real or complex (dependent on kernel) of shape dimensions '[n_charges, n_vecs]' where each of 'n_vecs' is associated with 'n_charges'. 'n_vecs' > 1 only supported with BLAS field translations.
 
         Returns:
-            np.ndarray: Potentials/potential gradients associated with target coordinates.
+            np.ndarray: Potentials/potential gradients associated with target coordinates. Potential is of the shape '[kernel_eval_size, n_targets]',
+            kernel_eval_size \in [1, 4] depending on whether the user is evaluating potentials or gradients.
         """
         # Check that inputs are numpy arrays
         try:
@@ -463,8 +460,9 @@ class KiFmm:
                 and sources.shape[1] == 3
                 and targets.shape[1] == 3
             )
-        except:
-            raise TypeError("sources and targets must be reals, and of shape [N, 3]")
+        except Exception as e:
+            print(e)
+            raise TypeError("sources and targets must be reals, and of shape [3, N]")
 
         try:
             assert type(sources[0].dtype) == type(targets[0].dtype)
@@ -473,11 +471,6 @@ class KiFmm:
                 f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
             )
 
-        # Check that arrays are in Fortran order
-        try:
-            assert np.isfortran(sources) and np.isfortran(targets)
-        except:
-            raise TypeError(f"sources, targets expected in Fortran order")
 
         expected_dtypes = KERNEL_DTYPE[self.kernel]
         try:

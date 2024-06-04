@@ -226,7 +226,6 @@ macro_rules! laplace_blas_constructors {
                     }
                 }
 
-
                 let fmm = SingleNodeBuilder::new()
                     .tree(
                         sources.as_slice().unwrap(),
@@ -586,7 +585,7 @@ macro_rules! define_class_methods {
                     .data()
                     .to_pyarray_bound(py)
                     .reshape_with_order(
-                        [ntargets, self.fmm.kernel_eval_size],
+                        [self.fmm.kernel_eval_size, ntargets],
                         NPY_ORDER::NPY_FORTRANORDER,
                     )
                     .unwrap();
@@ -626,15 +625,10 @@ macro_rules! define_class_methods {
                 let key = self.source_key_map.get(&leaf).unwrap();
                 let slice = self.fmm.tree.source_tree.coordinates(&key).unwrap();
                 let ncoords = slice.len() / self.fmm.dim();
-                let coords_row_major =
-                    rlst_array_from_slice2!(slice, [ncoords, self.fmm.dim()], [self.fmm.dim(), 1]);
-                let mut coords_col_major =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [ncoords, self.fmm.dim()]);
-                coords_col_major.fill_from(coords_row_major.view());
-                let coords = coords_col_major
-                    .data()
+
+                let coords = slice
                     .to_pyarray_bound(py)
-                    .reshape_with_order([ncoords, self.fmm.dim()], NPY_ORDER::NPY_FORTRANORDER)
+                    .reshape([ncoords, self.fmm.dim()])
                     .unwrap();
                 Ok(coords)
             }
@@ -647,15 +641,9 @@ macro_rules! define_class_methods {
                 let key = self.target_key_map.get(&leaf).unwrap();
                 let slice = self.fmm.tree.target_tree.coordinates(&key).unwrap();
                 let ncoords = slice.len() / self.fmm.dim();
-                let coords_row_major =
-                    rlst_array_from_slice2!(slice, [ncoords, self.fmm.dim()], [self.fmm.dim(), 1]);
-                let mut coords_col_major =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [ncoords, self.fmm.dim()]);
-                coords_col_major.fill_from(coords_row_major.view());
-                let coords = coords_col_major
-                    .data()
+                let coords = slice
                     .to_pyarray_bound(py)
-                    .reshape_with_order([ncoords, self.fmm.dim()], NPY_ORDER::NPY_FORTRANORDER)
+                    .reshape([ncoords, self.fmm.dim()])
                     .unwrap();
                 Ok(coords)
             }
@@ -676,7 +664,7 @@ macro_rules! define_class_methods {
 
                     let potentials_i = potentials_i
                         .reshape_with_order(
-                            [n_potentials, self.fmm.kernel_eval_size],
+                            [self.fmm.kernel_eval_size, n_potentials],
                             NPY_ORDER::NPY_FORTRANORDER,
                         )
                         .unwrap();
@@ -696,7 +684,7 @@ macro_rules! define_class_methods {
                     .potentials
                     .to_pyarray_bound(py)
                     .reshape_with_order(
-                        [n_potentials, self.fmm.kernel_eval_size],
+                        [self.fmm.kernel_eval_size, n_potentials],
                         NPY_ORDER::NPY_FORTRANORDER,
                     )
                     .unwrap();
