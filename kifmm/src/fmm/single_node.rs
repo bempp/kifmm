@@ -533,7 +533,6 @@ mod test {
             println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
             assert!(rel_error <= threshold)
         });
-        assert!(false);
     }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
