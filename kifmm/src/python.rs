@@ -124,8 +124,8 @@ macro_rules! laplace_fft_constructors {
                     .tree(
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
-                        depth,
                         n_crit,
+                        depth,
                         prune_empty,
                     )
                     .unwrap()
