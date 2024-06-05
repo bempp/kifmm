@@ -7,7 +7,7 @@ use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use kifmm::BlasFieldTranslationIa;
 use num::{Complex, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccessMut};
+use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -21,8 +21,9 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
+    let expansion_order = [5];
+    let depth = None;
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
     let wavenumber = 1.0;
 
@@ -33,14 +34,14 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -52,32 +53,32 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
         .unwrap();
 
-    let mut group = c.benchmark_group("Helmholtz Potentials f32");
+    let mut group = c.benchmark_group("Helmholtz Potentials mat f32");
     group
         .sample_size(10)
         .measurement_time(Duration::from_secs(200));
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas_5.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas_5.evaluate(false).unwrap()),
     );
 
     group.bench_function(
-        format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas_10.evaluate().unwrap()),
+        format!("M2L=BLAS, N={nsources}, NVecs=10, wavenumber={wavenumber}"),
+        |b| b.iter(|| fmm_blas_10.evaluate(false).unwrap()),
     );
 }
 
@@ -90,8 +91,9 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
+    let expansion_order = [5];
+    let depth = None;
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
     let wavenumber = 1.0;
 
@@ -102,14 +104,14 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -121,32 +123,32 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
         .unwrap();
 
-    let mut group = c.benchmark_group("Helmholtz Gradients f32");
+    let mut group = c.benchmark_group("Helmholtz Gradients mat f32");
     group
         .sample_size(10)
         .measurement_time(Duration::from_secs(300));
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, NVecs=5, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas_5.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas_5.evaluate(false).unwrap()),
     );
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, NVecs=10, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas_10.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas_10.evaluate(false).unwrap()),
     );
 }
 

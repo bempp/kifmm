@@ -4,6 +4,12 @@ pub trait SourceToTargetData {
     /// Metadata for applying each to source to target translation, depends on both the kernel
     /// and translation method
     type Metadata;
+
+    /// Can check and equivalent surfaces be overdetermined?
+    fn overdetermined(&self) -> bool;
+
+    /// Calculated as equivalent_surface_order - check_surface_order = surface_diff
+    fn surface_diff(&self) -> usize;
 }
 
 /// Set M2M and L2L metadata associated with a kernel
@@ -16,7 +22,10 @@ pub trait SourceAndTargetTranslationMetadata {
 }
 
 /// Set M2L metadata associated with a kernel
-pub trait SourcetoTargetTranslationMetadata {
+pub trait SourceToTargetTranslationMetadata {
     /// Source to target field translation
     fn source_to_target(&mut self);
+
+    /// Map between source/target nodes, indexed by level.
+    fn displacements(&mut self);
 }

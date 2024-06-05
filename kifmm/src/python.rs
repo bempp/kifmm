@@ -1,5 +1,6 @@
 //! Python bindings for constructors and basic methods
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::fmm::KiFmm;
 use crate::traits::fmm::Fmm;
@@ -78,13 +79,14 @@ macro_rules! laplace_fft_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
+                n_crit: Option<u64>,
+                depth: Option<u64>,
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -96,26 +98,18 @@ macro_rules! laplace_fft_constructors {
                     ));
                 };
 
-                let shape = sources.shape();
-                let sources_slice =
-                    rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut sources_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = sources_slice.data().as_ptr();
-                let p2 = sources_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, sources.as_slice().unwrap().len());
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
                 }
 
-                let shape = targets.shape();
-                let targets_slice =
-                    rlst_array_from_slice2!(targets.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut targets_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = targets_slice.data().as_ptr();
-                let p2 = targets_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, targets_slice.data().len());
+                if expansion_order.len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
                 }
 
                 let shape = charges.shape();
@@ -126,21 +120,18 @@ macro_rules! laplace_fft_constructors {
                     ));
                 }
 
-                let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
-                let p1 = charges_slice.data().as_ptr();
-                let p2 = charges_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, charges_slice.data().len());
-                }
-
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(
+                        sources.as_slice().unwrap(),
+                        targets.as_slice().unwrap(),
+                        depth,
+                        n_crit,
+                        prune_empty,
+                    )
                     .unwrap()
                     .parameters(
-                        &charges_arr,
-                        expansion_order,
+                        charges.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -200,14 +191,16 @@ macro_rules! laplace_blas_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
-                svd_threshold: <$type as RlstScalar>::Real,
+                svd_threshold: Option<<$type as RlstScalar>::Real>,
+                n_crit: Option<u64>,
+                depth: Option<u64>,
+                surface_diff: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -219,47 +212,36 @@ macro_rules! laplace_blas_constructors {
                     ));
                 };
 
-                let shape = sources.shape();
-                let sources_slice =
-                    rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut sources_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = sources_slice.data().as_ptr();
-                let p2 = sources_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, sources.as_slice().unwrap().len());
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
                 }
 
-                let shape = targets.shape();
-                let targets_slice =
-                    rlst_array_from_slice2!(targets.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut targets_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = targets_slice.data().as_ptr();
-                let p2 = targets_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, targets_slice.data().len());
+                if expansion_order.len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
                 }
 
-                let shape = charges.shape();
-                let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], shape[1]]);
-                let p1 = charges_slice.data().as_ptr();
-                let p2 = charges_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, charges_slice.data().len());
-                }
 
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(
+                        sources.as_slice().unwrap(),
+                        targets.as_slice().unwrap(),
+                        n_crit,
+                        depth,
+                        prune_empty,
+                    )
                     .unwrap()
                     .parameters(
-                        &charges_arr,
-                        expansion_order,
+                        charges.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        BlasFieldTranslationSaRcmp::new(Some(svd_threshold)),
+                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff),
                     )
                     .unwrap()
                     .build()
@@ -304,6 +286,18 @@ macro_rules! laplace_blas_constructors {
                     source_leaves,
                 })
             }
+
+            /// Cutoff rank
+            #[getter]
+            pub fn cutoff_ranks(&self) -> PyResult<Vec<usize>> {
+                Ok(self.fmm.source_to_target.cutoff_rank.clone())
+            }
+
+            /// Directional cutoff ranks
+            #[getter]
+            pub fn directional_cutoff_ranks(&self) -> PyResult<Vec<Vec<usize>>> {
+                Ok(self.fmm.source_to_target.directional_cutoff_ranks.clone())
+            }
         }
     };
 }
@@ -316,14 +310,15 @@ macro_rules! helmholtz_fft_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
+                n_crit: Option<u64>,
+                depth: Option<u64>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -335,26 +330,18 @@ macro_rules! helmholtz_fft_constructors {
                     ));
                 };
 
-                let shape = sources.shape();
-                let sources_slice =
-                    rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut sources_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = sources_slice.data().as_ptr();
-                let p2 = sources_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, sources.as_slice().unwrap().len());
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
                 }
 
-                let shape = targets.shape();
-                let targets_slice =
-                    rlst_array_from_slice2!(targets.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut targets_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = targets_slice.data().as_ptr();
-                let p2 = targets_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, targets_slice.data().len());
+                if expansion_order.len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
                 }
 
                 let shape = charges.shape();
@@ -365,21 +352,18 @@ macro_rules! helmholtz_fft_constructors {
                     ));
                 }
 
-                let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
-                let p1 = charges_slice.data().as_ptr();
-                let p2 = charges_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, charges_slice.data().len());
-                }
-
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(
+                        sources.as_slice().unwrap(),
+                        targets.as_slice().unwrap(),
+                        n_crit,
+                        depth,
+                        prune_empty,
+                    )
                     .unwrap()
                     .parameters(
-                        &charges_arr,
-                        expansion_order,
+                        charges.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
                         FftFieldTranslation::new(),
@@ -439,15 +423,17 @@ macro_rules! helmholtz_blas_constructors {
             #[new]
             #[allow(clippy::too_many_arguments)]
             pub fn new<'py>(
-                expansion_order: usize,
+                expansion_order: Vec<usize>,
                 sources: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
-                n_crit: u64,
-                sparse: bool,
+                prune_empty: bool,
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
-                svd_threshold: <$type as RlstScalar>::Real,
+                svd_threshold: Option<<$type as RlstScalar>::Real>,
+                n_crit: Option<u64>,
+                depth: Option<u64>,
+                surface_diff: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -459,26 +445,18 @@ macro_rules! helmholtz_blas_constructors {
                     ));
                 };
 
-                let shape = sources.shape();
-                let sources_slice =
-                    rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut sources_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = sources_slice.data().as_ptr();
-                let p2 = sources_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, sources.as_slice().unwrap().len());
+                if (n_crit.is_none() && depth.is_none()) || ( n_crit.is_some() && depth.is_some())  {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Either of `ncrit` or `depth` must be supplied",
+                    ));
                 }
 
-                let shape = targets.shape();
-                let targets_slice =
-                    rlst_array_from_slice2!(targets.as_slice().unwrap(), [shape[0], shape[1]]);
-                let mut targets_arr =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [shape[0], shape[1]]);
-                let p1 = targets_slice.data().as_ptr();
-                let p2 = targets_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, targets_slice.data().len());
+                if expansion_order.as_slice().len() > 1 {
+                    if depth.is_none() || n_crit.is_some() {
+                    return Err(PyErr::new::<PyTypeError, _>(
+                        "Expansion orders must be explicitly specified for each level when using variable expansion order.",
+                    ));
+                    }
                 }
 
                 let shape = charges.shape();
@@ -492,14 +470,20 @@ macro_rules! helmholtz_blas_constructors {
                 }
 
                 let fmm = SingleNodeBuilder::new()
-                    .tree(&sources_arr, &targets_arr, Some(n_crit), sparse)
+                    .tree(
+                        sources.as_slice().unwrap(),
+                        targets.as_slice().unwrap(),
+                        n_crit,
+                        depth,
+                        prune_empty,
+                    )
                     .unwrap()
                     .parameters(
-                        &charges_arr,
-                        expansion_order,
+                        charges.as_slice().unwrap(),
+                        expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
-                        BlasFieldTranslationIa::new(Some(svd_threshold)),
+                        BlasFieldTranslationIa::new(svd_threshold, surface_diff),
                     )
                     .unwrap()
                     .build()
@@ -544,6 +528,12 @@ macro_rules! helmholtz_blas_constructors {
                     source_leaves,
                 })
             }
+
+            /// Cutoff ranks
+            #[getter]
+            pub fn cutoff_ranks(&self) -> PyResult<Vec<Vec<usize>>> {
+                Ok(self.fmm.source_to_target.cutoff_ranks.clone())
+            }
         }
     };
 }
@@ -562,22 +552,13 @@ macro_rules! define_class_methods {
         /// Python interface
         #[pymethods]
         impl $name {
-            fn evaluate(&self) -> PyResult<()> {
-                self.fmm.evaluate().unwrap();
-                Ok(())
+            fn evaluate(&self, timed: bool) -> PyResult<HashMap<String, Duration>> {
+                let times = self.fmm.evaluate(timed).unwrap();
+                Ok(times)
             }
 
             fn clear(&mut self, charges: PyReadonlyArrayDyn<'_, $type>) -> PyResult<()> {
-                let shape = charges.shape();
-                let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-                let mut charges_arr = rlst_dynamic_array2!($type, [shape[0], 1]);
-                let p1 = charges_slice.data().as_ptr();
-                let p2 = charges_arr.data_mut().as_mut_ptr();
-                unsafe {
-                    std::ptr::copy_nonoverlapping(p1, p2, charges_slice.data().len());
-                }
-                self.fmm.clear(&charges_arr);
+                self.fmm.clear(charges.as_slice().unwrap());
                 Ok(())
             }
 
@@ -588,18 +569,6 @@ macro_rules! define_class_methods {
                 targets: PyReadonlyArrayDyn<'py, <$type as RlstScalar>::Real>,
                 charges: PyReadonlyArrayDyn<'py, $type>,
             ) -> PyResult<Bound<'py, PyArray<$type, Dim<[usize; 2]>>>> {
-                let shape = sources.shape();
-                let sources_slice =
-                    rlst_array_from_slice2!(sources.as_slice().unwrap(), [shape[0], shape[1]]);
-
-                let shape = targets.shape();
-                let targets_slice =
-                    rlst_array_from_slice2!(targets.as_slice().unwrap(), [shape[0], shape[1]]);
-
-                let shape = charges.shape();
-                let charges_slice =
-                    rlst_array_from_slice2!(charges.as_slice().unwrap(), [shape[0], 1]);
-
                 let shape = targets.shape();
                 let ntargets = shape[0];
                 let mut result_arr =
@@ -607,9 +576,9 @@ macro_rules! define_class_methods {
 
                 self.fmm.kernel.evaluate_st(
                     self.fmm.kernel_eval_type,
-                    sources_slice.data(),
-                    targets_slice.data(),
-                    charges_slice.data(),
+                    sources.as_slice().unwrap(),
+                    targets.as_slice().unwrap(),
+                    charges.as_slice().unwrap(),
                     result_arr.data_mut(),
                 );
 

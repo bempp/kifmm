@@ -21,7 +21,7 @@
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 //! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
-//! use rlst::{rlst_dynamic_array2, RawAccessMut};
+//! use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 //!
 //! // Setup random sources and targets
 //! let nsources = 1000;
@@ -31,8 +31,9 @@
 //!
 //! // FMM parameters
 //! let n_crit = Some(150); // Threshold for number of particles in a leaf box
-//! let expansion_order = 5; // Expansion order of multipole/local expansions
-//! let sparse = true; // Whether to exclude empty boxes in octrees
+//! let depth = None; //
+//! let expansion_order = [5]; // Expansion order of multipole/local expansions
+//! let prune_empty = true; // Whether to exclude empty boxes in octrees
 //!
 //! // FFT based Field Translation
 //! {
@@ -43,11 +44,11 @@
 //!
 //!     // Build FMM object, with a given kernel and field translation
 //!     let mut fmm_fft = SingleNodeBuilder::new()
-//!         .tree(&sources, &targets, n_crit, sparse)
+//!         .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 //!         .unwrap()
 //!         .parameters(
-//!             &charges,
-//!             expansion_order,
+//!             charges.data(),
+//!             &expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
 //!             FftFieldTranslation::new(), // Choose a field translation method, could replace with BLAS field translation
@@ -57,14 +58,14 @@
 //!         .unwrap();
 //!
 //!     // Run the FMM
-//!     fmm_fft.evaluate();
+//!     fmm_fft.evaluate(false);
 //!
 //!     // Optionally clear, to re-evaluate with new charges
 //!     let nvecs = 1;
 //!     let tmp = vec![1.0; nsources * nvecs];
 //!     let mut new_charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 //!     new_charges.data_mut().copy_from_slice(&tmp);
-//!     fmm_fft.clear(&new_charges);
+//!     fmm_fft.clear(charges.data());
 //! }
 //!
 //! ````

@@ -1,5 +1,5 @@
 //! Data structures for kernel independent FMM
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
@@ -174,6 +174,9 @@ where
     /// Dimension of the FMM
     pub dim: usize,
 
+    /// Instruction set architecture
+    pub isa: Isa,
+
     /// A single node tree
     pub tree: SingleNodeFmmTree<Scalar::Real>,
 
@@ -183,11 +186,17 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
-    /// The expansion order of the FMM
-    pub expansion_order: usize,
+    /// The expansion order of the FMM, used to construct equivalent surfaces.
+    pub equivalent_surface_order: Vec<usize>, // Index corresponds to level
+
+    /// The expansion order used to construct check surfaces
+    pub check_surface_order: Vec<usize>, // index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs: usize,
+    pub ncoeffs_equivalent_surface: Vec<usize>, // Index corresponds to level
+
+    /// The number of coefficients, corresponding to points discretising the check surface
+    pub ncoeffs_check_surface: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -205,10 +214,13 @@ where
     pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_surfaces_sources: Vec<Scalar::Real>,
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Scalar::Real>,
+
+    /// Upward surfaces associated with source leaves
+    pub leaf_upward_check_surfaces_sources: Vec<Scalar::Real>,
 
     /// Upward surfaces associated with target leaves
-    pub leaf_upward_surfaces_targets: Vec<Scalar::Real>,
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
 
     /// Scales of each source leaf box
     pub leaf_scales_sources: Vec<Scalar>,
@@ -280,15 +292,18 @@ where
 {
     fn default() -> Self {
         KiFmm {
+            isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
-            expansion_order: 0,
+            equivalent_surface_order: Vec::default(),
+            check_surface_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
-            ncoeffs: 0,
+            ncoeffs_equivalent_surface: Vec::default(),
+            ncoeffs_check_surface: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),
@@ -306,8 +321,9 @@ where
             level_index_pointer_multipoles: Vec::default(),
             potentials: Vec::default(),
             potentials_send_pointers: Vec::default(),
-            leaf_upward_surfaces_sources: Vec::default(),
-            leaf_upward_surfaces_targets: Vec::default(),
+            leaf_upward_equivalent_surfaces_sources: Vec::default(),
+            leaf_upward_check_surfaces_sources: Vec::default(),
+            leaf_downward_equivalent_surfaces_targets: Vec::default(),
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),
@@ -380,7 +396,7 @@ pub enum FmmEvalType {
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
 /// use kifmm::tree::helpers::points_fixture;
-/// use rlst::{rlst_dynamic_array2, RawAccessMut};
+/// use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 /// use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 ///
 /// /// Particle data
@@ -390,9 +406,10 @@ pub enum FmmEvalType {
 /// let targets = points_fixture::<f64>(ntargets, None, None, Some(3));
 ///
 /// // FMM parameters
-/// let n_crit = Some(150);
-/// let expansion_order = 10;
-/// let sparse = true;
+/// let n_crit = Some(150); // Constructed from data, using `n_crit` parameter
+/// let depth = None; // Must not specify a depth in this case
+/// let expansion_order = [10]; // Constructed with `n_crit`, therefore can only use a single expansion order.
+/// let prune_empty = true;
 ///
 /// /// Charge data
 /// let nvecs = 1;
@@ -402,14 +419,14 @@ pub enum FmmEvalType {
 ///
 /// /// Create a new builder, and attach a tree
 /// let fmm = SingleNodeBuilder::new()
-///     .tree(&sources, &targets, n_crit, sparse)
+///     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 ///     .unwrap();
 ///
 /// /// Specify the FMM parameters, such as the kernel , the kernel evaluation mode, expansion order and charge data
 /// let fmm = fmm
 ///     .parameters(
-///         &charges,
-///         expansion_order,
+///         charges.data(),
+///         &expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
 ///         FftFieldTranslation::new(),
@@ -429,6 +446,9 @@ where
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Instruction set architecture
+    pub isa: Option<Isa>,
+
     /// Tree
     pub tree: Option<SingleNodeFmmTree<Scalar::Real>>,
 
@@ -436,7 +456,7 @@ where
     pub kernel: Option<Kernel>,
 
     /// Charges
-    pub charges: Option<Charges<Scalar>>,
+    pub charges: Option<Vec<Scalar>>,
 
     /// Data and metadata for field translations
     pub source_to_target: Option<SourceToTargetData>,
@@ -444,17 +464,26 @@ where
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
 
-    /// Expansion order
-    pub expansion_order: Option<usize>,
+    /// Expansion order used to discretise equivalent surface
+    pub equivalent_surface_order: Option<Vec<usize>>,
+
+    /// Expansion order used to discretise check surface
+    pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs: Option<usize>,
+    pub ncoeffs_equivalent_surface: Option<Vec<usize>>,
+
+    /// Number of coefficients
+    pub ncoeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,
 
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
+
+    /// Has depth or ncrit been set
+    pub depth_set: Option<bool>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -528,16 +557,19 @@ where
     Scalar: RlstScalar + AsComplex + Default + Dft,
 {
     /// Map between indices of surface convolution grid points.
-    pub surf_to_conv_map: Vec<usize>,
+    pub surf_to_conv_map: Vec<Vec<usize>>, // Indexed by level
 
     /// Map between indices of convolution and surface grid points.
-    pub conv_to_surf_map: Vec<usize>,
+    pub conv_to_surf_map: Vec<Vec<usize>>, // Indexed by level
 
     /// Precomputed data required for FFT compressed M2L interaction.
     pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// The map between sources/targets in
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -558,7 +590,9 @@ where
 ///  Indexed by tree level.
 ///
 /// - `cutoff_rank`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
-///    matrices corresponding to unique transfer vectors. Indexed by tree level.
+///    matrices corresponding to unique transfer vectors.
+
+/// - `directional_cutoff_ranks`- Rank of recompressed M2L matrix, indexed by transfer vector.
 #[derive(Default)]
 pub struct BlasFieldTranslationSaRcmp<Scalar>
 where
@@ -568,13 +602,22 @@ where
     pub threshold: Scalar::Real,
 
     /// Precomputed metadata
-    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>,
+    pub metadata: Vec<BlasMetadataSaRcmp<Scalar>>, // Indexed by level
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// Cutoff ranks
-    pub cutoff_rank: Vec<usize>,
+    /// Cutoff rank
+    pub cutoff_rank: Vec<usize>, // Indexed by level
+
+    /// Directional cutoff ranks
+    pub directional_cutoff_ranks: Vec<Vec<usize>>,
+
+    /// The map between sources/targets in
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -590,6 +633,9 @@ where
 /// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
 ///
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions. Indexed by tree level.
+///
+/// - `cutoff_ranks`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
+///    matrices corresponding to unique transfer vectors. Indexed by level and then by transfer vector.
 #[derive(Default)]
 pub struct BlasFieldTranslationIa<Scalar>
 where
@@ -603,6 +649,15 @@ where
 
     /// Unique transfer vectors corresponding to each metadata
     pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
+
+    /// Cutoff ranks
+    pub cutoff_ranks: Vec<Vec<usize>>,
+
+    /// The map between sources/targets in
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.
@@ -767,4 +822,21 @@ where
             c_vt: Vec::default(),
         }
     }
+}
+
+/// Instruction set architecture
+
+#[derive(Default, Clone, Copy, Debug)]
+pub enum Isa {
+    /// Neon FCMA ISA, extension which provides floating point complex multiply-add instructions.
+    #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
+    Neon(pulp::aarch64::NeonFcma),
+
+    /// AVX2 ISA
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    Avx(pulp::x86::V3),
+
+    /// Default is no vectorisation
+    #[default]
+    Default,
 }

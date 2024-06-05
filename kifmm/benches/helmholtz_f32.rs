@@ -7,7 +7,7 @@ use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use kifmm::BlasFieldTranslationIa;
 use num::{Complex, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccessMut};
+use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -21,8 +21,9 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
 
     // FMM parameters
     let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
+    let depth = None;
+    let expansion_order = [5];
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
 
     // FFT based M2L for a vector of charges
@@ -34,11 +35,11 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
     let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
             FftFieldTranslation::new(),
@@ -48,14 +49,14 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -68,12 +69,12 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
 
     group.bench_function(
         format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_fft.evaluate().unwrap()),
+        |b| b.iter(|| fmm_fft.evaluate(false).unwrap()),
     );
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas.evaluate(false).unwrap()),
     );
 }
 
@@ -85,9 +86,10 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
+    let n_crit = Some(150);
+    let depth = None;
+    let expansion_order = [5];
+    let prune_empty = true;
     let svd_threshold = Some(1e-2);
 
     // FFT based M2L for a vector of charges
@@ -99,11 +101,11 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
     let wavenumber = 1.0;
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
             FftFieldTranslation::new(),
@@ -113,14 +115,14 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            BlasFieldTranslationIa::new(svd_threshold),
+            BlasFieldTranslationIa::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -133,12 +135,12 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
 
     group.bench_function(
         format!("M2L=FFT, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_fft.evaluate().unwrap()),
+        |b| b.iter(|| fmm_fft.evaluate(false).unwrap()),
     );
 
     group.bench_function(
         format!("M2L=BLAS, N={nsources}, wavenumber={wavenumber}"),
-        |b| b.iter(|| fmm_blas.evaluate().unwrap()),
+        |b| b.iter(|| fmm_blas.evaluate(false).unwrap()),
     );
 }
 

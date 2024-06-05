@@ -1,8 +1,9 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, sync::RwLock};
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use num::{One, Zero};
+
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
@@ -12,7 +13,6 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::matvec::matvec8x8,
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
@@ -31,73 +31,7 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
-impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
-where
-    Scalar: RlstScalar
-        + AsComplex
-        + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
-        + Default,
-    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData,
-{
-    /// Map between each transfer vector, at the level of a cluster (eight siblings together), of source cluster
-    /// to target cluster.
-    ///
-    /// Returns a vector of read-write locked index vectors, of length 26 - i.e. the number of unique halo positions
-    /// between a target cluster and its source clusters for homogenous kernels. Each element consists of a vector
-    /// of indices containing the index of the source cluster multipole coefficients being translated for each target
-    /// cluster index respectively.
-    fn displacements(&self, level: u64) -> Vec<RwLock<Vec<usize>>> {
-        let targets = self.tree().target_tree().keys(level).unwrap();
-
-        let targets_parents: HashSet<MortonKey<_>> =
-            targets.iter().map(|target| target.parent()).collect();
-        let mut targets_parents = targets_parents.into_iter().collect_vec();
-        targets_parents.sort();
-        let ntargets_parents = targets_parents.len();
-
-        let sources = self.tree().source_tree().keys(level).unwrap();
-
-        let sources_parents: HashSet<MortonKey<_>> =
-            sources.iter().map(|source| source.parent()).collect();
-        let mut sources_parents = sources_parents.into_iter().collect_vec();
-        sources_parents.sort();
-        let nsources_parents = sources_parents.len();
-
-        let result = vec![Vec::new(); NHALO];
-        let result = result.into_iter().map(RwLock::new).collect_vec();
-
-        let targets_parents_neighbors = targets_parents
-            .iter()
-            .map(|parent| parent.all_neighbors())
-            .collect_vec();
-
-        let zero_displacement = nsources_parents * NSIBLINGS;
-
-        (0..NHALO).into_par_iter().for_each(|i| {
-            let mut result_i = result[i].write().unwrap();
-            for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-                // Check if neighbor exists in a valid tree
-                if let Some(neighbor) = all_neighbors[i] {
-                    // If it does, check if first child exists in the source tree
-                    let first_child = neighbor.first_child();
-                    if let Some(neighbor_displacement) =
-                        self.level_index_pointer_multipoles[level as usize].get(&first_child)
-                    {
-                        result_i.push(*neighbor_displacement)
-                    } else {
-                        result_i.push(zero_displacement)
-                    }
-                } else {
-                    result_i.push(zero_displacement)
-                }
-            }
-        });
-
-        result
-    }
-}
+use super::gemv::Gemv8x8;
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
@@ -106,6 +40,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default,
+    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -127,7 +62,10 @@ where
                 };
 
                 let m2l_operator_index = self.m2l_operator_index(level);
+                let fft_map_index = self.fft_map_index(level);
                 let c2e_operator_index = self.c2e_operator_index(level);
+                let displacement_index = self.displacement_index(level);
+                let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
 
                 // Number of target and source boxes at this level
                 let ntargets = targets.len();
@@ -145,22 +83,17 @@ where
                 let nsources_parents = sources_parents.len();
 
                 // Size of input FFT sequence
-                let shape_in = <Scalar as Dft>::shape_in(self.expansion_order);
-                let size_in: usize = <Scalar as Dft>::size_in(self.expansion_order);
+                let shape_in = <Scalar as Dft>::shape_in(self.equivalent_surface_order(level));
+                let size_in: usize = <Scalar as Dft>::size_in(self.equivalent_surface_order(level));
 
                 // Size of transformed FFT sequence
-                let size_out = <Scalar as Dft>::size_out(self.expansion_order);
+                let size_out = <Scalar as Dft>::size_out(self.equivalent_surface_order(level));
 
                 // Calculate displacements of multipole data with respect to source tree
-                let all_displacements = self.displacements(level);
+                let all_displacements = &self.source_to_target.displacements[displacement_index];
 
                 // Lookup multipole data from source tree
-                let min = &sources[0];
-                let max = &sources[nsources - 1];
-                let min_idx = self.tree().source_tree().index(min).unwrap();
-                let max_idx = self.tree().source_tree().index(max).unwrap();
-                let multipoles =
-                    &self.multipoles[min_idx * self.ncoeffs..(max_idx + 1) * self.ncoeffs];
+                let multipoles = self.multipoles(level).unwrap();
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
@@ -228,7 +161,9 @@ where
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 {
                     multipoles
-                        .par_chunks_exact(self.ncoeffs * NSIBLINGS * chunk_size_pre_proc)
+                        .par_chunks_exact(
+                            ncoeffs_equivalent_surface * NSIBLINGS * chunk_size_pre_proc,
+                        )
                         .enumerate()
                         .for_each(|(i, multipole_chunk)| {
                             // Place Signal on convolution grid
@@ -236,11 +171,13 @@ where
                                 vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
-                                let multipole =
-                                    &multipole_chunk[i * self.ncoeffs..(i + 1) * self.ncoeffs];
+                                let multipole = &multipole_chunk[i * ncoeffs_equivalent_surface
+                                    ..(i + 1) * ncoeffs_equivalent_surface];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
-                                for (surf_idx, &conv_idx) in
-                                    self.source_to_target.surf_to_conv_map.iter().enumerate()
+                                for (surf_idx, &conv_idx) in self.source_to_target.surf_to_conv_map
+                                    [fft_map_index]
+                                    .iter()
+                                    .enumerate()
                                 {
                                     signal[conv_idx] = multipole[surf_idx]
                                 }
@@ -343,6 +280,12 @@ where
                                     for i in 0..NHALO {
                                         let frequency_offset = freq * NHALO;
                                         let k_f = &kernel_data_ft[i + frequency_offset];
+
+                                        let k_f_slice = unsafe {
+                                            &*(k_f.as_slice().as_ptr()
+                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
+                                        };
+
                                         // Lookup signals
                                         let displacements = &all_displacements[i].read().unwrap()
                                             [chunk_start..chunk_end];
@@ -351,14 +294,26 @@ where
                                             let displacement = displacements[j];
                                             let s_f = &signal_hat_f
                                                 [displacement..displacement + NSIBLINGS];
+                                            let s_f_slice = unsafe {
+                                                &*(s_f.as_ptr()
+                                                    as *const [<Scalar as AsComplex>::ComplexType;
+                                                        8])
+                                            };
 
-                                            matvec8x8::<<Scalar as AsComplex>::ComplexType>(
-                                                k_f,
-                                                s_f,
-                                                &mut save_locations
-                                                    [j * NSIBLINGS..(j + 1) * NSIBLINGS],
+                                            let save_locations = &mut save_locations
+                                                [j * NSIBLINGS..(j + 1) * NSIBLINGS];
+                                            let save_locations_slice = unsafe {
+                                                &mut *(save_locations.as_ptr()
+                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                                            };
+
+                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
+                                                self.isa,
+                                                k_f_slice,
+                                                s_f_slice,
+                                                save_locations_slice,
                                                 scale,
-                                            )
+                                            );
                                         }
                                     }
                                 },
@@ -391,12 +346,16 @@ where
                         .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
                         .for_each(|(check_potential_chunk, local_ptrs)| {
                             // Map to surface grid
-                            let mut potential_chunk =
-                                rlst_dynamic_array2!(Scalar, [self.ncoeffs, NSIBLINGS]);
+                            let mut potential_chunk = rlst_dynamic_array2!(
+                                Scalar,
+                                [ncoeffs_equivalent_surface, NSIBLINGS]
+                            );
 
                             for i in 0..NSIBLINGS {
-                                for (surf_idx, &conv_idx) in
-                                    self.source_to_target.conv_to_surf_map.iter().enumerate()
+                                for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
+                                    [fft_map_index]
+                                    .iter()
+                                    .enumerate()
                                 {
                                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
                                         check_potential_chunk[i * size_in + conv_idx];
@@ -414,11 +373,14 @@ where
 
                             local_chunk
                                 .data()
-                                .chunks_exact(self.ncoeffs)
+                                .chunks_exact(ncoeffs_equivalent_surface)
                                 .zip(local_ptrs)
                                 .for_each(|(result, local)| {
                                     let local = unsafe {
-                                        std::slice::from_raw_parts_mut(local[0].raw, self.ncoeffs)
+                                        std::slice::from_raw_parts_mut(
+                                            local[0].raw,
+                                            ncoeffs_equivalent_surface,
+                                        )
                                     };
                                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                                 });

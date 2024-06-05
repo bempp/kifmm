@@ -4,7 +4,7 @@ use kifmm::{FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccessMut};
+use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -18,8 +18,9 @@ fn main() {
 
     // FMM parameters
     let n_crit = Some(150);
-    let expansion_order = 5;
-    let sparse = true;
+    let depth = None;
+    let expansion_order = [5];
+    let prune_empty = true;
 
     // Kernel parameter
     let wavenumber = 2.5;
@@ -32,11 +33,11 @@ fn main() {
         charges.data_mut().copy_from_slice(&tmp);
 
         let fmm_fft = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
-                expansion_order,
+                charges.data(),
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
                 FftFieldTranslation::new(),
@@ -44,7 +45,7 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate().unwrap();
+        fmm_fft.evaluate(false).unwrap();
     }
 
     // BLAS based M2L
@@ -65,20 +66,20 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let fmm_vec = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
-                expansion_order,
+                charges.data(),
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslationIa::new(singular_value_threshold),
+                BlasFieldTranslationIa::new(singular_value_threshold, None),
             )
             .unwrap()
             .build()
             .unwrap();
 
-        fmm_vec.evaluate().unwrap();
+        fmm_vec.evaluate(false).unwrap();
 
         // Matrix of charges
         let nvecs = 5;
@@ -94,18 +95,18 @@ fn main() {
             });
 
         let fmm_mat = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
-                expansion_order,
+                charges.data(),
+                &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                BlasFieldTranslationIa::new(singular_value_threshold),
+                BlasFieldTranslationIa::new(singular_value_threshold, None),
             )
             .unwrap()
             .build()
             .unwrap();
-        fmm_mat.evaluate().unwrap();
+        fmm_mat.evaluate(false).unwrap();
     }
 }

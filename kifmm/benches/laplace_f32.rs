@@ -5,7 +5,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
-use rlst::{rlst_dynamic_array2, RawAccessMut};
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 extern crate blas_src;
 extern crate lapack_src;
@@ -18,10 +18,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
-    let svd_threshold = Some(1e-2);
+    let n_crit = Some(150);
+    let depth = None;
+    let expansion_order = [5];
+    let prune_empty = true;
+    let svd_threshold = Some(2e-1);
 
     // FFT based M2L for a vector of charges
     let nvecs = 1;
@@ -30,11 +31,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
             FftFieldTranslation::new(),
@@ -44,14 +45,14 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -63,11 +64,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .measurement_time(Duration::from_secs(15));
 
     group.bench_function(format!("M2L=FFT, N={nsources}"), |b| {
-        b.iter(|| fmm_fft.evaluate().unwrap())
+        b.iter(|| fmm_fft.evaluate(false).unwrap())
     });
 
     group.bench_function(format!("M2L=BLAS, N={nsources}"), |b| {
-        b.iter(|| fmm_blas.evaluate().unwrap())
+        b.iter(|| fmm_blas.evaluate(false).unwrap())
     });
 }
 
@@ -79,10 +80,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
-    let svd_threshold = Some(1e-2);
+    let n_crit = Some(150);
+    let depth = None;
+    let expansion_order = [5];
+    let prune_empty = true;
+    let svd_threshold = Some(2e-1);
 
     // FFT based M2L for a vector of charges
     let nvecs = 1;
@@ -91,11 +93,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
     charges.data_mut().copy_from_slice(&tmp);
 
     let fmm_fft = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
             FftFieldTranslation::new(),
@@ -105,14 +107,14 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         .unwrap();
 
     let fmm_blas = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
         .unwrap()
         .parameters(
-            &charges,
-            expansion_order,
+            charges.data(),
+            &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None),
         )
         .unwrap()
         .build()
@@ -124,11 +126,11 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
         .measurement_time(Duration::from_secs(20));
 
     group.bench_function(format!("M2L=FFT, N={nsources}"), |b| {
-        b.iter(|| fmm_fft.evaluate().unwrap())
+        b.iter(|| fmm_fft.evaluate(false).unwrap())
     });
 
     group.bench_function(format!("M2L=BLAS, N={nsources}"), |b| {
-        b.iter(|| fmm_blas.evaluate().unwrap())
+        b.iter(|| fmm_blas.evaluate(false).unwrap())
     });
 }
 

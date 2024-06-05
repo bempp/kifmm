@@ -15,9 +15,9 @@ fn main() {
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
     // FMM parameters
-    let n_crit = Some(150);
-    let depth = None;
-    let expansion_order = [5];
+    let n_crit = None;
+    let depth = Some(2); // If explicitly specifying depth, FMMs support variable expansion order for each level
+    let expansion_order = [6, 5, 4]; // Must match depth + 1, indexed by tree level
     let prune_empty = true;
 
     // FFT based M2L for a vector of charges
