@@ -533,6 +533,7 @@ mod test {
             println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
             assert!(rel_error <= threshold)
         });
+        assert!(false);
     }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
@@ -818,8 +819,8 @@ mod test {
     #[test]
     fn foo() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let nsources = 1000000;
+        let ntargets = 1000000;
 
         let min = None;
         let max = None;
@@ -827,7 +828,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
+        let n_crit = Some(150);
         let depth = None;
         let expansion_order = [6];
 
