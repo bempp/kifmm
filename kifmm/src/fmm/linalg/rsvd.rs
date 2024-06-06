@@ -1,7 +1,7 @@
 use crate::traits::general::Epsilon;
 use rand::SeedableRng;
 use rlst::{
-    dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RlstError, RlstResult, RlstScalar, Shape, VectorContainer
+    dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar, Shape, VectorContainer
 };
 use rand_chacha::{self, ChaCha8Rng};
 use rand_distr::{StandardNormal, Standard};
@@ -64,8 +64,12 @@ where
 
 }
 
+/// Choose a normalisation method for the orthonormal subspace
 pub enum Normalizer {
+    /// Expensive, more accurate
     Qr,
+
+    /// Cheaper less accurate
     Lu
 }
 
@@ -91,38 +95,62 @@ where
     let random_state = random_state.unwrap_or(0);
     omega.fill_from_seed_normally_distributed(random_state);
 
+    let mut q1 = rlst_dynamic_array2!(f32, [mat.shape()[0], size]);
+    // compute m x l sample matrix
+    let y = empty_array::<f32, 2>().simple_mult_into_resize(
+        mat.view(),
+        omega.view()
+    );
 
-    // if let Some(normalizer) = power_iteration_normalizer {
-    //     match normalizer {
-    //         Normalizer::Lu => {
-    //             // Perform power iterations
-    //             for _ in 0..n_iter {
-    //                 panic!("Unimplemented")
-    //             }
-    //         }
-    //         Normalizer::Qr => {
-    //             // Perform power iterations
-    //             for _ in 0..n_iter {
+    // // orthonormalise columns using QR
+    let qr = QrDecomposition::<f32, _>::new(y).expect("QR Decomposition failed");
+    qr.get_q_alloc(q1.view_mut()).unwrap();
 
-    //                 let y_tilde = empty_array::<f32, 2>().simple_mult_into_resize(
-    //                     mat_transpose.view(), q_mat.view()
-    //                 );
+    let mut q2 = rlst_dynamic_array2!(f32, [mat.shape()[1], size]);
 
-    //                 println!("Y TILDE {:?}", y_tilde.shape());
-    //                 let qr =  QrDecomposition::<f32, _>::new(y_tilde).expect("QR Decomposition failed");
-    //                 qr.get_q_alloc(q_mat.view_mut()).unwrap();
+    if let Some(normalizer) = power_iteration_normalizer {
+        match normalizer {
+            Normalizer::Lu => {
+                // Perform power iterations
+                for _ in 0..n_iter {
+                    panic!("Unimplemented")
+                }
+            }
+            Normalizer::Qr => {
+                // Perform power iterations
+                for _ in 0..n_iter {
 
-    //                 // let aq = empty_array::<f32, 2>().simple_mult_into_resize(
-    //                 //     mat.view(), q_mat.view()
-    //                 // );
-    //                 // let qr =  QrDecomposition::<f32, _>::new(aq).expect("QR Decomposition failed");
-    //                 // qr.get_q_alloc(q_mat.view_mut()).unwrap();
+                    let atq = empty_array::<f32, 2>().simple_mult_into_resize(
+                        mat_transpose.view(), q1.view()
+                    );
+                    let qr = QrDecomposition::<f32, _>::new(atq).unwrap();
+                    qr.get_q_alloc(q2.view_mut()).unwrap();
 
+                    let aq = empty_array::<f32, 2>().simple_mult_into_resize(
+                        mat.view(), q2.view()
+                    );
 
-    //             }
-    //         }
-    //     }
-    // }
+                    let qr = QrDecomposition::<f32, _>::new(aq).unwrap();
+                    qr.get_q_alloc(q1.view_mut()).unwrap();
+                }
+
+                let atq = empty_array::<f32, 2>().simple_mult_into_resize(
+                    mat_transpose.view(), q1.view()
+                );
+
+                let qr = QrDecomposition::<f32, _>::new(atq).unwrap();
+                qr.get_q_alloc(q2.view_mut()).unwrap();
+                let aq = empty_array::<f32, 2>().simple_mult_into_resize(
+                    mat.view(), q2.view()
+                );
+
+                let qr = QrDecomposition::<f32, _>::new(aq).unwrap();
+                qr.get_q_alloc(q1.view_mut()).unwrap();
+
+                return q1
+            }
+        }
+    }
 
 
     // compute m x l sample matrix
@@ -131,35 +159,32 @@ where
         omega.view()
     );
 
-    // // orthonormalise columns using QR
+    // orthonormalise columns using QR
     let mut q = rlst_dynamic_array2!(f32, y.shape());
     let qr = QrDecomposition::<f32, _>::new(y).expect("QR Decomposition failed");
     qr.get_q_alloc(q.view_mut()).unwrap();
 
 
-    q
+    q1
 }
 
 #[cfg(test)]
 mod test {
-    use rlst::{empty_array, rlst_dynamic_array2, DefaultIteratorMut, MultInto, MultIntoResize, RawAccess, RawAccessMut, Shape};
+    use rlst::{assert_array_abs_diff_eq, empty_array, rlst_dynamic_array2, DefaultIterator, DefaultIteratorMut, MultInto, MultIntoResize, RawAccess, RawAccessMut, Shape};
 
     use crate::fmm::linalg::rsvd::{rsvd, Normalizer};
 
-
     #[test]
-    fn test_randomized_range_finder() {
+    fn test_rsvd() {
         let mut mat = rlst_dynamic_array2!(f32, [5, 6]);
 
         mat.data_mut().iter_mut().enumerate().for_each(|(i, v)| *v += (i+1) as f32);
-        let (s, u, vt) = rsvd(&mat, 2, None, None, None, None).unwrap();
+        let (s, u, vt) = rsvd(&mat, 2, None, Some(2), Some(Normalizer::Qr), None).unwrap();
 
         let mut mat_s = rlst_dynamic_array2!(f32, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
-
-        println!("HERE {:?} {:?} {:?}", u.shape(), mat_s.shape(), vt.shape());
 
         let mat_rec = empty_array::<f32, 2>().simple_mult_into_resize(
             u.view(),
@@ -169,10 +194,6 @@ mod test {
             )
         );
 
-        println!("expected {:?}", mat.data());
-
-        println!("found {:?}", mat_rec.data());
-
-        assert!(false);
+        assert_array_abs_diff_eq!(mat_rec.view(), mat.view(), 1e-5);
     }
 }
