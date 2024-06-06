@@ -25,7 +25,7 @@ use crate::{
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
             ncoeffs_kifmm, potential_pointers,
         },
-        pinv::pinv,
+        linalg::pinv::pinv,
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             FftFieldTranslation, FftMetadata,

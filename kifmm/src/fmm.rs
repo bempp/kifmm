@@ -5,7 +5,7 @@ pub mod helpers;
 pub mod isa;
 mod kernel;
 mod multi_node;
-pub mod pinv;
+pub mod linalg;
 mod send_ptr;
 mod single_node;
 mod tree;
