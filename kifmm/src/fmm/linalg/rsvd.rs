@@ -20,10 +20,19 @@ where
     Self: RlstScalar + RandScalar,
     Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>: MatrixSvd<Item = Self>
 {
-    /// Bar
-    fn rsvd(
+    /// Compute randomised SVD when target rank is known.
+    fn rsvd_fixed_rank(
         mat: &RsvdMatrix<Self>,
         n_components: usize, // Number of singular values and vectors to extract
+        n_oversamples: Option<usize>, // Additional number of random vectors to sample the range of M for proper conditioning.
+        power_iteration_normaliser: Option<Normaliser>,
+        random_state: Option<usize>
+    ) -> RsvdReturnType<Self>;
+
+    /// Compute randomised SVD when target rank is unknown, and a given tolerance is required
+    fn rsvd_fixed_error(
+        mat: &RsvdMatrix<Self>,
+        tol: Self, // Error tolerance for final matrix
         n_oversamples: Option<usize>, // Additional number of random vectors to sample the range of M for proper conditioning.
         power_iteration_normaliser: Option<Normaliser>,
         random_state: Option<usize>
@@ -37,7 +46,7 @@ macro_rules! impl_matrix_rsvd {
             $ty: RlstScalar + RandScalar,
             Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2>: MatrixSvd<Item = $ty>,
         {
-            fn rsvd(
+            fn rsvd_fixed_rank(
                 mat: &RsvdMatrix<Self>,
                 n_components: usize,
                 n_oversamples: Option<usize>,
@@ -46,14 +55,24 @@ macro_rules! impl_matrix_rsvd {
             ) -> RsvdReturnType<Self> {
                 $func(mat, n_components, n_oversamples, power_iteration_normaliser, random_state)
             }
+
+            fn rsvd_fixed_error(
+                mat: &RsvdMatrix<Self>,
+                tol: Self, // Error tolerance for final matrix
+                n_oversamples: Option<usize>, // Additional number of random vectors to sample the range of M for proper conditioning.
+                power_iteration_normaliser: Option<Normaliser>,
+                random_state: Option<usize>
+            ) -> RsvdReturnType<Self> {
+                panic!("Unimplemented")
+            }
         }
     };
 }
 
-impl_matrix_rsvd!(f32, rsvd_f32);
-impl_matrix_rsvd!(f64, rsvd_f64);
+impl_matrix_rsvd!(f32, rsvd_fixed_rank_f32);
+impl_matrix_rsvd!(f64, rsvd_fixed_rank_f64);
 
-macro_rules! generate_randomized_range_finder {
+macro_rules! generate_randomized_range_finder_fixed_rank {
     ($ty:ty, $name:ident) => {
         /// Foo
         pub fn $name(
@@ -144,8 +163,8 @@ macro_rules! generate_randomized_range_finder {
     };
 }
 
-generate_randomized_range_finder!(f32, randomized_range_finder_f32);
-generate_randomized_range_finder!(f64, randomized_range_finder_f64);
+generate_randomized_range_finder_fixed_rank!(f32, randomized_range_finder_fixed_rank_f32);
+generate_randomized_range_finder_fixed_rank!(f64, randomized_range_finder_fixed_rank_f64);
 
 macro_rules! generate_rsvd {
     ($ty:ty, $randomized_range_finder:ident, $name:ident) => {
@@ -194,10 +213,8 @@ macro_rules! generate_rsvd {
     };
 }
 
-generate_rsvd!(f32, randomized_range_finder_f32, rsvd_f32);
-generate_rsvd!(f64, randomized_range_finder_f64, rsvd_f64);
-
-
+generate_rsvd!(f32, randomized_range_finder_fixed_rank_f32, rsvd_fixed_rank_f32);
+generate_rsvd!(f64, randomized_range_finder_fixed_rank_f64, rsvd_fixed_rank_f64);
 
 
 #[cfg(test)]
@@ -217,7 +234,7 @@ mod test {
         let power_iteration_normaliser = Some(Normaliser::Qr(2));
         let random_state = None;
 
-        let (s, u, vt) = f32::rsvd(&mat, n_components, n_oversamples, power_iteration_normaliser, random_state).unwrap();
+        let (s, u, vt) = f32::rsvd_fixed_rank(&mat, n_components, n_oversamples, power_iteration_normaliser, random_state).unwrap();
 
         let mut mat_s = rlst_dynamic_array2!(f32, [s.len(), s.len()]);
         for i in 0..s.len() {
@@ -246,7 +263,7 @@ mod test {
         let power_iteration_normaliser = Some(Normaliser::Qr(2));
         let random_state = None;
 
-        let (s, u, vt) = f64::rsvd(&mat, n_components, n_oversamples, power_iteration_normaliser, random_state).unwrap();
+        let (s, u, vt) = f64::rsvd_fixed_rank(&mat, n_components, n_oversamples, power_iteration_normaliser, random_state).unwrap();
 
         let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
         for i in 0..s.len() {
