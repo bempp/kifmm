@@ -1,8 +1,8 @@
 use num::traits::FloatConst;
 use rand_distr::{Standard, StandardNormal};
 use rlst::{
-    dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray, DefaultIterator,
-    MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RawAccessMut,
+    dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray,
+    MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess,
     RlstResult, RlstScalar, Shape, VectorContainer,
 };
 
@@ -79,7 +79,7 @@ macro_rules! impl_matrix_rsvd {
 impl_matrix_rsvd!(f32, rsvd_fixed_rank_f32, rsvd_fixed_error_f32);
 impl_matrix_rsvd!(f64, rsvd_fixed_rank_f64, rsvd_fixed_error_f64);
 
-macro_rules! generate_randomized_range_finder_fixed_rank {
+macro_rules! generate_randomised_range_finder_fixed_rank {
     ($ty:ty, $name:ident) => {
         /// Foo
         pub fn $name(
@@ -157,11 +157,11 @@ macro_rules! generate_randomized_range_finder_fixed_rank {
     };
 }
 
-generate_randomized_range_finder_fixed_rank!(f32, randomized_range_finder_fixed_rank_f32);
-generate_randomized_range_finder_fixed_rank!(f64, randomized_range_finder_fixed_rank_f64);
+generate_randomised_range_finder_fixed_rank!(f32, randomised_range_finder_fixed_rank_f32);
+generate_randomised_range_finder_fixed_rank!(f64, randomised_range_finder_fixed_rank_f64);
 
 macro_rules! generate_rsvd_fixed_rank {
-    ($ty:ty, $randomized_range_finder:ident, $name:ident) => {
+    ($ty:ty, $randomised_range_finder:ident, $name:ident) => {
         /// Foo
         pub fn $name(
             mat: &RsvdMatrix<$ty>,
@@ -177,7 +177,7 @@ macro_rules! generate_rsvd_fixed_rank {
             let n_random = n_components + n_oversamples;
 
             let q =
-                $randomized_range_finder(mat, n_random, power_iteration_normaliser, random_state);
+                $randomised_range_finder(mat, n_random, power_iteration_normaliser, random_state);
             let mut q_transpose = rlst_dynamic_array2!($ty, [q.shape()[1], q.shape()[0]]);
             q_transpose.fill_from(q.view().transpose());
 
@@ -210,16 +210,16 @@ macro_rules! generate_rsvd_fixed_rank {
 
 generate_rsvd_fixed_rank!(
     f32,
-    randomized_range_finder_fixed_rank_f32,
+    randomised_range_finder_fixed_rank_f32,
     rsvd_fixed_rank_f32
 );
 generate_rsvd_fixed_rank!(
     f64,
-    randomized_range_finder_fixed_rank_f64,
+    randomised_range_finder_fixed_rank_f64,
     rsvd_fixed_rank_f64
 );
 
-macro_rules! generate_randomized_range_finder_fixed_error {
+macro_rules! generate_randomised_range_finder_fixed_error {
     ($type:ty, $name:ident) => {
         fn $name(
             mat: &RsvdMatrix<$type>,
@@ -299,11 +299,11 @@ macro_rules! generate_randomized_range_finder_fixed_error {
     };
 }
 
-generate_randomized_range_finder_fixed_error!(f32, randomized_range_finder_fixed_error_f32);
-generate_randomized_range_finder_fixed_error!(f64, randomized_range_finder_fixed_error_f64);
+generate_randomised_range_finder_fixed_error!(f32, randomised_range_finder_fixed_error_f32);
+generate_randomised_range_finder_fixed_error!(f64, randomised_range_finder_fixed_error_f64);
 
 macro_rules! generate_rsvd_fixed_error {
-    ($type:ty, $randomized_range_finder:ident, $name:ident) => {
+    ($type:ty, $randomised_range_finder:ident, $name:ident) => {
         /// Foo
         pub fn $name(
             mat: &RsvdMatrix<$type>,
@@ -314,7 +314,7 @@ macro_rules! generate_rsvd_fixed_error {
         where
             Array<$type, BaseArray<$type, VectorContainer<$type>, 2>, 2>: MatrixSvd<Item = $type>,
         {
-            let q = $randomized_range_finder(mat, tol, k_block, random_state);
+            let q = $randomised_range_finder(mat, tol, k_block, random_state);
 
             let mut q_transpose = rlst_dynamic_array2!($type, [q.shape()[1], q.shape()[0]]);
             q_transpose.fill_from(q.view().transpose());
@@ -349,12 +349,12 @@ macro_rules! generate_rsvd_fixed_error {
 
 generate_rsvd_fixed_error!(
     f32,
-    randomized_range_finder_fixed_error_f32,
+    randomised_range_finder_fixed_error_f32,
     rsvd_fixed_error_f32
 );
 generate_rsvd_fixed_error!(
     f64,
-    randomized_range_finder_fixed_error_f64,
+    randomised_range_finder_fixed_error_f64,
     rsvd_fixed_error_f64
 );
 
@@ -366,7 +366,7 @@ mod test {
     };
 
     use super::MatrixRsvd;
-    use crate::fmm::linalg::rsvd::{rsvd_fixed_error_f32, Normaliser};
+    use crate::fmm::linalg::rsvd::Normaliser;
 
     #[test]
     fn test_rsvd_fixed_error_f32() {
