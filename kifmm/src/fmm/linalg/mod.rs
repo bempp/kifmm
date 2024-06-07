@@ -1,2 +1,2 @@
-pub mod rsvd;
 pub mod pinv;
+pub mod rsvd;
