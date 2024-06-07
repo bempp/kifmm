@@ -1,6 +1,7 @@
 use num::traits::FloatConst;
 use rand_distr::{Standard, StandardNormal};
 use rlst::{
+    c32, c64,
     dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray,
     MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess,
     RlstResult, RlstScalar, Shape, VectorContainer,
@@ -35,7 +36,7 @@ where
     /// Compute randomised SVD when target rank is unknown, and a given tolerance is required
     fn rsvd_fixed_error(
         mat: &RsvdMatrix<Self>,
-        tol: Self,
+        tol: <Self as RlstScalar>::Real,
         k_block: Option<usize>,
         random_state: Option<usize>,
     ) -> RsvdReturnType<Self>;
@@ -66,7 +67,7 @@ macro_rules! impl_matrix_rsvd {
 
             fn rsvd_fixed_error(
                 mat: &RsvdMatrix<Self>,
-                tol: Self,
+                tol: <Self as RlstScalar>::Real,
                 k_block: Option<usize>,
                 random_state: Option<usize>,
             ) -> RsvdReturnType<Self> {
@@ -78,6 +79,8 @@ macro_rules! impl_matrix_rsvd {
 
 impl_matrix_rsvd!(f32, rsvd_fixed_rank_f32, rsvd_fixed_error_f32);
 impl_matrix_rsvd!(f64, rsvd_fixed_rank_f64, rsvd_fixed_error_f64);
+impl_matrix_rsvd!(c32, rsvd_fixed_rank_c32, rsvd_fixed_error_c32);
+impl_matrix_rsvd!(c64, rsvd_fixed_rank_c64, rsvd_fixed_error_c64);
 
 macro_rules! generate_randomised_range_finder_fixed_rank {
     ($ty:ty, $name:ident) => {
@@ -89,8 +92,9 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             random_state: Option<usize>,
         ) -> RsvdMatrix<$ty>
         where
-            StandardNormal: rand_distr::Distribution<$ty>,
-            Standard: rand_distr::Distribution<$ty>,
+            $ty: RlstScalar,
+            StandardNormal: rand_distr::Distribution<<$ty as RlstScalar>::Real>,
+            Standard: rand_distr::Distribution<<$ty as RlstScalar>::Real>,
         {
             let mut mat_transpose = rlst_dynamic_array2!($ty, [mat.shape()[1], mat.shape()[0]]);
             mat_transpose.fill_from(mat.view().transpose());
@@ -159,6 +163,8 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
 
 generate_randomised_range_finder_fixed_rank!(f32, randomised_range_finder_fixed_rank_f32);
 generate_randomised_range_finder_fixed_rank!(f64, randomised_range_finder_fixed_rank_f64);
+generate_randomised_range_finder_fixed_rank!(c32, randomised_range_finder_fixed_rank_c32);
+generate_randomised_range_finder_fixed_rank!(c64, randomised_range_finder_fixed_rank_c64);
 
 macro_rules! generate_rsvd_fixed_rank {
     ($ty:ty, $randomised_range_finder:ident, $name:ident) => {
@@ -187,7 +193,7 @@ macro_rules! generate_rsvd_fixed_rank {
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
             let mut uhat = rlst_dynamic_array2!($ty, [b.shape()[0], k]);
-            let mut s = vec![0 as $ty; k];
+            let mut s = vec![<$ty as RlstScalar>::Real::from(0.); k];
             let mut vt = rlst_dynamic_array2!($ty, [k, b.shape()[1]]);
 
             let mut b_copy = rlst_dynamic_array2!($ty, b.shape());
@@ -219,15 +225,28 @@ generate_rsvd_fixed_rank!(
     rsvd_fixed_rank_f64
 );
 
+generate_rsvd_fixed_rank!(
+    c32,
+    randomised_range_finder_fixed_rank_c32,
+    rsvd_fixed_rank_c32
+);
+generate_rsvd_fixed_rank!(
+    c64,
+    randomised_range_finder_fixed_rank_c64,
+    rsvd_fixed_rank_c64
+);
+
+
 macro_rules! generate_randomised_range_finder_fixed_error {
     ($type:ty, $name:ident) => {
         fn $name(
             mat: &RsvdMatrix<$type>,
-            tol: $type,
+            tol: <$type as RlstScalar>::Real,
             k_block: Option<usize>,
             random_state: Option<usize>,
         ) -> RsvdMatrix<$type>
         where
+            $type: RlstScalar,
             Array<$type, BaseArray<$type, VectorContainer<$type>, 2>, 2>: MatrixSvd<Item = $type>,
         {
             let [_m, n] = mat.shape();
@@ -235,7 +254,7 @@ macro_rules! generate_randomised_range_finder_fixed_error {
             // Number of samples in block
             let kblock = k_block.unwrap_or(10);
 
-            let tol = tol / (10. * (2. / <$type>::PI()).sqrt());
+            let tol = tol / (10. * (2. / <<$type as RlstScalar>::Real>::PI()).sqrt());
 
             // Build random matrix
             let mut omega = rlst_dynamic_array2!($type, [n, kblock]);
@@ -301,17 +320,20 @@ macro_rules! generate_randomised_range_finder_fixed_error {
 
 generate_randomised_range_finder_fixed_error!(f32, randomised_range_finder_fixed_error_f32);
 generate_randomised_range_finder_fixed_error!(f64, randomised_range_finder_fixed_error_f64);
+generate_randomised_range_finder_fixed_error!(c32, randomised_range_finder_fixed_error_c32);
+generate_randomised_range_finder_fixed_error!(c64, randomised_range_finder_fixed_error_c64);
 
 macro_rules! generate_rsvd_fixed_error {
     ($type:ty, $randomised_range_finder:ident, $name:ident) => {
         /// Foo
         pub fn $name(
             mat: &RsvdMatrix<$type>,
-            tol: $type,
+            tol: <$type as RlstScalar>::Real,
             k_block: Option<usize>,
             random_state: Option<usize>,
         ) -> RsvdReturnType<$type>
         where
+            $type: RlstScalar,
             Array<$type, BaseArray<$type, VectorContainer<$type>, 2>, 2>: MatrixSvd<Item = $type>,
         {
             let q = $randomised_range_finder(mat, tol, k_block, random_state);
@@ -326,7 +348,7 @@ macro_rules! generate_rsvd_fixed_error {
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
             let mut uhat = rlst_dynamic_array2!($type, [b.shape()[0], k]);
-            let mut s = vec![0 as $type; k];
+            let mut s = vec![<$type as RlstScalar>::Real::from(0.); k];
             let mut vt = rlst_dynamic_array2!($type, [k, b.shape()[1]]);
 
             let mut b_copy = rlst_dynamic_array2!($type, b.shape());
@@ -356,6 +378,18 @@ generate_rsvd_fixed_error!(
     f64,
     randomised_range_finder_fixed_error_f64,
     rsvd_fixed_error_f64
+);
+
+generate_rsvd_fixed_error!(
+    c32,
+    randomised_range_finder_fixed_error_c32,
+    rsvd_fixed_error_c32
+);
+
+generate_rsvd_fixed_error!(
+    c64,
+    randomised_range_finder_fixed_error_c64,
+    rsvd_fixed_error_c64
 );
 
 #[cfg(test)]
