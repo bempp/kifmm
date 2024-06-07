@@ -25,7 +25,7 @@ use crate::{
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
             ncoeffs_kifmm, potential_pointers,
         },
-        linalg::pinv::pinv,
+        linalg::{pinv::pinv, rsvd::MatrixRsvd},
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             FftFieldTranslation, FftMetadata,
@@ -1318,7 +1318,7 @@ where
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
 where
-    Scalar: RlstScalar + Default,
+    Scalar: RlstScalar + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
     Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
@@ -1453,20 +1453,24 @@ where
 
             let mu = se2tc_fat.shape()[0];
             let nvt = se2tc_fat.shape()[1];
-            let k = std::cmp::min(mu, nvt);
 
-            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
-            let mut sigma = vec![Scalar::zero().re(); k];
-            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+            // let k = std::cmp::min(mu, nvt);
+            // let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
+            // let mut sigma = vec![Scalar::zero().re(); k];
+            // let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
-            se2tc_fat
-                .into_svd_alloc(
-                    u_big.view_mut(),
-                    vt_big.view_mut(),
-                    &mut sigma[..],
-                    SvdMode::Reduced,
-                )
-                .unwrap();
+            // se2tc_fat
+            //     .into_svd_alloc(
+            //         u_big.view_mut(),
+            //         vt_big.view_mut(),
+            //         &mut sigma[..],
+            //         SvdMode::Reduced,
+            //     )
+            //     .unwrap();
+
+            // let (sigma, u_big, vt_big) = Scalar::rsvd_fixed_error(&se2tc_fat, self.source_to_target.threshold, None, None).unwrap();
+            let (sigma, u_big, vt_big) = Scalar::rsvd_fixed_rank(&se2tc_fat, 100, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(3)), None).unwrap();
+
             let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
@@ -1484,19 +1488,21 @@ where
             // Store compressed M2L operators
             let thin_nrows = se2tc_thin.shape()[0];
             let nst = se2tc_thin.shape()[1];
-            let k = std::cmp::min(thin_nrows, nst);
-            let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
-            let mut _r = vec![Scalar::zero().re(); k];
-            let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
+            // let k = std::cmp::min(thin_nrows, nst);
+            // let mut _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
+            // let mut _r = vec![Scalar::zero().re(); k];
+            // let mut st = rlst_dynamic_array2!(Scalar, [k, nst]);
 
-            se2tc_thin
-                .into_svd_alloc(
-                    _gamma.view_mut(),
-                    st.view_mut(),
-                    &mut _r[..],
-                    SvdMode::Reduced,
-                )
-                .unwrap();
+            // se2tc_thin
+            //     .into_svd_alloc(
+            //         _gamma.view_mut(),
+            //         st.view_mut(),
+            //         &mut _r[..],
+            //         SvdMode::Reduced,
+            //     )
+            //     .unwrap();
+
+            let (_r, _gamma, st) = Scalar::rsvd_fixed_rank(&se2tc_thin, 100, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(3)), None).unwrap();
 
             let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
             for j in 0..cutoff_rank {
