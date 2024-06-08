@@ -64,7 +64,7 @@ fn grid_search_laplace_blas<T>(
     charges.data_mut().copy_from_slice(&tmp);
 
     let s = Instant::now();
-    parameters.into_iter().enumerate().for_each(
+    parameters.into_par_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order))| {
 
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
