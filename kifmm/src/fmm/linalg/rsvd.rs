@@ -262,23 +262,21 @@ macro_rules! generate_randomised_range_finder_fixed_error {
             omega.fill_from_seed_normally_distributed(random_state);
 
             // Find random samples
-            let y = empty_array::<$type, 2>().simple_mult_into_resize(mat.view(), omega.view());
+            let mut y = empty_array::<$type, 2>().simple_mult_into_resize(mat.view(), omega.view());
             let y_shape = y.shape();
-            let mut y_copy = rlst_dynamic_array2!($type, y.shape());
-            y_copy.view_mut().fill_from(y.view());
 
             let mut q_curr = rlst_dynamic_array2!($type, y_shape);
 
             let mut done = false;
             while !done {
                 // Sketch Q
-                let y_shape = y_copy.shape();
+                let y_shape = y.shape();
                 let mut q = rlst_dynamic_array2!($type, y_shape);
                 let mut qt = rlst_dynamic_array2!($type, [q.shape()[1], q.shape()[0]]);
 
                 // Copy local loop variable, as ownership passes to QR decomposition
                 let mut y_loop = rlst_dynamic_array2!($type, y_shape);
-                y_loop.view_mut().fill_from(y_copy.view());
+                y_loop.view_mut().fill_from(y.view());
 
                 let qr = QrDecomposition::<$type, _>::new(y_loop).unwrap();
                 qr.get_q_alloc(q.view_mut()).unwrap();
@@ -301,13 +299,13 @@ macro_rules! generate_randomised_range_finder_fixed_error {
                     let y_new =
                         empty_array::<$type, 2>().simple_mult_into_resize(mat.view(), omega.view());
                     let mut y_big_data = Vec::new();
-                    y_big_data.extend_from_slice(y_copy.data());
+                    y_big_data.extend_from_slice(y.data());
                     y_big_data.extend_from_slice(y_new.data());
                     let y_big = rlst_dynamic_array2!(
                         $type,
-                        [y_copy.shape()[0], y_copy.shape()[1] + y_new.shape()[1]]
+                        [y_shape[0], y_shape[1] + y_new.shape()[1]]
                     );
-                    y_copy = y_big;
+                    y = y_big;
                 } else {
                     done = true;
                 }
@@ -394,13 +392,126 @@ generate_rsvd_fixed_error!(
 
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
+
+    use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel};
+    use itertools::Itertools;
+    use num::Float;
     use rlst::{
-        assert_array_abs_diff_eq, empty_array, rlst_dynamic_array2, DefaultIterator,
-        MultIntoResize, RawAccessMut, Shape,
+        assert_array_abs_diff_eq, empty_array, rlst_dynamic_array2, DefaultIterator, MatrixSvd, MultIntoResize, RawAccessMut, RlstScalar, Shape
     };
 
-    use super::MatrixRsvd;
-    use crate::fmm::linalg::rsvd::Normaliser;
+    use super::{MatrixRsvd, RsvdMatrix};
+    use crate::{fmm::{field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level, helpers::ncoeffs_kifmm, linalg::rsvd::Normaliser}, tree::{constants::{ALPHA_INNER, NTRANSFER_VECTORS_KIFMM}, types::Domain}};
+    use crate::traits::tree::FmmTreeNode;
+
+    fn metadata<Scalar: RlstScalar<Real = Scalar> + Float>(equivalent_surface_order: usize, check_surface_order: usize)
+        -> (RsvdMatrix<Scalar>, RsvdMatrix<Scalar>)
+    {
+        let nrows = ncoeffs_kifmm(check_surface_order);
+        let ncols = ncoeffs_kifmm(equivalent_surface_order);
+        let mut se2tc_fat =
+        rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+        let mut se2tc_thin =
+            rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+        let alpha = Scalar::real(ALPHA_INNER);
+
+        let domain = Domain {
+            origin: [Scalar::zero(), Scalar::zero(), Scalar::zero()],
+            side_length: [Scalar::one(), Scalar::one(), Scalar::one()]
+        };
+
+        let kernel = Laplace3dKernel::new();
+
+        for (i, t) in compute_transfer_vectors_at_level(3).unwrap().iter().enumerate() {
+            let source_equivalent_surface = t.source.surface_grid(
+                equivalent_surface_order,
+                &domain,
+                alpha,
+            );
+
+            let target_check_surface = t.target.surface_grid(
+                check_surface_order,
+                &domain,
+                alpha,
+            );
+
+            let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
+
+            kernel.assemble_st(
+                green_kernels::types::EvalType::Value,
+                &target_check_surface[..],
+                &source_equivalent_surface[..],
+                tmp_gram.data_mut(),
+            );
+
+            let mut block = se2tc_fat
+                .view_mut()
+                .into_subview([0, i * ncols], [nrows, ncols]);
+            block.fill_from(tmp_gram.view());
+
+            let mut block_column = se2tc_thin
+                .view_mut()
+                .into_subview([i * nrows, 0], [nrows, ncols]);
+            block_column.fill_from(tmp_gram.view());
+        }
+
+        (se2tc_fat, se2tc_thin)
+
+    }
+
+    #[test]
+    fn test_rsvd_accuracy() {
+
+        let equivalent_surface_order = 10;
+        let check_surface_order = 10;
+        let setup = Instant::now();
+        let (se2tc_fat, se2tc_thin) = metadata::<f64>(equivalent_surface_order, check_surface_order);
+        println!("SETUP {:?}", setup.elapsed());
+
+        // Compute rsvd
+        let tol = 1e-5;
+        let k_block = Some(5);
+        let random_state = None;
+        let start = Instant::now();
+        let (s, u, vt) = f64::rsvd_fixed_error(&se2tc_fat, tol, k_block, random_state).unwrap();
+        println!("RANDOM TIME {:?}", start.elapsed());
+
+        // Compare with classical svd
+        let mu = se2tc_fat.shape()[0];
+        let nvt = se2tc_fat.shape()[1];
+        let k = std::cmp::min(mu, nvt);
+        let mut u_c = rlst_dynamic_array2!(f64, [mu, k]);
+        let mut s_c = vec![0f64; k];
+        let mut vt_c = rlst_dynamic_array2!(f64, [k, nvt]);
+
+        let start = Instant::now();
+        se2tc_fat
+        .into_svd_alloc(
+            u_c.view_mut(),
+            vt_c.view_mut(),
+            &mut s_c[..],
+            rlst::SvdMode::Reduced,
+        )
+        .unwrap();
+        println!("CLASSICAL TIME {:?}", start.elapsed());
+
+        let abs_error = s.iter().zip(s_c.iter()).map(|(&s, &s_c)| {
+
+            (s-s_c).abs()
+        }).collect_vec();
+
+        let mean_err = abs_error.iter().sum::<f64>() / (abs_error.len() as f64);
+        let max_err = abs_error
+            .iter()
+            .cloned()
+            .filter(|&x| !x.is_nan())
+            .fold(f64::NEG_INFINITY, |a, b| a.max(b));
+
+        println!("MEAN {:?} MAX {:?}", mean_err, max_err);
+
+        assert!(false);
+    }
 
     #[test]
     fn test_rsvd_fixed_error_f32() {
