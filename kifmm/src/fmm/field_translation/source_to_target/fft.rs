@@ -31,7 +31,7 @@ use crate::{
     FftFieldTranslation, Fmm,
 };
 
-use super::gemv::Gemv8x8;
+use crate::traits::general::Gemv8x8;
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
