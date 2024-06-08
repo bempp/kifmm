@@ -53,18 +53,19 @@ fn grid_search_laplace_blas<T>(
 
     let n_params = parameters.len();
 
+    // Setup random sources and targets
+    let nsources = 1000000;
+    let ntargets = 1000000;
+    let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
+    let targets = points_fixture::<T::Real>(ntargets, None, None, Some(1));
+    let nvecs = 1;
+    let tmp = vec![T::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
     let s = Instant::now();
-    parameters.into_par_iter().enumerate().for_each(
+    parameters.into_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order))| {
-            // Setup random sources and targets
-            let nsources = 1000000;
-            let ntargets = 1000000;
-            let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
-            let targets = points_fixture::<T::Real>(ntargets, None, None, Some(1));
-            let nvecs = 1;
-            let tmp = vec![T::one(); nsources * nvecs];
-            let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
-            charges.data_mut().copy_from_slice(&tmp);
 
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
             let fmm = SingleNodeBuilder::new()
@@ -126,6 +127,7 @@ fn grid_search_laplace_blas<T>(
     let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
+    let mut progress = 0;
     for (i, fmm) in fmms.lock().unwrap().iter() {
         let (surface_diff, svd_threshold, depth, expansion_order) = parameters_cloned[*i];
 
@@ -134,7 +136,8 @@ fn grid_search_laplace_blas<T>(
         let s = Instant::now();
         fmm.evaluate(false).unwrap();
         let time = s.elapsed().as_millis() as f32;
-        println!("BLAS Evaluated {:?}/{:?}", i, n_params);
+        progress += 1;
+        println!("BLAS Evaluated {:?}/{:?}", progress, n_params);
 
         let leaf_idx = 1;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
@@ -223,6 +226,7 @@ fn grid_search_laplace_fft<T>(
         .into_par_iter()
         .enumerate()
         .for_each(|(i, (depth, expansion_order))| {
+
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
             // Setup random sources and targets
             let nsources = 1000000;
@@ -365,19 +369,19 @@ fn main() {
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
 
-    grid_search_laplace_fft::<f32>(
-        "grid_search_laplace_fft_f32".to_string(),
-        &expansion_order_vec,
-        &depth_vec,
-    );
+    // grid_search_laplace_fft::<f32>(
+    //     "grid_search_laplace_fft_f32_m1".to_string(),
+    //     &expansion_order_vec,
+    //     &depth_vec,
+    // );
 
-    grid_search_laplace_blas::<f32>(
-        "grid_search_laplace_blas_f32".to_string(),
-        &expansion_order_vec,
-        &svd_threshold_vec,
-        &surface_diff_vec,
-        &depth_vec,
-    );
+    // grid_search_laplace_blas::<f32>(
+    //     "grid_search_laplace_blas_f32_m1".to_string(),
+    //     &expansion_order_vec,
+    //     &svd_threshold_vec,
+    //     &surface_diff_vec,
+    //     &depth_vec,
+    // );
 
     let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
     let svd_threshold_vec = vec![
@@ -393,14 +397,14 @@ fn main() {
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
 
-    grid_search_laplace_fft::<f64>(
-        "grid_search_laplace_fft_f64".to_string(),
-        &expansion_order_vec,
-        &depth_vec,
-    );
+    // grid_search_laplace_fft::<f64>(
+    //     "grid_search_laplace_fft_f64_m1".to_string(),
+    //     &expansion_order_vec,
+    //     &depth_vec,
+    // );
 
     grid_search_laplace_blas::<f64>(
-        "grid_search_laplace_blas_f64".to_string(),
+        "grid_search_laplace_blas_f64_m1".to_string(),
         &expansion_order_vec,
         &svd_threshold_vec,
         &surface_diff_vec,
