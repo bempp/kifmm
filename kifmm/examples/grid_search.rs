@@ -32,16 +32,6 @@ fn grid_search_laplace_blas<T>(
     T: RlstScalar<Real = T> + Epsilon + Float + Default + SampleUniform,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
 {
-    // Setup random sources and targets
-    let nsources = 1000000;
-    let ntargets = 1000000;
-    let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
-    let targets = points_fixture::<T::Real>(ntargets, None, None, Some(1));
-    let nvecs = 1;
-    let tmp = vec![T::one(); nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
-
     // FMM parameters
     let prune_empty = true;
 
@@ -66,6 +56,16 @@ fn grid_search_laplace_blas<T>(
     let s = Instant::now();
     parameters.into_par_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order))| {
+            // Setup random sources and targets
+            let nsources = 1000000;
+            let ntargets = 1000000;
+            let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
+            let targets = points_fixture::<T::Real>(ntargets, None, None, Some(1));
+            let nvecs = 1;
+            let tmp = vec![T::one(); nsources * nvecs];
+            let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
+            charges.data_mut().copy_from_slice(&tmp);
+
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
             let fmm = SingleNodeBuilder::new()
                 .tree(
@@ -117,6 +117,15 @@ fn grid_search_laplace_blas<T>(
         "BLAS Pre-computation Time Elapsed {:?}",
         s.elapsed().as_secs()
     );
+
+    // Setup random sources and targets
+    let nsources = 1000000;
+    let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
+    let nvecs = 1;
+    let tmp = vec![T::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
     for (i, fmm) in fmms.lock().unwrap().iter() {
         let (surface_diff, svd_threshold, depth, expansion_order) = parameters_cloned[*i];
 
@@ -195,16 +204,6 @@ fn grid_search_laplace_fft<T>(
         + Epsilon,
     <T as AsComplex>::ComplexType: Gemv8x8<Scalar = <T as AsComplex>::ComplexType>,
 {
-    // Setup random sources and targets
-    let nsources = 1000000;
-    let ntargets = 1000000;
-    let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
-    let targets = points_fixture::<T::Real>(ntargets, None, None, Some(1));
-    let nvecs = 1;
-    let tmp = vec![T::one(); nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
-
     // FMM parameters
     let prune_empty = true;
 
@@ -225,6 +224,15 @@ fn grid_search_laplace_fft<T>(
         .enumerate()
         .for_each(|(i, (depth, expansion_order))| {
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
+            // Setup random sources and targets
+            let nsources = 1000000;
+            let ntargets = 1000000;
+            let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
+            let targets = points_fixture::<T::Real>(ntargets, None, None, Some(1));
+            let nvecs = 1;
+            let tmp = vec![T::one(); nsources * nvecs];
+            let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
+            charges.data_mut().copy_from_slice(&tmp);
 
             let fmm = SingleNodeBuilder::new()
                 .tree(
@@ -273,13 +281,22 @@ fn grid_search_laplace_fft<T>(
         ])
         .unwrap();
 
+    let nsources = 1000000;
+    let sources = points_fixture::<T::Real>(nsources, None, None, Some(0));
+    let nvecs = 1;
+    let tmp = vec![T::one(); nsources * nvecs];
+    let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let mut progress = 0;
     for (i, fmm) in fmms.lock().unwrap().iter() {
         let (depth, expansion_order) = parameters_cloned[*i];
 
         let s = Instant::now();
         fmm.evaluate(false).unwrap();
         let time = s.elapsed().as_millis() as f32;
-        println!("FFT Evaluated {:?}/{:?}", i, n_params);
+        progress += 1;
+        println!("FFT Evaluated {:?}/{:?}", progress, n_params);
 
         let leaf_idx = 1;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
@@ -379,7 +396,7 @@ fn main() {
     grid_search_laplace_fft::<f64>(
         "grid_search_laplace_fft_f64".to_string(),
         &expansion_order_vec,
-        &depth_vec
+        &depth_vec,
     );
 
     grid_search_laplace_blas::<f64>(
