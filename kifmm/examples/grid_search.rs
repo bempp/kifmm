@@ -362,31 +362,31 @@ fn main() {
         &depth_vec,
     );
 
-    // let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
-    // let svd_threshold_vec = vec![
-    //     None,
-    //     Some(1e-15),
-    //     Some(1e-12),
-    //     Some(1e-9),
-    //     Some(1e-6),
-    //     Some(1e-3),
-    //     Some(1e-1),
-    // ];
+    let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
+    let svd_threshold_vec = vec![
+        None,
+        Some(1e-15),
+        Some(1e-12),
+        Some(1e-9),
+        Some(1e-6),
+        Some(1e-3),
+        Some(1e-1),
+    ];
 
-    // let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
-    // let depth_vec: Vec<u64> = vec![4, 5];
+    let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
+    let depth_vec: Vec<u64> = vec![4, 5];
 
-    // grid_search_laplace_fft::<f64>(
-    //     "grid_search_laplace_fft_f64".to_string(),
-    //     &expansion_order_vec,
-    //     &depth_vec
-    // );
+    grid_search_laplace_fft::<f64>(
+        "grid_search_laplace_fft_f64".to_string(),
+        &expansion_order_vec,
+        &depth_vec
+    );
 
-    // grid_search_laplace_blas::<f64>(
-    //     "grid_search_laplace_blas_f64".to_string(),
-    //     &expansion_order_vec,
-    //     &svd_threshold_vec,
-    //     &surface_diff_vec,
-    //     &depth_vec,
-    // );
+    grid_search_laplace_blas::<f64>(
+        "grid_search_laplace_blas_f64".to_string(),
+        &expansion_order_vec,
+        &svd_threshold_vec,
+        &surface_diff_vec,
+        &depth_vec,
+    );
 }
