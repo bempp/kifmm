@@ -66,7 +66,6 @@ fn grid_search_laplace_blas<T>(
     let s = Instant::now();
     parameters.into_par_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order))| {
-
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
             let fmm = SingleNodeBuilder::new()
                 .tree(
@@ -226,7 +225,6 @@ fn grid_search_laplace_fft<T>(
         .into_iter()
         .enumerate()
         .for_each(|(i, (depth, expansion_order))| {
-
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
             // Setup random sources and targets
             let nsources = 1000000;
@@ -383,11 +381,7 @@ fn main() {
         &depth_vec,
     );
 
-    let expansion_order_vec: Vec<usize> = vec![
-        6, 7,
-        8, 9,
-        10
-        ];
+    let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
     let svd_threshold_vec = vec![
         None,
         Some(1e-15),
