@@ -223,7 +223,7 @@ fn grid_search_laplace_fft<T>(
 
     let s = Instant::now();
     parameters
-        .into_par_iter()
+        .into_iter()
         .enumerate()
         .for_each(|(i, (depth, expansion_order))| {
 
@@ -375,15 +375,19 @@ fn main() {
     //     &depth_vec,
     // );
 
-    // grid_search_laplace_blas::<f32>(
-    //     "grid_search_laplace_blas_f32_m1".to_string(),
-    //     &expansion_order_vec,
-    //     &svd_threshold_vec,
-    //     &surface_diff_vec,
-    //     &depth_vec,
-    // );
+    grid_search_laplace_blas::<f32>(
+        "grid_search_laplace_blas_f32_m1".to_string(),
+        &expansion_order_vec,
+        &svd_threshold_vec,
+        &surface_diff_vec,
+        &depth_vec,
+    );
 
-    let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
+    let expansion_order_vec: Vec<usize> = vec![
+        6, 7,
+        8, 9,
+        10
+        ];
     let svd_threshold_vec = vec![
         None,
         Some(1e-15),
@@ -403,11 +407,11 @@ fn main() {
     //     &depth_vec,
     // );
 
-    grid_search_laplace_blas::<f64>(
-        "grid_search_laplace_blas_f64_m1".to_string(),
-        &expansion_order_vec,
-        &svd_threshold_vec,
-        &surface_diff_vec,
-        &depth_vec,
-    );
+    // grid_search_laplace_blas::<f64>(
+    //     "grid_search_laplace_blas_f64_m1_8".to_string(),
+    //     &expansion_order_vec,
+    //     &svd_threshold_vec,
+    //     &surface_diff_vec,
+    //     &depth_vec,
+    // );
 }
