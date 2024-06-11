@@ -685,7 +685,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -791,7 +791,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -854,7 +854,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -879,7 +879,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -990,7 +990,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1015,7 +1015,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1341,7 +1341,7 @@ mod test {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -1437,7 +1437,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1459,7 +1459,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1562,7 +1562,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1584,7 +1584,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()

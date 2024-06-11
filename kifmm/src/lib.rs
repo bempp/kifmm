@@ -51,7 +51,7 @@
 //!             &expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
-//!             FftFieldTranslation::new(), // Choose a field translation method, could replace with BLAS field translation
+//!             FftFieldTranslation::new(None), // Choose a field translation method, could replace with BLAS field translation
 //!         )
 //!         .unwrap()
 //!         .build()

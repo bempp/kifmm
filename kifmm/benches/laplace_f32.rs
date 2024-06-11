@@ -38,7 +38,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            FftFieldTranslation::new(),
+            FftFieldTranslation::new(None),
         )
         .unwrap()
         .build()
@@ -100,7 +100,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            FftFieldTranslation::new(),
+            FftFieldTranslation::new(None),
         )
         .unwrap()
         .build()

@@ -2,8 +2,7 @@
 # Treat warnings as a build error.
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
-python = ["dep:pyo3", "dep:numpy"]
-
+python = ["dep:pyo3", "dep:numpy", "dep:blas-src", "dep:lapack-src"]
 
 [package]
 name = "kifmm"
@@ -42,9 +41,13 @@ bytemuck = "1.16.0"
 
 [target.aarch64-apple-darwin.dependencies]
 rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd", features = ["metal"]}
+blas-src = { version = "0.10", features = ["accelerate"], optional = true }
+lapack-src = { version = "0.10", features = ["accelerate"], optional = true }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd", features = ["blis"]}
+blas-src = { version = "0.10", features = ["blis"], optional = true}
+lapack-src = { version = "0.10", features = ["netlib"], optional = true}
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}

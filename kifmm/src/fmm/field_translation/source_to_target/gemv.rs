@@ -1,5 +1,5 @@
 //! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
-use crate::fmm::types::Isa;
+use crate::{fmm::types::Isa, traits::general::Gemv8x8};
 use rlst::{c32, c64, RlstScalar};
 
 /// The 8x8 gemv operation, always inlined.
@@ -38,20 +38,6 @@ pub struct Gemv8x8Data<'a, T: RlstScalar> {
     pub vector: &'a [T; 8],
     pub result: &'a mut [T; 8],
     pub scale: T::Real,
-}
-
-/// Implement vectorised 8x8 gemv,
-pub trait Gemv8x8 {
-    type Scalar: RlstScalar;
-
-    /// 8x8 GEMV
-    fn gemv8x8(
-        isa: Isa,
-        matrix: &[Self::Scalar; 64],
-        vector: &[Self::Scalar; 8],
-        result: &mut [Self::Scalar; 8],
-        scale: Self::Scalar,
-    );
 }
 
 impl Gemv8x8 for c32 {

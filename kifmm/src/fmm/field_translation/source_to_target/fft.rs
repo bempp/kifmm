@@ -20,7 +20,7 @@ use crate::{
     traits::{
         fftw::Dft,
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
-        general::AsComplex,
+        general::{AsComplex, Gemv8x8},
         tree::{FmmTree, Tree},
         types::FmmError,
     },
@@ -30,8 +30,6 @@ use crate::{
     },
     FftFieldTranslation, Fmm,
 };
-
-use super::gemv::Gemv8x8;
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
@@ -119,8 +117,9 @@ where
                 } else if level == 3 {
                     max_chunk_size = 64
                 } else {
-                    max_chunk_size = 128
+                    max_chunk_size = self.source_to_target.block_size
                 }
+
                 let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 

@@ -55,7 +55,8 @@ class KiFmm:
         timed=False,
         svd_threshold=None,
         wavenumber=None,
-        surface_diff=None
+        surface_diff=None,
+        block_size=None,
     ):
         """Constructor for Single Node FMMss.
 
@@ -76,6 +77,7 @@ class KiFmm:
             wavenumber (float, optional): Must specify a wavenumber for Helmholtz kernels. Defaults to None for Laplace kernels.
             surface_diff (int, optional): Calculated as check_expansion_order-equivalent_expansion_order, used to provide more stability when using BLAS based field translations.
             Defaults to 0 if not specified for BLAS based field translations.
+            block_size (int, optional): Maximum block size used in FFT based M2L translations, if not specified set to 128.
         """
 
         # Check valid tree spec
@@ -170,6 +172,7 @@ class KiFmm:
                 f"kernel '{kernel}' invalid choice, must be one of {KERNELS}"
             )
 
+        # CHeck for valid kernel
         try:
             assert kernel_eval_type in KERNEL_EVAL_TYPES.keys()
         except:
@@ -192,6 +195,13 @@ class KiFmm:
             raise TypeError(
                 f"field translation '{field_translation}' is not valid, expect one of {FIELD_TRANSLATION_TYPES}"
             )
+
+        # Check for valid block size
+        try:
+            if block_size is not None:
+                assert isinstance(block_size, int)
+        except:
+            raise TypeError(f"block sizes of type '{type(block_size)}', expected int")
 
         try:
             assert isinstance(timed, bool)
@@ -218,6 +228,7 @@ class KiFmm:
         self.constructor = CONSTRUCTORS[self.dtype][self.kernel][self.field_translation]
         self.svd_threshold = svd_threshold
         self.surface_diff = surface_diff
+        self.block_size = block_size
 
         if self.kernel == "helmholtz":
             try:
@@ -238,6 +249,7 @@ class KiFmm:
                     self.kernel_eval_type,
                     self.n_crit,
                     self.depth,
+                    self.block_size,
                 )
 
             elif self.field_translation == "blas":
@@ -251,7 +263,7 @@ class KiFmm:
                     self.svd_threshold,
                     self.n_crit,
                     self.depth,
-                    self.surface_diff
+                    self.surface_diff,
                 )
 
         elif kernel == "helmholtz":
@@ -266,6 +278,7 @@ class KiFmm:
                     self.wavenumber,
                     self.n_crit,
                     self.depth,
+                    self.block_size,
                 )
 
             elif self.field_translation == "blas":
@@ -280,7 +293,7 @@ class KiFmm:
                     self.svd_threshold,
                     self.n_crit,
                     self.depth,
-                    self.surface_diff
+                    self.surface_diff,
                 )
 
         self.source_keys = self.fmm.source_keys
@@ -470,7 +483,6 @@ class KiFmm:
             raise TypeError(
                 f"sources of type {type(sources[0].dtype)}, targets of type {type(targets[0].dtype)} do not match."
             )
-
 
         expected_dtypes = KERNEL_DTYPE[self.kernel]
         try:

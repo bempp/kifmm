@@ -429,7 +429,7 @@ pub enum FmmEvalType {
 ///         &expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
-///         FftFieldTranslation::new(),
+///         FftFieldTranslation::new(None),
 ///     )
 ///     .unwrap()
 ///     .build()
@@ -561,6 +561,9 @@ where
 
     /// Map between indices of convolution and surface grid points.
     pub conv_to_surf_map: Vec<Vec<usize>>, // Indexed by level
+
+    /// Maximum block size when grouping interactions
+    pub block_size: usize,
 
     /// Precomputed data required for FFT compressed M2L interaction.
     pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level

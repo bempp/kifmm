@@ -25,6 +25,9 @@ use rlst::{
 
 use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
+extern crate blas_src;
+extern crate lapack_src;
+
 macro_rules! define_pyclass {
     ($name: ident, $type: ident, $kernel: ident, $field_translation: ident) => {
         /// Python interface
@@ -87,6 +90,7 @@ macro_rules! laplace_fft_constructors {
                 kernel_eval_type: usize,
                 n_crit: Option<u64>,
                 depth: Option<u64>,
+                block_size: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -134,7 +138,7 @@ macro_rules! laplace_fft_constructors {
                         expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        FftFieldTranslation::new(),
+                        FftFieldTranslation::new(block_size),
                     )
                     .unwrap()
                     .build()
@@ -317,7 +321,8 @@ macro_rules! helmholtz_fft_constructors {
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
                 n_crit: Option<u64>,
-                depth: Option<u64>
+                depth: Option<u64>,
+                block_size: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -365,7 +370,7 @@ macro_rules! helmholtz_fft_constructors {
                         expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
-                        FftFieldTranslation::new(),
+                        FftFieldTranslation::new(block_size),
                     )
                     .unwrap()
                     .build()
