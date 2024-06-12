@@ -26,3 +26,8 @@ fftw-src/fftw-*
 *.ipynb_checkpoints/
 *.pyc
 *.so
+
+# Editor
+*.vim/
+
+
