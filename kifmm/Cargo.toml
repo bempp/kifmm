@@ -57,6 +57,14 @@ name = "laplace_f32"
 harness = false
 
 [[bench]]
+name = "direct_f32"
+harness = false
+
+[[bench]]
+name = "direct_f64"
+harness = false
+
+[[bench]]
 name = "helmholtz_f32"
 harness = false
 
