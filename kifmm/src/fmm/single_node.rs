@@ -323,8 +323,6 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
-    use std::time::Instant;
-
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
