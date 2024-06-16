@@ -1,6 +1,4 @@
 //! Builder objects to construct FMMs
-use std::time::Instant;
-
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
 use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
@@ -116,10 +114,8 @@ where
 
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let s = Instant::now();
             let source_tree = SingleNodeTree::new(sources, depth, prune_empty, self.domain)?;
             let target_tree = SingleNodeTree::new(targets, depth, prune_empty, self.domain)?;
-            println!("TREE TIME {:?}", s.elapsed());
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,

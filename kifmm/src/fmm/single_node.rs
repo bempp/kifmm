@@ -789,8 +789,8 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 1000000;
-        let ntargets = 1000000;
+        let nsources = 9000;
+        let ntargets = 10000;
 
         let min = None;
         let max = None;
