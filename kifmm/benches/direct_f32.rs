@@ -1,19 +1,17 @@
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
+use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
-use green_kernels::traits::Kernel;
 
 extern crate blas_src;
 extern crate lapack_src;
 
-
 fn multithreaded_f32(c: &mut Criterion) {
-
     let mut group = c.benchmark_group("Multi Threaded Direct f32");
 
     group
@@ -36,8 +34,17 @@ fn multithreaded_f32(c: &mut Criterion) {
 
         let mut result = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 
-
-        group.bench_function(format!("N={nsources}"), |b| {b.iter(|| kernel.evaluate_mt(EvalType::Value, sources.data(), targets.data(), charges.data(), result.data_mut()))});
+        group.bench_function(format!("N={nsources}"), |b| {
+            b.iter(|| {
+                kernel.evaluate_mt(
+                    EvalType::Value,
+                    sources.data(),
+                    targets.data(),
+                    charges.data(),
+                    result.data_mut(),
+                )
+            })
+        });
     }
 
     {
@@ -56,8 +63,17 @@ fn multithreaded_f32(c: &mut Criterion) {
 
         let mut result = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 
-
-        group.bench_function(format!("N={nsources}"), |b| {b.iter(|| kernel.evaluate_mt(EvalType::Value, sources.data(), targets.data(), charges.data(), result.data_mut()))});
+        group.bench_function(format!("N={nsources}"), |b| {
+            b.iter(|| {
+                kernel.evaluate_mt(
+                    EvalType::Value,
+                    sources.data(),
+                    targets.data(),
+                    charges.data(),
+                    result.data_mut(),
+                )
+            })
+        });
     }
 
     {
@@ -76,11 +92,19 @@ fn multithreaded_f32(c: &mut Criterion) {
 
         let mut result = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 
-
-        group.bench_function(format!("N={nsources}"), |b| {b.iter(|| kernel.evaluate_mt(EvalType::Value, sources.data(), targets.data(), charges.data(), result.data_mut()))});
+        group.bench_function(format!("N={nsources}"), |b| {
+            b.iter(|| {
+                kernel.evaluate_mt(
+                    EvalType::Value,
+                    sources.data(),
+                    targets.data(),
+                    charges.data(),
+                    result.data_mut(),
+                )
+            })
+        });
     }
 }
-
 
 fn singlethreaded_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Single Threaded Direct f32");
@@ -105,8 +129,17 @@ fn singlethreaded_f32(c: &mut Criterion) {
 
         let mut result = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 
-
-        group.bench_function(format!("N={nsources}"), |b| {b.iter(|| kernel.evaluate_st(EvalType::Value, sources.data(), targets.data(), charges.data(), result.data_mut()))});
+        group.bench_function(format!("N={nsources}"), |b| {
+            b.iter(|| {
+                kernel.evaluate_st(
+                    EvalType::Value,
+                    sources.data(),
+                    targets.data(),
+                    charges.data(),
+                    result.data_mut(),
+                )
+            })
+        });
     }
 
     {
@@ -125,8 +158,17 @@ fn singlethreaded_f32(c: &mut Criterion) {
 
         let mut result = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 
-
-        group.bench_function(format!("N={nsources}"), |b| {b.iter(|| kernel.evaluate_st(EvalType::Value, sources.data(), targets.data(), charges.data(), result.data_mut()))});
+        group.bench_function(format!("N={nsources}"), |b| {
+            b.iter(|| {
+                kernel.evaluate_st(
+                    EvalType::Value,
+                    sources.data(),
+                    targets.data(),
+                    charges.data(),
+                    result.data_mut(),
+                )
+            })
+        });
     }
 }
 
