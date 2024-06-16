@@ -1,7 +1,7 @@
 //! Implementation of traits to compute metadata for field translation operations.
 use std::{
     collections::{HashMap, HashSet},
-    sync::RwLock,
+    sync::RwLock, time::Instant,
 };
 
 use green_kernels::{
@@ -1463,6 +1463,7 @@ where
             let mut sigma = vec![Scalar::zero().re(); k];
             let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
+            let s = Instant::now();
             se2tc_fat
                 .into_svd_alloc(
                     u_big.view_mut(),
@@ -1513,7 +1514,7 @@ where
             let mut c_vt = Vec::new();
             let mut directional_cutoff_ranks = Vec::new();
 
-            for i in 0..self.source_to_target.transfer_vectors.len() {
+            (0..self.source_to_target.transfer_vectors.len()).into_par_iter().for_each(|i| {
                 let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -1558,11 +1559,59 @@ where
                     sigma_mat_i_compressed.view(),
                     vt_i_compressed_.view(),
                 );
+            });
+            println!("SVD TIME {:?}", s.elapsed());
 
-                c_u.push(u_i_compressed);
-                c_vt.push(vt_i_compressed);
-                directional_cutoff_ranks.push(directional_cutoff_rank);
-            }
+            // for i in 0..self.source_to_target.transfer_vectors.len() {
+            //     let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+
+            //     let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+            //         sigma_mat.view(),
+            //         empty_array::<Scalar, 2>()
+            //             .simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+            //     );
+
+            //     let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+            //     let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
+            //     let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+
+            //     tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+            //         .unwrap();
+
+            //     let directional_cutoff_rank =
+            //         find_cutoff_rank(&sigma_i, self.source_to_target.threshold, cutoff_rank);
+
+            //     let mut u_i_compressed =
+            //         rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
+            //     let mut vt_i_compressed_ =
+            //         rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
+
+            //     let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
+            //         Scalar,
+            //         [directional_cutoff_rank, directional_cutoff_rank]
+            //     );
+
+            //     u_i_compressed
+            //         .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
+            //     vt_i_compressed_
+            //         .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
+
+            //     for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+            //         unsafe {
+            //             *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
+            //                 Scalar::from(*s).unwrap();
+            //         }
+            //     }
+
+            //     let vt_i_compressed = empty_array::<Scalar, 2>().simple_mult_into_resize(
+            //         sigma_mat_i_compressed.view(),
+            //         vt_i_compressed_.view(),
+            //     );
+
+            //     // c_u.push(u_i_compressed);
+            //     // c_vt.push(vt_i_compressed);
+            //     // directional_cutoff_ranks.push(directional_cutoff_rank);
+            // }
 
             let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
             st_trunc.fill_from(s_trunc.transpose());

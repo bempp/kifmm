@@ -323,6 +323,8 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
+
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
@@ -789,8 +791,8 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let nsources = 1000000;
+        let ntargets = 1000000;
 
         let min = None;
         let max = None;
@@ -800,7 +802,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = [9];
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -810,6 +812,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
+        let s = Instant::now();
         let mut fmm = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
@@ -818,28 +821,30 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                BlasFieldTranslationSaRcmp::new(None, None),
             )
             .unwrap()
             .build()
             .unwrap();
-        fmm.evaluate(false).unwrap();
+        println!("SETUP {:?}", s.elapsed());
+            // fmm.evaluate(false).unwrap();
 
-        // Reset Charge data and re-evaluate potential
-        let mut rng = StdRng::seed_from_u64(1);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        assert!(false);
+        // // Reset Charge data and re-evaluate potential
+        // let mut rng = StdRng::seed_from_u64(1);
+        // charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        fmm.clear(charges.data());
-        fmm.evaluate(false).unwrap();
+        // fmm.clear(charges.data());
+        // fmm.evaluate(false).unwrap();
 
-        let fmm = Box::new(fmm);
-        test_single_node_laplace_fmm_vector_helper::<f64>(
-            fmm,
-            EvalType::Value,
-            &sources,
-            &charges,
-            threshold_pot,
-        );
+        // let fmm = Box::new(fmm);
+        // test_single_node_laplace_fmm_vector_helper::<f64>(
+        //     fmm,
+        //     EvalType::Value,
+        //     &sources,
+        //     &charges,
+        //     threshold_pot,
+        // );
     }
 
     #[test]
