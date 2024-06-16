@@ -791,8 +791,8 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 1000000;
-        let ntargets = 1000000;
+        let nsources = 10000;
+        let ntargets = 9000;
 
         let min = None;
         let max = None;
@@ -821,6 +821,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
+                // BlasFieldTranslationSaRcmp::new(None, None),
                 BlasFieldTranslationSaRcmp::new(None, None),
             )
             .unwrap()

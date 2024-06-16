@@ -1,7 +1,7 @@
 //! Implementation of traits to compute metadata for field translation operations.
 use std::{
     collections::{HashMap, HashSet},
-    sync::RwLock, time::Instant,
+    sync::{Mutex, RwLock}, time::Instant,
 };
 
 use green_kernels::{
@@ -1510,9 +1510,14 @@ where
                 }
             }
 
-            let mut c_u = Vec::new();
-            let mut c_vt = Vec::new();
-            let mut directional_cutoff_ranks = Vec::new();
+            let mut c_u = Mutex::new(Vec::new());
+            let mut c_vt = Mutex::new(Vec::new());
+            let mut directional_cutoff_ranks = Mutex::new(vec![0usize; self.source_to_target.transfer_vectors.len()]);
+
+            for _ in 0..self.source_to_target.transfer_vectors.len() {
+                c_u.lock().unwrap().push(rlst_dynamic_array2!(Scalar, [1, 1]));
+                c_vt.lock().unwrap().push(rlst_dynamic_array2!(Scalar, [1, 1]));
+            }
 
             (0..self.source_to_target.transfer_vectors.len()).into_par_iter().for_each(|i| {
                 let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
@@ -1559,6 +1564,10 @@ where
                     sigma_mat_i_compressed.view(),
                     vt_i_compressed_.view(),
                 );
+
+                directional_cutoff_ranks.lock().unwrap()[i] = directional_cutoff_rank;
+                c_u.lock().unwrap()[i] = u_i_compressed;
+                c_vt.lock().unwrap()[i] = vt_i_compressed;
             });
             println!("SVD TIME {:?}", s.elapsed());
 
@@ -1615,6 +1624,10 @@ where
 
             let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
             st_trunc.fill_from(s_trunc.transpose());
+
+            let c_vt = std::mem::take(&mut *c_vt.lock().unwrap());
+            let c_u = std::mem::take(&mut *c_u.lock().unwrap());
+            let directional_cutoff_ranks = std::mem::take(&mut *directional_cutoff_ranks.lock().unwrap());
 
             let result = BlasMetadataSaRcmp {
                 u,
