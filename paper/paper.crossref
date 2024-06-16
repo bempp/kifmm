@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20240405T205401-d096e0c62de842571e829e943de2b8623de51ccc</doi_batch_id>
-    <timestamp>20240405205401</timestamp>
+    <doi_batch_id>20240614T145943-d096e0c62de842571e829e943de2b8623de51ccc</doi_batch_id>
+    <timestamp>20240614145943</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -83,16 +83,28 @@ Rust</title>
           </collection>
         </doi_data>
         <citation_list>
-          <citation key="fidgit">
-            <article_title>Fidgit: An ungodly union of GitHub and
-figshare</article_title>
-            <author>Smith</author>
-            <journal_title>GitHub repository</journal_title>
-            <cYear>2020</cYear>
-            <unstructured_citation>Smith, A. M., Thaney, K., &amp;
-Hahnel, M. (2020). Fidgit: An ungodly union of GitHub and figshare. In
-GitHub repository. GitHub.
-https://github.com/arfon/fidgit</unstructured_citation>
+          <citation key="cipra2000best">
+            <article_title>The best of the 20th century: Editors name
+top 10 algorithms</article_title>
+            <author>Cipra</author>
+            <journal_title>SIAM news</journal_title>
+            <issue>4</issue>
+            <volume>33</volume>
+            <cYear>2000</cYear>
+            <unstructured_citation>Cipra, B. A. (2000). The best of the
+20th century: Editors name top 10 algorithms. SIAM News, 33(4),
+1–2.</unstructured_citation>
+          </citation>
+          <citation key="asanovic2006landscape">
+            <article_title>The landscape of parallel computing research:
+A view from berkeley</article_title>
+            <author>Asanovic</author>
+            <cYear>2006</cYear>
+            <unstructured_citation>Asanovic, K., Bodik, R., Catanzaro,
+B. C., Gebis, J. J., Husbands, P., Keutzer, K., Patterson, D. A.,
+Plishker, W. L., Shalf, J., Williams, S. W., &amp; others. (2006). The
+landscape of parallel computing research: A view from
+berkeley.</unstructured_citation>
           </citation>
         </citation_list>
       </journal_article>

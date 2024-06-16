@@ -18,7 +18,11 @@ bibliography: paper.bib
 
 # Summary
 
-The Kernel Independent Fast Multipole Method (kiFMM) is ...
+The Fast Multipole Method (FMM) is a core algorithm for scientific computing, commonly cited as one of the top algorithmic advances of the twentieth century [@cipra2000best], and crucial to optimise due to its propensity in scientific and engineering applications [@asanovic2006landscape]. High performance implementations, that are easy to extend, and deploy to multiple hardware targets are uncommon due to the complexity of algorithm implementation. We present `kifmm-rs` a Rust based implementation of the kernel-independent FMM, with Python bindings, that allows for
+
+
+$$\phi(x_i) = \sum_{j=1}^N K(x_i, y_j)q_j$$
+
 
 # Statement of need
 
@@ -44,8 +48,13 @@ Past and ongoing research projects
 - Older FMM efforts
 - Embedded within new Bempp-rs
 
+# Single Node Performance
 
-# Mathematics
+We benchmark our codes against other leading implementations
+...
+
+
+<!-- # Mathematics
 
 Single dollars ($) are required for inline mathematics e.g. $f(x) = e^{\pi/x}$
 
@@ -79,8 +88,8 @@ For a quick reference, the following citation commands can be used:
 # Figures
 
 <!-- Figures can be included like this: -->
-![Caption for example figure.\label{fig:example}](fig.png)
-and referenced from text using \autoref{fig:example}.
+<!-- ![Caption for example figure.\label{fig:example}](fig.png)
+and referenced from text using \autoref{fig:example}. --> -->
 
 <!-- Figure sizes can be customized by adding an optional second parameter: -->
 <!-- ![Caption for example figure.](figure.png){ width=20% } -->
