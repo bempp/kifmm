@@ -1469,7 +1469,9 @@ where
             //     .unwrap();
 
             // let (sigma, u_big, vt_big) = Scalar::rsvd_fixed_error(&se2tc_fat, self.source_to_target.threshold, None, None).unwrap();
-            let (sigma, u_big, vt_big) = Scalar::rsvd_fixed_rank(&se2tc_fat, 100, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(3)), None).unwrap();
+            let niter = 1;
+            let target_rank = ncoeffs_kifmm(self.equivalent_surface_order(2)) / 2;
+            let (sigma, u_big, vt_big) = Scalar::rsvd_fixed_rank(&se2tc_fat, target_rank, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(niter)), None).unwrap();
 
             let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols);
 
@@ -1502,7 +1504,8 @@ where
             //     )
             //     .unwrap();
 
-            let (_r, _gamma, st) = Scalar::rsvd_fixed_rank(&se2tc_thin, 100, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(3)), None).unwrap();
+            // let (_r, _gamma, st) = Scalar::rsvd_fixed_rank(&se2tc_thin, 100, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(3)), None).unwrap();
+            let (_r, _gamma, st) = Scalar::rsvd_fixed_rank(&se2tc_thin, target_rank, None, Some(crate::fmm::linalg::rsvd::Normaliser::Qr(niter)), None).unwrap();
 
             let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
             for j in 0..cutoff_rank {
