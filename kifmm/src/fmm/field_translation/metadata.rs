@@ -31,7 +31,9 @@ use crate::{
             FftFieldTranslation, FftMetadata, RandomSVDSettings,
         },
         KiFmm,
-    }, linalg::{pinv::*, rsvd::*}, traits::{
+    },
+    linalg::{pinv::*, rsvd::*},
+    traits::{
         fftw::{Dft, DftType},
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
@@ -40,15 +42,16 @@ use crate::{
         fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
-    }, tree::{
+    },
+    tree::{
         constants::{
             ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
         types::MortonKey,
-    }, Fmm
+    },
+    Fmm,
 };
-
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
@@ -1480,10 +1483,18 @@ where
 
             if let Some(rsvd_settings) = &self.source_to_target.svd_mode {
                 // Estimate target rank
-                let max_equivalent_surface_ncoeffs = self.ncoeffs_equivalent_surface.iter().max().unwrap();
+                let max_equivalent_surface_ncoeffs =
+                    self.ncoeffs_equivalent_surface.iter().max().unwrap();
                 let max_check_surface_ncoeffs = self.ncoeffs_check_surface.iter().max().unwrap();
                 let target_rank = max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
-                (sigma, u_big, vt_big) = Scalar::rsvd_fixed_rank(&se2tc_fat, target_rank, rsvd_settings.n_oversamples, rsvd_settings.normaliser, rsvd_settings.random_state).unwrap();
+                (sigma, u_big, vt_big) = Scalar::rsvd_fixed_rank(
+                    &se2tc_fat,
+                    target_rank,
+                    rsvd_settings.n_oversamples,
+                    rsvd_settings.normaliser,
+                    rsvd_settings.random_state,
+                )
+                .unwrap();
             } else {
                 u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
                 sigma = vec![Scalar::zero().re(); k];
@@ -1523,22 +1534,30 @@ where
 
             if let Some(rsvd_settings) = &self.source_to_target.svd_mode {
                 // Estimate target rank
-                let max_equivalent_surface_ncoeffs = self.ncoeffs_equivalent_surface.iter().max().unwrap();
+                let max_equivalent_surface_ncoeffs =
+                    self.ncoeffs_equivalent_surface.iter().max().unwrap();
                 let max_check_surface_ncoeffs = self.ncoeffs_check_surface.iter().max().unwrap();
                 let target_rank = max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
-                (_r, _gamma, st) = Scalar::rsvd_fixed_rank(&se2tc_thin, target_rank, rsvd_settings.n_oversamples, rsvd_settings.normaliser, rsvd_settings.random_state).unwrap();
+                (_r, _gamma, st) = Scalar::rsvd_fixed_rank(
+                    &se2tc_thin,
+                    target_rank,
+                    rsvd_settings.n_oversamples,
+                    rsvd_settings.normaliser,
+                    rsvd_settings.random_state,
+                )
+                .unwrap();
             } else {
                 _gamma = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
                 _r = vec![Scalar::zero().re(); k];
                 st = rlst_dynamic_array2!(Scalar, [k, nst]);
                 se2tc_thin
-                .into_svd_alloc(
-                    _gamma.view_mut(),
-                    st.view_mut(),
-                    &mut _r[..],
-                    SvdMode::Reduced,
-                )
-                .unwrap();
+                    .into_svd_alloc(
+                        _gamma.view_mut(),
+                        st.view_mut(),
+                        &mut _r[..],
+                        SvdMode::Reduced,
+                    )
+                    .unwrap();
             }
 
             let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
@@ -2366,7 +2385,11 @@ where
 {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
-    pub fn new(threshold: Option<Scalar::Real>, surface_diff: Option<usize>, svd_mode: Option<RandomSVDSettings>) -> Self {
+    pub fn new(
+        threshold: Option<Scalar::Real>,
+        surface_diff: Option<usize>,
+        svd_mode: Option<RandomSVDSettings>,
+    ) -> Self {
         let tmp = Scalar::epsilon().re();
 
         Self {

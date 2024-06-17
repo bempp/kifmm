@@ -16,28 +16,28 @@ fn precomputation_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(15));
 
-        {
-            let nsources = 5000;
-            let ntargets = 5000;
-            let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-            let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+    {
+        let nsources = 5000;
+        let ntargets = 5000;
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
-            // FMM parameters
-            let n_crit = Some(150);
-            let depth = None;
-            let e = 3;
-            let expansion_order = [e];
-            let prune_empty = true;
+        // FMM parameters
+        let n_crit = Some(150);
+        let depth = None;
+        let e = 3;
+        let expansion_order = [e];
+        let prune_empty = true;
 
-            // FFT based M2L for a vector of charges
-            let nvecs = 1;
-            let tmp = vec![1.0; nsources * nvecs];
-            let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
-            charges.data_mut().copy_from_slice(&tmp);
+        // FFT based M2L for a vector of charges
+        let nvecs = 1;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
 
-            group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
-                b.iter(|| {
-                    let fmm_fft = SingleNodeBuilder::new()
+        group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
+            b.iter(|| {
+                let fmm_fft = SingleNodeBuilder::new()
                     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                     .unwrap()
                     .parameters(
@@ -49,12 +49,13 @@ fn precomputation_f32(c: &mut Criterion) {
                     )
                     .unwrap()
                     .build()
-                    .unwrap();                })
-            });
+                    .unwrap();
+            })
+        });
 
-            group.bench_function(format!("M2L=BLAS expansion_order={e}"), |b| {
-                b.iter(|| {
-                    let fmm_blas = SingleNodeBuilder::new()
+        group.bench_function(format!("M2L=BLAS expansion_order={e}"), |b| {
+            b.iter(|| {
+                let fmm_blas = SingleNodeBuilder::new()
                     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                     .unwrap()
                     .parameters(
@@ -67,33 +68,32 @@ fn precomputation_f32(c: &mut Criterion) {
                     .unwrap()
                     .build()
                     .unwrap();
-                })
-            });
-        }
+            })
+        });
+    }
 
+    {
+        let nsources = 5000;
+        let ntargets = 5000;
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
-        {
-            let nsources = 5000;
-            let ntargets = 5000;
-            let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-            let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+        // FMM parameters
+        let n_crit = Some(150);
+        let depth = None;
+        let e = 5;
+        let expansion_order = [e];
+        let prune_empty = true;
 
-            // FMM parameters
-            let n_crit = Some(150);
-            let depth = None;
-            let e = 5;
-            let expansion_order = [e];
-            let prune_empty = true;
+        // FFT based M2L for a vector of charges
+        let nvecs = 1;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
 
-            // FFT based M2L for a vector of charges
-            let nvecs = 1;
-            let tmp = vec![1.0; nsources * nvecs];
-            let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
-            charges.data_mut().copy_from_slice(&tmp);
-
-            group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
-                b.iter(|| {
-                    let fmm_fft = SingleNodeBuilder::new()
+        group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
+            b.iter(|| {
+                let fmm_fft = SingleNodeBuilder::new()
                     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                     .unwrap()
                     .parameters(
@@ -105,12 +105,13 @@ fn precomputation_f32(c: &mut Criterion) {
                     )
                     .unwrap()
                     .build()
-                    .unwrap();                })
-            });
+                    .unwrap();
+            })
+        });
 
-            group.bench_function(format!("M2L=BLAS expansion_order={e}"), |b| {
-                b.iter(|| {
-                    let fmm_blas = SingleNodeBuilder::new()
+        group.bench_function(format!("M2L=BLAS expansion_order={e}"), |b| {
+            b.iter(|| {
+                let fmm_blas = SingleNodeBuilder::new()
                     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                     .unwrap()
                     .parameters(
@@ -123,11 +124,9 @@ fn precomputation_f32(c: &mut Criterion) {
                     .unwrap()
                     .build()
                     .unwrap();
-                })
-            });
-
-        }
-
+            })
+        });
+    }
 }
 
 criterion_group!(p_f32, precomputation_f32);

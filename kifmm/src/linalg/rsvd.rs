@@ -1,10 +1,9 @@
 use num::traits::FloatConst;
 use rand_distr::{Standard, StandardNormal};
 use rlst::{
-    c32, c64,
-    dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray,
-    MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess,
-    RlstResult, RlstScalar, Shape, VectorContainer,
+    c32, c64, dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray,
+    MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RlstResult,
+    RlstScalar, Shape, VectorContainer,
 };
 
 /// Matrix type
@@ -236,7 +235,6 @@ generate_rsvd_fixed_rank!(
     randomised_range_finder_fixed_rank_c64,
     rsvd_fixed_rank_c64
 );
-
 
 macro_rules! generate_randomised_range_finder_fixed_error {
     ($type:ty, $name:ident) => {

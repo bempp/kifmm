@@ -337,7 +337,11 @@ mod test {
     };
 
     use crate::{
-        fmm::types::{BlasFieldTranslationIa, RandomSVDSettings}, linalg::rsvd::Normaliser, traits::tree::{FmmTree, FmmTreeNode, Tree}, tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey}, BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
+        fmm::types::{BlasFieldTranslationIa, RandomSVDSettings},
+        linalg::rsvd::Normaliser,
+        traits::tree::{FmmTree, FmmTreeNode, Tree},
+        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
+        BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(

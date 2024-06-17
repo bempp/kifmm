@@ -6,10 +6,12 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
-    linalg::rsvd::Normaliser, traits::{
+    linalg::rsvd::Normaliser,
+    traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
-    }, tree::types::{Domain, MortonKey, SingleNodeTree}
+    },
+    tree::types::{Domain, MortonKey, SingleNodeTree},
 };
 
 #[cfg(feature = "mpi")]
@@ -634,14 +636,19 @@ pub struct RandomSVDSettings {
 }
 
 impl RandomSVDSettings {
-    pub fn new(n_iter: usize, n_components: Option<usize>, n_oversamples: Option<usize> , random_state: Option<usize>) -> Self {
+    pub fn new(
+        n_iter: usize,
+        n_components: Option<usize>,
+        n_oversamples: Option<usize>,
+        random_state: Option<usize>,
+    ) -> Self {
         if n_iter > 0 {
             Self {
                 n_iter,
                 n_components,
                 normaliser: Some(Normaliser::Qr(n_iter)),
                 n_oversamples,
-                random_state
+                random_state,
             }
         } else {
             Self {
@@ -649,7 +656,7 @@ impl RandomSVDSettings {
                 n_components,
                 normaliser: None,
                 n_oversamples,
-                random_state
+                random_state,
             }
         }
     }
