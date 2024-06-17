@@ -4,13 +4,18 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::tree::helpers::points_fixture;
+use rayon::ThreadPoolBuilder;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
+use num_cpus;
 
 extern crate blas_src;
 extern crate lapack_src;
 
 fn precomputation_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("F32 Setup");
+
+    let num_threads = num_cpus::get_physical();
+    ThreadPoolBuilder::new().num_threads(num_threads).build_global().unwrap();
 
     group
         .sample_size(10)
@@ -69,7 +74,6 @@ fn precomputation_f32(c: &mut Criterion) {
                     .unwrap();
                 })
             });
-
         }
 
 
