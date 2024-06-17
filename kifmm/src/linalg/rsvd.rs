@@ -13,6 +13,7 @@ pub type RsvdMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 type RsvdReturnType<T> = RlstResult<(Vec<<T as RlstScalar>::Real>, RsvdMatrix<T>, RsvdMatrix<T>)>;
 
 /// Choose a normalisation method for the orthonormal subspace
+#[derive(Copy, Clone)]
 pub enum Normaliser {
     /// Expensive, more accurate
     Qr(usize),

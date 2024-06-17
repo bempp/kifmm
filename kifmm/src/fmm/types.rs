@@ -6,11 +6,10 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
-    traits::{
+    linalg::rsvd::Normaliser, traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
-    },
-    tree::types::{Domain, MortonKey, SingleNodeTree},
+    }, tree::types::{Domain, MortonKey, SingleNodeTree}
 };
 
 #[cfg(feature = "mpi")]
@@ -622,7 +621,38 @@ where
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
 
-    pub svd_mode: Option<usize>,
+    pub svd_mode: Option<RandomSVDSettings>,
+}
+
+#[derive(Default)]
+pub struct RandomSVDSettings {
+    pub n_iter: usize,
+    pub n_components: Option<usize>,
+    pub normaliser: Option<Normaliser>,
+    pub n_oversamples: Option<usize>,
+    pub random_state: Option<usize>,
+}
+
+impl RandomSVDSettings {
+    pub fn new(n_iter: usize, n_components: Option<usize>, n_oversamples: Option<usize> , random_state: Option<usize>) -> Self {
+        if n_iter > 0 {
+            Self {
+                n_iter,
+                n_components,
+                normaliser: Some(Normaliser::Qr(n_iter)),
+                n_oversamples,
+                random_state
+            }
+        } else {
+            Self {
+                n_iter,
+                n_components,
+                normaliser: None,
+                n_oversamples,
+                random_state
+            }
+        }
+    }
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.

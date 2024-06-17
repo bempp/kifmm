@@ -64,7 +64,7 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
             )
             .unwrap()
             .build()
@@ -89,7 +89,7 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
             )
             .unwrap()
             .build()

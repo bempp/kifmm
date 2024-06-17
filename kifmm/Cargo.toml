@@ -38,6 +38,7 @@ pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethod
 numpy = { version = "0.21", optional = true }
 pulp = "0.18.12"
 bytemuck = "1.16.0"
+rand_distr = "0.4.3"
 
 [target.aarch64-apple-darwin.dependencies]
 rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd", features = ["metal"]}

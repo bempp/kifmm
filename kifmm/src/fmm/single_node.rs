@@ -337,10 +337,7 @@ mod test {
     };
 
     use crate::{
-        fmm::types::BlasFieldTranslationIa,
-        traits::tree::{FmmTree, FmmTreeNode, Tree},
-        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+        fmm::types::{BlasFieldTranslationIa, RandomSVDSettings}, linalg::rsvd::Normaliser, traits::tree::{FmmTree, FmmTreeNode, Tree}, tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey}, BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
@@ -786,6 +783,9 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let s = Instant::now();
+
+        let rsvd_settings = Some(RandomSVDSettings::new(1, None, None, None));
+
         let mut fmm = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
@@ -794,13 +794,13 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None, None),
+                BlasFieldTranslationSaRcmp::new(None, None, rsvd_settings),
             )
             .unwrap()
             .build()
             .unwrap();
-        println!("SETUP {:?}", s.elapsed());
-        assert!(false);
+        // println!("SETUP {:?}", s.elapsed());
+        // assert!(false);
         fmm.evaluate(false).unwrap();
 
         // Reset Charge data and re-evaluate potential
@@ -818,6 +818,7 @@ mod test {
             &charges,
             threshold_pot,
         );
+        assert!(false);
     }
 
     #[test]

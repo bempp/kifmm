@@ -62,7 +62,7 @@ fn precomputation_f32(c: &mut Criterion) {
                         &expansion_order,
                         Laplace3dKernel::new(),
                         EvalType::Value,
-                        BlasFieldTranslationSaRcmp::new(None, None),
+                        BlasFieldTranslationSaRcmp::new(None, None, None),
                     )
                     .unwrap()
                     .build()
@@ -118,7 +118,7 @@ fn precomputation_f32(c: &mut Criterion) {
                         &expansion_order,
                         Laplace3dKernel::new(),
                         EvalType::Value,
-                        BlasFieldTranslationSaRcmp::new(None, None),
+                        BlasFieldTranslationSaRcmp::new(None, None, None),
                     )
                     .unwrap()
                     .build()
