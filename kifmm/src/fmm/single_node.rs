@@ -323,6 +323,8 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
+
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
@@ -783,6 +785,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
+        let s = Instant::now();
         let mut fmm = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
@@ -791,11 +794,13 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(None),
+                BlasFieldTranslationSaRcmp::new(None, None),
             )
             .unwrap()
             .build()
             .unwrap();
+        println!("SETUP {:?}", s.elapsed());
+        assert!(false);
         fmm.evaluate(false).unwrap();
 
         // Reset Charge data and re-evaluate potential
@@ -813,142 +818,6 @@ mod test {
             &charges,
             threshold_pot,
         );
-    }
-
-    #[test]
-    fn foo() {
-        // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-
-        let min = None;
-        let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
-
-        // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
-
-        let prune_empty = true;
-        let threshold_pot = 1e-3;
-        let threshold_deriv = 1e-4;
-        let threshold_deriv_blas = 1e-3;
-        let singular_value_threshold = Some(1e-2);
-
-        // Charge data
-        let nvecs = 1;
-        let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
-
-        // FFT based field translation
-        {
-            // Evaluate potentials
-            let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    EvalType::Value,
-                    FftFieldTranslation::new(None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_fft.evaluate(false).unwrap();
-            let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_fft,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_pot,
-            );
-
-            // Evaluate potentials + derivatives
-            let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    EvalType::ValueDeriv,
-                    FftFieldTranslation::new(None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_fft.evaluate(false).unwrap();
-
-            let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_fft,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv,
-            );
-        }
-
-        // BLAS based field translation
-        {
-            // Evaluate potentials
-            let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_pot,
-            );
-
-            // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv_blas,
-            );
-        }
     }
 
     #[test]
