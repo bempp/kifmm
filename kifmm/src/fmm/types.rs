@@ -626,7 +626,7 @@ where
     pub svd_mode: Option<RandomSVDSettings>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub struct RandomSVDSettings {
     pub n_iter: usize,
     pub n_components: Option<usize>,
