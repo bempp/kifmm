@@ -395,16 +395,16 @@ fn main() {
     );
 
     let rsvd_settings_vec = vec![
-        // None,
+        None,
         Some(RandomSVDSettings::new(1, None, Some(5), None)),
-        // Some(RandomSVDSettings::new(2, None, Some(5), None)),
-        // Some(RandomSVDSettings::new(4, None, Some(5), None)),
-        // Some(RandomSVDSettings::new(1, None, Some(10), None)),
-        // Some(RandomSVDSettings::new(2, None, Some(10), None)),
-        // Some(RandomSVDSettings::new(4, None, Some(10), None)),
-        // Some(RandomSVDSettings::new(1, None, Some(20), None)),
-        // Some(RandomSVDSettings::new(2, None, Some(20), None)),
-        // Some(RandomSVDSettings::new(4, None, Some(20), None)),
+        Some(RandomSVDSettings::new(2, None, Some(5), None)),
+        Some(RandomSVDSettings::new(4, None, Some(5), None)),
+        Some(RandomSVDSettings::new(1, None, Some(10), None)),
+        Some(RandomSVDSettings::new(2, None, Some(10), None)),
+        Some(RandomSVDSettings::new(4, None, Some(10), None)),
+        Some(RandomSVDSettings::new(1, None, Some(20), None)),
+        Some(RandomSVDSettings::new(2, None, Some(20), None)),
+        Some(RandomSVDSettings::new(4, None, Some(20), None)),
     ];
 
     grid_search_laplace_blas::<f32>(
