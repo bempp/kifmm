@@ -776,7 +776,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = [10];
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -803,8 +803,8 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        // println!("SETUP {:?}", s.elapsed());
-        // assert!(false);
+        println!("SETUP {:?}", s.elapsed());
+        assert!(false);
         fmm.evaluate(false).unwrap();
 
         // Reset Charge data and re-evaluate potential
