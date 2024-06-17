@@ -621,6 +621,8 @@ where
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
+
+    pub svd_mode: Option<usize>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.

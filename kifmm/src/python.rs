@@ -244,7 +244,7 @@ macro_rules! laplace_blas_constructors {
                         expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff),
+                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, None),
                     )
                     .unwrap()
                     .build()

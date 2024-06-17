@@ -86,6 +86,7 @@ pub mod hyksort;
 pub mod python;
 pub mod traits;
 pub mod tree;
+pub mod linalg;
 
 // Public API
 #[doc(inline)]

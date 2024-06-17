@@ -703,7 +703,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold, None),
+                BlasFieldTranslationSaRcmp::new(svd_threshold, None, None),
             )
             .unwrap()
             .build()
@@ -750,7 +750,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold, None),
+                BlasFieldTranslationSaRcmp::new(svd_threshold, None, None),
             )
             .unwrap()
             .build()
@@ -794,7 +794,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None),
+                BlasFieldTranslationSaRcmp::new(None, None, None),
             )
             .unwrap()
             .build()
@@ -914,7 +914,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
                 )
                 .unwrap()
                 .build()
@@ -939,7 +939,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
                 )
                 .unwrap()
                 .build()
@@ -995,7 +995,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff, None),
                 )
                 .unwrap()
                 .build()
@@ -1021,7 +1021,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
                 )
                 .unwrap()
                 .build()
@@ -1076,7 +1076,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff, None),
                 )
                 .unwrap()
                 .build()
@@ -1133,7 +1133,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff, None),
                 )
                 .unwrap()
                 .build()
@@ -1159,7 +1159,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
                 )
                 .unwrap()
                 .build()
@@ -1641,7 +1641,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
                 )
                 .unwrap()
                 .build()
@@ -1663,7 +1663,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, None),
                 )
                 .unwrap()
                 .build()

@@ -26,7 +26,6 @@ use crate::{
             leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
             ncoeffs_kifmm, potential_pointers,
         },
-        pinv::pinv,
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             FftFieldTranslation, FftMetadata,
@@ -50,8 +49,10 @@ use crate::{
         helpers::find_corners,
         types::MortonKey,
     },
+    linalg::{pinv::*, rsvd::*},
     Fmm,
 };
+
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
@@ -2345,13 +2346,14 @@ where
 {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
-    pub fn new(threshold: Option<Scalar::Real>, surface_diff: Option<usize>) -> Self {
+    pub fn new(threshold: Option<Scalar::Real>, surface_diff: Option<usize>, svd_mode: Option<usize>) -> Self {
         let tmp = Scalar::epsilon().re();
 
         Self {
             threshold: threshold.unwrap_or(tmp),
             transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
             surface_diff: surface_diff.unwrap_or_default(),
+            svd_mode,
             ..Default::default()
         }
     }
@@ -2451,7 +2453,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(Some(1e-5), None),
+                BlasFieldTranslationSaRcmp::new(Some(1e-5), None, None),
             )
             .unwrap()
             .build()
