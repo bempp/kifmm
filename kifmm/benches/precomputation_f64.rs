@@ -19,8 +19,8 @@ fn precomputation_f64(c: &mut Criterion) {
         {
             let nsources = 5000;
             let ntargets = 5000;
-            let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-            let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+            let sources = points_fixture::<f64>(nsources, None, None, Some(0));
+            let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
             // FMM parameters
             let n_crit = Some(150);
@@ -32,7 +32,7 @@ fn precomputation_f64(c: &mut Criterion) {
             // FFT based M2L for a vector of charges
             let nvecs = 1;
             let tmp = vec![1.0; nsources * nvecs];
-            let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+            let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
             charges.data_mut().copy_from_slice(&tmp);
 
             group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
@@ -76,8 +76,8 @@ fn precomputation_f64(c: &mut Criterion) {
         {
             let nsources = 5000;
             let ntargets = 5000;
-            let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-            let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+            let sources = points_fixture::<f64>(nsources, None, None, Some(0));
+            let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
             // FMM parameters
             let n_crit = Some(150);
@@ -89,7 +89,7 @@ fn precomputation_f64(c: &mut Criterion) {
             // FFT based M2L for a vector of charges
             let nvecs = 1;
             let tmp = vec![1.0; nsources * nvecs];
-            let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+            let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
             charges.data_mut().copy_from_slice(&tmp);
 
             group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
@@ -132,8 +132,8 @@ fn precomputation_f64(c: &mut Criterion) {
         {
             let nsources = 5000;
             let ntargets = 5000;
-            let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-            let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+            let sources = points_fixture::<f64>(nsources, None, None, Some(0));
+            let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
 
             // FMM parameters
             let n_crit = Some(150);
@@ -145,7 +145,7 @@ fn precomputation_f64(c: &mut Criterion) {
             // FFT based M2L for a vector of charges
             let nvecs = 1;
             let tmp = vec![1.0; nsources * nvecs];
-            let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+            let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
             charges.data_mut().copy_from_slice(&tmp);
 
             group.bench_function(format!("M2L=FFT expansion_order={e}"), |b| {
