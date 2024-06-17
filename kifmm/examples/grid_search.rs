@@ -67,6 +67,7 @@ fn grid_search_laplace_blas<T>(
     parameters.into_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings))| {
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
+            let s = Instant::now();
             let fmm = SingleNodeBuilder::new()
                 .tree(
                     sources.data(),
@@ -86,8 +87,8 @@ fn grid_search_laplace_blas<T>(
                 .unwrap()
                 .build()
                 .unwrap();
-
-            fmms.lock().unwrap().push((i, fmm));
+            let setup_time = s.elapsed();
+            fmms.lock().unwrap().push((i, fmm, setup_time));
             *progress.lock().unwrap().deref_mut() += 1;
 
             println!(
@@ -106,12 +107,13 @@ fn grid_search_laplace_blas<T>(
             "surface_diff".to_string(),
             "svd_threshold".to_string(),
             "expansion_order".to_string(),
-            "time".to_string(),
+            "runtime".to_string(),
             "min_rel_err".to_string(),
             "mean_rel_err".to_string(),
             "max_rel_err".to_string(),
             "n_iter".to_string(),
-            "n_oversamples".to_string()
+            "n_oversamples".to_string(),
+            "setup_time".to_string()
         ])
         .unwrap();
 
@@ -129,7 +131,7 @@ fn grid_search_laplace_blas<T>(
     charges.data_mut().copy_from_slice(&tmp);
 
     let mut progress = 0;
-    for (i, fmm) in fmms.lock().unwrap().iter() {
+    for (i, fmm, setup_time) in fmms.lock().unwrap().iter() {
         let (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings) = parameters_cloned[*i];
 
         let svd_threshold = svd_threshold.unwrap_or(T::zero().re());
@@ -199,7 +201,8 @@ fn grid_search_laplace_blas<T>(
                 mean_rel_err.to_string(),
                 max_rel_err.to_string(),
                 n_iter.to_string(),
-                n_oversamples.to_string()
+                n_oversamples.to_string(),
+                (setup_time.as_millis() as f32 ).to_string()
             ])
             .unwrap();
     }
@@ -250,6 +253,7 @@ fn grid_search_laplace_fft<T>(
             let mut charges = rlst_dynamic_array2!(T, [nsources, nvecs]);
             charges.data_mut().copy_from_slice(&tmp);
 
+            let s = Instant::now();
             let fmm = SingleNodeBuilder::new()
                 .tree(
                     sources.data(),
@@ -269,8 +273,9 @@ fn grid_search_laplace_fft<T>(
                 .unwrap()
                 .build()
                 .unwrap();
+            let setup_time = s.elapsed();
 
-            fmms.lock().unwrap().push((i, fmm));
+            fmms.lock().unwrap().push((i, fmm, setup_time));
             *progress.lock().unwrap().deref_mut() += 1;
 
             println!(
@@ -294,6 +299,7 @@ fn grid_search_laplace_fft<T>(
             "min_rel_err".to_string(),
             "mean_rel_err".to_string(),
             "max_rel_err".to_string(),
+            "setup_time".to_string(),
         ])
         .unwrap();
 
@@ -305,7 +311,7 @@ fn grid_search_laplace_fft<T>(
     charges.data_mut().copy_from_slice(&tmp);
 
     let mut progress = 0;
-    for (i, fmm) in fmms.lock().unwrap().iter() {
+    for (i, fmm, setup_time) in fmms.lock().unwrap().iter() {
         let (depth, expansion_order) = parameters_cloned[*i];
 
         let s = Instant::now();
@@ -360,6 +366,7 @@ fn grid_search_laplace_fft<T>(
                 min_rel_err.to_string(),
                 mean_rel_err.to_string(),
                 max_rel_err.to_string(),
+                (setup_time.as_millis() as f32).to_string(),
             ])
             .unwrap();
     }
@@ -381,26 +388,23 @@ fn main() {
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
 
-    // grid_search_laplace_fft::<f32>(
-    //     "grid_search_laplace_fft_f32_m1".to_string(),
-    //     &expansion_order_vec,
-    //     &depth_vec,
-    // );
+    grid_search_laplace_fft::<f32>(
+        "grid_search_laplace_fft_f32_m1".to_string(),
+        &expansion_order_vec,
+        &depth_vec,
+    );
 
     let rsvd_settings_vec = vec![
         // None,
         Some(RandomSVDSettings::new(1, None, Some(5), None)),
         // Some(RandomSVDSettings::new(2, None, Some(5), None)),
         // Some(RandomSVDSettings::new(4, None, Some(5), None)),
-        // Some(RandomSVDSettings::new(8, None, Some(5), None)),
         // Some(RandomSVDSettings::new(1, None, Some(10), None)),
         // Some(RandomSVDSettings::new(2, None, Some(10), None)),
         // Some(RandomSVDSettings::new(4, None, Some(10), None)),
-        // Some(RandomSVDSettings::new(8, None, Some(10), None)),
-        // Some(RandomSVDSettings::new(1, None, Some(15), None)),
-        // Some(RandomSVDSettings::new(2, None, Some(15), None)),
-        // Some(RandomSVDSettings::new(4, None, Some(15), None)),
-        // Some(RandomSVDSettings::new(8, None, Some(15), None)),
+        // Some(RandomSVDSettings::new(1, None, Some(20), None)),
+        // Some(RandomSVDSettings::new(2, None, Some(20), None)),
+        // Some(RandomSVDSettings::new(4, None, Some(20), None)),
     ];
 
     grid_search_laplace_blas::<f32>(
