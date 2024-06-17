@@ -727,7 +727,7 @@ where
             }
 
             transfer_vectors
-                .into_iter()
+                .into_par_iter()
                 .enumerate()
                 .for_each(|(i, t)| {
                     let source_equivalent_surface = t.source.surface_grid(
@@ -1541,7 +1541,7 @@ where
                     .push(rlst_dynamic_array2!(Scalar, [1, 1]));
             }
 
-            (0..NTRANSFER_VECTORS_KIFMM).into_iter().for_each(|i| {
+            (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
                 let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
