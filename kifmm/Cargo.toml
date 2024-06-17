@@ -53,8 +53,13 @@ lapack-src = { version = "0.10", features = ["netlib"], optional = true}
 criterion = { version = "0.5.*", features = ["html_reports"]}
 
 [[bench]]
-name = "laplace_f32"
+name = "precomputation_f32"
 harness = false
+
+[[bench]]
+name = "precomputation_f64"
+harness = false
+
 
 [[bench]]
 name = "direct_f32"
@@ -62,6 +67,10 @@ harness = false
 
 [[bench]]
 name = "direct_f64"
+harness = false
+
+[[bench]]
+name = "laplace_f32"
 harness = false
 
 [[bench]]
