@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20240614T145943-d096e0c62de842571e829e943de2b8623de51ccc</doi_batch_id>
-    <timestamp>20240614145943</timestamp>
+    <doi_batch_id>20240618T111825-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
+    <timestamp>20240618111825</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -37,8 +37,8 @@
       </journal_issue>
       <journal_article publication_type="full_text">
         <titles>
-          <title>kifmm-rs: A Kernel-Independent Fast Multipole Method in
-Rust</title>
+          <title>kifmm-rs: A Kernel-Independent Fast Multipole Framework
+in Rust</title>
         </titles>
         <contributors>
           <person_name sequence="first" contributor_role="author">
@@ -95,16 +95,75 @@ top 10 algorithms</article_title>
 20th century: Editors name top 10 algorithms. SIAM News, 33(4),
 1–2.</unstructured_citation>
           </citation>
-          <citation key="asanovic2006landscape">
-            <article_title>The landscape of parallel computing research:
-A view from berkeley</article_title>
-            <author>Asanovic</author>
-            <cYear>2006</cYear>
-            <unstructured_citation>Asanovic, K., Bodik, R., Catanzaro,
-B. C., Gebis, J. J., Husbands, P., Keutzer, K., Patterson, D. A.,
-Plishker, W. L., Shalf, J., Williams, S. W., &amp; others. (2006). The
-landscape of parallel computing research: A view from
-berkeley.</unstructured_citation>
+          <citation key="Ying2004">
+            <article_title>A kernel-independent adaptive fast multipole
+algorithm in two and three dimensions</article_title>
+            <author>Ying</author>
+            <journal_title>Journal of Computational
+Physics</journal_title>
+            <issue>2</issue>
+            <volume>196</volume>
+            <doi>10.1016/j.jcp.2003.11.021</doi>
+            <cYear>2004</cYear>
+            <unstructured_citation>Ying, L., Biros, G., &amp; Zorin, D.
+(2004). A kernel-independent adaptive fast multipole algorithm in two
+and three dimensions. Journal of Computational Physics, 196(2), 591–626.
+https://doi.org/10.1016/j.jcp.2003.11.021</unstructured_citation>
+          </citation>
+          <citation key="Malhotra2015">
+            <article_title>PVFMM: A Parallel Kernel Independent FMM for
+Particle and Volume Potentials</article_title>
+            <author>Malhotra</author>
+            <journal_title>Commun. Comput. Phys.</journal_title>
+            <issue>3</issue>
+            <volume>18</volume>
+            <doi>10.4208/cicp.020215.150515sw</doi>
+            <cYear>2015</cYear>
+            <unstructured_citation>Malhotra, D., &amp; Biros, G. (2015).
+PVFMM: A Parallel Kernel Independent FMM for Particle and Volume
+Potentials. Commun. Comput. Phys., 18(3), 808–830.
+https://doi.org/10.4208/cicp.020215.150515sw</unstructured_citation>
+          </citation>
+          <citation key="wang2021exafmm">
+            <article_title>ExaFMM: A high-performance fast multipole
+method library with c++ and python interfaces</article_title>
+            <author>Wang</author>
+            <journal_title>Journal of Open Source
+Software</journal_title>
+            <issue>61</issue>
+            <volume>6</volume>
+            <cYear>2021</cYear>
+            <unstructured_citation>Wang, T., Yokota, R., &amp; Barba, L.
+A. (2021). ExaFMM: A high-performance fast multipole method library with
+c++ and python interfaces. Journal of Open Source Software, 6(61),
+3145.</unstructured_citation>
+          </citation>
+          <citation key="Greengard1987">
+            <article_title>A fast algorithm for particle
+simulations</article_title>
+            <author>Greengard</author>
+            <journal_title>Journal of Computational
+Physics</journal_title>
+            <issue>2</issue>
+            <volume>73</volume>
+            <doi>10.1016/0021-9991(87)90140-9</doi>
+            <cYear>1987</cYear>
+            <unstructured_citation>Greengard, L., &amp; Rokhlin, V.
+(1987). A fast algorithm for particle simulations. Journal of
+Computational Physics, 73(2), 325–348.
+https://doi.org/10.1016/0021-9991(87)90140-9</unstructured_citation>
+          </citation>
+          <citation key="Kailasa2024">
+            <article_title>Designing kernel independent fast multipole
+methods for modern architectures</article_title>
+            <author>Kailasa</author>
+            <journal_title>Submitted To SIAM Journal on Scientific
+Computing</journal_title>
+            <cYear>2024</cYear>
+            <unstructured_citation>Kailasa, S., Betcke, T., &amp;
+El-Kazdadi, S. (2024). Designing kernel independent fast multipole
+methods for modern architectures. Submitted To SIAM Journal on
+Scientific Computing.</unstructured_citation>
           </citation>
         </citation_list>
       </journal_article>
