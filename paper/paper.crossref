@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20240618T133803-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
-    <timestamp>20240618133803</timestamp>
+    <doi_batch_id>20240618T161237-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
+    <timestamp>20240618161237</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -110,6 +110,21 @@ Physics</journal_title>
 and three dimensions. Journal of Computational Physics, 196(2), 591–626.
 https://doi.org/10.1016/j.jcp.2003.11.021</unstructured_citation>
           </citation>
+          <citation key="Fong2009">
+            <article_title>The black-box fast multipole
+method</article_title>
+            <author>Fong</author>
+            <journal_title>Journal of Computational
+Physics</journal_title>
+            <issue>23</issue>
+            <volume>228</volume>
+            <doi>10.1016/j.jcp.2009.08.031</doi>
+            <cYear>2009</cYear>
+            <unstructured_citation>Fong, W., &amp; Darve, E. (2009). The
+black-box fast multipole method. Journal of Computational Physics,
+228(23), 8712–8725.
+https://doi.org/10.1016/j.jcp.2009.08.031</unstructured_citation>
+          </citation>
           <citation key="Malhotra2015">
             <article_title>PVFMM: A Parallel Kernel Independent FMM for
 Particle and Volume Potentials</article_title>
@@ -194,7 +209,7 @@ Media.</unstructured_citation>
 rust</article_title>
             <author>Betcke</author>
             <cYear>2024</cYear>
-            <unstructured_citation>Betcke, M., T. &amp; Scroggs. (2024).
+            <unstructured_citation>Betcke, T., &amp; Scroggs, M. (2024).
 Bempp-rs: Boundary element methods in rust.
 https://github.com/bempp/bempp-rs</unstructured_citation>
           </citation>
