@@ -818,13 +818,13 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                BlasFieldTranslationSaRcmp::new(None, None),
             )
             .unwrap()
             .build()
             .unwrap();
-        fmm.evaluate(false).unwrap();
 
+        fmm.evaluate(false).unwrap();
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());

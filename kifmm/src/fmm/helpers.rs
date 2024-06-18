@@ -143,11 +143,7 @@ where
     let mut result = vec![(0usize, 0usize); tree.n_leaves().unwrap()];
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let n_points = if let Some(n) = tree.n_coordinates(leaf) {
-            n
-        } else {
-            0
-        };
+        let n_points = tree.n_coordinates(leaf).unwrap_or_default();
 
         // Update charge index pointer
         result[i] = (index_pointer, index_pointer + n_points);
