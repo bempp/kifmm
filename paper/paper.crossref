@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20240618T111825-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
-    <timestamp>20240618111825</timestamp>
+    <doi_batch_id>20240618T133803-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
+    <timestamp>20240618133803</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -164,6 +164,39 @@ Computing</journal_title>
 El-Kazdadi, S. (2024). Designing kernel independent fast multipole
 methods for modern architectures. Submitted To SIAM Journal on
 Scientific Computing.</unstructured_citation>
+          </citation>
+          <citation key="engquist2010fast">
+            <article_title>Fast directional algorithms for the helmholtz
+kernel</article_title>
+            <author>Engquist</author>
+            <journal_title>Journal of Computational and Applied
+Mathematics</journal_title>
+            <issue>6</issue>
+            <volume>234</volume>
+            <cYear>2010</cYear>
+            <unstructured_citation>Engquist, B., &amp; Ying, L. (2010).
+Fast directional algorithms for the helmholtz kernel. Journal of
+Computational and Applied Mathematics, 234(6),
+1851–1859.</unstructured_citation>
+          </citation>
+          <citation key="steinbach2007numerical">
+            <volume_title>Numerical approximation methods for elliptic
+boundary value problems: Finite and boundary elements</volume_title>
+            <author>Steinbach</author>
+            <cYear>2007</cYear>
+            <unstructured_citation>Steinbach, O. (2007). Numerical
+approximation methods for elliptic boundary value problems: Finite and
+boundary elements. Springer Science &amp; Business
+Media.</unstructured_citation>
+          </citation>
+          <citation key="bempp_rs">
+            <article_title>Bempp-rs: Boundary element methods in
+rust</article_title>
+            <author>Betcke</author>
+            <cYear>2024</cYear>
+            <unstructured_citation>Betcke, M., T. &amp; Scroggs. (2024).
+Bempp-rs: Boundary element methods in rust.
+https://github.com/bempp/bempp-rs</unstructured_citation>
           </citation>
         </citation_list>
       </journal_article>
