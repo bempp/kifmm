@@ -148,11 +148,10 @@ Indeed, the full API is more extensive, including features that enable for varia
 
 # Benchmarks
 
-We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] for the target architectures in Table (\ref{tab:hardware_and_software}) for achieving a given precision for a common benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for one million uniformly distributed source and target points. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software performance using two common acceleration schemes for the field translation, FFT and BLAS level 3 operations, only the former of which are supported by current state of the art implementations.
+We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] for the target architectures in Table (\ref{tab:hardware_and_software}) for achieving a given precision for a common benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software performance using two common acceleration schemes for the field translation, FFT and BLAS level 3 operations, only the former of which are supported by current state of the art implementations.
 
 
 [Space for Plot]
-
 
 Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we report only the specifications of its 'performance' CPU cores. We report per core cache sizes for L1/L2 and total cache size for L3. \label{tab:hardware_and_software}
 
