@@ -25,7 +25,7 @@ We present `kifmm-rs` a Rust based implementation of the kernel independent Fast
     \label{eq:sec:summary:potential}
 \end{equation}
 
-to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluated at a set of target points, $\{x_i\}_{i=1}^M$, due to a set of densities, $\{ q_j \}_{j=1}^N$. Compatible kernels, which commonly arise from second-order elliptic partial differential equations, such as the Laplace kernel which models the electrostatic or gravitational potentials corresponding to a set of source points on a set of target points,
+from $O(N^2)$ to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluated at a set of target points, $\{x_i\}_{i=1}^M$, due to a set of densities, $\{ q_j \}_{j=1}^N$ and $K(.,.)$ is the interaction kernel. Compatible kernels commonly arise from second-order elliptic partial differential equations, such as the Laplace kernel which models the electrostatic or gravitational potentials corresponding to a set of source points on a set of target points,
 
 \begin{equation}
     K(x, y) = \begin{cases}
@@ -35,9 +35,7 @@ to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluated at a set of
     \label{eq:sec:summary:laplace_kernel}
 \end{equation}
 
-The FMM finds a major application in the acceleration of Boundary Element Methods (BEM) for elliptic boundary value problems [@steinbach2007numerical], which can be used to model a wide range of natural phenomena.
-
-Kernel independent variants of the FMM (kiFMMs) replace the analytical series approximations used to compress far-field interactions between clusters of source and target points, with approximation schemes that are based on kernel evaluations and extensions of the algorithm can also handle oscillatory problems specified by the Helmholtz kernel [@Ying2004; @engquist2010fast], with a common underlying algorithmic and software machinery that can be optimised in a kernel-independent manner.
+The FMM also finds a major application in the acceleration of Boundary Element Methods (BEM) for elliptic boundary value problems [@steinbach2007numerical], which can be used to model a wide range of natural phenomena. Kernel independent variants of the FMM (kiFMMs) replace the analytical series approximations used to compress far-field interactions between clusters of source and target points, with approximation schemes that are based on kernel evaluations and extensions of the algorithm can also handle oscillatory problems specified by the Helmholtz kernel [@Ying2004; @engquist2010fast], with a common underlying algorithmic and software machinery that can be optimised in a kernel-independent manner.
 
 The FMM splits (\ref{eq:sec:summary:potential}) for a given target cluster into \textit{near} and \textit{far} components, the latter of which are taken to be _admissable_, i.e. amenable to approximation via an expansion scheme or alternative interpolation method such as [@Ying2004; @Fong2009],
 
@@ -46,18 +44,18 @@ The FMM splits (\ref{eq:sec:summary:potential}) for a given target cluster into 
     \label{eq:sec:summary:near_far_split}
 \end{equation}
 
-the near component evaluated directly using the kernel function $K(.,.)$, and the far-field compressed via a _field translation_, referred to as the multipole to local (M2L) translation. This split, in addition to a recursive procedure through a hierarchical data structure, commonly an octree in 3D, used to discretise the problem domain gives rise to the linear/log-linear complexity of the FMM, as the number of far-field interactions which are admissable is limited by a constant depending on the problem dimension. The evaluation of the near field component commonly referred to as the particle to particle (P2P) operation. These two operations conspire to dominate runtimes in practical implementations. An approximate rule of thumb being that the P2P is compute bound, and the M2L is memory bound, acceleration attempts for FMM softwares often focus on reformulations that ensure the M2L has a high arithmetic intensity.
+the near component evaluated directly using the kernel function $K(.,.)$, and the far-field compressed via a _field translation_, referred to as the multipole to local (M2L) translation. This split, in addition to a recursive loop through a hierarchical data structure, commonly an octree for three dimensional problems, gives rise to the linear/log-linear complexity of the FMM, as the number of far-field interactions which are admissable is limited by a constant depending on the problem dimension. The evaluation of the near field component commonly referred to as the particle to particle (P2P) operation. These two operations conspire to dominate runtimes in practical implementations. An approximate rule of thumb being that the P2P is compute bound, and the M2L is memory bound, acceleration attempts for FMM softwares often focus on reformulations that ensure the M2L has a high arithmetic intensity.
 
 # Statement of need
 
-Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. However, both of these efforts are packaged as opaque heavily templated C++ libraries, with brittle optimisations for the M2L and P2P operations that make it complex for users or new developers to exchange or experiment with new algorithmic or implementation ideas that improve runtime performance. Furthermore, it is not possible to readily deploy the software on new hardware platforms due to reliance on hand written CMake based builds. Notably, neither softwares support building to Arm targets which are becoming more common as both commodity and HPC platforms.
+Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. However, both of these efforts are heavily templated C++ libraries, with brittle optimisations for the M2L and P2P operations that make it complex for users or new developers to exchange or experiment with new algorithmic or implementation ideas that improve runtime performance. It is not possible to readily deploy these softwares on new hardware platforms due to reliance on hand written CMake based builds. Notably, neither softwares support building to Arm targets which are becoming more common as both commodity and HPC platforms, with no performance promised for systems which don't support AVX instruction sets.
 
-Novice users are provided with Python bindings in [@wang2021exafmm], however the state of the art distributed code is only accessible via C++ [@Malhotra2015]. Software sub-components such as the hierarchical tree data structures and kernel implementations are not readily re-usable for related algorithmic work by downstream users, and underlying software used in compute kernels such as libraries for BLAS, LAPACK, or the FFT are not readily exchangeable by users to experiment with performance differences across hardware variations.
+Novice users are provided with Python bindings in [@wang2021exafmm], however the state of the art distributed code is only accessible via C++ [@Malhotra2015]. In both softwares, sub-components such as the octree data structures and kernel implementations are not readily re-usable for related algorithmic work by downstream users, and underlying software used in compute kernels such as libraries for BLAS, LAPACK, or the FFT are not readily exchangeable for experimentation with performance differences across hardwares.
 
 Our principle contributions with `kifmm-rs` that extend beyond current state of the art implementations are:
 
-- A _highly portable_ Rust-based data-oriented software design that allows us to easily test the impact of different algorithmic approaches, and backends for computational kernels such as BLAS libraries, for critical algorithmic sub-components such as the M2L and P2P operations.
-- _State of the art_ single-node performance enabled by the optimisation of BLAS based M2L field translation, based on level 3 operations with high arithmetic intensity that are well suited to current and future hardware architectures that prioritise minimal memory movement per flop.
+- A _highly portable_ Rust-based data-oriented software design that allows us to easily test the impact of different algorithmic approaches and computational backends, such as BLAS libraries, for critical algorithmic sub-components such as the M2L and P2P operations.
+- _State of the art_ single-node performance enabled by the optimisation of BLAS based M2L field translation, based entirely on level 3 operations with high arithmetic intensity that are well suited to current and future hardware architectures that prioritise minimal memory movement per flop.
 - The ability to _process multiple right hand sides_ corresponding to the same particle distribution using (\ref{eq:sec:summary:potential}), a common application in BEM.
 - _Simple API_, with full Python bindings for non-specialist users. For basic usage all users need to specify are source and target coordinates, and associated source densities, with no temporary files.
 
@@ -73,27 +71,84 @@ As a platform for scientific computing, Rust's principal benefits are its build 
 
 Rust's 'trait' system effectively allows us to write our code towards the 'data oriented design' paradigm. Which places optimal memory movement through cache hierarchies at the centre of a software's design. Resultantly, 'structs of arrays' are preferred to 'arrays of structs' - i.e. simple objects that wrap contiguously stored buffers in comparison to complex objects storing complex objects.
 
-Traits are contracts between types, and types can implement multiple traits. Therefore we are able to compose complex polymorphic behaviour for our data structures, which consist of simple structs of arrays, by writing all interfaces using traits. In this way, we are able to easily compose sub-components of our software, such as field translation algorithms, explicit SIMD vectorisation strategies for different architectures, single node and MPI distributed octrees, interaction kernels and underlying BLAS or LAPACK implementations. This makes our software more akin to a framework for developing kiFMMs, which can take different flavours, and be used to explore the efficacy of different approaches on different hardware targets.
+Traits are contracts between types, and types can implement multiple traits. Therefore we are able to compose complex polymorphic behaviour for our data structures, which consist of simple structs of arrays, by writing all interfaces using traits. In this way, we are able to easily compose sub-components of our software, such as field translation algorithms, explicit SIMD vectorisation strategies for different architectures (via the Pulp library [@pulp]), single node and MPI distributed octrees, interaction kernels and underlying BLAS or LAPACK implementations (via the RLST library [@rlst]). This makes our software more akin to a framework for developing kiFMMs, which can take different flavours, and be used to explore the efficacy of different FMM approaches across hardware targets and software backends.
 
 ## API
 
-Our Rust APIs are simple in comparison to other leading codes, with the requirement for no temporary metadata files [@wang2021exafmm], or setup of ancillary data structures such as hierarchical trees [@Malhotra2015], required by the user. FMMs are simply parametrised by performance specific parameters controlling the field translations, or tolerable tree depths, which if left unspecified leaves the software to make a best guess based on available hardware resources. At its simplest, a user only specifies buffers associated with source and target particle coordinates, and associated source densities. They can access potentials, and potential gradients, either by leaf box or indeed the underlying buffer.
+Our Rust APIs are simple in comparison to other leading codes, with the requirement for no temporary metadata files [@wang2021exafmm], or setup of ancillary data structures such as hierarchical trees [@Malhotra2015], required by the user. FMMs are simply parameterised using the builder pattern, with operator chaining to modulate the runtime object. At its simplest, a user only specifies buffers associated with source and target particle coordinates, and associated source densities. Trait interfaces implemented for FMM objects allows users to access the associated objects such as PDE kernels and data such as multipole expansions.
 
 ```rust
-// Rust API for creating an FMM
+use rand::{thread_rng, Rng};
+use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder};
+use kifmm::traits::tree::{FmmTree, Tree};
+use kifmm::traits::fmm::Fmm;
+
 fn main() {
+    // Generate some random source/target/charge data
+    let dim = 3;
+    let nsources = 1000000;
+    let ntargets = 2000000;
 
-  let fmm = ...
+    // The number of right hand sides, FMM is configured from data
+    let nrhs = 1;
+    let mut rng = thread_rng();
+    let mut sources = vec![0f32; nsources * dim * nrhs];
+    let mut targets = vec![0f32; ntargets * dim * nrhs];
+    let mut charges = vec![0f32; nsources * nrhs];
 
-  fmm.clear(&charges) // reset and run again with new charge data
+    sources.iter_mut().for_each(|s| *s = rng.gen());
+    targets.iter_mut().for_each(|t| *t = rng.gen());
+    charges.iter_mut().for_each(|c| *c = rng.gen());
+
+    // Set tree parameters
+    // Library refines tree till fewer than 'n_crit' particles per leaf box
+    let n_crit = Some(150);
+    // Alternatively, users can specify the tree depth they require
+    let depth = None;
+    // Choose to remove empty leaves
+    let prune_empty = true;
+
+    // Set FMM Parameters
+    // Can either set globally for whole tree, or level-by-level
+    let expansion_order = &[6];
+    // Parameters which control speed and accuracy of BLAS based field translation
+    let singular_value_threshold = Some(1e-5);
+    let check_surface_diff = Some(2);
+
+    // Create an FMM
+    let fmm = SingleNodeBuilder::new()
+        .tree(&sources, &targets, n_crit, depth, prune_empty) // Create tree
+        .unwrap()
+        .parameters(
+            &charges,
+            expansion_order, // Set expansion order, by tree level or globally
+            Laplace3dKernel::new(), // Choose kernel,
+            EvalType::Value, // Choose potential or potential + deriv evaluation
+            BlasFieldTranslationSaRcmp::new(
+              singular_value_threshold,
+              check_surface_diff
+              ), // Choose field translation
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    // Run FMM
+    let times = fmm.evaluate(true); // Optionally time the operators
+
+    // Lookup potentials by leaf from target leaf boxes
+    let leaf_idx = 0;
+    let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+    let leaf_potential = fmm.potential(&leaf);
 }
 ```
 
-The Python API mirrors Rust, and we provide a full set of API usage, file input/output and plotting examples [in the repository](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples).
+Indeed, the full API is more extensive, including features that enable for variable expansion orders by level useful for high-frequency problems, accelerated pre-computations for the BLAS based field translations based on randomised SVDs, alternative field translation implementations, data visualisation with MayaVi and methods for file IO. Both [Python](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples) and [Rust](https://github.com/bempp/kifmm/tree/main/kifmm/examples) examples can be found in the repository.
 
 # Benchmarks
 
-We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] for the target architectures in Table (\ref{tab:hardware_and_software}) for achieving a given precision for a common benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for a million uniformly distributed source and target points. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software performance using two common acceleration schemes for the field translation, FFT and BLAS level 3 operations, only the former of which are supported by [@Malhotra2015; @wang2021exafmm].
+We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] for the target architectures in Table (\ref{tab:hardware_and_software}) for achieving a given precision for a common benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for one million uniformly distributed source and target points. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software performance using two common acceleration schemes for the field translation, FFT and BLAS level 3 operations, only the former of which are supported by current state of the art implementations.
 
 
 [Space for Plot]
@@ -115,16 +170,6 @@ Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we rep
 | **LAPACK**    | Apple Accelerate   | Netlib   |
 | **FFT**    | FFTW   | FFTW  |
 | **Threading**    | Rayon   | Rayon |
-
-
-# Figures
-
-<!-- Figures can be included like this: -->
-<!-- ![Caption for example figure.\label{fig:example}](fig.png)
-and referenced from text using \autoref{fig:example}. -->
-
-<!-- Figure sizes can be customized by adding an optional second parameter: -->
-<!-- ![Caption for example figure.](figure.png){ width=20% } -->
 
 # Acknowledgements
 
