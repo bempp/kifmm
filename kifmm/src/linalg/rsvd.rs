@@ -109,6 +109,8 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             // Compute sample matrix of size [m, size]
             let y = empty_array::<$ty, 2>().simple_mult_into_resize(mat.view(), omega.view());
 
+            println!("Y {:?} OMEGA {:?} A {:?}", y.shape(), omega.shape(), mat.shape());
+
             // Ortho-normalise columns using QR
             let qr = QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
             qr.get_q_alloc(q1.view_mut()).unwrap();
@@ -187,8 +189,10 @@ macro_rules! generate_rsvd_fixed_rank {
             let mut q_transpose = rlst_dynamic_array2!($ty, [q.shape()[1], q.shape()[0]]);
             q_transpose.fill_from(q.view().transpose());
 
+            println!("QT {:?}", q_transpose.shape());
             // Project matrix to (k+p) dimensional space using orthonormal basis
             let b = empty_array::<$ty, 2>().simple_mult_into_resize(q_transpose.view(), mat.view());
+            println!("B {:?}", b.shape());
 
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
@@ -208,6 +212,8 @@ macro_rules! generate_rsvd_fixed_rank {
                 .unwrap();
 
             let u = empty_array::<$ty, 2>().simple_mult_into_resize(q.view(), uhat.view());
+
+            println!("Q {:?} {:?}", u.shape(), vt.shape());
 
             Ok((s, u, vt))
         }

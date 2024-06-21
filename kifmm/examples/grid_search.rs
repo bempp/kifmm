@@ -396,8 +396,8 @@ fn main() {
     // );
 
     let rsvd_settings_vec = vec![
-        None,
-        // Some(RandomSVDSettings::new(1, None, Some(5), None)),
+        // None,
+        Some(RandomSVDSettings::new(1, None, Some(5), None)),
         // Some(RandomSVDSettings::new(2, None, Some(5), None)),
         // Some(RandomSVDSettings::new(4, None, Some(5), None)),
         // Some(RandomSVDSettings::new(1, None, Some(10), None)),

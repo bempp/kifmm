@@ -1471,24 +1471,47 @@ where
             let nvt = se2tc_fat.shape()[1];
             let k = std::cmp::min(mu, nvt);
 
-            let mut u_big;
-            let mut sigma;
-            let mut vt_big;
+            // let mut u_big;
+            // let mut sigma;
+            // let mut vt_big;
+            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut sigma = vec![Scalar::zero().re(); k];
+            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+            let mut target_rank = k;
 
             if let Some(rsvd_settings) = &self.source_to_target.svd_mode {
                 // Estimate target rank
                 let max_equivalent_surface_ncoeffs =
                     self.ncoeffs_equivalent_surface.iter().max().unwrap();
                 let max_check_surface_ncoeffs = self.ncoeffs_check_surface.iter().max().unwrap();
-                let target_rank = max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
-                (sigma, u_big, vt_big) = Scalar::rsvd_fixed_rank(
-                    &se2tc_fat,
+                target_rank = max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+
+                let mut se2tc_fat_transpose = rlst_dynamic_array2!(Scalar, [se2tc_fat.shape()[1], se2tc_fat.shape()[0]]);
+                se2tc_fat_transpose.view_mut().fill_from(se2tc_fat.view().transpose());
+
+                let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
+                    &se2tc_fat_transpose,
                     target_rank,
                     rsvd_settings.n_oversamples,
                     rsvd_settings.normaliser,
                     rsvd_settings.random_state,
                 )
                 .unwrap();
+                println!("RUNNING RSVD, target rank {:?}", sigma_t.len());
+                u_big = rlst_dynamic_array2!(Scalar, [mu, sigma_t.len()]);
+                // sigma = vec![Scalar::zero().re(); sigma.len()];
+                vt_big = rlst_dynamic_array2!(Scalar, [sigma_t.len(), nvt]);
+
+                println!("vt {:?} ubt {:?}", vt_big.shape(), u_big_t.shape());
+                vt_big.fill_from(u_big_t.transpose());
+                u_big.fill_from(vt_big_t.transpose());
+                sigma = sigma_t;
+                // u_big.fill_from(u_big_tmp.transpose());
+                // sigma = sigma_tmp;
+                // vt_big = vt_big_tmp.transpose();
+                // u_big = u_big_tmp.transpose();
+                // sigma = sigma_tmp;
+
             } else {
                 u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
                 sigma = vec![Scalar::zero().re(); k];
@@ -1503,6 +1526,8 @@ where
                     )
                     .unwrap();
             }
+
+            // assert!(false);
 
             let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols);
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
