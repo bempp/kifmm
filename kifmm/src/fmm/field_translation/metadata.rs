@@ -1,7 +1,6 @@
 //! Implementation of traits to compute metadata for field translation operations.
 use std::{
-    collections::{HashMap, HashSet},
-    sync::{Mutex, RwLock},
+    collections::{HashMap, HashSet}, f32::consts::E, sync::{Mutex, RwLock}
 };
 
 use green_kernels::{
@@ -1414,21 +1413,18 @@ where
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
 
-        // TODO: Need to see what happens for very shallow trees
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let iterator = if self.variable_expansion_order() {
             self.equivalent_surface_order
-                .iter()
-                .skip(2)
-                .cloned()
-                .zip(self.check_surface_order.iter().skip(2).cloned())
-                .collect_vec()
+            .iter()
+            .skip(2)
+            .cloned()
+            .zip(self.check_surface_order.iter().skip(2).cloned())
+            .collect_vec()
         } else {
-            self.equivalent_surface_order
-                .iter()
-                .cloned()
-                .zip(self.check_surface_order.iter().cloned())
-                .collect_vec()
+            vec![(self.equivalent_surface_order[0], self.check_surface_order[0])]
         };
+
+        // println!("HERE {:?} {:?}", iterator, self.variable_expansion_order());
 
         for (equivalent_surface_order, check_surface_order) in iterator {
             let nrows = ncoeffs_kifmm(check_surface_order);
@@ -2097,7 +2093,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             (level - 2) as usize
         } else {
             0
@@ -2105,7 +2101,7 @@ where
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             level as usize
         } else {
             0
@@ -2113,7 +2109,7 @@ where
     }
 
     fn c2e_operator_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             level as usize
         } else {
             0
@@ -2121,7 +2117,7 @@ where
     }
 
     fn m2m_operator_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order{
             (level - 1) as usize
         } else {
             0
@@ -2129,7 +2125,7 @@ where
     }
 
     fn l2l_operator_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             (level - 1) as usize
         } else {
             0
@@ -2137,7 +2133,7 @@ where
     }
 
     fn m2l_operator_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             (level - 2) as usize
         } else {
             0

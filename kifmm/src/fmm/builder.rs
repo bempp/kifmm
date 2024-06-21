@@ -1,4 +1,6 @@
 //! Builder objects to construct FMMs
+use std::collections::HashSet;
+
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
 use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
@@ -42,6 +44,7 @@ where
             domain: None,
             equivalent_surface_order: None,
             check_surface_order: None,
+            variable_expansion_order: None,
             ncoeffs_equivalent_surface: None,
             ncoeffs_check_surface: None,
             kernel_eval_type: None,
@@ -188,6 +191,14 @@ where
                 ));
             }
 
+            let unique_expansion_orders: HashSet<_> = expansion_order.iter().cloned().collect();
+
+            if unique_expansion_orders.len() > 1 {
+                self.variable_expansion_order = Some(true)
+            } else {
+                self.variable_expansion_order = Some(false)
+            }
+
             let check_surface_order = if source_to_target.overdetermined() {
                 expansion_order
                     .iter()
@@ -239,6 +250,7 @@ where
                 tree: self.tree.unwrap(),
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
+                variable_expansion_order: self.variable_expansion_order.unwrap(),
                 ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
                 ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),

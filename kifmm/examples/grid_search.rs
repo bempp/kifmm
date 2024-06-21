@@ -67,6 +67,7 @@ fn grid_search_laplace_blas<T>(
     parameters.into_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings))| {
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
+
             let s = Instant::now();
             let fmm = SingleNodeBuilder::new()
                 .tree(
@@ -388,27 +389,27 @@ fn main() {
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
 
-    grid_search_laplace_fft::<f32>(
-        "grid_search_laplace_fft_f32_m1".to_string(),
-        &expansion_order_vec,
-        &depth_vec,
-    );
+    // grid_search_laplace_fft::<f32>(
+    //     "grid_search_laplace_fft_f32_m1".to_string(),
+    //     &expansion_order_vec,
+    //     &depth_vec,
+    // );
 
     let rsvd_settings_vec = vec![
         None,
-        Some(RandomSVDSettings::new(1, None, Some(5), None)),
-        Some(RandomSVDSettings::new(2, None, Some(5), None)),
-        Some(RandomSVDSettings::new(4, None, Some(5), None)),
-        Some(RandomSVDSettings::new(1, None, Some(10), None)),
-        Some(RandomSVDSettings::new(2, None, Some(10), None)),
-        Some(RandomSVDSettings::new(4, None, Some(10), None)),
-        Some(RandomSVDSettings::new(1, None, Some(20), None)),
-        Some(RandomSVDSettings::new(2, None, Some(20), None)),
-        Some(RandomSVDSettings::new(4, None, Some(20), None)),
+        // Some(RandomSVDSettings::new(1, None, Some(5), None)),
+        // Some(RandomSVDSettings::new(2, None, Some(5), None)),
+        // Some(RandomSVDSettings::new(4, None, Some(5), None)),
+        // Some(RandomSVDSettings::new(1, None, Some(10), None)),
+        // Some(RandomSVDSettings::new(2, None, Some(10), None)),
+        // Some(RandomSVDSettings::new(4, None, Some(10), None)),
+        // Some(RandomSVDSettings::new(1, None, Some(20), None)),
+        // Some(RandomSVDSettings::new(2, None, Some(20), None)),
+        // Some(RandomSVDSettings::new(4, None, Some(20), None)),
     ];
 
     grid_search_laplace_blas::<f32>(
-        "grid_search_laplace_blas_f32_m1".to_string(),
+        "foo".to_string(),
         &expansion_order_vec,
         &svd_threshold_vec,
         &surface_diff_vec,

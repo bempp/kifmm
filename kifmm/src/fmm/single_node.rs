@@ -39,6 +39,10 @@ where
         self.dim
     }
 
+    fn variable_expansion_order(&self) -> bool {
+        self.variable_expansion_order
+    }
+
     fn equivalent_surface_order(&self, level: u64) -> usize {
         self.equivalent_surface_order[self.expansion_index(level)]
     }
@@ -822,7 +826,6 @@ mod test {
             &charges,
             threshold_pot,
         );
-        assert!(false);
     }
 
     #[test]

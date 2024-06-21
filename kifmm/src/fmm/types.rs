@@ -187,6 +187,8 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
+    pub variable_expansion_order: bool,
+
     /// The expansion order of the FMM, used to construct equivalent surfaces.
     pub equivalent_surface_order: Vec<usize>, // Index corresponds to level
 
@@ -297,6 +299,7 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
+            variable_expansion_order: false,
             equivalent_surface_order: Vec::default(),
             check_surface_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
@@ -464,6 +467,8 @@ where
 
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
+
+    pub variable_expansion_order: Option<bool>,
 
     /// Expansion order used to discretise equivalent surface
     pub equivalent_surface_order: Option<Vec<usize>>,
