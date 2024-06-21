@@ -153,6 +153,7 @@ We benchmark our software against other leading implementations on a single node
 
 [Space for Plot]
 
+
 Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we report only the specifications of its 'performance' CPU cores. We report per core cache sizes for L1/L2 and total cache size for L3. \label{tab:hardware_and_software}
 
 |  | **Apple M1 Pro** | **AMD 3790X** |
