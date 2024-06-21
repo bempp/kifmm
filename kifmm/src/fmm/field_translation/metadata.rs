@@ -1424,8 +1424,6 @@ where
             vec![(self.equivalent_surface_order[0], self.check_surface_order[0])]
         };
 
-        // println!("HERE {:?} {:?}", iterator, self.variable_expansion_order());
-
         for (equivalent_surface_order, check_surface_order) in iterator {
             let nrows = ncoeffs_kifmm(check_surface_order);
             let ncols = ncoeffs_kifmm(equivalent_surface_order);
