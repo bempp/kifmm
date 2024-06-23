@@ -104,22 +104,22 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             let random_state = random_state.unwrap_or(0);
             omega.fill_from_seed_normally_distributed(random_state);
 
-            let mut q1 = rlst_dynamic_array2!($ty, [mat.shape()[0], size]);
-
-            // Compute sample matrix of size [m, size]
-            let y = empty_array::<$ty, 2>().simple_mult_into_resize(mat.view(), omega.view());
-
-            println!("Y {:?} OMEGA {:?} A {:?}", y.shape(), omega.shape(), mat.shape());
-
-            // Ortho-normalise columns using QR
-            let qr = QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
-            qr.get_q_alloc(q1.view_mut()).unwrap();
-
-            let mut q2 = rlst_dynamic_array2!($ty, [mat.shape()[1], size]);
-
             if let Some(normaliser) = power_iteration_normaliser {
                 match normaliser {
                     Normaliser::Qr(n_iter) => {
+                        let mut q1 = rlst_dynamic_array2!($ty, [mat.shape()[0], size]);
+
+                        // Compute sample matrix of size [m, size]
+                        let y = empty_array::<$ty, 2>()
+                            .simple_mult_into_resize(mat.view(), omega.view());
+
+                        // Ortho-normalise columns using QR
+                        let qr =
+                            QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
+                        qr.get_q_alloc(q1.view_mut()).unwrap();
+
+                        let mut q2 = rlst_dynamic_array2!($ty, [mat.shape()[1], size]);
+
                         // Perform power iterations
                         for _ in 0..n_iter {
                             let atq = empty_array::<$ty, 2>()
@@ -184,15 +184,12 @@ macro_rules! generate_rsvd_fixed_rank {
             let n_oversamples = n_oversamples.unwrap_or(10);
             let n_random = n_components + n_oversamples;
 
+            use std::time::Instant;
             let q =
                 $randomised_range_finder(mat, n_random, power_iteration_normaliser, random_state);
             let mut q_transpose = rlst_dynamic_array2!($ty, [q.shape()[1], q.shape()[0]]);
             q_transpose.fill_from(q.view().transpose());
-
-            println!("QT {:?}", q_transpose.shape());
-            // Project matrix to (k+p) dimensional space using orthonormal basis
             let b = empty_array::<$ty, 2>().simple_mult_into_resize(q_transpose.view(), mat.view());
-            println!("B {:?}", b.shape());
 
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
@@ -210,10 +207,7 @@ macro_rules! generate_rsvd_fixed_rank {
                     rlst::SvdMode::Reduced,
                 )
                 .unwrap();
-
             let u = empty_array::<$ty, 2>().simple_mult_into_resize(q.view(), uhat.view());
-
-            println!("Q {:?} {:?}", u.shape(), vt.shape());
 
             Ok((s, u, vt))
         }

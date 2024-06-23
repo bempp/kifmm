@@ -3,11 +3,15 @@ use std::{fs::File, ops::DerefMut, sync::Mutex, time::Instant};
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::EvalType};
 use itertools::{iproduct, Itertools};
 use kifmm::{
-    fmm::types::RandomSVDSettings, linalg::rsvd::MatrixRsvd, traits::{
+    fmm::types::RandomSvdSettings,
+    linalg::rsvd::MatrixRsvd,
+    traits::{
         fftw::Dft,
         general::{AsComplex, Epsilon, Gemv8x8},
         tree::{FmmTree, Tree},
-    }, tree::helpers::points_fixture, BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder
+    },
+    tree::helpers::points_fixture,
+    BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder,
 };
 use num::{zero, Float};
 use rand::distributions::uniform::SampleUniform;
@@ -26,7 +30,7 @@ fn grid_search_laplace_blas<T>(
     svd_threshold_vec: &Vec<Option<T>>,
     surface_diff_vec: &Vec<usize>,
     depth_vec: &Vec<u64>,
-    rsvd_settings_vec: &Vec<Option<RandomSVDSettings>>
+    rsvd_settings_vec: &Vec<Option<RandomSVDSettings>>,
 ) where
     T: RlstScalar<Real = T> + Epsilon + Float + Default + SampleUniform + MatrixRsvd,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
@@ -41,9 +45,17 @@ fn grid_search_laplace_blas<T>(
         expansion_order_vec.iter(),
         rsvd_settings_vec.iter()
     )
-    .map(|(surface_diff, svd_threshold, depth, expansion_order, rsvd_settings)| {
-        (*surface_diff, *svd_threshold, *depth, *expansion_order, rsvd_settings)
-    })
+    .map(
+        |(surface_diff, svd_threshold, depth, expansion_order, rsvd_settings)| {
+            (
+                *surface_diff,
+                *svd_threshold,
+                *depth,
+                *expansion_order,
+                rsvd_settings,
+            )
+        },
+    )
     .collect_vec();
 
     let parameters_cloned = parameters.iter().cloned().collect_vec();
@@ -83,7 +95,11 @@ fn grid_search_laplace_blas<T>(
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
-                    BlasFieldTranslationSaRcmp::new(svd_threshold, Some(surface_diff), *rsvd_settings),
+                    BlasFieldTranslationSaRcmp::new(
+                        svd_threshold,
+                        Some(surface_diff),
+                        *rsvd_settings,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -114,7 +130,7 @@ fn grid_search_laplace_blas<T>(
             "max_rel_err".to_string(),
             "n_iter".to_string(),
             "n_oversamples".to_string(),
-            "setup_time".to_string()
+            "setup_time".to_string(),
         ])
         .unwrap();
 
@@ -133,7 +149,8 @@ fn grid_search_laplace_blas<T>(
 
     let mut progress = 0;
     for (i, fmm, setup_time) in fmms.lock().unwrap().iter() {
-        let (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings) = parameters_cloned[*i];
+        let (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings) =
+            parameters_cloned[*i];
 
         let svd_threshold = svd_threshold.unwrap_or(T::zero().re());
 
@@ -203,7 +220,7 @@ fn grid_search_laplace_blas<T>(
                 max_rel_err.to_string(),
                 n_iter.to_string(),
                 n_oversamples.to_string(),
-                (setup_time.as_millis() as f32 ).to_string()
+                (setup_time.as_millis() as f32).to_string(),
             ])
             .unwrap();
     }
@@ -397,7 +414,7 @@ fn main() {
 
     let rsvd_settings_vec = vec![
         // None,
-        Some(RandomSVDSettings::new(1, None, Some(5), None)),
+        Some(RandomSvdSettings::new(1, None, Some(5), None)),
         // Some(RandomSVDSettings::new(2, None, Some(5), None)),
         // Some(RandomSVDSettings::new(4, None, Some(5), None)),
         // Some(RandomSVDSettings::new(1, None, Some(10), None)),
@@ -408,16 +425,17 @@ fn main() {
         // Some(RandomSVDSettings::new(4, None, Some(20), None)),
     ];
 
-    grid_search_laplace_blas::<f32>(
-        "foo".to_string(),
-        &expansion_order_vec,
-        &svd_threshold_vec,
-        &surface_diff_vec,
-        &depth_vec,
-        &rsvd_settings_vec
-    );
+    // grid_search_laplace_blas::<f32>(
+    //     "foo".to_string(),
+    //     &expansion_order_vec,
+    //     &svd_threshold_vec,
+    //     &surface_diff_vec,
+    //     &depth_vec,
+    //     &rsvd_settings_vec
+    // );
 
-    let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
+    // let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
+    let expansion_order_vec: Vec<usize> = vec![10];
     let svd_threshold_vec = vec![
         None,
         Some(1e-15),
@@ -437,11 +455,12 @@ fn main() {
     //     &depth_vec,
     // );
 
-    // grid_search_laplace_blas::<f64>(
-    //     "grid_search_laplace_blas_f64_m1_8".to_string(),
-    //     &expansion_order_vec,
-    //     &svd_threshold_vec,
-    //     &surface_diff_vec,
-    //     &depth_vec,
-    // );
+    grid_search_laplace_blas::<f64>(
+        "grid_search_laplace_blas_f64_m1_8".to_string(),
+        &expansion_order_vec,
+        &svd_threshold_vec,
+        &surface_diff_vec,
+        &depth_vec,
+        &rsvd_settings_vec,
+    );
 }

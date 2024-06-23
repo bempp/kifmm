@@ -628,11 +628,11 @@ where
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
 
-    pub svd_mode: Option<RandomSVDSettings>,
+    pub svd_mode: FmmSvdMode,
 }
 
 #[derive(Default, Clone, Copy)]
-pub struct RandomSVDSettings {
+pub struct RandomSvdSettings {
     pub n_iter: usize,
     pub n_components: Option<usize>,
     pub normaliser: Option<Normaliser>,
@@ -640,7 +640,15 @@ pub struct RandomSVDSettings {
     pub random_state: Option<usize>,
 }
 
-impl RandomSVDSettings {
+#[derive(Default)]
+pub enum FmmSvdMode {
+    Random(RandomSvdSettings),
+
+    #[default]
+    Deterministic,
+}
+
+impl RandomSvdSettings {
     pub fn new(
         n_iter: usize,
         n_components: Option<usize>,
