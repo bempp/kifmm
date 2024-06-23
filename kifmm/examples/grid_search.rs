@@ -3,7 +3,7 @@ use std::{fs::File, ops::DerefMut, sync::Mutex, time::Instant};
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::EvalType};
 use itertools::{iproduct, Itertools};
 use kifmm::{
-    fmm::types::RandomSvdSettings,
+    fmm::types::{RandomSvdSettings, FmmSvdMode},
     linalg::rsvd::MatrixRsvd,
     traits::{
         fftw::Dft,
@@ -30,7 +30,7 @@ fn grid_search_laplace_blas<T>(
     svd_threshold_vec: &Vec<Option<T>>,
     surface_diff_vec: &Vec<usize>,
     depth_vec: &Vec<u64>,
-    rsvd_settings_vec: &Vec<Option<RandomSVDSettings>>,
+    rsvd_settings_vec: &Vec<FmmSvdMode>,
 ) where
     T: RlstScalar<Real = T> + Epsilon + Float + Default + SampleUniform + MatrixRsvd,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
@@ -200,12 +200,15 @@ fn grid_search_laplace_blas<T>(
 
         let n_iter;
         let n_oversamples;
-        if let Some(rsvd_settings) = rsvd_settings {
-            n_iter = rsvd_settings.n_iter;
-            n_oversamples = rsvd_settings.n_oversamples.unwrap()
-        } else {
-            n_iter = 0;
-            n_oversamples = 0;
+        match rsvd_settings {
+            FmmSvdMode::Random(settings) => {
+                n_iter = settings.n_iter;
+                n_oversamples = settings.n_oversamples.unwrap()
+            }
+            FmmSvdMode::Deterministic => {
+                n_iter = 0;
+                n_oversamples = 0;
+            }
         }
 
         writer
@@ -414,7 +417,7 @@ fn main() {
 
     let rsvd_settings_vec = vec![
         // None,
-        Some(RandomSvdSettings::new(1, None, Some(5), None)),
+        FmmSvdMode::Random(RandomSvdSettings::new(1, None, Some(5), None)),
         // Some(RandomSVDSettings::new(2, None, Some(5), None)),
         // Some(RandomSVDSettings::new(4, None, Some(5), None)),
         // Some(RandomSVDSettings::new(1, None, Some(10), None)),

@@ -640,7 +640,7 @@ pub struct RandomSvdSettings {
     pub random_state: Option<usize>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
     Random(RandomSvdSettings),
 
