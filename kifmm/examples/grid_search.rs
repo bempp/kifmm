@@ -3,8 +3,8 @@ use std::{fs::File, ops::DerefMut, sync::Mutex, time::Instant};
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::EvalType};
 use itertools::{iproduct, Itertools};
 use kifmm::{
-    fmm::types::{RandomSvdSettings, FmmSvdMode},
-    linalg::rsvd::MatrixRsvd,
+    fmm::types::{FmmSvdMode, RandomSvdSettings},
+    linalg::rsvd::{MatrixRsvd, Normaliser},
     traits::{
         fftw::Dft,
         general::{AsComplex, Epsilon, Gemv8x8},
@@ -198,16 +198,26 @@ fn grid_search_laplace_blas<T>(
 
         let mean_rel_err: T = rel_error.into_iter().sum::<T>() / T::from(direct.len()).unwrap();
 
-        let n_iter;
-        let n_oversamples;
+        let n_iter_;
+        let n_oversamples_;
         match rsvd_settings {
-            FmmSvdMode::Random(settings) => {
-                n_iter = settings.n_iter;
-                n_oversamples = settings.n_oversamples.unwrap()
+            FmmSvdMode::Random {
+                n_components: _,
+                normaliser,
+                n_oversamples,
+                random_state: _,
+            } => {
+                if let Some(Normaliser::Qr(n)) = normaliser {
+                    n_iter_ = n.clone()
+                } else {
+                    n_iter_ = 0;
+                }
+                n_oversamples_ = n_oversamples.unwrap().clone();
             }
+
             FmmSvdMode::Deterministic => {
-                n_iter = 0;
-                n_oversamples = 0;
+                n_iter_ = 0usize;
+                n_oversamples_ = 0usize;
             }
         }
 
@@ -221,8 +231,8 @@ fn grid_search_laplace_blas<T>(
                 min_rel_err.to_string(),
                 mean_rel_err.to_string(),
                 max_rel_err.to_string(),
-                n_iter.to_string(),
-                n_oversamples.to_string(),
+                n_iter_.to_string(),
+                n_oversamples_.to_string(),
                 (setup_time.as_millis() as f32).to_string(),
             ])
             .unwrap();
@@ -417,7 +427,7 @@ fn main() {
 
     let rsvd_settings_vec = vec![
         // None,
-        FmmSvdMode::Random(RandomSvdSettings::new(1, None, Some(5), None)),
+        FmmSvdMode::new(true, Some(1), None, Some(5), None),
         // Some(RandomSVDSettings::new(2, None, Some(5), None)),
         // Some(RandomSVDSettings::new(4, None, Some(5), None)),
         // Some(RandomSVDSettings::new(1, None, Some(10), None)),

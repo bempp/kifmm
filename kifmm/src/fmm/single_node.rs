@@ -708,7 +708,11 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                BlasFieldTranslationSaRcmp::new(
+                    svd_threshold,
+                    None,
+                    crate::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -755,7 +759,11 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                BlasFieldTranslationSaRcmp::new(
+                    svd_threshold,
+                    None,
+                    crate::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -780,7 +788,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [7];
+        let expansion_order = [6];
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -792,7 +800,8 @@ mod test {
 
         let s = Instant::now();
 
-        let rsvd_settings = crate::fmm::types::FmmSvdMode::Random(RandomSvdSettings::new(0, None, None, None));
+        let rsvd_settings = crate::fmm::types::FmmSvdMode::new(true, None, None, None, None);
+        let rsvd_settings = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
 
         let mut fmm = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -803,14 +812,13 @@ mod test {
                 Laplace3dKernel::new(),
                 EvalType::Value,
                 BlasFieldTranslationSaRcmp::new(None, None, rsvd_settings),
-                // FftFieldTranslation::new(None)
             )
             .unwrap()
             .build()
             .unwrap();
         println!("SETUP {:?}", s.elapsed());
-        assert!(false);
-        // fmm.evaluate(false).unwrap();
+
+        // assert!(false);
 
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
@@ -827,8 +835,6 @@ mod test {
             &charges,
             threshold_pot,
         );
-
-        // assert!(false);
     }
 
     #[test]
@@ -925,7 +931,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -950,7 +960,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1006,7 +1020,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        surface_diff,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1032,7 +1050,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1087,7 +1109,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        surface_diff,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1144,7 +1170,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        surface_diff,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1170,7 +1200,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1652,7 +1686,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1674,7 +1712,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, crate::fmm::types::FmmSvdMode::Deterministic),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()

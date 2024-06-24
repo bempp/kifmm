@@ -34,6 +34,15 @@ CONSTRUCTORS = {
     },
 }
 
+class RandomSvdSettings:
+    def __init__(n_iter, n_components, n_oversamples, random_state):
+        self.n_iter = n_iter
+        self.n_components = n_components
+        self.n_oversamples = n_oversamples
+        self.random_state = random_state
+
+    def settings(&self):
+        return (self.n_iter, self.n_components, self.n_oversamples, self.random_state)
 
 class KiFmm:
     """
@@ -57,6 +66,7 @@ class KiFmm:
         wavenumber=None,
         surface_diff=None,
         block_size=None,
+        rsvd=None
     ):
         """Constructor for Single Node FMMss.
 
@@ -78,6 +88,7 @@ class KiFmm:
             surface_diff (int, optional): Calculated as check_expansion_order-equivalent_expansion_order, used to provide more stability when using BLAS based field translations.
             Defaults to 0 if not specified for BLAS based field translations.
             block_size (int, optional): Maximum block size used in FFT based M2L translations, if not specified set to 128.
+            rsvd (tuple(int), optional): If using BLAS based field translations, can optionally use randomised SVD to accelerate precomputations.
         """
 
         # Check valid tree spec
@@ -215,6 +226,12 @@ class KiFmm:
         else:
             self.expansion_order = [expansion_order]
 
+        if field_translation == "blas":
+            if rsvd == None:
+                self.rsvd = None
+            else:
+                self.rsvd = rsvd.settings()
+
         self.sources = sources
         self.targets = targets
         self.charges = charges
@@ -264,6 +281,7 @@ class KiFmm:
                     self.n_crit,
                     self.depth,
                     self.surface_diff,
+                    self.rsvd
                 )
 
         elif kernel == "helmholtz":

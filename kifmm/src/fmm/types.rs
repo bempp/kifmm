@@ -642,10 +642,45 @@ pub struct RandomSvdSettings {
 
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
-    Random(RandomSvdSettings),
-
+    Random {
+        n_components: Option<usize>,
+        normaliser: Option<Normaliser>,
+        n_oversamples: Option<usize>,
+        random_state: Option<usize>,
+    },
     #[default]
     Deterministic,
+}
+
+impl FmmSvdMode {
+    pub fn new(
+        random: bool,
+        n_iter: Option<usize>,
+        n_components: Option<usize>,
+        n_oversamples: Option<usize>,
+        random_state: Option<usize>,
+    ) -> Self {
+        if random {
+            let n_iter = n_iter.unwrap_or_default();
+            if n_iter > 0 {
+                FmmSvdMode::Random {
+                    n_components,
+                    normaliser: Some(Normaliser::Qr(n_iter)),
+                    n_oversamples,
+                    random_state,
+                }
+            } else {
+                FmmSvdMode::Random {
+                    n_components,
+                    normaliser: None,
+                    n_oversamples,
+                    random_state,
+                }
+            }
+        } else {
+            FmmSvdMode::Deterministic
+        }
+    }
 }
 
 impl RandomSvdSettings {

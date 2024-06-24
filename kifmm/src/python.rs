@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::fmm::types::FmmSvdMode;
 use crate::fmm::KiFmm;
 use crate::traits::fmm::Fmm;
 use crate::traits::tree::Tree;
@@ -204,7 +205,8 @@ macro_rules! laplace_blas_constructors {
                 svd_threshold: Option<<$type as RlstScalar>::Real>,
                 n_crit: Option<u64>,
                 depth: Option<u64>,
-                surface_diff: Option<usize>
+                surface_diff: Option<usize>,
+                rsvd: Option<(Option<usize>, Option<usize>, Option<usize>, Option<usize>)>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -230,6 +232,13 @@ macro_rules! laplace_blas_constructors {
                     }
                 }
 
+                let svd_settings;
+                if let Some(rsvd) = rsvd {
+                    svd_settings = FmmSvdMode::new(true, rsvd.0, rsvd.1, rsvd.2, rsvd.3)
+                } else {
+                    svd_settings = FmmSvdMode::new(false, None, None, None, None)
+                }
+
                 let fmm = SingleNodeBuilder::new()
                     .tree(
                         sources.as_slice().unwrap(),
@@ -244,7 +253,7 @@ macro_rules! laplace_blas_constructors {
                         expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, None),
+                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_settings),
                     )
                     .unwrap()
                     .build()

@@ -14,7 +14,7 @@ use num::{Float, Zero};
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
-    BaseArray, Gemm, MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess,
+    BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess,
     RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
     VectorContainer,
 };
@@ -30,11 +30,11 @@ use crate::{
         },
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
-            FftFieldTranslation, FftMetadata, FmmSvdMode, RandomSvdSettings,
+            FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
         KiFmm,
     },
-    linalg::{pinv::*, rsvd::*},
+    linalg::{pinv::pinv, rsvd::MatrixRsvd},
     traits::{
         fftw::{Dft, DftType},
         field::{
@@ -1476,7 +1476,6 @@ where
             let mu = se2tc_fat.shape()[0];
             let nvt = se2tc_fat.shape()[1];
             let k = std::cmp::min(mu, nvt);
-            let target_rank;
 
             let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
             let mut sigma = vec![Scalar::zero().re(); k];
@@ -1486,13 +1485,24 @@ where
             let start = Instant::now();
 
             match &self.source_to_target.svd_mode {
-                FmmSvdMode::Random(rsvd_settings) => {
-                    // Estimate target rank
-                    let max_equivalent_surface_ncoeffs =
-                        self.ncoeffs_equivalent_surface.iter().max().unwrap();
-                    let max_check_surface_ncoeffs =
-                        self.ncoeffs_check_surface.iter().max().unwrap();
-                    target_rank = max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                &FmmSvdMode::Random {
+                    n_components,
+                    normaliser,
+                    n_oversamples,
+                    random_state,
+                } => {
+                    let target_rank;
+                    if let Some(n_components) = n_components {
+                        target_rank = n_components
+                    } else {
+                        // Estimate target rank
+                        let max_equivalent_surface_ncoeffs =
+                            self.ncoeffs_equivalent_surface.iter().max().unwrap();
+                        let max_check_surface_ncoeffs =
+                            self.ncoeffs_check_surface.iter().max().unwrap();
+                        target_rank =
+                            max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                    }
 
                     let mut se2tc_fat_transpose =
                         rlst_dynamic_array2!(Scalar, se2tc_fat.view().transpose().shape());
@@ -1503,9 +1513,9 @@ where
                     let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
                         &se2tc_fat_transpose,
                         target_rank,
-                        rsvd_settings.n_oversamples,
-                        rsvd_settings.normaliser,
-                        rsvd_settings.random_state,
+                        n_oversamples,
+                        normaliser,
+                        random_state,
                     )
                     .unwrap();
                     // println!("RUNNING RSVD, target rank {:?}", sigma_t.len());
@@ -1548,21 +1558,31 @@ where
                 st.fill_from(u_big.view().transpose())
             } else {
                 match &self.source_to_target.svd_mode {
-                    FmmSvdMode::Random(rsvd_settings) => {
-                        // Estimate target rank
-                        let max_equivalent_surface_ncoeffs =
-                            self.ncoeffs_equivalent_surface.iter().max().unwrap();
-                        let max_check_surface_ncoeffs =
-                            self.ncoeffs_check_surface.iter().max().unwrap();
-                        let target_rank =
-                            max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                    &FmmSvdMode::Random {
+                        n_components,
+                        normaliser,
+                        n_oversamples,
+                        random_state,
+                    } => {
+                        let target_rank;
+                        if let Some(n_components) = n_components {
+                            target_rank = n_components
+                        } else {
+                            // Estimate target rank
+                            let max_equivalent_surface_ncoeffs =
+                                self.ncoeffs_equivalent_surface.iter().max().unwrap();
+                            let max_check_surface_ncoeffs =
+                                self.ncoeffs_check_surface.iter().max().unwrap();
+                            target_rank =
+                                max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                        }
 
                         (_gamma, _r, st) = Scalar::rsvd_fixed_rank(
                             &se2tc_thin,
                             target_rank,
-                            rsvd_settings.n_oversamples,
-                            rsvd_settings.normaliser,
-                            rsvd_settings.random_state,
+                            n_oversamples,
+                            normaliser,
+                            random_state,
                         )
                         .unwrap();
                     }

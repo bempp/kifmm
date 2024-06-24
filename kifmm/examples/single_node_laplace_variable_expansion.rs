@@ -64,7 +64,11 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, kifmm::fmm::types::FmmSvdMode::Deterministic),
+                BlasFieldTranslationSaRcmp::new(
+                    singular_value_threshold,
+                    None,
+                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -89,7 +93,11 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None, kifmm::fmm::types::FmmSvdMode::Deterministic),
+                BlasFieldTranslationSaRcmp::new(
+                    singular_value_threshold,
+                    None,
+                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
