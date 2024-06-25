@@ -800,7 +800,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+                FftFieldTranslation::new(Some(128))
             )
             .unwrap()
             .build()
