@@ -140,9 +140,77 @@ where
                 }
 
                 // 2. Apply BLAS operation
+                #[cfg(target_os = "macos")]
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
+                        .zip(multipole_idxs)
+                        .zip(local_idxs)
+                        .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                            let c_u_sub =
+                                &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
+                            let c_vt_sub =
+                                &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
+
+                            let mut compressed_multipoles_subset = rlst_dynamic_array2!(
+                                Scalar,
+                                [
+                                    self.source_to_target.cutoff_rank[m2l_operator_index],
+                                    multipole_idxs.len()
+                                ]
+                            );
+
+                            for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
+                                compressed_multipoles_subset.data_mut()[i * self
+                                    .source_to_target
+                                    .cutoff_rank[m2l_operator_index]
+                                    ..(i + 1)
+                                        * self.source_to_target.cutoff_rank[m2l_operator_index]]
+                                    .copy_from_slice(
+                                        &compressed_multipoles.data()[multipole_idx
+                                            * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                            ..(multipole_idx + 1)
+                                                * self.source_to_target.cutoff_rank
+                                                    [m2l_operator_index]],
+                                    );
+                            }
+
+                            let compressed_check_potential = empty_array::<Scalar, 2>()
+                                .simple_mult_into_resize(
+                                    c_u_sub.view(),
+                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                        c_vt_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
+                                );
+
+                            for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
+                                let check_potential_lock =
+                                    compressed_level_check_potentials[local_idx].lock().unwrap();
+                                let check_potential_ptr = check_potential_lock.raw;
+                                let check_potential = unsafe {
+                                    std::slice::from_raw_parts_mut(
+                                        check_potential_ptr,
+                                        self.source_to_target.cutoff_rank[m2l_operator_index],
+                                    )
+                                };
+                                let tmp = &compressed_check_potential.data()[multipole_idx
+                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    ..(multipole_idx + 1)
+                                        * self.source_to_target.cutoff_rank[m2l_operator_index]];
+                                check_potential
+                                    .iter_mut()
+                                    .zip(tmp)
+                                    .for_each(|(l, r)| *l += *r);
+                            }
+                        });
+                }
+
+                // 2. Apply BLAS operation
+                #[cfg(target_os = "linux")]
+                {
+                    (0..NTRANSFER_VECTORS_KIFMM)
+                        .into_iter()
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
@@ -289,6 +357,7 @@ where
                 }
 
                 // 2. Apply the BLAS operation
+                #[cfg(target_os = "macos")]
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
@@ -387,6 +456,107 @@ where
                             }
                         });
                 }
+
+                #[cfg(target_os = "linux")]
+                {
+                    (0..NTRANSFER_VECTORS_KIFMM)
+                        .into_iter()
+                        .zip(multipole_idxs)
+                        .zip(local_idxs)
+                        .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                            let c_u_sub =
+                                &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
+                            let c_vt_sub =
+                                &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
+
+                            let mut compressed_multipoles_subset = rlst_dynamic_array2!(
+                                Scalar,
+                                [
+                                    self.source_to_target.cutoff_rank[m2l_operator_index],
+                                    multipole_idxs.len() * nmatvecs
+                                ]
+                            );
+
+                            for (local_multipole_idx, &global_multipole_idx) in
+                                multipole_idxs.iter().enumerate()
+                            {
+                                let key_displacement_global = global_multipole_idx
+                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    * nmatvecs;
+
+                                let key_displacement_local = local_multipole_idx
+                                    * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                    * nmatvecs;
+
+                                for charge_vec_idx in 0..nmatvecs {
+                                    let charge_vec_displacement = charge_vec_idx
+                                        * self.source_to_target.cutoff_rank[m2l_operator_index];
+
+                                    compressed_multipoles_subset.data_mut()[key_displacement_local
+                                        + charge_vec_displacement
+                                        ..key_displacement_local
+                                            + charge_vec_displacement
+                                            + self.source_to_target.cutoff_rank
+                                                [m2l_operator_index]]
+                                        .copy_from_slice(
+                                            &compressed_multipoles.data()[key_displacement_global
+                                                + charge_vec_displacement
+                                                ..key_displacement_global
+                                                    + charge_vec_displacement
+                                                    + self.source_to_target.cutoff_rank
+                                                        [m2l_operator_index]],
+                                        );
+                                }
+                            }
+
+                            let compressed_check_potential = empty_array::<Scalar, 2>()
+                                .simple_mult_into_resize(
+                                    c_u_sub.view(),
+                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                        c_vt_sub.view(),
+                                        compressed_multipoles_subset.view(),
+                                    ),
+                                );
+
+                            for (local_multipole_idx, &global_local_idx) in
+                                local_idxs.iter().enumerate()
+                            {
+                                let check_potential_lock = compressed_level_check_potentials
+                                    [global_local_idx]
+                                    .lock()
+                                    .unwrap();
+
+                                for charge_vec_idx in 0..nmatvecs {
+                                    let check_potential_ptr =
+                                        check_potential_lock[charge_vec_idx].raw;
+                                    let check_potential = unsafe {
+                                        std::slice::from_raw_parts_mut(
+                                            check_potential_ptr,
+                                            self.source_to_target.cutoff_rank[m2l_operator_index],
+                                        )
+                                    };
+
+                                    let key_displacement = local_multipole_idx
+                                        * self.source_to_target.cutoff_rank[m2l_operator_index]
+                                        * nmatvecs;
+                                    let charge_vec_displacement = charge_vec_idx
+                                        * self.source_to_target.cutoff_rank[m2l_operator_index];
+
+                                    let tmp = &compressed_check_potential.data()[key_displacement
+                                        + charge_vec_displacement
+                                        ..key_displacement
+                                            + charge_vec_displacement
+                                            + self.source_to_target.cutoff_rank
+                                                [m2l_operator_index]];
+                                    check_potential
+                                        .iter_mut()
+                                        .zip(tmp)
+                                        .for_each(|(l, r)| *l += *r);
+                                }
+                            }
+                        });
+                }
+
 
                 // 3. Compute local expansions from compressed check potentials
                 {
