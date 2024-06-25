@@ -12,7 +12,7 @@ use rlst::{
 
 use crate::{
     fmm::{
-        constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
+        constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
         helpers::chunk_size,
         types::{FmmEvalType, KiFmm},
     },
@@ -89,7 +89,7 @@ where
                     );
 
                 // Use check potentials to compute the multipole expansion
-                let chunk_size = chunk_size(n_leaves, P2M_MAX_CHUNK_SIZE);
+                let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
                 check_potentials
                     .data()
                     .par_chunks_exact(ncoeffs_check_surface * chunk_size)
@@ -285,8 +285,8 @@ where
                 }
 
                 let mut max_chunk_size = nparents;
-                if max_chunk_size > M2M_MAX_CHUNK_SIZE {
-                    max_chunk_size = M2M_MAX_CHUNK_SIZE
+                if max_chunk_size > M2M_MAX_BLOCK_SIZE {
+                    max_chunk_size = M2M_MAX_BLOCK_SIZE
                 }
                 let chunk_size = chunk_size(nparents, max_chunk_size);
 

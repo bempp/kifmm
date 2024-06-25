@@ -1,3 +1,4 @@
+//! Implementation of randomised SVD using BLAS3
 use num::traits::FloatConst;
 use rand_distr::{Standard, StandardNormal};
 use rlst::{
@@ -18,7 +19,7 @@ pub enum Normaliser {
     Qr(usize),
 }
 
-/// Foo
+/// Trait for rSVD implementation
 pub trait MatrixRsvd
 where
     Self: RlstScalar + RandScalar,
@@ -184,11 +185,10 @@ macro_rules! generate_rsvd_fixed_rank {
             let n_oversamples = n_oversamples.unwrap_or(10);
             let n_random = n_components + n_oversamples;
 
-            use std::time::Instant;
             let q =
                 $randomised_range_finder(mat, n_random, power_iteration_normaliser, random_state);
             let mut q_transpose = rlst_dynamic_array2!($ty, [q.shape()[1], q.shape()[0]]);
-            q_transpose.fill_from(q.view().transpose());
+            q_transpose.fill_from(q.view().conj().transpose());
             let b = empty_array::<$ty, 2>().simple_mult_into_resize(q_transpose.view(), mat.view());
 
             // Compute svd on thin matrix (k+p) wide
@@ -281,7 +281,7 @@ macro_rules! generate_randomised_range_finder_fixed_error {
 
                 let qr = QrDecomposition::<$type, _>::new(y_loop).unwrap();
                 qr.get_q_alloc(q.view_mut()).unwrap();
-                qt.view_mut().fill_from(q.view().transpose());
+                qt.view_mut().fill_from(q.view().conj().transpose());
                 q_curr = rlst_dynamic_array2!($type, q.shape());
                 q_curr.view_mut().fill_from(q.view());
 
@@ -338,7 +338,7 @@ macro_rules! generate_rsvd_fixed_error {
             let q = $randomised_range_finder(mat, tol, k_block, random_state);
 
             let mut q_transpose = rlst_dynamic_array2!($type, [q.shape()[1], q.shape()[0]]);
-            q_transpose.fill_from(q.view().transpose());
+            q_transpose.fill_from(q.view().conj().transpose());
 
             // Project matrix to (k+p) dimensional space using orthonormal basis
             let b =

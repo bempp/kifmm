@@ -187,6 +187,7 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
+    /// Set to true if expansion order varies by level
     pub variable_expansion_order: bool,
 
     /// The expansion order of the FMM, used to construct equivalent surfaces.
@@ -468,6 +469,7 @@ where
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
 
+    /// Variable expansion order by level
     pub variable_expansion_order: Option<bool>,
 
     /// Expansion order used to discretise equivalent surface
@@ -628,31 +630,37 @@ where
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
 
+    /// Select SVD algorithm for compression, either deterministic or randomised
     pub svd_mode: FmmSvdMode,
 }
 
-#[derive(Default, Clone, Copy)]
-pub struct RandomSvdSettings {
-    pub n_iter: usize,
-    pub n_components: Option<usize>,
-    pub normaliser: Option<Normaliser>,
-    pub n_oversamples: Option<usize>,
-    pub random_state: Option<usize>,
-}
-
+/// Variants of SVD algorithms
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
+
+    /// Use randomised SVD with optional power iteration for additional accuracy
     Random {
+        /// Number of singular values/vectors sought
         n_components: Option<usize>,
+
+        /// Set normaliser
         normaliser: Option<Normaliser>,
+
+        /// Set number of additional samples, in addition to n_components
         n_oversamples: Option<usize>,
+
+        /// Set a random state.
         random_state: Option<usize>,
     },
+
+    /// Use DGESVD from Lapack bindings
     #[default]
     Deterministic,
 }
 
 impl FmmSvdMode {
+
+    /// Constructor for SVD settings
     pub fn new(
         random: bool,
         n_iter: Option<usize>,
@@ -679,33 +687,6 @@ impl FmmSvdMode {
             }
         } else {
             FmmSvdMode::Deterministic
-        }
-    }
-}
-
-impl RandomSvdSettings {
-    pub fn new(
-        n_iter: usize,
-        n_components: Option<usize>,
-        n_oversamples: Option<usize>,
-        random_state: Option<usize>,
-    ) -> Self {
-        if n_iter > 0 {
-            Self {
-                n_iter,
-                n_components,
-                normaliser: Some(Normaliser::Qr(n_iter)),
-                n_oversamples,
-                random_state,
-            }
-        } else {
-            Self {
-                n_iter,
-                n_components,
-                normaliser: None,
-                n_oversamples,
-                random_state,
-            }
         }
     }
 }

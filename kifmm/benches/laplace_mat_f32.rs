@@ -4,6 +4,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, SingleNodeBuilder};
 use kifmm::traits::fmm::Fmm;
+use kifmm::fmm::types::FmmSvdMode;
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
@@ -38,7 +39,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold, None, None),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None, FmmSvdMode::new(false, None, None, None, None)),
         )
         .unwrap()
         .build()
@@ -57,7 +58,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold, None, None),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None, FmmSvdMode::new(false, None, None, None, None)),
         )
         .unwrap()
         .build()
@@ -105,7 +106,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold, None, None),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None, FmmSvdMode::new(false, None, None, None, None)),
         )
         .unwrap()
         .build()
@@ -124,7 +125,7 @@ fn laplace_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Laplace3dKernel::new(),
             EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold, None, None),
+            BlasFieldTranslationSaRcmp::new(svd_threshold, None, FmmSvdMode::new(false, None, None, None, None)),
         )
         .unwrap()
         .build()

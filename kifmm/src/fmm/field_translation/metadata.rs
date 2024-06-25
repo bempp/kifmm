@@ -1,7 +1,6 @@
 //! Implementation of traits to compute metadata for field translation operations.
 use std::{
     collections::{HashMap, HashSet},
-    f32::consts::E,
     sync::{Mutex, RwLock},
 };
 
@@ -1483,6 +1482,9 @@ where
             use std::time::Instant;
             let start = Instant::now();
 
+            // Target rank defined by max dimension before cutoff
+            let mut target_rank = k;
+
             match &self.source_to_target.svd_mode {
                 &FmmSvdMode::Random {
                     n_components,
@@ -1490,11 +1492,10 @@ where
                     n_oversamples,
                     random_state,
                 } => {
-                    let target_rank;
+                    // Estimate targget rank if unspecified by user
                     if let Some(n_components) = n_components {
                         target_rank = n_components
                     } else {
-                        // Estimate target rank
                         let max_equivalent_surface_ncoeffs =
                             self.ncoeffs_equivalent_surface.iter().max().unwrap();
                         let max_check_surface_ncoeffs =
@@ -1538,7 +1539,8 @@ where
                 }
             }
 
-            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols);
+            // Cutoff rank is the minimum of the target rank and the value found by user threshold
+            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);

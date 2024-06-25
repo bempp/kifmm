@@ -3,7 +3,7 @@ use std::{fs::File, ops::DerefMut, sync::Mutex, time::Instant};
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::EvalType};
 use itertools::{iproduct, Itertools};
 use kifmm::{
-    fmm::types::{FmmSvdMode, RandomSvdSettings},
+    fmm::types::FmmSvdMode,
     linalg::rsvd::{MatrixRsvd, Normaliser},
     traits::{
         fftw::Dft,
@@ -13,9 +13,8 @@ use kifmm::{
     tree::helpers::points_fixture,
     BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder,
 };
-use num::{zero, Float};
+use num::Float;
 use rand::distributions::uniform::SampleUniform;
-use rayon::prelude::*;
 use rlst::{
     rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RawAccess, RawAccessMut, RlstScalar, Shape,
     VectorContainer,
@@ -243,6 +242,7 @@ fn grid_search_laplace_fft<T>(
     filename: String,
     expansion_order_vec: &Vec<usize>,
     depth_vec: &Vec<u64>,
+    block_size_vec: &Vec<usize>
 ) where
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
     T: RlstScalar<Real = T>
@@ -257,8 +257,8 @@ fn grid_search_laplace_fft<T>(
     // FMM parameters
     let prune_empty = true;
 
-    let parameters = iproduct!(depth_vec.iter(), expansion_order_vec.iter())
-        .map(|(depth, expansion_order)| (*depth, *expansion_order))
+    let parameters = iproduct!(depth_vec.iter(), expansion_order_vec.iter(), block_size_vec.iter())
+        .map(|(depth, expansion_order, block_size)| (*depth, *expansion_order, *block_size))
         .collect_vec();
 
     let parameters_cloned = parameters.iter().cloned().collect_vec();
@@ -272,7 +272,7 @@ fn grid_search_laplace_fft<T>(
     parameters
         .into_iter()
         .enumerate()
-        .for_each(|(i, (depth, expansion_order))| {
+        .for_each(|(i, (depth, expansion_order, block_size))| {
             let expansion_order = vec![expansion_order; (depth + 1) as usize];
             // Setup random sources and targets
             let nsources = 1000000;
@@ -299,7 +299,7 @@ fn grid_search_laplace_fft<T>(
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
-                    FftFieldTranslation::new(None),
+                    FftFieldTranslation::new(Some(block_size)),
                 )
                 .unwrap()
                 .build()
@@ -326,7 +326,8 @@ fn grid_search_laplace_fft<T>(
         .write_record(&[
             "depth".to_string(),
             "expansion_order".to_string(),
-            "time".to_string(),
+            "block_size".to_string(),
+            "runtime".to_string(),
             "min_rel_err".to_string(),
             "mean_rel_err".to_string(),
             "max_rel_err".to_string(),
@@ -343,7 +344,7 @@ fn grid_search_laplace_fft<T>(
 
     let mut progress = 0;
     for (i, fmm, setup_time) in fmms.lock().unwrap().iter() {
-        let (depth, expansion_order) = parameters_cloned[*i];
+        let (depth, expansion_order, block_size) = parameters_cloned[*i];
 
         let s = Instant::now();
         fmm.evaluate(false).unwrap();
@@ -393,6 +394,7 @@ fn grid_search_laplace_fft<T>(
             .write_record(&[
                 depth.to_string(),
                 expansion_order.to_string(),
+                block_size.to_string(),
                 time.to_string(),
                 min_rel_err.to_string(),
                 mean_rel_err.to_string(),
@@ -418,62 +420,68 @@ fn main() {
     ];
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
+    let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128, 256];
 
     // grid_search_laplace_fft::<f32>(
     //     "grid_search_laplace_fft_f32_m1".to_string(),
     //     &expansion_order_vec,
     //     &depth_vec,
+    //     &max_m2l_fft_block_size_vec
     // );
 
     let rsvd_settings_vec = vec![
         FmmSvdMode::new(false, None, None, None, None),
         FmmSvdMode::new(true, None, None, Some(5), None),
-        FmmSvdMode::new(true, Some(1), None, Some(5), None),
-        FmmSvdMode::new(true, Some(2), None, Some(5), None),
         FmmSvdMode::new(true, None, None, Some(10), None),
-        FmmSvdMode::new(true, Some(1), None, Some(10), None),
-        FmmSvdMode::new(true, Some(2), None, Some(10), None),
         FmmSvdMode::new(true, None, None, Some(20), None),
-        FmmSvdMode::new(true, Some(1), None, Some(20), None),
-        FmmSvdMode::new(true, Some(2), None, Some(20), None),
     ];
 
-    // grid_search_laplace_blas::<f32>(
-    //     "foo".to_string(),
-    //     &expansion_order_vec,
-    //     &svd_threshold_vec,
-    //     &surface_diff_vec,
-    //     &depth_vec,
-    //     &rsvd_settings_vec
-    // );
+    // for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
+    //     grid_search_laplace_blas::<f32>(
+    //         format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
+    //         &expansion_order_vec,
+    //         &svd_threshold_vec,
+    //         &surface_diff_vec,
+    //         &depth_vec,
+    //         &vec![rsvd_settings]
+    //     );
+    // }
 
-    // let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
-    let expansion_order_vec: Vec<usize> = vec![10];
+    let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
     let svd_threshold_vec = vec![
         None,
         Some(1e-15),
         Some(1e-12),
         Some(1e-9),
         Some(1e-6),
-        Some(1e-3),
-        Some(1e-1),
     ];
 
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
 
-    // grid_search_laplace_fft::<f64>(
-    //     "grid_search_laplace_fft_f64_m1".to_string(),
-    //     &expansion_order_vec,
-    //     &depth_vec,
-    // );
+    let iterator = iproduct!(expansion_order_vec.iter(), depth_vec.iter()).enumerate();
 
-    grid_search_laplace_blas::<f64>(
-        "grid_search_laplace_blas_f64_m1_8".to_string(),
-        &expansion_order_vec,
-        &svd_threshold_vec,
-        &surface_diff_vec,
-        &depth_vec,
-        &rsvd_settings_vec,
-    );
+    for (i, (&expansion_order, &depth)) in iterator {
+        grid_search_laplace_fft::<f64>(
+            format!("grid_search_laplace_fft_f64_m1_{i}").to_string(),
+            &vec![expansion_order],
+            &vec![depth],
+            &max_m2l_fft_block_size_vec
+        );
+    }
+
+    // let iterator = iproduct!(rsvd_settings_vec.iter(), expansion_order_vec.iter(), svd_threshold_vec.iter()).enumerate();
+    // for (i, (&rsvd_settings, &expansion_order, &svd_threshold)) in  iterator {
+
+    //     println!("Progress {:?}/{:?}", i, expansion_order_vec.len() * svd_threshold_vec.len() * rsvd_settings_vec.len());
+
+    //     grid_search_laplace_blas::<f64>(
+    //         format!("grid_search_laplace_blas_f64_m1_{i}").to_string(),
+    //         &vec![expansion_order],
+    //         &vec![svd_threshold],
+    //         &surface_diff_vec,
+    //         &depth_vec,
+    //         &vec![rsvd_settings]
+    //     );
+    // }
 }

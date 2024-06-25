@@ -9,7 +9,7 @@ use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAcces
 use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
-    fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
+    fmm::{constants::L2L_MAX_BLOCK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{FmmOperatorData, HomogenousKernel, TargetTranslation},
@@ -60,8 +60,8 @@ where
                 }
 
                 let mut max_chunk_size = nparents;
-                if max_chunk_size > L2L_MAX_CHUNK_SIZE {
-                    max_chunk_size = L2L_MAX_CHUNK_SIZE
+                if max_chunk_size > L2L_MAX_BLOCK_SIZE {
+                    max_chunk_size = L2L_MAX_BLOCK_SIZE
                 }
                 let chunk_size = chunk_size(nparents, max_chunk_size);
 
