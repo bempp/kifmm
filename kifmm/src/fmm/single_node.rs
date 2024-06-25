@@ -186,7 +186,6 @@ where
         // Upward pass
         let mut times = FmmTime::new();
 
-
         if timed {
             {
                 let s = Instant::now();
