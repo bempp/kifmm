@@ -117,7 +117,7 @@ where
                                 check_potential.data_mut(),
                             );
 
-                            let tmp = if self.kernel.is_homogenous() {
+                            // let tmp = if self.kernel.is_homogenous() {
                                 let mut scaled_check_potential = rlst_dynamic_array2!(
                                     Scalar,
                                     [ncoeffs_check_surface, 1]
@@ -134,15 +134,15 @@ where
                                     self.uc2e_inv_1[operator_index].view(),
                                     tmp2.view()
                                 )
-                            } else {
-                                empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_1[operator_index].view(),
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        self.uc2e_inv_2[operator_index].view(),
-                                        check_potential.view(),
-                                    ),
-                                )
-                            };
+                            // } else {
+                            //     empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            //         self.uc2e_inv_1[operator_index].view(),
+                            //         empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            //             self.uc2e_inv_2[operator_index].view(),
+                            //             check_potential.view(),
+                            //         ),
+                            //     )
+                            // };
                         }
                     });
 
