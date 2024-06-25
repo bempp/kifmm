@@ -125,13 +125,13 @@ where
                                 scaled_check_potential.fill_from(check_potential);
                                 scaled_check_potential.scale_inplace(scale[0]);
 
-                                empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_1[operator_index].view(),
+                                // empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    // self.uc2e_inv_1[operator_index].view(),
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
                                         self.uc2e_inv_2[operator_index].view(),
                                         scaled_check_potential,
-                                    ),
-                                )
+                                    );
+                                // )
                             } else {
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
                                     self.uc2e_inv_1[operator_index].view(),
