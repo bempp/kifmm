@@ -26,6 +26,9 @@ use crate::{
     Fmm,
 };
 
+use rlst::MultInto;
+
+
 impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
@@ -114,30 +117,30 @@ where
                                 check_potential.data_mut(),
                             );
 
-                            // let tmp = if self.kernel.is_homogenous() {
-                            //     let mut scaled_check_potential = rlst_dynamic_array2!(
-                            //         Scalar,
-                            //         [ncoeffs_check_surface, 1]
-                            //     );
-                            //     scaled_check_potential.fill_from(check_potential);
-                            //     scaled_check_potential.scale_inplace(scale[0]);
+                            let tmp = if self.kernel.is_homogenous() {
+                                let mut scaled_check_potential = rlst_dynamic_array2!(
+                                    Scalar,
+                                    [ncoeffs_check_surface, 1]
+                                );
+                                scaled_check_potential.fill_from(check_potential);
+                                scaled_check_potential.scale_inplace(scale[0]);
 
-                            //     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            //         self.uc2e_inv_1[operator_index].view(),
-                            //         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            //             self.uc2e_inv_2[operator_index].view(),
-                            //             scaled_check_potential,
-                            //         ),
-                            //     )
-                            // } else {
-                            //     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            //         self.uc2e_inv_1[operator_index].view(),
-                            //         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            //             self.uc2e_inv_2[operator_index].view(),
-                            //             check_potential.view(),
-                            //         ),
-                            //     )
-                            // };
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_1[operator_index].view(),
+                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                        self.uc2e_inv_2[operator_index].view(),
+                                        scaled_check_potential,
+                                    ),
+                                )
+                            } else {
+                                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_1[operator_index].view(),
+                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                        self.uc2e_inv_2[operator_index].view(),
+                                        check_potential.view(),
+                                    ),
+                                )
+                            };
                         }
                     });
 
