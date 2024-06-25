@@ -192,37 +192,37 @@ where
                 self.p2m()?;
                 times.insert("p2m".to_string(), s.elapsed());
 
+                let s = Instant::now();
                 for level in (1..=self.tree().source_tree().depth()).rev() {
-                    let s = Instant::now();
                     self.m2m(level)?;
-                    let label = "m2m".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
                 }
+                let label = "m2m".to_string();
+                times.insert(label, s.elapsed());
             }
 
             // Downward pass
-            {
-                for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        let s = Instant::now();
-                        self.l2l(level)?;
-                        let label = "l2l".to_string() + &format!("_level_{}", level);
-                        times.insert(label, s.elapsed());
-                    }
-                    let s = Instant::now();
-                    self.m2l(level)?;
-                    let label = "m2l".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
-                }
+            // {
+            //     for level in 2..=self.tree().target_tree().depth() {
+            //         if level > 2 {
+            //             let s = Instant::now();
+            //             self.l2l(level)?;
+            //             let label = "l2l".to_string() + &format!("_level_{}", level);
+            //             times.insert(label, s.elapsed());
+            //         }
+            //         let s = Instant::now();
+            //         self.m2l(level)?;
+            //         let label = "m2l".to_string() + &format!("_level_{}", level);
+            //         times.insert(label, s.elapsed());
+            //     }
 
-                // Leaf level computation
-                let s = Instant::now();
-                self.p2p()?;
-                times.insert("p2p".to_string(), s.elapsed());
-                let s = Instant::now();
-                self.l2p()?;
-                times.insert("l2p".to_string(), s.elapsed());
-            }
+            //     // Leaf level computation
+            //     let s = Instant::now();
+            //     self.p2p()?;
+            //     times.insert("p2p".to_string(), s.elapsed());
+            //     let s = Instant::now();
+            //     self.l2p()?;
+            //     times.insert("l2p".to_string(), s.elapsed());
+            // }
         } else {
             // Upward pass
             {
@@ -771,8 +771,8 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let nsources = 1000000;
+        let ntargets = 1000000;
 
         let min = None;
         let max = None;
@@ -780,9 +780,9 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
+        let n_crit = Some(400);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = [10];
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -801,19 +801,22 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+                FftFieldTranslation::new(Some(128)),
             )
             .unwrap()
             .build()
             .unwrap();
 
-        fmm.evaluate(false).unwrap();
+        let times = fmm.evaluate(true).unwrap();
+        println!("TIME {:?}", times);
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         fmm.clear(charges.data());
         fmm.evaluate(false).unwrap();
+
+        assert!(false);
 
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
