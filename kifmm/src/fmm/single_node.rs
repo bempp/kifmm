@@ -186,8 +186,6 @@ where
         // Upward pass
         let mut times = FmmTime::new();
 
-        #[cfg(target_os = "linux")]
-        rlst::threading::disable_threading();
 
         if timed {
             {
