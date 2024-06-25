@@ -341,7 +341,7 @@ mod test {
     };
 
     use crate::{
-        fmm::types::{BlasFieldTranslationIa},
+        fmm::types::BlasFieldTranslationIa,
         traits::tree::{FmmTree, FmmTreeNode, Tree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,

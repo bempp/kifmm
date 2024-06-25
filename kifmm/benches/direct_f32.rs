@@ -3,8 +3,6 @@ use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
-use kifmm::traits::fmm::Fmm;
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
@@ -172,7 +170,5 @@ fn singlethreaded_f32(c: &mut Criterion) {
     }
 }
 
-// criterion_group!(d_f32, multithreaded_f32, singlethreaded_f32);
-criterion_group!(d_f32, singlethreaded_f32);
-
+criterion_group!(d_f32, multithreaded_f32, singlethreaded_f32);
 criterion_main!(d_f32);

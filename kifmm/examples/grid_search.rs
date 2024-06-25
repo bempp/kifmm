@@ -242,7 +242,7 @@ fn grid_search_laplace_fft<T>(
     filename: String,
     expansion_order_vec: &Vec<usize>,
     depth_vec: &Vec<u64>,
-    block_size_vec: &Vec<usize>
+    block_size_vec: &Vec<usize>,
 ) where
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
     T: RlstScalar<Real = T>
@@ -257,9 +257,13 @@ fn grid_search_laplace_fft<T>(
     // FMM parameters
     let prune_empty = true;
 
-    let parameters = iproduct!(depth_vec.iter(), expansion_order_vec.iter(), block_size_vec.iter())
-        .map(|(depth, expansion_order, block_size)| (*depth, *expansion_order, *block_size))
-        .collect_vec();
+    let parameters = iproduct!(
+        depth_vec.iter(),
+        expansion_order_vec.iter(),
+        block_size_vec.iter()
+    )
+    .map(|(depth, expansion_order, block_size)| (*depth, *expansion_order, *block_size))
+    .collect_vec();
 
     let parameters_cloned = parameters.iter().cloned().collect_vec();
 
@@ -448,13 +452,7 @@ fn main() {
     // }
 
     let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
-    let svd_threshold_vec = vec![
-        None,
-        Some(1e-15),
-        Some(1e-12),
-        Some(1e-9),
-        Some(1e-6),
-    ];
+    let svd_threshold_vec = vec![None, Some(1e-15), Some(1e-12), Some(1e-9), Some(1e-6)];
 
     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
     let depth_vec: Vec<u64> = vec![4, 5];
@@ -466,7 +464,7 @@ fn main() {
             format!("grid_search_laplace_fft_f64_m1_{i}").to_string(),
             &vec![expansion_order],
             &vec![depth],
-            &max_m2l_fft_block_size_vec
+            &max_m2l_fft_block_size_vec,
         );
     }
 

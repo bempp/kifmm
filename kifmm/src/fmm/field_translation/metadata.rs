@@ -1479,9 +1479,6 @@ where
             let mut sigma = vec![Scalar::zero().re(); k];
             let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
-            use std::time::Instant;
-            let start = Instant::now();
-
             // Target rank defined by max dimension before cutoff
             let mut target_rank = k;
 
@@ -1518,11 +1515,9 @@ where
                         random_state,
                     )
                     .unwrap();
-                    // println!("RUNNING RSVD, target rank {:?}", sigma_t.len());
                     u_big = rlst_dynamic_array2!(Scalar, [mu, sigma_t.len()]);
                     vt_big = rlst_dynamic_array2!(Scalar, [sigma_t.len(), nvt]);
 
-                    // println!("vt {:?} ubt {:?}", vt_big.shape(), u_big_t.shape());
                     vt_big.fill_from(u_big_t.transpose());
                     u_big.fill_from(vt_big_t.transpose());
                     sigma = sigma_t;
@@ -1540,7 +1535,8 @@ where
             }
 
             // Cutoff rank is the minimum of the target rank and the value found by user threshold
-            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
+            let cutoff_rank =
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
@@ -1602,8 +1598,6 @@ where
                     }
                 }
             }
-
-            println!("Big SVD {:?}", start.elapsed());
 
             u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
             vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));

@@ -637,7 +637,6 @@ where
 /// Variants of SVD algorithms
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
-
     /// Use randomised SVD with optional power iteration for additional accuracy
     Random {
         /// Number of singular values/vectors sought
@@ -659,7 +658,6 @@ pub enum FmmSvdMode {
 }
 
 impl FmmSvdMode {
-
     /// Constructor for SVD settings
     pub fn new(
         random: bool,
