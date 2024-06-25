@@ -327,8 +327,6 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
-    use std::time::Instant;
-
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
@@ -797,11 +795,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let s = Instant::now();
-
-        let rsvd_settings = crate::fmm::types::FmmSvdMode::new(true, None, None, None, None);
-        let rsvd_settings = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
-
+        let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
         let mut fmm = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
@@ -810,14 +804,11 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None, rsvd_settings),
+                BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
             )
             .unwrap()
             .build()
             .unwrap();
-        println!("SETUP {:?}", s.elapsed());
-
-        // assert!(false);
 
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);

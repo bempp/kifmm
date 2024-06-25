@@ -16,7 +16,7 @@ use kifmm::{
 use num::Float;
 use rand::distributions::uniform::SampleUniform;
 use rlst::{
-    rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RawAccess, RawAccessMut, RlstScalar, Shape,
+    rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RawAccess, RawAccessMut, RlstScalar,
     VectorContainer,
 };
 extern crate blas_src;
@@ -25,11 +25,11 @@ use csv::Writer;
 
 fn grid_search_laplace_blas<T>(
     filename: String,
-    expansion_order_vec: &Vec<usize>,
-    svd_threshold_vec: &Vec<Option<T>>,
-    surface_diff_vec: &Vec<usize>,
-    depth_vec: &Vec<u64>,
-    rsvd_settings_vec: &Vec<FmmSvdMode>,
+    expansion_order_vec: &[usize],
+    svd_threshold_vec: &[Option<T>],
+    surface_diff_vec: &[usize],
+    depth_vec: &[u64],
+    rsvd_settings_vec: &[FmmSvdMode],
 ) where
     T: RlstScalar<Real = T> + Epsilon + Float + Default + SampleUniform + MatrixRsvd,
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
@@ -207,11 +207,11 @@ fn grid_search_laplace_blas<T>(
                 random_state: _,
             } => {
                 if let Some(Normaliser::Qr(n)) = normaliser {
-                    n_iter_ = n.clone()
+                    n_iter_ = *n
                 } else {
                     n_iter_ = 0;
                 }
-                n_oversamples_ = n_oversamples.unwrap().clone();
+                n_oversamples_ = n_oversamples.unwrap();
             }
 
             FmmSvdMode::Deterministic => {
@@ -240,9 +240,9 @@ fn grid_search_laplace_blas<T>(
 
 fn grid_search_laplace_fft<T>(
     filename: String,
-    expansion_order_vec: &Vec<usize>,
-    depth_vec: &Vec<u64>,
-    block_size_vec: &Vec<usize>,
+    expansion_order_vec: &[usize],
+    depth_vec: &[u64],
+    block_size_vec: &[usize],
 ) where
     Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
     T: RlstScalar<Real = T>
@@ -410,29 +410,7 @@ fn grid_search_laplace_fft<T>(
 }
 
 fn main() {
-    let expansion_order_vec: Vec<usize> = vec![3, 4, 5, 6];
-    let svd_threshold_vec = vec![
-        None,
-        Some(1e-7),
-        Some(1e-6),
-        Some(1e-5),
-        Some(1e-4),
-        Some(1e-3),
-        Some(1e-2),
-        Some(1e-1),
-        Some(2e-2),
-    ];
-    let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
-    let depth_vec: Vec<u64> = vec![4, 5];
     let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128, 256];
-
-    // grid_search_laplace_fft::<f32>(
-    //     "grid_search_laplace_fft_f32_m1".to_string(),
-    //     &expansion_order_vec,
-    //     &depth_vec,
-    //     &max_m2l_fft_block_size_vec
-    // );
-
     let rsvd_settings_vec = vec![
         FmmSvdMode::new(false, None, None, None, None),
         FmmSvdMode::new(true, None, None, Some(5), None),
@@ -440,46 +418,82 @@ fn main() {
         FmmSvdMode::new(true, None, None, Some(20), None),
     ];
 
-    // for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
-    //     grid_search_laplace_blas::<f32>(
-    //         format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
-    //         &expansion_order_vec,
-    //         &svd_threshold_vec,
-    //         &surface_diff_vec,
-    //         &depth_vec,
-    //         &vec![rsvd_settings]
-    //     );
-    // }
+    // Single Precision
+    {
+        let expansion_order_vec: Vec<usize> = vec![3, 4, 5, 6];
+        let svd_threshold_vec = vec![
+            None,
+            Some(1e-7),
+            Some(1e-6),
+            Some(1e-5),
+            Some(1e-4),
+            Some(1e-3),
+            Some(1e-2),
+            Some(1e-1),
+            Some(2e-2),
+        ];
+        let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
+        let depth_vec: Vec<u64> = vec![4, 5];
 
-    let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
-    let svd_threshold_vec = vec![None, Some(1e-15), Some(1e-12), Some(1e-9), Some(1e-6)];
-
-    let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
-    let depth_vec: Vec<u64> = vec![4, 5];
-
-    let iterator = iproduct!(expansion_order_vec.iter(), depth_vec.iter()).enumerate();
-
-    for (i, (&expansion_order, &depth)) in iterator {
-        grid_search_laplace_fft::<f64>(
-            format!("grid_search_laplace_fft_f64_m1_{i}").to_string(),
-            &vec![expansion_order],
-            &vec![depth],
+        grid_search_laplace_fft::<f32>(
+            "grid_search_laplace_fft_f32_m1".to_string(),
+            &expansion_order_vec,
+            &depth_vec,
             &max_m2l_fft_block_size_vec,
         );
+
+        for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
+            grid_search_laplace_blas::<f32>(
+                format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
+                &expansion_order_vec,
+                &svd_threshold_vec,
+                &surface_diff_vec,
+                &depth_vec,
+                &[rsvd_settings],
+            );
+        }
     }
 
-    // let iterator = iproduct!(rsvd_settings_vec.iter(), expansion_order_vec.iter(), svd_threshold_vec.iter()).enumerate();
-    // for (i, (&rsvd_settings, &expansion_order, &svd_threshold)) in  iterator {
+    // // Double Precision
+    // {
+    //     let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10];
+    //     let svd_threshold_vec = vec![None, Some(1e-15), Some(1e-12), Some(1e-9), Some(1e-6)];
 
-    //     println!("Progress {:?}/{:?}", i, expansion_order_vec.len() * svd_threshold_vec.len() * rsvd_settings_vec.len());
+    //     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
+    //     let depth_vec: Vec<u64> = vec![4, 5];
 
-    //     grid_search_laplace_blas::<f64>(
-    //         format!("grid_search_laplace_blas_f64_m1_{i}").to_string(),
-    //         &vec![expansion_order],
-    //         &vec![svd_threshold],
-    //         &surface_diff_vec,
-    //         &depth_vec,
-    //         &vec![rsvd_settings]
-    //     );
+    //     let iterator = iproduct!(expansion_order_vec.iter(), depth_vec.iter()).enumerate();
+
+    //     for (i, (&expansion_order, &depth)) in iterator {
+    //         grid_search_laplace_fft::<f64>(
+    //             format!("grid_search_laplace_fft_f64_m1_{i}").to_string(),
+    //             &vec![expansion_order],
+    //             &vec![depth],
+    //             &max_m2l_fft_block_size_vec,
+    //         );
+    //     }
+
+    //     let iterator = iproduct!(
+    //         rsvd_settings_vec.iter(),
+    //         expansion_order_vec.iter(),
+    //         svd_threshold_vec.iter()
+    //     )
+    //     .enumerate();
+    //     for (i, (&rsvd_settings, &expansion_order, &svd_threshold)) in iterator {
+    //         println!(
+    //             "Progress {:?}/{:?}",
+    //             i,
+    //             expansion_order_vec.len() * svd_threshold_vec.len() * rsvd_settings_vec.len()
+    //         );
+
+    //         grid_search_laplace_blas::<f64>(
+    //             format!("grid_search_laplace_blas_f64_m1_{i}").to_string(),
+    //             &vec![expansion_order],
+    //             &vec![svd_threshold],
+    //             &surface_diff_vec,
+    //             &depth_vec,
+    //             &vec![rsvd_settings],
+    //         );
+    //     }
     // }
 }
