@@ -130,7 +130,7 @@ where
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
                                         self.uc2e_inv_2[operator_index].view(),
                                         scaled_check_potential,
-                                    );
+                                    )
                                 // )
                             } else {
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
