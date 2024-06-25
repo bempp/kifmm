@@ -42,7 +42,7 @@ fn helmholtz_potentials_f32(c: &mut Criterion) {
             &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::Value,
-            FftFieldTranslation::new(),
+            FftFieldTranslation::new(None),
         )
         .unwrap()
         .build()
@@ -108,7 +108,7 @@ fn helmholtz_potentials_gradients_f32(c: &mut Criterion) {
             &expansion_order,
             Helmholtz3dKernel::new(wavenumber),
             EvalType::ValueDeriv,
-            FftFieldTranslation::new(),
+            FftFieldTranslation::new(None),
         )
         .unwrap()
         .build()

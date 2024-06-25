@@ -12,7 +12,7 @@ use rlst::{
 
 use crate::{
     fmm::{
-        constants::{M2M_MAX_CHUNK_SIZE, P2M_MAX_CHUNK_SIZE},
+        constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
         helpers::chunk_size,
         types::{FmmEvalType, KiFmm},
     },
@@ -77,18 +77,9 @@ where
                             let nsources = coordinates_row_major.len() / self.dim;
 
                             if nsources > 0 {
-                                let coordinates_row_major = rlst_array_from_slice2!(
-                                    coordinates_row_major,
-                                    [nsources, self.dim],
-                                    [self.dim, 1]
-                                );
-                                let mut coordinates_col_major =
-                                    rlst_dynamic_array2!(Scalar::Real, [nsources, self.dim]);
-                                coordinates_col_major.fill_from(coordinates_row_major.view());
-
                                 self.kernel.evaluate_st(
                                     EvalType::Value,
-                                    coordinates_col_major.data(),
+                                    coordinates_row_major,
                                     upward_check_surface,
                                     charges,
                                     check_potential,
@@ -98,7 +89,7 @@ where
                     );
 
                 // Use check potentials to compute the multipole expansion
-                let chunk_size = chunk_size(n_leaves, P2M_MAX_CHUNK_SIZE);
+                let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
                 check_potentials
                     .data()
                     .par_chunks_exact(ncoeffs_check_surface * chunk_size)
@@ -187,18 +178,9 @@ where
                                         * ncoeffs_check_surface
                                         ..(i + 1) * ncoeffs_check_surface];
 
-                                    let coordinates_mat = rlst_array_from_slice2!(
-                                        coordinates_row_major,
-                                        [nsources, self.dim],
-                                        [self.dim, 1]
-                                    );
-                                    let mut coordinates_col_major =
-                                        rlst_dynamic_array2!(Scalar::Real, [nsources, self.dim]);
-                                    coordinates_col_major.fill_from(coordinates_mat.view());
-
                                     self.kernel.evaluate_st(
                                         EvalType::Value,
-                                        coordinates_col_major.data(),
+                                        coordinates_row_major,
                                         upward_check_surface,
                                         charges_i,
                                         check_potential_i,
@@ -303,8 +285,8 @@ where
                 }
 
                 let mut max_chunk_size = nparents;
-                if max_chunk_size > M2M_MAX_CHUNK_SIZE {
-                    max_chunk_size = M2M_MAX_CHUNK_SIZE
+                if max_chunk_size > M2M_MAX_BLOCK_SIZE {
+                    max_chunk_size = M2M_MAX_BLOCK_SIZE
                 }
                 let chunk_size = chunk_size(nparents, max_chunk_size);
 
