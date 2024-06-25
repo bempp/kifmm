@@ -14,9 +14,8 @@ use num::{Float, Zero};
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
-    BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
-    VectorContainer,
+    BaseArray, Gemm, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
+    SvdMode, UnsafeRandomAccessByRef, UnsafeRandomAccessMut, VectorContainer,
 };
 
 use crate::{
