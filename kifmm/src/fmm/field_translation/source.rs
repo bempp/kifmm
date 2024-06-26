@@ -3,11 +3,11 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
+use pulp::Scalar;
 use rayon::prelude::*;
 
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultInto, MultIntoResize, RawAccess, RawAccessMut, RlstScalar
 };
 
 use crate::{
@@ -54,139 +54,97 @@ where
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                // let mut check_potentials =
-                //     rlst_dynamic_array2!(Scalar, [n_leaves * ncoeffs_check_surface, 1]);
+                let mut check_potentials =
+                rlst_dynamic_array2!(Scalar, [n_leaves * ncoeffs_check_surface, 1]);
 
-                // self.tree.source_tree().leaves.par_iter()
-                //     .zip(self.leaf_multipoles.par_iter())
-                //     .for_each(|(leaf, multipole_ptr)| {
+            // Compute check potential for each box
+            check_potentials
+                .data_mut()
+                .par_chunks_exact_mut(ncoeffs_check_surface)
+                .zip(
+                    self.leaf_upward_check_surfaces_sources
+                        .par_chunks_exact(check_surface_size),
+                )
+                .zip(&self.charge_index_pointer_sources)
+                .for_each(
+                    |((check_potential, upward_check_surface), charge_index_pointer)| {
+                        let charges =
+                            &self.charges[charge_index_pointer.0..charge_index_pointer.1];
 
-                //     });
+                        let coordinates_row_major = &coordinates[charge_index_pointer.0
+                            * self.dim
+                            ..charge_index_pointer.1 * self.dim];
+                        let nsources = coordinates_row_major.len() / self.dim;
 
-                let scale = homogenous_kernel_scale(depth);
-
-                self.leaf_upward_check_surfaces_sources
-                    .par_chunks_exact(check_surface_size)
-                    .zip(self.charge_index_pointer_sources.par_iter())
-                    .zip(self.leaf_multipoles.par_iter())
-                    .for_each(
-                        |((upward_check_surface, charge_index_pointer), leaf_multipoles)| {
-                            let charges =
-                                &self.charges[charge_index_pointer.0..charge_index_pointer.1];
-
-                            let coordinates_row_major = &coordinates[charge_index_pointer.0
-                                * self.dim
-                                ..charge_index_pointer.1 * self.dim];
-                            let nsources = coordinates_row_major.len() / self.dim;
-
-                            let mut check_potential =
-                                rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, 1]);
-
-                            // if nsources > 0 {
+                        if nsources > 0 {
                             self.kernel.evaluate_st(
                                 EvalType::Value,
                                 coordinates_row_major,
                                 upward_check_surface,
                                 charges,
-                                check_potential.data_mut(),
+                                check_potential,
                             );
+                        }
+                    },
+                );
 
-                            // let tmp = if self.kernel.is_homogenous() {
-                                check_potential.scale_inplace(scale);
-
-                                let tmp2 = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_2[operator_index].view(),
-                                    check_potential.view(),
-                                );
-
-                                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_1[operator_index].view(),
-                                    tmp2.view(),
-                                );
-
-
-                            // } else {
-                            //     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            //         self.uc2e_inv_1[operator_index].view(),
-                            //         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            //             self.uc2e_inv_2[operator_index].view(),
-                            //             check_potential.view(),
-                            //         ),
-                            //     )
-                            // };
-
-                            // let multipole = unsafe {
-                            //     std::slice::from_raw_parts_mut(
-                            //         leaf_multipoles[0].raw,
-                            //         ncoeffs_equivalent_surface,
-                            //     )
-                            // };
-
-                            // multipole
-                            //     .iter_mut()
-                            //     .zip(&tmp.data()[0..ncoeffs_equivalent_surface])
-                            //     .for_each(|(m, t)| *m += *t);
-                            // }
-                        },
+            // Use check potentials to compute the multipole expansion
+            let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
+            check_potentials
+                .data()
+                .par_chunks_exact(ncoeffs_check_surface * chunk_size)
+                .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
+                .zip(
+                    self.leaf_scales_sources
+                        .par_chunks_exact(ncoeffs_check_surface * chunk_size),
+                )
+                .for_each(|((check_potential, multipole_ptrs), scale)| {
+                    let check_potential = rlst_array_from_slice2!(
+                        check_potential,
+                        [ncoeffs_check_surface, chunk_size]
                     );
 
-                // // Use check potentials to compute the multipole expansion
-                // let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
-                // check_potentials
-                //     .data()
-                //     .par_chunks_exact(ncoeffs_check_surface * chunk_size)
-                //     .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
-                //     .zip(
-                //         self.leaf_scales_sources
-                //             .par_chunks_exact(ncoeffs_check_surface * chunk_size),
-                //     )
-                //     .for_each(|((check_potential, multipole_ptrs), scale)| {
-                //         let check_potential = rlst_array_from_slice2!(
-                //             check_potential,
-                //             [ncoeffs_check_surface, chunk_size]
-                //         );
+                    let tmp = if self.kernel.is_homogenous() {
+                        let mut scaled_check_potential =
+                            rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, chunk_size]);
+                        scaled_check_potential.fill_from(check_potential);
+                        scaled_check_potential.scale_inplace(scale[0]);
 
-                //         let tmp = if self.kernel.is_homogenous() {
-                //             let mut scaled_check_potential =
-                //                 rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, chunk_size]);
-                //             scaled_check_potential.fill_from(check_potential);
-                //             scaled_check_potential.scale_inplace(scale[0]);
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            self.uc2e_inv_1[operator_index].view(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_2[operator_index].view(),
+                                scaled_check_potential,
+                            ),
+                        )
+                    } else {
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            self.uc2e_inv_1[operator_index].view(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.uc2e_inv_2[operator_index].view(),
+                                check_potential.view(),
+                            ),
+                        )
+                    };
 
-                //             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                //                 self.uc2e_inv_1[operator_index].view(),
-                //                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                //                     self.uc2e_inv_2[operator_index].view(),
-                //                     scaled_check_potential,
-                //                 ),
-                //             )
-                //         } else {
-                //             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                //                 self.uc2e_inv_1[operator_index].view(),
-                //                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                //                     self.uc2e_inv_2[operator_index].view(),
-                //                     check_potential.view(),
-                //                 ),
-                //             )
-                //         };
-
-                //         for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
-                //         {
-                //             let multipole = unsafe {
-                //                 std::slice::from_raw_parts_mut(
-                //                     multipole_ptr[0].raw,
-                //                     ncoeffs_equivalent_surface,
-                //                 )
-                //             };
-                //             multipole
-                //                 .iter_mut()
-                //                 .zip(
-                //                     &tmp.data()[i * ncoeffs_equivalent_surface
-                //                         ..(i + 1) * ncoeffs_equivalent_surface],
-                //                 )
-                //                 .for_each(|(m, t)| *m += *t);
-                //         }
-                //     });
-                Ok(())
+                    for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size)
+                    {
+                        let multipole = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                multipole_ptr[0].raw,
+                                ncoeffs_equivalent_surface,
+                            )
+                        };
+                        multipole
+                            .iter_mut()
+                            .zip(
+                                &tmp.data()[i * ncoeffs_equivalent_surface
+                                    ..(i + 1) * ncoeffs_equivalent_surface],
+                            )
+                            .for_each(|(m, t)| *m += *t);
+                    }
+                });
+            Ok(())
             }
 
             FmmEvalType::Matrix(nmatvecs) => {

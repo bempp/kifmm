@@ -1,7 +1,7 @@
 //! Crate wide constants
 
 /// Maximum block size to use to process leaf boxes during P2M kernel.
-pub const P2M_MAX_BLOCK_SIZE: usize = 1;
+pub const P2M_MAX_BLOCK_SIZE: usize = 128;
 
 /// Maximum block size to use to process boxes by level during M2M kernel.
 pub const M2M_MAX_BLOCK_SIZE: usize = 1;
