@@ -13,7 +13,7 @@ use rlst::{
 use crate::{
     fmm::{
         constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
-        helpers::chunk_size,
+        helpers::{chunk_size, homogenous_kernel_scale},
         types::{FmmEvalType, KiFmm},
     },
     traits::{
@@ -54,26 +54,36 @@ where
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                let mut check_potentials =
-                    rlst_dynamic_array2!(Scalar, [n_leaves * ncoeffs_check_surface, 1]);
+                // let mut check_potentials =
+                //     rlst_dynamic_array2!(Scalar, [n_leaves * ncoeffs_check_surface, 1]);
+
+
+                // self.tree.source_tree().leaves.par_iter()
+                //     .zip(self.leaf_multipoles.par_iter())
+                //     .for_each(|(leaf, multipole_ptr)| {
+
+                //     });
+
+                let scale = homogenous_kernel_scale(depth);
 
                 self.leaf_upward_check_surfaces_sources
                     .par_chunks_exact(check_surface_size)
-                    .zip(&self.charge_index_pointer_sources)
+                    .zip(self.charge_index_pointer_sources.par_iter())
                     .zip(self.leaf_multipoles.par_iter())
                     .for_each(
                         |((upward_check_surface, charge_index_pointer), leaf_multipoles)| {
                             let charges =
                                 &self.charges[charge_index_pointer.0..charge_index_pointer.1];
 
-                            let mut check_potential =
-                                rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, 1]);
                             let coordinates_row_major = &coordinates[charge_index_pointer.0
                                 * self.dim
                                 ..charge_index_pointer.1 * self.dim];
                             let nsources = coordinates_row_major.len() / self.dim;
 
-                            if nsources > 0 {
+                            let mut check_potential =
+                                rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, 1]);
+
+                            // if nsources > 0 {
                                 self.kernel.evaluate_st(
                                     EvalType::Value,
                                     coordinates_row_major,
@@ -83,10 +93,7 @@ where
                                 );
 
                                 let tmp = if self.kernel.is_homogenous() {
-                                    // let mut scaled_check_potential =
-                                    //     rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, chunk_size]);
-                                    // scaled_check_potential.fill_from(check_potential);
-                                    // scaled_check_potential.scale_inplace(scale[0]);
+                                    check_potential.scale_inplace(scale);
 
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
                                         self.uc2e_inv_1[operator_index].view(),
@@ -116,7 +123,7 @@ where
                                     .iter_mut()
                                     .zip(&tmp.data()[0..ncoeffs_equivalent_surface])
                                     .for_each(|(m, t)| *m += *t);
-                            }
+                            // }
                         },
                     );
 

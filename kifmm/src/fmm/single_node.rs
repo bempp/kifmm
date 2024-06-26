@@ -200,28 +200,28 @@ where
             }
 
             // Downward pass
-            {
-                for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        let s = Instant::now();
-                        self.l2l(level)?;
-                        let label = "l2l".to_string() + &format!("_level_{}", level);
-                        times.insert(label, s.elapsed());
-                    }
-                    let s = Instant::now();
-                    self.m2l(level)?;
-                    let label = "m2l".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
-                }
+            // {
+            //     for level in 2..=self.tree().target_tree().depth() {
+            //         if level > 2 {
+            //             let s = Instant::now();
+            //             self.l2l(level)?;
+            //             let label = "l2l".to_string() + &format!("_level_{}", level);
+            //             times.insert(label, s.elapsed());
+            //         }
+            //         let s = Instant::now();
+            //         self.m2l(level)?;
+            //         let label = "m2l".to_string() + &format!("_level_{}", level);
+            //         times.insert(label, s.elapsed());
+            //     }
 
-                // Leaf level computation
-                let s = Instant::now();
-                self.p2p()?;
-                times.insert("p2p".to_string(), s.elapsed());
-                let s = Instant::now();
-                self.l2p()?;
-                times.insert("l2p".to_string(), s.elapsed());
-            }
+            //     // Leaf level computation
+            //     let s = Instant::now();
+            //     self.p2p()?;
+            //     times.insert("p2p".to_string(), s.elapsed());
+            //     let s = Instant::now();
+            //     self.l2p()?;
+            //     times.insert("l2p".to_string(), s.elapsed());
+            // }
         } else {
             // Upward pass
             {
