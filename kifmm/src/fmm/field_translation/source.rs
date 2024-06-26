@@ -57,14 +57,13 @@ where
                 // let mut check_potentials =
                 //     rlst_dynamic_array2!(Scalar, [n_leaves * ncoeffs_check_surface, 1]);
 
-
                 // self.tree.source_tree().leaves.par_iter()
                 //     .zip(self.leaf_multipoles.par_iter())
                 //     .for_each(|(leaf, multipole_ptr)| {
 
                 //     });
 
-                // let scale = homogenous_kernel_scale(depth);
+                let scale = homogenous_kernel_scale(depth);
 
                 self.leaf_upward_check_surfaces_sources
                     .par_chunks_exact(check_surface_size)
@@ -84,45 +83,49 @@ where
                                 rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, 1]);
 
                             // if nsources > 0 {
-                                self.kernel.evaluate_st(
-                                    EvalType::Value,
-                                    coordinates_row_major,
-                                    upward_check_surface,
-                                    charges,
-                                    check_potential.data_mut(),
+                            self.kernel.evaluate_st(
+                                EvalType::Value,
+                                coordinates_row_major,
+                                upward_check_surface,
+                                charges,
+                                check_potential.data_mut(),
+                            );
+
+                            // let tmp = if self.kernel.is_homogenous() {
+                                check_potential.scale_inplace(scale);
+
+                                let tmp2 = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_2[operator_index].view(),
+                                    check_potential.view(),
                                 );
 
-                                // let tmp = if self.kernel.is_homogenous() {
-                                //     check_potential.scale_inplace(scale);
+                                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                    self.uc2e_inv_1[operator_index].view(),
+                                    tmp2.view(),
+                                );
 
-                                //     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                //         self.uc2e_inv_1[operator_index].view(),
-                                //         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                //             self.uc2e_inv_2[operator_index].view(),
-                                //             check_potential.view(),
-                                //         ),
-                                //     )
-                                // } else {
-                                //     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                //         self.uc2e_inv_1[operator_index].view(),
-                                //         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                //             self.uc2e_inv_2[operator_index].view(),
-                                //             check_potential.view(),
-                                //         ),
-                                //     )
-                                // };
 
-                                // let multipole = unsafe {
-                                //     std::slice::from_raw_parts_mut(
-                                //         leaf_multipoles[0].raw,
-                                //         ncoeffs_equivalent_surface,
-                                //     )
-                                // };
+                            // } else {
+                            //     empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            //         self.uc2e_inv_1[operator_index].view(),
+                            //         empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            //             self.uc2e_inv_2[operator_index].view(),
+                            //             check_potential.view(),
+                            //         ),
+                            //     )
+                            // };
 
-                                // multipole
-                                //     .iter_mut()
-                                //     .zip(&tmp.data()[0..ncoeffs_equivalent_surface])
-                                //     .for_each(|(m, t)| *m += *t);
+                            // let multipole = unsafe {
+                            //     std::slice::from_raw_parts_mut(
+                            //         leaf_multipoles[0].raw,
+                            //         ncoeffs_equivalent_surface,
+                            //     )
+                            // };
+
+                            // multipole
+                            //     .iter_mut()
+                            //     .zip(&tmp.data()[0..ncoeffs_equivalent_surface])
+                            //     .for_each(|(m, t)| *m += *t);
                             // }
                         },
                     );

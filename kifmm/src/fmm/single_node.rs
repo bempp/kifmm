@@ -800,7 +800,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(Some(128))
+                FftFieldTranslation::new(Some(128)),
             )
             .unwrap()
             .build()
