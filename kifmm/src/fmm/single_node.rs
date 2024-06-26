@@ -200,28 +200,28 @@ where
             }
 
             // Downward pass
-            // {
-            //     for level in 2..=self.tree().target_tree().depth() {
-            //         if level > 2 {
-            //             let s = Instant::now();
-            //             self.l2l(level)?;
-            //             let label = "l2l".to_string() + &format!("_level_{}", level);
-            //             times.insert(label, s.elapsed());
-            //         }
-            //         let s = Instant::now();
-            //         self.m2l(level)?;
-            //         let label = "m2l".to_string() + &format!("_level_{}", level);
-            //         times.insert(label, s.elapsed());
-            //     }
+            {
+                for level in 2..=self.tree().target_tree().depth() {
+                    if level > 2 {
+                        let s = Instant::now();
+                        self.l2l(level)?;
+                        let label = "l2l".to_string() + &format!("_level_{}", level);
+                        times.insert(label, s.elapsed());
+                    }
+                    let s = Instant::now();
+                    self.m2l(level)?;
+                    let label = "m2l".to_string() + &format!("_level_{}", level);
+                    times.insert(label, s.elapsed());
+                }
 
-            //     // Leaf level computation
-            //     let s = Instant::now();
-            //     self.p2p()?;
-            //     times.insert("p2p".to_string(), s.elapsed());
-            //     let s = Instant::now();
-            //     self.l2p()?;
-            //     times.insert("l2p".to_string(), s.elapsed());
-            // }
+                // Leaf level computation
+                let s = Instant::now();
+                self.p2p()?;
+                times.insert("p2p".to_string(), s.elapsed());
+                let s = Instant::now();
+                self.l2p()?;
+                times.insert("l2p".to_string(), s.elapsed());
+            }
         } else {
             // Upward pass
             {
@@ -323,6 +323,8 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
+
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
@@ -806,7 +808,10 @@ mod test {
             .build()
             .unwrap();
 
-        fmm.evaluate(false).unwrap();
+        let s = Instant::now();
+        let times = fmm.evaluate(true).unwrap();
+        println!("time {:?} {:?}", times, s.elapsed());
+        assert!(false);
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
@@ -814,7 +819,6 @@ mod test {
         fmm.clear(charges.data());
         let times = fmm.evaluate(true).unwrap();
         println!("time {:?}", times);
-        assert!(false);
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
             fmm,
