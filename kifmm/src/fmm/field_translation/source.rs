@@ -64,7 +64,7 @@ where
 
                 //     });
 
-                let scale = homogenous_kernel_scale(depth);
+                // let scale = homogenous_kernel_scale(depth);
 
                 self.leaf_upward_check_surfaces_sources
                     .par_chunks_exact(check_surface_size)
@@ -92,37 +92,37 @@ where
                                     check_potential.data_mut(),
                                 );
 
-                                let tmp = if self.kernel.is_homogenous() {
-                                    check_potential.scale_inplace(scale);
+                                // let tmp = if self.kernel.is_homogenous() {
+                                //     check_potential.scale_inplace(scale);
 
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        self.uc2e_inv_1[operator_index].view(),
-                                        empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                            self.uc2e_inv_2[operator_index].view(),
-                                            check_potential.view(),
-                                        ),
-                                    )
-                                } else {
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        self.uc2e_inv_1[operator_index].view(),
-                                        empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                            self.uc2e_inv_2[operator_index].view(),
-                                            check_potential.view(),
-                                        ),
-                                    )
-                                };
+                                //     empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                //         self.uc2e_inv_1[operator_index].view(),
+                                //         empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                //             self.uc2e_inv_2[operator_index].view(),
+                                //             check_potential.view(),
+                                //         ),
+                                //     )
+                                // } else {
+                                //     empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                //         self.uc2e_inv_1[operator_index].view(),
+                                //         empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                //             self.uc2e_inv_2[operator_index].view(),
+                                //             check_potential.view(),
+                                //         ),
+                                //     )
+                                // };
 
-                                let multipole = unsafe {
-                                    std::slice::from_raw_parts_mut(
-                                        leaf_multipoles[0].raw,
-                                        ncoeffs_equivalent_surface,
-                                    )
-                                };
+                                // let multipole = unsafe {
+                                //     std::slice::from_raw_parts_mut(
+                                //         leaf_multipoles[0].raw,
+                                //         ncoeffs_equivalent_surface,
+                                //     )
+                                // };
 
-                                multipole
-                                    .iter_mut()
-                                    .zip(&tmp.data()[0..ncoeffs_equivalent_surface])
-                                    .for_each(|(m, t)| *m += *t);
+                                // multipole
+                                //     .iter_mut()
+                                //     .zip(&tmp.data()[0..ncoeffs_equivalent_surface])
+                                //     .for_each(|(m, t)| *m += *t);
                             // }
                         },
                     );
