@@ -136,7 +136,6 @@ impl RealToComplexFft3D for f32 {
         shape: &[usize],
         plan: &Self::Plan,
     ) -> Result<(), FftError> {
-
         unsafe { ffi::fftwf_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
 
         Ok(())
@@ -289,16 +288,7 @@ impl RealToComplexFft3D for f64 {
         shape: &[usize],
         plan: &Self::Plan,
     ) -> Result<(), FftError> {
-        let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-
-        let it_in_ = in_.chunks_exact_mut(info.n_input);
-        let it_out = out.chunks_exact_mut(info.n_output);
-
-        it_in_.zip(it_out).for_each(|(in_, out)| {
-            unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
-        });
-
-        // unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+        unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
         Ok(())
     }
 

@@ -77,7 +77,6 @@ unsafe impl Sync for Plan64 {}
 unsafe impl<T: RlstScalar, P: FftwPlan + Send + Sync> Send for Plan<T, P> {}
 unsafe impl<T: RlstScalar, P: FftwPlan + Send + Sync> Sync for Plan<T, P> {}
 
-
 /// FFTW in 'estimate' mode. A sub-optimal heuristic is used to create FFT plan.
 /// input/output arrays are not overwritten during planning, see [original doc](https://www.fftw.org/fftw3_doc/Planner-Flags.html) for detail
 pub const FFTW_ESTIMATE: u32 = 1 << 6;

@@ -110,8 +110,6 @@ impl Dft for f32 {
         shape: &[usize],
         plan: &Self::Plan,
     ) -> Result<(), FftError> {
-
-
         f32::r2c_batch(in_, out, shape, plan)?;
         Ok(())
     }

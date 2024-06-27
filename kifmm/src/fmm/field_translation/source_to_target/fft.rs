@@ -1,15 +1,15 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, time::Instant};
+use std::{collections::HashSet, sync::RwLock, time::Instant};
 
 use itertools::Itertools;
 use num::{One, Zero};
 
+use crate::fftw::types::BatchSize;
 use pulp::Scalar;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
 };
-use crate::fftw::types::BatchSize;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
@@ -44,7 +44,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
-    <Scalar as Dft>::Plan: Send + Sync
+    <Scalar as Dft>::Plan: Send + Sync,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
@@ -165,7 +165,10 @@ where
 
                 // 1.i Add multipoles to convolution grid
 
-                let mut signals = vec![Scalar::zero(); size_in * NSIBLINGS * nsources_parents]; // in Morton order
+                // let mut signals = vec![Scalar::zero(); size_in * NSIBLINGS * nsources_parents]; // in Morton order
+                let mut signals = unsafe {
+                    crate::fftw::helpers::fftw_malloc(size_in * NSIBLINGS * nsources_parents)
+                };
                 {
                     multipoles
                         .par_chunks_exact(
@@ -191,32 +194,37 @@ where
                 }
 
                 // 1.ii Perform batch FFT
-
-                // Cast cheaper than init Complex numbers ...
-                let signals_hat_buffer_c =
-                    vec![Scalar::Real::zero(); size_out * NSIBLINGS * nsources_parents * 2];
-                let signals_hat_c;
-                unsafe {
-                    let ptr =
-                        signals_hat_buffer_c.as_ptr() as *mut <Scalar as AsComplex>::ComplexType;
-                    signals_hat_c = std::slice::from_raw_parts_mut(
-                        ptr,
-                        size_out * NSIBLINGS * nsources_parents,
-                    );
-                }
+                let mut signals_hat_c = unsafe {
+                    crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
+                        size_out * NSIBLINGS * nsources_parents * 2,
+                    )
+                };
 
                 {
-                    // let plan = Scalar::plan(&mut signals, signals_hat_c, &shape_in, Some(BatchSize(NSIBLINGS as i32))).unwrap();
-                    let plan = Scalar::plan(&mut signals, signals_hat_c, &shape_in, None).unwrap();
+                    let plan = RwLock::new(
+                        Scalar::plan(
+                            &mut signals,
+                            &mut signals_hat_c,
+                            &shape_in,
+                            Some(BatchSize((NSIBLINGS) as i32)),
+                        )
+                        .unwrap(),
+                    );
 
-                    signals.par_chunks_exact_mut(size_in * NSIBLINGS)
-                        .zip(signals_hat_c.par_chunks_exact_mut(size_out * NSIBLINGS)).for_each(|(in_, out)| {
-                            assert!(in_.len() % NSIBLINGS == 0);
-                            assert!(out.len() % NSIBLINGS == 0);
+                    signals
+                        .par_chunks_exact_mut(size_in * NSIBLINGS)
+                        .zip(
+                            signals_hat_c
+                                .par_chunks_exact_mut(size_out * NSIBLINGS),
+                        )
+                        .for_each(|(in_, out)| {
+                            let plan = plan.read().unwrap();
                             let _ = Scalar::forward_dft_batch(in_, out, &shape_in, &plan);
                         })
                 }
-                // println!("Found {:?}", &signals_hat_c[0..4]);
+
+                // 1.iii Re-order based on frequency
+
 
                 // {
                 //     multipoles

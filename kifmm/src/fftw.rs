@@ -5,6 +5,6 @@
 //!
 mod c2c;
 mod dft;
-mod helpers;
+pub mod helpers;
 mod r2c;
 pub mod types;

@@ -227,9 +227,6 @@ pub trait DftType {
     type OutputType: RlstScalar + Default + Sized;
 }
 
-
-
-
 /// Interface for DFT for use from FMM
 pub trait Dft
 where
