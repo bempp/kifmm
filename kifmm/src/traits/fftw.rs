@@ -3,7 +3,7 @@ use num::Float;
 use num_complex::{Complex, ComplexFloat};
 use rlst::RlstScalar;
 
-use crate::fftw::types::{FftError, Sign};
+use crate::fftw::types::{BatchSize, FftError, FftwPlan, Sign};
 
 /// Interface for Real-to_Complex DFT computed with FFT library for 3D real data.
 ///
@@ -54,6 +54,9 @@ where
     Self: Sized + RlstScalar + Float,
     Complex<Self>: RlstScalar,
 {
+    /// Associated type for plans
+    type Plan;
+
     /// Compute in parallel real-to-complex DFT over batches of input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3]` representing the
     /// 3D input sequence. Returns a batched output, where each output sequence of shape [n1, n2, n3/2 + 1]. The input and output sequences are expected in column major order.
     ///
@@ -78,6 +81,7 @@ where
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &Self::Plan,
     ) -> Result<(), FftError>;
 
     /// Compute a parallel complex-to-real DFT over batches of input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3/2 + 1]` representing the
@@ -223,11 +227,27 @@ pub trait DftType {
     type OutputType: RlstScalar + Default + Sized;
 }
 
+
+
+
 /// Interface for DFT for use from FMM
 pub trait Dft
 where
     Self: Sized + RlstScalar + DftType,
 {
+    /// Associated type for plans
+    type Plan;
+
+    /// Create an FFT Plan
+    fn plan(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+        batch: Option<BatchSize>,
+    ) -> Result<Self::Plan, FftError>;
+
+    fn destroy_plan(plan: Self::Plan);
+
     /// Input shape, shape of convolution grid
     fn shape_in(expansion_order: usize) -> [usize; 3];
 
@@ -245,6 +265,7 @@ where
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan,
     ) -> Result<(), FftError>;
 
     /// Forward transform, if real data is used as input computes R2C dft, batched over multiple datasets
@@ -252,6 +273,7 @@ where
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan,
     ) -> Result<(), FftError>;
 
     /// Forward transform, if real data is used as input computes R2C dft, batched in parallel over multiple datasets

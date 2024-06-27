@@ -324,6 +324,8 @@ where
 #[allow(clippy::type_complexity)]
 #[cfg(test)]
 mod test {
+    use std::time::Instant;
+
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::EvalType,
@@ -771,8 +773,8 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let nsources = 1000000;
+        let ntargets = 1000000;
 
         let min = None;
         let max = None;
@@ -782,7 +784,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = [10];
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -801,13 +803,16 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+                FftFieldTranslation::new(Some(64)), // BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
             )
             .unwrap()
             .build()
             .unwrap();
 
+        let s = Instant::now();
         fmm.evaluate(false).unwrap();
+        println!("runtime {:?}", s.elapsed());
+        assert!(false);
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());

@@ -1036,7 +1036,14 @@ where
                     let mut kernel_hat =
                         rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-                    let _ = Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                    let plan = Scalar::plan(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
+                        .unwrap();
+                    let _ = Scalar::forward_dft(
+                        kernel.data_mut(),
+                        kernel_hat.data_mut(),
+                        &shape,
+                        &plan,
+                    );
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
@@ -1235,8 +1242,15 @@ where
                         let mut kernel_hat =
                             rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-                        let _ =
-                            Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                        let plan =
+                            Scalar::plan(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
+                                .unwrap();
+                        let _ = Scalar::forward_dft(
+                            kernel.data_mut(),
+                            kernel_hat.data_mut(),
+                            &shape,
+                            &plan,
+                        );
 
                         kernel_data_vec[i].push(kernel_hat);
                     } else {
@@ -2045,8 +2059,15 @@ where
                         let mut kernel_hat =
                             rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-                        let _ =
-                            Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
+                        let plan =
+                            Scalar::plan(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
+                                .unwrap();
+                        let _ = Scalar::forward_dft(
+                            kernel.data_mut(),
+                            kernel_hat.data_mut(),
+                            &shape,
+                            &plan,
+                        );
 
                         kernel_data_vec[i].push(kernel_hat);
                     } else {
@@ -2845,7 +2866,8 @@ mod test {
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
 
-        let _ = f64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
+        let plan = f64::plan(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
+        let _ = f64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
 
         let source_equivalent_surface = transfer_vector.source.surface_grid(
             expansion_order[coeff_idx],
@@ -2895,7 +2917,9 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
-        let _ = f64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
+
+        let plan = f64::plan(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
+        let _ = f64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
 
         let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
         for k in 0..o / 2 + 1 {
@@ -3009,7 +3033,8 @@ mod test {
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
 
-        let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
+        let plan = c64::plan(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
+        let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
 
         let source_equivalent_surface = source.surface_grid(
             expansion_order[coeff_index],
@@ -3059,7 +3084,8 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
-        let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
+        let plan = c64::plan(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
+        let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
 
         let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
         for k in 0..o {
