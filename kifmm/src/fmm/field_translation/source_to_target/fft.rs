@@ -92,7 +92,7 @@ where
                 let size_out = <Scalar as Dft>::size_out(self.equivalent_surface_order(level));
 
                 // Calculate displacements of multipole data with respect to source tree
-                // let all_displacements = &self.source_to_target.displacements[displacement_index];
+                let all_displacements = &self.source_to_target.displacements[displacement_index];
 
                 // Lookup multipole data from source tree
                 let multipoles = self.multipoles(level).unwrap();
@@ -205,7 +205,7 @@ where
 
                 let mut signals_hat_f = unsafe {
                     crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
-                        (size_out * (NSIBLINGS * nsources_parents) + nzeros),
+                        (size_out * (NSIBLINGS * nsources_parents + nzeros)),
                     )
                 };
 
@@ -224,7 +224,7 @@ where
                     signals
                         .par_chunks_exact_mut(size_in * batch_size)
                         .zip(signals_hat_c.par_chunks_exact_mut(size_out * batch_size))
-                        .zip(signals_hat_f.par_chunks_exact_mut(size_out * batch_size))
+                        .zip(signals_hat_f.par_chunks_exact_mut((size_out + nzeros) * batch_size))
                         .for_each(|((in_, out), out_f)| {
                             let plan = plan.read().unwrap();
                             let _ = Scalar::forward_dft_batch(in_, out, &shape_in, &plan);
@@ -239,103 +239,115 @@ where
 
                 // 2. Compute Hadamard Product
                 // 2. i Compile interactions of each source/target pair
+              {
+                    (0..size_out)
+                        .into_par_iter()
+                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
+                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+                        .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
+                            (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
+                                |chunk_start| {
+                                    let chunk_end = std::cmp::min(
+                                        chunk_start + chunk_size_kernel,
+                                        ntargets_parents,
+                                    );
 
-                let targets_parents_neighbors = targets_parents
-                    .iter()
-                    .map(|parent| parent.all_neighbors())
-                    .collect_vec();
+                                    let save_locations = &mut check_potential_hat_f
+                                        [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
 
-                let all_displacements = vec![Vec::new(); NHALO];
-                let all_displacements =
-                    all_displacements.into_iter().map(RwLock::new).collect_vec();
+                                    for i in 0..NHALO {
+                                        let frequency_offset = freq * NHALO;
+                                        let k_f = &kernel_data_ft[i + frequency_offset];
 
-
-                (0..NHALO).into_par_iter().for_each(|i| {
-                    let mut result_i = all_displacements[i].write().unwrap();
-                    for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-                        // Check if neighbor exists in a valid tree
-                        if let Some(neighbor) = all_neighbors[i] {
-                            // If it does, check if first child exists in the source tree
-                            let first_child = neighbor.first_child();
-                            if let Some(&neighbor_displacement) = self
-                                .level_index_pointer_multipoles[level as usize]
-                                .get(&first_child)
-                            {
-                                // Displacement also needs to be by frequency!
-
-                                    let ptr = SendPtr {
-                                    raw: unsafe {
-                                        signals_hat_f.as_ptr().add(neighbor_displacement * NSIBLINGS )
-                                    },
-                                };
-
-                                result_i.push(ptr)
-                            } else {
-                                let ptr = SendPtr {
-                                    raw: unsafe { signals_hat_f.as_ptr().add(nsources * size_out) },
-                                };
-                                result_i.push(ptr)
-                            }
-                        } else {
-                            let ptr = SendPtr {
-                                raw: unsafe { signals_hat_f.as_ptr().add(nsources * size_out) },
-                            };
-                            result_i.push(ptr)
-                        }
-                    }
-                });
-
-
-                (0..size_out)
-                    .into_par_iter()
-                    .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-                    .for_each(|(freq, check_potential_hat_f)| {
-                        (0..ntargets_parents)
-                            .step_by(chunk_size_kernel)
-                            .for_each(|chunk_start| {
-                                let chunk_end = std::cmp::min(
-                                    chunk_start + chunk_size_kernel,
-                                    ntargets_parents,
-                                );
-
-                                // let save_locations = &mut check_potential_hat_f[]
-
-                                let mut result = [<Scalar as AsComplex>::ComplexType::zero(); 8];
-                                let tmp = [<Scalar as AsComplex>::ComplexType::one(); 8];
-
-                                for i in 0..NHALO {
-                                    let frequency_offset = freq * NHALO;
-                                    let k_f = &kernel_data_ft[i + frequency_offset];
-                                    let k_f_slice = unsafe {
-                                        &*(k_f.as_slice().as_ptr()
-                                            as *const [<Scalar as AsComplex>::ComplexType; 64])
-                                    };
-
-                                    // Lookup signals
-                                    let signals_ptrs = &all_displacements[i].read().unwrap()
-                                        [chunk_start..chunk_end];
-
-                                    for j in 0..(chunk_end - chunk_start) {
-                                        let signal_ptr = unsafe { signals_ptrs[j].raw};
-                                        let s_f_slice = unsafe {
-                                            &*(std::slice::from_raw_parts(signal_ptr, NSIBLINGS)
-                                                .as_ptr()
-                                                as *const [<Scalar as AsComplex>::ComplexType; 8])
+                                        let k_f_slice = unsafe {
+                                            &*(k_f.as_slice().as_ptr()
+                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
                                         };
 
-                                        <Scalar as AsComplex>::ComplexType::gemv8x8(
-                                            self.isa,
-                                            k_f_slice,
-                                            &s_f_slice,
-                                            &mut result,
-                                            scale
-                                        )
+                                        // Lookup signals
+                                        let displacements = &all_displacements[i].read().unwrap()
+                                            [chunk_start..chunk_end];
 
+                                        for j in 0..(chunk_end - chunk_start) {
+                                            let displacement = displacements[j];
+                                            let s_f = &signal_hat_f
+                                                [displacement..displacement + NSIBLINGS];
+                                            let s_f_slice = unsafe {
+                                                &*(s_f.as_ptr()
+                                                    as *const [<Scalar as AsComplex>::ComplexType;
+                                                        8])
+                                            };
 
+                                            let save_locations = &mut save_locations
+                                                [j * NSIBLINGS..(j + 1) * NSIBLINGS];
+                                            let save_locations_slice = unsafe {
+                                                &mut *(save_locations.as_ptr()
+                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                                            };
+
+                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
+                                                self.isa,
+                                                k_f_slice,
+                                                s_f_slice,
+                                                save_locations_slice,
+                                                scale,
+                                            );
+                                        }
                                     }
-                                }
-                            })
-                    });
+                                },
+                            );
+                        });
+                }
+
+                // (0..size_out)
+                //     .into_par_iter()
+                //     .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+                //     .for_each(|(freq, check_potential_hat_f)| {
+                //         (0..ntargets_parents)
+                //             .step_by(chunk_size_kernel)
+                //             .for_each(|chunk_start| {
+                //                 let chunk_end = std::cmp::min(
+                //                     chunk_start + chunk_size_kernel,
+                //                     ntargets_parents,
+                //                 );
+
+                //                 // let save_locations = &mut check_potential_hat_f[]
+
+                //                 let mut result = [<Scalar as AsComplex>::ComplexType::zero(); 8];
+                //                 let tmp = [<Scalar as AsComplex>::ComplexType::one(); 8];
+
+                //                 for i in 0..NHALO {
+                //                     let frequency_offset = freq * NHALO;
+                //                     let k_f = &kernel_data_ft[i + frequency_offset];
+                //                     let k_f_slice = unsafe {
+                //                         &*(k_f.as_slice().as_ptr()
+                //                             as *const [<Scalar as AsComplex>::ComplexType; 64])
+                //                     };
+
+                //                     // Lookup signals
+                //                     let signals_ptrs = &all_displacements[i].read().unwrap()
+                //                         [chunk_start..chunk_end];
+
+                //                     for j in 0..(chunk_end - chunk_start) {
+                //                         let signal_ptr = unsafe { signals_ptrs[j].raw};
+                //                         let s_f_slice = unsafe {
+                //                             &*(std::slice::from_raw_parts(signal_ptr, NSIBLINGS)
+                //                                 .as_ptr()
+                //                                 as *const [<Scalar as AsComplex>::ComplexType; 8])
+                //                         };
+
+                //                         <Scalar as AsComplex>::ComplexType::gemv8x8(
+                //                             self.isa,
+                //                             k_f_slice,
+                //                             &s_f_slice,
+                //                             &mut result,
+                //                             scale
+                //                         )
+
+                //                     }
+                //                 }
+                //             })
+                //     });
 
                 // println!("res {:?}", result[0]);
 
