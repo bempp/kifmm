@@ -207,33 +207,33 @@ where
                 };
 
                 {
+                    let batch_size = NSIBLINGS;
                     let plan = RwLock::new(
                         Scalar::plan(
                             &mut signals,
                             &mut signals_hat_c,
                             &shape_in,
-                            Some(BatchSize((NSIBLINGS) as i32)),
+                            Some(BatchSize(batch_size as i32)),
                         )
                         .unwrap(),
                     );
 
                     signals
-                        .par_chunks_exact_mut(size_in * NSIBLINGS)
+                        .par_chunks_exact_mut(size_in * batch_size)
                         .zip(
                             signals_hat_c
-                                .par_chunks_exact_mut(size_out * NSIBLINGS),
+                                .par_chunks_exact_mut(size_out * batch_size),
                         )
-                        .zip(signals_hat_f.par_chunks_exact_mut(size_out * NSIBLINGS))
+                        .zip(signals_hat_f.par_chunks_exact_mut(size_out * batch_size))
                         .for_each(|((in_, out), out_f)| {
                             let plan = plan.read().unwrap();
                             let _ = Scalar::forward_dft_batch(in_, out, &shape_in, &plan);
 
                             for i in 0..size_out {
-                                for j in 0..NSIBLINGS {
-                                    out_f[NSIBLINGS * i + j] = out[size_out * j + i]
+                                for j in 0..batch_size {
+                                    out_f[batch_size * i + j] = out[size_out * j + i]
                                 }
                             }
-
                         })
                 }
 
