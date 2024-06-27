@@ -1,5 +1,5 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Instant};
 
 use itertools::Itertools;
 use num::{One, Zero};
@@ -157,6 +157,7 @@ where
                     check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
                 }
 
+                let s = Instant::now();
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 {
                     multipoles
@@ -259,132 +260,134 @@ where
                         });
                 }
 
-                // 2. Compute the Hadamard product
-                {
-                    (0..size_out)
-                        .into_par_iter()
-                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
-                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-                        .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
-                            (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
-                                |chunk_start| {
-                                    let chunk_end = std::cmp::min(
-                                        chunk_start + chunk_size_kernel,
-                                        ntargets_parents,
-                                    );
+                println!("FFT {:?} {:?}", level, s.elapsed());
 
-                                    let save_locations = &mut check_potential_hat_f
-                                        [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
+                // // 2. Compute the Hadamard product
+                // {
+                //     (0..size_out)
+                //         .into_par_iter()
+                //         .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
+                //         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+                //         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
+                //             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
+                //                 |chunk_start| {
+                //                     let chunk_end = std::cmp::min(
+                //                         chunk_start + chunk_size_kernel,
+                //                         ntargets_parents,
+                //                     );
 
-                                    for i in 0..NHALO {
-                                        let frequency_offset = freq * NHALO;
-                                        let k_f = &kernel_data_ft[i + frequency_offset];
+                //                     let save_locations = &mut check_potential_hat_f
+                //                         [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
 
-                                        let k_f_slice = unsafe {
-                                            &*(k_f.as_slice().as_ptr()
-                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
-                                        };
+                //                     for i in 0..NHALO {
+                //                         let frequency_offset = freq * NHALO;
+                //                         let k_f = &kernel_data_ft[i + frequency_offset];
 
-                                        // Lookup signals
-                                        let displacements = &all_displacements[i].read().unwrap()
-                                            [chunk_start..chunk_end];
+                //                         let k_f_slice = unsafe {
+                //                             &*(k_f.as_slice().as_ptr()
+                //                                 as *const [<Scalar as AsComplex>::ComplexType; 64])
+                //                         };
 
-                                        for j in 0..(chunk_end - chunk_start) {
-                                            let displacement = displacements[j];
-                                            let s_f = &signal_hat_f
-                                                [displacement..displacement + NSIBLINGS];
-                                            let s_f_slice = unsafe {
-                                                &*(s_f.as_ptr()
-                                                    as *const [<Scalar as AsComplex>::ComplexType;
-                                                        8])
-                                            };
+                //                         // Lookup signals
+                //                         let displacements = &all_displacements[i].read().unwrap()
+                //                             [chunk_start..chunk_end];
 
-                                            let save_locations = &mut save_locations
-                                                [j * NSIBLINGS..(j + 1) * NSIBLINGS];
-                                            let save_locations_slice = unsafe {
-                                                &mut *(save_locations.as_ptr()
-                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
-                                            };
+                //                         for j in 0..(chunk_end - chunk_start) {
+                //                             let displacement = displacements[j];
+                //                             let s_f = &signal_hat_f
+                //                                 [displacement..displacement + NSIBLINGS];
+                //                             let s_f_slice = unsafe {
+                //                                 &*(s_f.as_ptr()
+                //                                     as *const [<Scalar as AsComplex>::ComplexType;
+                //                                         8])
+                //                             };
 
-                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
-                                                self.isa,
-                                                k_f_slice,
-                                                s_f_slice,
-                                                save_locations_slice,
-                                                scale,
-                                            );
-                                        }
-                                    }
-                                },
-                            );
-                        });
-                }
+                //                             let save_locations = &mut save_locations
+                //                                 [j * NSIBLINGS..(j + 1) * NSIBLINGS];
+                //                             let save_locations_slice = unsafe {
+                //                                 &mut *(save_locations.as_ptr()
+                //                                     as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                //                             };
 
-                // 3. Post process to find local expansions at target boxes
-                {
-                    check_potential_hat_c
-                        .par_chunks_exact_mut(size_out)
-                        .enumerate()
-                        .for_each(|(i, check_potential_hat_chunk)| {
-                            // Lookup all frequencies for this target box
-                            for j in 0..size_out {
-                                check_potential_hat_chunk[j] =
-                                    check_potentials_hat_f[j * ntargets + i]
-                            }
-                        });
+                //                             <Scalar as AsComplex>::ComplexType::gemv8x8(
+                //                                 self.isa,
+                //                                 k_f_slice,
+                //                                 s_f_slice,
+                //                                 save_locations_slice,
+                //                                 scale,
+                //                             );
+                //                         }
+                //                     }
+                //                 },
+                //             );
+                //         });
+                // }
 
-                    // Compute inverse FFT
-                    let _ = Scalar::backward_dft_batch_par(
-                        check_potential_hat_c,
-                        &mut check_potential,
-                        &shape_in,
-                    );
+                // // 3. Post process to find local expansions at target boxes
+                // {
+                //     check_potential_hat_c
+                //         .par_chunks_exact_mut(size_out)
+                //         .enumerate()
+                //         .for_each(|(i, check_potential_hat_chunk)| {
+                //             // Lookup all frequencies for this target box
+                //             for j in 0..size_out {
+                //                 check_potential_hat_chunk[j] =
+                //                     check_potentials_hat_f[j * ntargets + i]
+                //             }
+                //         });
 
-                    check_potential
-                        .par_chunks_exact(NSIBLINGS * size_in)
-                        .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
-                        .for_each(|(check_potential_chunk, local_ptrs)| {
-                            // Map to surface grid
-                            let mut potential_chunk = rlst_dynamic_array2!(
-                                Scalar,
-                                [ncoeffs_equivalent_surface, NSIBLINGS]
-                            );
+                //     // Compute inverse FFT
+                //     let _ = Scalar::backward_dft_batch_par(
+                //         check_potential_hat_c,
+                //         &mut check_potential,
+                //         &shape_in,
+                //     );
 
-                            for i in 0..NSIBLINGS {
-                                for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
-                                    [fft_map_index]
-                                    .iter()
-                                    .enumerate()
-                                {
-                                    *potential_chunk.get_mut([surf_idx, i]).unwrap() =
-                                        check_potential_chunk[i * size_in + conv_idx];
-                                }
-                            }
+                //     check_potential
+                //         .par_chunks_exact(NSIBLINGS * size_in)
+                //         .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
+                //         .for_each(|(check_potential_chunk, local_ptrs)| {
+                //             // Map to surface grid
+                //             let mut potential_chunk = rlst_dynamic_array2!(
+                //                 Scalar,
+                //                 [ncoeffs_equivalent_surface, NSIBLINGS]
+                //             );
 
-                            // Can now find local expansion coefficients
-                            let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_1[c2e_operator_index].view(),
-                                empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.dc2e_inv_2[c2e_operator_index].view(),
-                                    potential_chunk,
-                                ),
-                            );
+                //             for i in 0..NSIBLINGS {
+                //                 for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
+                //                     [fft_map_index]
+                //                     .iter()
+                //                     .enumerate()
+                //                 {
+                //                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                //                         check_potential_chunk[i * size_in + conv_idx];
+                //                 }
+                //             }
 
-                            local_chunk
-                                .data()
-                                .chunks_exact(ncoeffs_equivalent_surface)
-                                .zip(local_ptrs)
-                                .for_each(|(result, local)| {
-                                    let local = unsafe {
-                                        std::slice::from_raw_parts_mut(
-                                            local[0].raw,
-                                            ncoeffs_equivalent_surface,
-                                        )
-                                    };
-                                    local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
-                                });
-                        });
-                }
+                //             // Can now find local expansion coefficients
+                //             let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                 self.dc2e_inv_1[c2e_operator_index].view(),
+                //                 empty_array::<Scalar, 2>().simple_mult_into_resize(
+                //                     self.dc2e_inv_2[c2e_operator_index].view(),
+                //                     potential_chunk,
+                //                 ),
+                //             );
+
+                //             local_chunk
+                //                 .data()
+                //                 .chunks_exact(ncoeffs_equivalent_surface)
+                //                 .zip(local_ptrs)
+                //                 .for_each(|(result, local)| {
+                //                     let local = unsafe {
+                //                         std::slice::from_raw_parts_mut(
+                //                             local[0].raw,
+                //                             ncoeffs_equivalent_surface,
+                //                         )
+                //                     };
+                //                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
+                //                 });
+                //         });
+                // }
 
                 Ok(())
             }
