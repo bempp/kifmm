@@ -98,20 +98,20 @@ where
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
-                let mut signals_hat_f_buffer =
-                    vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
-                let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                unsafe {
-                    let ptr = signals_hat_f_buffer.as_mut_ptr()
-                        as *mut <Scalar as AsComplex>::ComplexType;
-                    signals_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
-                }
+                // let mut signals_hat_f_buffer =
+                //     vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
+                // let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
+                // unsafe {
+                //     let ptr = signals_hat_f_buffer.as_mut_ptr()
+                //         as *mut <Scalar as AsComplex>::ComplexType;
+                //     signals_hat_f =
+                //         std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
+                // }
 
-                // A thread safe mutable pointer for saving to this vector
-                let signals_hat_f_ptr = SendPtrMut {
-                    raw: signals_hat_f.as_mut_ptr(),
-                };
+                // // A thread safe mutable pointer for saving to this vector
+                // let signals_hat_f_ptr = SendPtrMut {
+                //     raw: signals_hat_f.as_mut_ptr(),
+                // };
 
                 // Pre processing chunk size, in terms of number of source parents
                 let max_chunk_size;
@@ -200,6 +200,12 @@ where
                     )
                 };
 
+                let mut signals_hat_f = unsafe {
+                    crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
+                        size_out * NSIBLINGS * nsources_parents * 2,
+                    )
+                };
+
                 {
                     let plan = RwLock::new(
                         Scalar::plan(
@@ -217,13 +223,19 @@ where
                             signals_hat_c
                                 .par_chunks_exact_mut(size_out * NSIBLINGS),
                         )
-                        .for_each(|(in_, out)| {
+                        .zip(signals_hat_f.par_chunks_exact_mut(size_out * NSIBLINGS))
+                        .for_each(|((in_, out), out_f)| {
                             let plan = plan.read().unwrap();
                             let _ = Scalar::forward_dft_batch(in_, out, &shape_in, &plan);
+
+                            for i in 0..size_out {
+                                for j in 0..NSIBLINGS {
+                                    out_f[NSIBLINGS * i + j] = out[size_out * j + i]
+                                }
+                            }
+
                         })
                 }
-
-                // 1.iii Re-order based on frequency
 
 
                 // {
