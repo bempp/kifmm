@@ -1038,6 +1038,7 @@ where
 
                     let plan = Scalar::plan(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
                         .unwrap();
+
                     let _ = Scalar::forward_dft(
                         kernel.data_mut(),
                         kernel_hat.data_mut(),
@@ -2126,12 +2127,15 @@ where
                     let k_f = &kernel_f[frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
                         .to_vec();
                     let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-                    let mut k_ft = rlst_dynamic_array2!(
-                        <Scalar as DftType>::OutputType,
-                        [NSIBLINGS, NSIBLINGS]
-                    );
-                    k_ft.fill_from(k_f_.view());
-                    kernel_data_ft.push(k_ft.data().to_vec());
+                    // let mut k_ft = rlst_dynamic_array2!(
+                    //     <Scalar as DftType>::OutputType,
+                    //     [NSIBLINGS, NSIBLINGS]
+                    // );
+                    // k_ft.fill_from(k_f_.view());
+                    // kernel_data_ft.push(k_ft.data().to_vec());
+                    let mut k_ft = unsafe { crate::fftw::helpers::fftw_malloc(NSIBLINGS  * NSIBLINGS) };
+                    k_ft.copy_from_slice(k_f_.data());
+                    kernel_data_ft.push(k_ft);
                 }
             }
 
