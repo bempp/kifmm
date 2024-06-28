@@ -18,7 +18,7 @@ use rlst::{
 };
 
 use crate::{
-    fmm::{
+    fftw::array::AlignedAllocable, fmm::{
         constants::DEFAULT_M2L_FFT_BLOCK_SIZE,
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::{
@@ -31,9 +31,7 @@ use crate::{
             FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
         KiFmm,
-    },
-    linalg::{pinv::pinv, rsvd::MatrixRsvd},
-    traits::{
+    }, linalg::{pinv::pinv, rsvd::MatrixRsvd}, traits::{
         fftw::{Dft, DftType},
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
@@ -42,15 +40,13 @@ use crate::{
         fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
-    },
-    tree::{
+    }, tree::{
         constants::{
             ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
         types::MortonKey,
-    },
-    Fmm,
+    }, Fmm
 };
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
@@ -1104,7 +1100,7 @@ where
                 let mut k_ft =
                     rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
                 k_ft.fill_from(k_f_.view());
-                kernel_data_ft.push(k_ft.data().to_vec());
+                // kernel_data_ft.push(k_ft.data().to_vec());
             }
         }
 
@@ -1315,7 +1311,7 @@ where
                         [NSIBLINGS, NSIBLINGS]
                     );
                     k_ft.fill_from(k_f_.view());
-                    kernel_data_ft.push(k_ft.data().to_vec());
+                    // kernel_data_ft.push(k_ft.data().to_vec());
                 }
             }
 
@@ -1857,6 +1853,7 @@ where
         + Default
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
+    <Scalar as DftType>::OutputType: AlignedAllocable
 {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
@@ -2133,7 +2130,8 @@ where
                     // );
                     // k_ft.fill_from(k_f_.view());
                     // kernel_data_ft.push(k_ft.data().to_vec());
-                    let mut k_ft = unsafe { crate::fftw::helpers::fftw_malloc(NSIBLINGS  * NSIBLINGS) };
+                    // let mut k_ft = unsafe { crate::fftw::helpers::fftw_malloc(NSIBLINGS  * NSIBLINGS) };
+                    let mut k_ft = crate::fftw::array::AlignedVec::new(NSIBLINGS_SQUARED);
                     k_ft.copy_from_slice(k_f_.data());
                     kernel_data_ft.push(k_ft);
                 }

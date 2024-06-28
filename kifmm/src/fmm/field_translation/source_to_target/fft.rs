@@ -4,7 +4,7 @@ use std::{collections::HashSet, sync::RwLock, time::Instant};
 use itertools::Itertools;
 use num::{One, Zero};
 
-use crate::{fftw::types::BatchSize, fmm::types::SendPtr};
+use crate::{fftw::{array::AlignedAllocable, types::BatchSize}, fmm::types::SendPtr};
 use pulp::Scalar;
 use rayon::prelude::*;
 use rlst::{
@@ -45,6 +45,8 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
     <Scalar as Dft>::Plan: Send + Sync,
+    <Scalar as AsComplex>::ComplexType: AlignedAllocable,
+    Scalar: AlignedAllocable
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
@@ -137,7 +139,8 @@ where
                 //         std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
                 // }
 
-                let mut check_potentials_hat_f = unsafe { crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(size_out * ntargets)};
+                // let mut check_potentials_hat_f = unsafe { crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(size_out * ntargets)};
+                let mut check_potentials_hat_f = crate::fftw::array::AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * ntargets);
 
                 // Amount to scale the application of the kernel by
                 let scale = if self.kernel.is_homogenous() {
@@ -156,12 +159,14 @@ where
 
                 // Allocate buffer to store the check potentials in box order
                 let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
-                let check_potential_hat_c;
-                unsafe {
-                    let ptr =
-                        check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
-                    check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
-                }
+                // let check_potential_hat_c;
+                // unsafe {
+                //     let ptr =
+                //         check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
+                //     check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
+                // }
+
+                let mut check_potentials_hat_c = crate::fftw::array::AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * ntargets);
 
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 let s = Instant::now();
@@ -169,9 +174,11 @@ where
                 // 1.i Add multipoles to convolution grid
 
                 // let mut signals = vec![Scalar::zero(); size_in * NSIBLINGS * nsources_parents]; // in Morton order
-                let mut signals = unsafe {
-                    crate::fftw::helpers::fftw_malloc(size_in * NSIBLINGS * nsources_parents)
-                };
+                // let mut signals = unsafe {
+                //     crate::fftw::helpers::fftw_malloc(size_in * NSIBLINGS * nsources_parents)
+                // };
+
+                let mut signals = crate::fftw::array::AlignedVec::<Scalar>::new(size_in * nsources);
                 {
                     multipoles
                         .par_chunks_exact(
@@ -197,17 +204,19 @@ where
                 }
 
                 // 1.ii Perform batch FFT
-                let mut signals_hat_c = unsafe {
-                    crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
-                        size_out * NSIBLINGS * nsources_parents,
-                    )
-                };
+                // let mut signals_hat_c = unsafe {
+                //     crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
+                //         size_out * NSIBLINGS * nsources_parents,
+                //     )
+                // };
+                let mut signals_hat_c = crate::fftw::array::AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * nsources);
 
-                let mut signals_hat_f = unsafe {
-                    crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
-                        (size_out * (NSIBLINGS * nsources_parents + nzeros)),
-                    )
-                };
+                // let mut signals_hat_f = unsafe {
+                //     crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(
+                //         (size_out * (NSIBLINGS * nsources_parents + nzeros)),
+                //     )
+                // };
+                let mut signals_hat_f = crate::fftw::array::AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * (nsources + nzeros));
 
                 {
                     let batch_size = NSIBLINGS;
@@ -239,65 +248,65 @@ where
 
                 // 2. Compute Hadamard Product
                 // 2. i Compile interactions of each source/target pair
-              {
-                    (0..size_out)
-                        .into_par_iter()
-                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
-                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-                        .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
-                            (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
-                                |chunk_start| {
-                                    let chunk_end = std::cmp::min(
-                                        chunk_start + chunk_size_kernel,
-                                        ntargets_parents,
-                                    );
+            //   {
+            //         (0..size_out)
+            //             .into_par_iter()
+            //             .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
+            //             .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+            //             .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
+            //                 (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
+            //                     |chunk_start| {
+            //                         let chunk_end = std::cmp::min(
+            //                             chunk_start + chunk_size_kernel,
+            //                             ntargets_parents,
+            //                         );
 
-                                    let save_locations = &mut check_potential_hat_f
-                                        [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
+            //                         let save_locations = &mut check_potential_hat_f
+            //                             [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
 
-                                    for i in 0..NHALO {
-                                        let frequency_offset = freq * NHALO;
-                                        let k_f = &kernel_data_ft[i + frequency_offset];
+            //                         for i in 0..NHALO {
+            //                             let frequency_offset = freq * NHALO;
+            //                             let k_f = &kernel_data_ft[i + frequency_offset];
 
-                                        let k_f_slice = unsafe {
-                                            &*(k_f.as_slice().as_ptr()
-                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
-                                        };
+            //                             let k_f_slice = unsafe {
+            //                                 &*(k_f.as_slice().as_ptr()
+            //                                     as *const [<Scalar as AsComplex>::ComplexType; 64])
+            //                             };
 
-                                        // Lookup signals
-                                        let displacements = &all_displacements[i].read().unwrap()
-                                            [chunk_start..chunk_end];
+            //                             // Lookup signals
+            //                             let displacements = &all_displacements[i].read().unwrap()
+            //                                 [chunk_start..chunk_end];
 
-                                        for j in 0..(chunk_end - chunk_start) {
-                                            let displacement = displacements[j];
-                                            let s_f = &signal_hat_f
-                                                [displacement..displacement + NSIBLINGS];
-                                            let s_f_slice = unsafe {
-                                                &*(s_f.as_ptr()
-                                                    as *const [<Scalar as AsComplex>::ComplexType;
-                                                        8])
-                                            };
+            //                             for j in 0..(chunk_end - chunk_start) {
+            //                                 let displacement = displacements[j];
+            //                                 let s_f = &signal_hat_f
+            //                                     [displacement..displacement + NSIBLINGS];
+            //                                 let s_f_slice = unsafe {
+            //                                     &*(s_f.as_ptr()
+            //                                         as *const [<Scalar as AsComplex>::ComplexType;
+            //                                             8])
+            //                                 };
 
-                                            let save_locations = &mut save_locations
-                                                [j * NSIBLINGS..(j + 1) * NSIBLINGS];
-                                            let save_locations_slice = unsafe {
-                                                &mut *(save_locations.as_ptr()
-                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
-                                            };
+            //                                 let save_locations = &mut save_locations
+            //                                     [j * NSIBLINGS..(j + 1) * NSIBLINGS];
+            //                                 let save_locations_slice = unsafe {
+            //                                     &mut *(save_locations.as_ptr()
+            //                                         as *mut [<Scalar as AsComplex>::ComplexType; 8])
+            //                                 };
 
-                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
-                                                self.isa,
-                                                k_f_slice,
-                                                s_f_slice,
-                                                save_locations_slice,
-                                                scale,
-                                            );
-                                        }
-                                    }
-                                },
-                            );
-                        });
-                }
+            //                                 <Scalar as AsComplex>::ComplexType::gemv8x8(
+            //                                     self.isa,
+            //                                     k_f_slice,
+            //                                     s_f_slice,
+            //                                     save_locations_slice,
+            //                                     scale,
+            //                                 );
+            //                             }
+            //                         }
+            //                     },
+            //                 );
+            //             });
+            //     }
 
                 // (0..size_out)
                 //     .into_par_iter()

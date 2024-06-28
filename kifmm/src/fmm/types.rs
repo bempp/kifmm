@@ -6,12 +6,10 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
-    linalg::rsvd::Normaliser,
-    traits::{
+    fftw::array::AlignedVec, linalg::rsvd::Normaliser, traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
-    },
-    tree::types::{Domain, MortonKey, SingleNodeTree},
+    }, tree::types::{Domain, MortonKey, SingleNodeTree}
 };
 
 #[cfg(feature = "mpi")]
@@ -789,7 +787,7 @@ where
     pub kernel_data: Vec<Vec<T>>,
 
     /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster, re-arranged in frequency order
-    pub kernel_data_f: Vec<Vec<T>>,
+    pub kernel_data_f: Vec<AlignedVec<T>>,
 }
 
 /// Stores metadata for BLAS based acceleration scheme for field translation.
