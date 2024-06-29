@@ -787,7 +787,7 @@ where
     pub kernel_data: Vec<Vec<T>>,
 
     /// DFT of unique kernel evaluations for each source cluster in a halo of a target cluster, re-arranged in frequency order
-    pub kernel_data_f: Vec<AlignedVec<T>>,
+    pub kernel_data_f: Vec<Vec<T>>,
 }
 
 /// Stores metadata for BLAS based acceleration scheme for field translation.
