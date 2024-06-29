@@ -813,7 +813,7 @@ mod test {
         let s = Instant::now();
         let times = fmm.evaluate(true).unwrap();
         println!("runtime {:?} \n {:?}", s.elapsed(), times);
-        assert!(false);
+        // assert!(false);
         // assert!(false);
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
