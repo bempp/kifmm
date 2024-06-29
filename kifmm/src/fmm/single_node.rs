@@ -783,7 +783,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(400);
+        let n_crit = Some(150);
         let depth = None;
         let expansion_order = [10];
         let prune_empty = true;
@@ -813,6 +813,7 @@ mod test {
         let s = Instant::now();
         let times = fmm.evaluate(true).unwrap();
         println!("runtime {:?} \n {:?}", s.elapsed(), times);
+        assert!(false);
         // assert!(false);
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
