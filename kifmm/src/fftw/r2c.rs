@@ -145,6 +145,7 @@ impl RealToComplexFft3D for f32 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
@@ -288,7 +289,17 @@ impl RealToComplexFft3D for f64 {
         shape: &[usize],
         plan: &Self::Plan,
     ) -> Result<(), FftError> {
-        unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+        // unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+
+        let info = validate_shape_r2c(shape, in_.len(), out.len())?;
+
+        let it_in_ = in_.chunks_exact_mut(info.n_input);
+        let it_out = out.chunks_exact_mut(info.n_output);
+
+        it_in_.zip(it_out).for_each(|(in_, out)| {
+            unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+        });
+
         Ok(())
     }
 
@@ -296,30 +307,25 @@ impl RealToComplexFft3D for f64 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
+
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_output);
         let it_out = out.chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            unsafe { ffi::fftw_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+            unsafe { ffi::fftw_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
 
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
-        };
+        // unsafe {
+        //     ffi::fftw_destroy_plan(plan.0);
+        // };
 
         Ok(())
     }

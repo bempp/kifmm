@@ -530,10 +530,11 @@ mod test {
             &mut direct,
         );
 
+        println!("err {:?} \nd {:?} \np {:?}", 1.0, &direct[0..3], &potential[0..3]);
+
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = RlstScalar::abs(d - p);
             let rel_error = abs_error / p;
-            // println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
             assert!(rel_error <= threshold)
         });
     }
@@ -782,7 +783,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(150);
+        let n_crit = Some(400);
         let depth = None;
         let expansion_order = [10];
         let prune_empty = true;
@@ -812,7 +813,7 @@ mod test {
         let s = Instant::now();
         let times = fmm.evaluate(true).unwrap();
         println!("runtime {:?} \n {:?}", s.elapsed(), times);
-        assert!(false);
+        // assert!(false);
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());

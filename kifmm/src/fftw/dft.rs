@@ -37,8 +37,6 @@ impl Dft for f32 {
             let ostride = 1i32;
             let odist = size_out as i32;
 
-            println!("HOW MANY {:?}", howmany);
-
             Plan32(validate_plan(excall!(ffi::fftwf_plan_many_dft_r2c(
                 shape.len() as i32,
                 shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
@@ -82,8 +80,6 @@ impl Dft for f32 {
                 let onembed = std::ptr::null();
                 let ostride = 1i32;
                 let odist = size_out as i32;
-
-                println!("HOW MANY {:?}", howmany);
 
                 Plan32(validate_plan(excall!(ffi::fftwf_plan_many_dft_c2r(
                     shape.len() as i32,
@@ -183,7 +179,7 @@ impl Dft for f32 {
         shape: &[usize],
         plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::c2r_batch(in_, out, shape)?;
+        f32::c2r_batch(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -215,9 +211,7 @@ impl Dft for f64 {
             let idist = size_in as i32;
             let onembed = std::ptr::null();
             let ostride = 1i32;
-            let odist = (out.len() / size_out) as i32;
-
-            println!("HHOW MANY {:?}", howmany);
+            let odist = size_out as i32;
 
             Plan64(
                 validate_plan(excall!(ffi::fftw_plan_many_dft_r2c(
@@ -269,8 +263,6 @@ impl Dft for f64 {
                 let onembed = std::ptr::null();
                 let ostride = 1i32;
                 let odist = (out.len() / size_out) as i32;
-
-                println!("HHOW MANY {:?}", howmany);
 
                 Plan64(
                     validate_plan(excall!(ffi::fftw_plan_many_dft_c2r(
@@ -377,7 +369,7 @@ impl Dft for f64 {
         shape: &[usize],
         plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::c2r_batch(in_, out, shape)?;
+        f64::c2r_batch(in_, out, shape, plan)?;
         Ok(())
     }
 

@@ -167,14 +167,15 @@ where
 
 
 
-                let mut in_ = vec![Scalar::zero(); NSIBLINGS * size_in];
-                let mut out = vec![<Scalar as AsComplex>::ComplexType::zero(); NSIBLINGS * size_out];
+                let mut in_ = vec![Scalar::zero(); nsources * size_in];
+                let mut out = vec![<Scalar as AsComplex>::ComplexType::zero(); nsources * size_out];
 
                 let plan = Scalar::plan_forward(
                     &mut in_,
                     &mut out,
                     &shape_in,
-                    Some(BatchSize(NSIBLINGS as i32)),
+                    None
+                    // Some(BatchSize(NSIBLINGS as i32)),
                 ).unwrap();
 
                 let s = Instant::now();
@@ -202,6 +203,7 @@ where
                             }
                         }
 
+
                         // Temporary buffer to hold results of FFT
                         let signal_hat_chunk_buffer =
                             vec![
@@ -225,16 +227,23 @@ where
                             &plan
                         );
 
-                        for i in 0..size_out {
+                        // println!("signal chunk {:?}", &signal_hat_chunk_c[0..100]);
+                        // assert!(false);
+
+                        for i in 0..(size_out+nzeros) {
                             for j in 0..NSIBLINGS {
-                                signals_hat_f_chunk[NSIBLINGS * i + j] =
-                                    signal_hat_chunk_c[size_out * j + i]
+                                if i < size_out {
+                                    signals_hat_f_chunk[NSIBLINGS * i + j] =
+                                        signal_hat_chunk_c[size_out * j + i]
+                                }
                             }
                         }
 
                     });
                 }
                 println!("M2L OP 1 level  {:?} time {:?}", level, s.elapsed());
+                // println!("signal hat {:?}", &signals_hat_f[0..10]);
+                // assert!(false);
 
                 // 2. Compute the Hadamard product
                 {
@@ -299,14 +308,15 @@ where
 
                 // 3. Post process to find local expansions at target boxes
                 {
-                    let mut in_ = vec![<Scalar as AsComplex>::ComplexType::zero(); NSIBLINGS * size_out];
-                    let mut out = vec![Scalar::zero(); NSIBLINGS * size_in];
+                    let mut in_ = vec![<Scalar as AsComplex>::ComplexType::zero(); ntargets * size_out];
+                    let mut out = vec![Scalar::zero(); ntargets * size_in];
 
                     let plan = Scalar::plan_backward(
                         &mut in_,
                         &mut out,
                         &shape_in,
-                        Some(BatchSize(NSIBLINGS as i32)),
+                        None
+                        // Some(BatchSize(NSIBLINGS as i32)),
                     ).unwrap();
 
                     check_potential_hat_c

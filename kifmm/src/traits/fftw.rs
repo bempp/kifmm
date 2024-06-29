@@ -108,6 +108,7 @@ where
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Compute a real-to-complex DFT over an input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3]`. Returns an output sequence of shape [n1, n2, n3/2 + 1].
