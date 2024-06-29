@@ -8,3 +8,4 @@ mod dft;
 mod helpers;
 mod r2c;
 pub mod types;
+pub mod array;

@@ -3,7 +3,7 @@ use num::Float;
 use num_complex::{Complex, ComplexFloat};
 use rlst::RlstScalar;
 
-use crate::fftw::types::{FftError, Sign};
+use crate::fftw::types::{BatchSize, FftError, Sign};
 
 /// Interface for Real-to_Complex DFT computed with FFT library for 3D real data.
 ///
@@ -54,6 +54,9 @@ where
     Self: Sized + RlstScalar + Float,
     Complex<Self>: RlstScalar,
 {
+    // Associated Plan
+    type Plan;
+
     /// Compute in parallel real-to-complex DFT over batches of input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3]` representing the
     /// 3D input sequence. Returns a batched output, where each output sequence of shape [n1, n2, n3/2 + 1]. The input and output sequences are expected in column major order.
     ///
@@ -65,6 +68,7 @@ where
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Compute real-to-complex DFT over batches of input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3]` representing the
@@ -78,6 +82,7 @@ where
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Compute a parallel complex-to-real DFT over batches of input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3/2 + 1]` representing the
@@ -91,6 +96,7 @@ where
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Compute a complex-to-real DFT over batches of input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3/2 + 1]` representing the
@@ -104,6 +110,7 @@ where
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Compute a real-to-complex DFT over an input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3]`. Returns an output sequence of shape [n1, n2, n3/2 + 1].
@@ -113,7 +120,7 @@ where
     /// * `input` - 3D input sequence, Expected in column major order.
     /// * `output` - 3D output sequence. Expected in column major order.
     /// * `shape` - Shape of each input sequence.
-    fn r2c(in_: &mut [Self], out: &mut [Complex<Self>], shape: &[usize]) -> Result<(), FftError>;
+    fn r2c(in_: &mut [Self], out: &mut [Complex<Self>], shape: &[usize], plan: &Self::Plan) -> Result<(), FftError>;
 
     /// Compute a complex-to-real DFT over an input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3/2 + 1]` representing the 3D output sequence of a real-to-complex DFT.
     /// Returns an output sequence of shape [n1, n2, n3]. The input and output sequences are expected in column major order.
@@ -123,7 +130,7 @@ where
     /// * `input` - 3D input sequence, Expected in column major order.
     /// * `output` - 3D output sequence. Expected in column major order.
     /// * `shape` - Shape of each input sequence.
-    fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize]) -> Result<(), FftError>;
+    fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize], plan: &Self::Plan) -> Result<(), FftError>;
 }
 
 /// Interface for Complex-to_Complex DFT computed with FFT library for 3D real data.
@@ -223,11 +230,35 @@ pub trait DftType {
     type OutputType: RlstScalar + Default + Sized;
 }
 
+pub trait FftwPlan {
+    type Plan;
+    fn plan(&self) -> *mut Self::Plan;
+}
+
 /// Interface for DFT for use from FMM
 pub trait Dft
 where
     Self: Sized + RlstScalar + DftType,
 {
+    /// Associated plan
+    type Plan;
+
+    /// Create an FFT Plan
+    fn plan_forward(
+        in_: &mut [<Self as DftType>::InputType],
+        out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+        batch: Option<BatchSize>,
+    ) -> Result<Self::Plan, FftError>;
+
+    /// Create an FFT Plan
+    fn plan_backward(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
+        shape: &[usize],
+        batch: Option<BatchSize>,
+    ) -> Result<Self::Plan, FftError>;
+
     /// Input shape, shape of convolution grid
     fn shape_in(expansion_order: usize) -> [usize; 3];
 
@@ -245,6 +276,7 @@ where
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Forward transform, if real data is used as input computes R2C dft, batched over multiple datasets
@@ -252,6 +284,7 @@ where
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Forward transform, if real data is used as input computes R2C dft, batched in parallel over multiple datasets
@@ -259,6 +292,7 @@ where
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Backward transform, if real data is used as input computes C2R dft
@@ -266,6 +300,7 @@ where
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Backward transform, if real data is used as input computes C2R dft, batched over multiple datasets
@@ -273,6 +308,7 @@ where
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Backward transform, if real data is used as input computes C2R dft, batched in parallel over multiple datasets
@@ -280,5 +316,6 @@ where
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 }

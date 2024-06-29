@@ -1,11 +1,106 @@
+use itertools::Itertools;
+use kifmm_fftw_sys::FFTW_ESTIMATE;
+use kifmm_fftw_sys as ffi;
 use rlst::{c32, c64};
+use num::Zero;
 
 use crate::{
-    fftw::types::{FftError, Sign},
-    traits::fftw::{ComplexToComplexFft3D, Dft, DftType, RealToComplexFft3D},
+    excall, fftw::types::{FftError, Sign}, traits::fftw::{ComplexToComplexFft3D, Dft, DftType, RealToComplexFft3D}
 };
 
+use super::{helpers::validate_plan, types::{BatchSize, Plan, Plan32, Plan64}};
+
 impl Dft for f32 {
+
+    type Plan = Plan<Self, Plan32>;
+
+    fn plan_forward(
+            in_: &mut [<Self as DftType>::InputType],
+            out: &mut [<Self as DftType>::OutputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+            let plan = if let Some(BatchSize(howmany)) = batch {
+                let size_in: usize = shape.iter().product();
+                let shape_out = [shape[0], shape[1], shape[2] / 2];
+                let size_out: usize = shape_out.iter().product();
+                let inembed = std::ptr::null();
+                let istride = 1i32;
+                let idist = size_in as i32;
+                let onembed = std::ptr::null();
+                let ostride = 1i32;
+                let odist = size_out as i32;
+
+                Plan32(validate_plan(excall!(ffi::fftwf_plan_many_dft_r2c(
+                    shape.len() as i32,
+                    shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                    howmany,
+                    in_.as_mut_ptr(),
+                    inembed,
+                    istride,
+                    idist,
+                    out.as_mut_ptr(),
+                    onembed,
+                    ostride,
+                    odist,
+                    FFTW_ESTIMATE
+                )))?)
+            } else {
+                Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
+                    shape.len() as i32,
+                    shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                    in_.as_mut_ptr(),
+                    out.as_mut_ptr(),
+                    FFTW_ESTIMATE
+                )))?)
+            };
+
+            Ok(Plan::new(plan))
+    }
+
+    fn plan_backward(
+            in_: &mut [<Self as DftType>::OutputType],
+            out: &mut [<Self as DftType>::InputType],
+            shape: &[usize],
+            batch: Option<crate::fftw::types::BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+            let plan = if let Some(BatchSize(howmany)) = batch {
+                let size_in: usize = shape.iter().product();
+                let shape_out = [shape[0], shape[1], shape[2] / 2];
+                let size_out: usize = shape_out.iter().product();
+                let inembed = std::ptr::null();
+                let istride = 1i32;
+                let idist = size_in as i32;
+                let onembed = std::ptr::null();
+                let ostride = 1i32;
+                let odist = size_out as i32;
+
+                Plan32(validate_plan(excall!(ffi::fftwf_plan_many_dft_c2r(
+                    shape.len() as i32,
+                    shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                    howmany,
+                    in_.as_mut_ptr(),
+                    inembed,
+                    istride,
+                    idist,
+                    out.as_mut_ptr(),
+                    onembed,
+                    ostride,
+                    odist,
+                    FFTW_ESTIMATE
+                )))?)
+            } else {
+                Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
+                    shape.len() as i32,
+                    shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                    in_.as_mut_ptr(),
+                    out.as_mut_ptr(),
+                    FFTW_ESTIMATE
+                )))?)
+            };
+            Ok(Plan::new(plan))
+    }
+
     fn shape_in(expansion_order: usize) -> [usize; 3] {
         let m = 2 * expansion_order - 1; // Size of each dimension of 3D kernel/signal
         let pad_size = 1;
@@ -32,8 +127,9 @@ impl Dft for f32 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::r2c(in_, out, shape)?;
+        f32::r2c(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -41,8 +137,9 @@ impl Dft for f32 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::r2c_batch(in_, out, shape)?;
+        f32::r2c_batch(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -50,8 +147,9 @@ impl Dft for f32 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::r2c_batch_par(in_, out, shape)?;
+        f32::r2c_batch_par(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -59,8 +157,9 @@ impl Dft for f32 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::c2r(in_, out, shape)?;
+        f32::c2r(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -68,8 +167,9 @@ impl Dft for f32 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::c2r_batch(in_, out, shape)?;
+        f32::c2r_batch(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -77,13 +177,117 @@ impl Dft for f32 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f32::c2r_batch_par(in_, out, shape)?;
+        f32::c2r_batch_par(in_, out, shape, plan)?;
         Ok(())
     }
 }
 
 impl Dft for f64 {
+
+    type Plan = Plan<Self, Plan64>;
+
+    fn plan_forward(
+            in_: &mut [<Self as DftType>::InputType],
+            out: &mut [<Self as DftType>::OutputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+            let plan = if let Some(BatchSize(howmany)) = batch {
+                let size_in: usize = shape.iter().product();
+                let shape_out = [shape[0], shape[1], shape[2] / 2];
+                let size_out: usize = shape_out.iter().product();
+                let inembed = std::ptr::null();
+                let istride = 1i32;
+                let idist = size_in as i32;
+                let onembed = std::ptr::null();
+                let ostride = 1i32;
+                let odist = size_out as i32;
+
+                Plan64(
+                    validate_plan(excall!(ffi::fftw_plan_many_dft_r2c(
+                        shape.len() as i32,
+                        shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                        howmany,
+                        in_.as_mut_ptr(),
+                        inembed,
+                        istride,
+                        idist,
+                        out.as_mut_ptr(),
+                        onembed,
+                        ostride,
+                        odist,
+                        FFTW_ESTIMATE
+                    )))
+                    .unwrap(),
+                )
+            } else {
+                Plan64(
+                    validate_plan(excall!(ffi::fftw_plan_dft_r2c(
+                        shape.len() as i32,
+                        shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                        in_.as_mut_ptr(),
+                        out.as_mut_ptr(),
+                        FFTW_ESTIMATE
+                    )))
+                    .unwrap(),
+                )
+            };
+
+            Ok(Plan::new(plan))
+    }
+
+    fn plan_backward(
+            in_: &mut [<Self as DftType>::OutputType],
+            out: &mut [<Self as DftType>::InputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+            let plan = if let Some(BatchSize(howmany)) = batch {
+                let size_in: usize = shape.iter().product();
+                let shape_out = [shape[0], shape[1], shape[2] / 2];
+                let size_out: usize = shape_out.iter().product();
+                let inembed = std::ptr::null();
+                let istride = 1i32;
+                let idist = size_in as i32;
+                let onembed = std::ptr::null();
+                let ostride = 1i32;
+                let odist = (out.len() / size_out) as i32;
+
+                Plan64(
+                    validate_plan(excall!(ffi::fftw_plan_many_dft_c2r(
+                        shape.len() as i32,
+                        shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                        howmany,
+                        in_.as_mut_ptr(),
+                        inembed,
+                        istride,
+                        idist,
+                        out.as_mut_ptr(),
+                        onembed,
+                        ostride,
+                        odist,
+                        FFTW_ESTIMATE
+                    )))
+                    .unwrap(),
+                )
+            } else {
+                Plan64(
+                    validate_plan(excall!(ffi::fftw_plan_dft_c2r(
+                        shape.len() as i32,
+                        shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                        in_.as_mut_ptr(),
+                        out.as_mut_ptr(),
+                        FFTW_ESTIMATE
+                    )))
+                    .unwrap(),
+                )
+            };
+
+            Ok(Plan::new(plan))
+    }
+
     fn size_in(expansion_order: usize) -> usize {
         Self::shape_in(expansion_order).iter().product()
     }
@@ -110,8 +314,9 @@ impl Dft for f64 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::r2c(in_, out, shape)?;
+        f64::r2c(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -119,8 +324,9 @@ impl Dft for f64 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::r2c_batch(in_, out, shape)?;
+        f64::r2c_batch(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -128,8 +334,9 @@ impl Dft for f64 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::r2c_batch_par(in_, out, shape)?;
+        f64::r2c_batch_par(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -137,8 +344,9 @@ impl Dft for f64 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::c2r(in_, out, shape)?;
+        f64::c2r(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -146,8 +354,9 @@ impl Dft for f64 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::c2r_batch(in_, out, shape)?;
+        f64::c2r_batch(in_, out, shape, plan)?;
         Ok(())
     }
 
@@ -155,13 +364,66 @@ impl Dft for f64 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
-        f64::c2r_batch_par(in_, out, shape)?;
+        f64::c2r_batch_par(in_, out, shape, plan)?;
         Ok(())
     }
 }
 
 impl Dft for c32 {
+
+    type Plan = Plan<Self, Plan32>;
+
+
+    fn plan_forward(
+            in_: &mut [<Self as DftType>::InputType],
+            out: &mut [<Self as DftType>::OutputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+        // TODO: To be replaced
+        let shape = [1, 1, 1];
+        let mut in_ = vec![Self::Real::zero(); 10];
+        let mut out = vec![Self::zero(); 10];
+        let plan = Plan32(
+            validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
+                shape.len() as i32,
+                shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                in_.as_mut_ptr(),
+                out.as_mut_ptr(),
+                FFTW_ESTIMATE
+            )))
+            .unwrap(),
+        );
+
+        Ok(Plan::new(plan))
+    }
+
+    fn plan_backward(
+            in_: &mut [<Self as DftType>::OutputType],
+            out: &mut [<Self as DftType>::InputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+        // TODO: To be replaced
+        let shape = [1, 1, 1];
+        let mut in_ = vec![Self::Real::zero(); 10];
+        let mut out = vec![Self::zero(); 10];
+        let plan = Plan32(
+            validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
+                shape.len() as i32,
+                shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                in_.as_mut_ptr(),
+                out.as_mut_ptr(),
+                FFTW_ESTIMATE
+            )))
+            .unwrap(),
+        );
+
+        Ok(Plan::new(plan))
+    }
+
     fn size_in(expansion_order: usize) -> usize {
         Self::shape_in(expansion_order).iter().product()
     }
@@ -188,6 +450,7 @@ impl Dft for c32 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c32::c2c(in_, out, shape, Sign::Forward)?;
         Ok(())
@@ -197,6 +460,7 @@ impl Dft for c32 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c32::c2c_batch(in_, out, shape, Sign::Forward)?;
         Ok(())
@@ -206,6 +470,7 @@ impl Dft for c32 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c32::c2c_batch_par(in_, out, shape, Sign::Forward)?;
         Ok(())
@@ -215,6 +480,7 @@ impl Dft for c32 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c32::c2c(in_, out, shape, Sign::Backward)?;
         Ok(())
@@ -224,6 +490,7 @@ impl Dft for c32 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c32::c2c_batch(in_, out, shape, Sign::Backward)?;
         Ok(())
@@ -233,6 +500,7 @@ impl Dft for c32 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c32::c2c_batch_par(in_, out, shape, Sign::Backward)?;
         Ok(())
@@ -240,6 +508,57 @@ impl Dft for c32 {
 }
 
 impl Dft for c64 {
+
+    type Plan = Plan<Self, Plan64>;
+
+    fn plan_forward(
+            in_: &mut [<Self as DftType>::InputType],
+            out: &mut [<Self as DftType>::OutputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+        // TODO: To be replaced
+        let shape = [1, 1, 1];
+        let mut in_ = vec![Self::Real::zero(); 10];
+        let mut out = vec![c64::zero(); 10];
+        let plan = Plan64(
+            validate_plan(excall!(ffi::fftw_plan_dft_r2c(
+                shape.len() as i32,
+                shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                in_.as_mut_ptr(),
+                out.as_mut_ptr(),
+                FFTW_ESTIMATE
+            )))
+            .unwrap(),
+        );
+
+        Ok(Plan::new(plan))
+    }
+
+    fn plan_backward(
+            in_: &mut [<Self as DftType>::OutputType],
+            out: &mut [<Self as DftType>::InputType],
+            shape: &[usize],
+            batch: Option<BatchSize>,
+        ) -> Result<Self::Plan, FftError> {
+        // TODO: To be replaced
+        let shape = [1, 1, 1];
+        let mut in_ = vec![Self::Real::zero(); 10];
+        let mut out = vec![c64::zero(); 10];
+        let plan = Plan64(
+            validate_plan(excall!(ffi::fftw_plan_dft_r2c(
+                shape.len() as i32,
+                shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
+                in_.as_mut_ptr(),
+                out.as_mut_ptr(),
+                FFTW_ESTIMATE
+            )))
+            .unwrap(),
+        );
+
+        Ok(Plan::new(plan))
+    }
+
     fn size_in(expansion_order: usize) -> usize {
         Self::shape_in(expansion_order).iter().product()
     }
@@ -266,6 +585,7 @@ impl Dft for c64 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c64::c2c(in_, out, shape, Sign::Forward)?;
         Ok(())
@@ -275,6 +595,7 @@ impl Dft for c64 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c64::c2c_batch(in_, out, shape, Sign::Forward)?;
         Ok(())
@@ -284,6 +605,7 @@ impl Dft for c64 {
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c64::c2c_batch_par(in_, out, shape, Sign::Forward)?;
         Ok(())
@@ -293,6 +615,7 @@ impl Dft for c64 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c64::c2c(in_, out, shape, Sign::Backward)?;
         Ok(())
@@ -302,6 +625,7 @@ impl Dft for c64 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c64::c2c_batch(in_, out, shape, Sign::Backward)?;
         Ok(())
@@ -311,6 +635,7 @@ impl Dft for c64 {
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError> {
         c64::c2c_batch_par(in_, out, shape, Sign::Backward)?;
         Ok(())
