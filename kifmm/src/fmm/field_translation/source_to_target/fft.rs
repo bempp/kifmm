@@ -602,23 +602,16 @@ where
 
                 let s = Instant::now();
                 let mut signals_hat_f_ptrs = Vec::new();
-                // Loop over sibling sets
-                for sibling_index in 0..(nsources_parents + 1) {
+                // Loop over sibling sets which exist, and single sibling set of zeros
+                for sibling_index in 0..nsources_parents {
                     let sibling_displacement = size_out * NSIBLINGS * sibling_index;
                     // Loop over all frequencies
-
-                    if sibling_index < nsources_parents {
-                        for freq in 0..size_out {
-                            let freq_displacement = freq*NSIBLINGS;
-                            let ptr = unsafe { SendPtr{raw: signals_hat_f.as_ptr().add(sibling_displacement+freq_displacement)} };
-                            signals_hat_f_ptrs.push(ptr)
-                        }
-                    } else {
-                        for freq in 0..size_out {
-                            let ptr = unsafe { SendPtr{raw: zeros.as_ptr()} };
-                            signals_hat_f_ptrs.push(ptr)
-                        }
+                    for freq in 0..size_out {
+                        let freq_displacement = freq*NSIBLINGS;
+                        let ptr = unsafe { SendPtr{raw: signals_hat_f.as_ptr().add(sibling_displacement+freq_displacement)} };
+                        signals_hat_f_ptrs.push(ptr)
                     }
+                    signals_hat_f_ptrs.push(SendPtr{raw: zeros.as_ptr()})
                 }
                 println!("M2L OP PTRS level  {:?} time {:?}", level, s.elapsed());
                 // assert!(false);
@@ -627,7 +620,7 @@ where
                 {
                     (0..size_out)
                         .into_par_iter()
-                        .zip(signals_hat_f_ptrs.par_chunks_exact(nsources + nzeros))
+                        .zip(signals_hat_f_ptrs.par_chunks_exact(nsources_parents + 1))
                         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
                         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
@@ -657,7 +650,7 @@ where
                                             let displacement = displacements[j];
                                             // let s_f = &signal_hat_f
                                             //     [displacement..displacement + NSIBLINGS];
-                                            let s_f = unsafe { std::slice::from_raw_parts(signal_hat_f[displacement].raw, 8) };
+                                            let s_f = unsafe { std::slice::from_raw_parts(signal_hat_f[displacement / 8].raw, 8) };
                                             let s_f_slice = unsafe {
                                                 &*(s_f.as_ptr()
                                                     as *const [<Scalar as AsComplex>::ComplexType;
