@@ -331,23 +331,37 @@ where
 
                 // 3. Post process to find local expansions at target boxes
                 {
+
+                    let mut out = AlignedVec::new(size_in);
+                    let mut in_ = AlignedVec::new(size_out);
+
+                    let plan = Scalar::plan_backward(
+                        &mut in_,
+                        &mut out,
+                        &shape_in,
+                        None,
+                    ).unwrap();
+
                     check_potential_hat_c
                         .par_chunks_exact_mut(size_out)
+                        .zip(check_potential.par_chunks_exact_mut(size_out))
                         .enumerate()
-                        .for_each(|(i, check_potential_hat_chunk)| {
+                        .for_each(|(i, (check_potential_hat_chunk, check_potential_chunk))| {
                             // Lookup all frequencies for this target box
                             for j in 0..size_out {
                                 check_potential_hat_chunk[j] =
                                     check_potentials_hat_f[j * ntargets + i]
                             }
+
+                            let _ = Scalar::backward_dft_batch(
+                                check_potential_hat_chunk,
+                                check_potential_chunk,
+                                &shape_in,
+                                &plan
+                            );
                         });
 
                     // Compute inverse FFT
-                    let _ = Scalar::backward_dft_batch_par(
-                        check_potential_hat_c,
-                        &mut check_potential,
-                        &shape_in,
-                    );
 
                     check_potential
                         .par_chunks_exact(NSIBLINGS * size_in)
