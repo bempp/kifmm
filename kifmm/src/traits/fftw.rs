@@ -236,9 +236,17 @@ where
     type Plan;
 
     /// Create an FFT Plan
-    fn plan(
+    fn plan_forward(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
+        shape: &[usize],
+        batch: Option<BatchSize>,
+    ) -> Result<Self::Plan, FftError>;
+
+    /// Create an FFT Plan
+    fn plan_backward(
+        in_: &mut [<Self as DftType>::OutputType],
+        out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
         batch: Option<BatchSize>,
     ) -> Result<Self::Plan, FftError>;
@@ -292,6 +300,7 @@ where
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
+        plan: &Self::Plan
     ) -> Result<(), FftError>;
 
     /// Backward transform, if real data is used as input computes C2R dft, batched in parallel over multiple datasets
