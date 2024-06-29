@@ -375,8 +375,9 @@ where
                         .par_chunks_exact(
                             ncoeffs_equivalent_surface * NSIBLINGS,
                         )
+                        .zip(signals_hat_f.par_chunks_exact_mut(NSIBLINGS * (size_out + 8)))
                         .enumerate()
-                        .for_each(|(i, multipole_chunk)| {
+                        .for_each(|(i, (multipole_chunk, signals_hat_f_chunk))| {
                             let mut signal_chunk =
                             vec![Scalar::zero(); size_in * NSIBLINGS];
 
@@ -416,58 +417,13 @@ where
                             &plan
                         );
 
-                        // Re-order the temporary buffer into frequency order before flushing to main memory
-                        let signal_hat_chunk_f_buffer =
-                            vec![
-                                Scalar::Real::zero();
-                                size_out * NSIBLINGS * 2
-                            ];
-                        let signal_hat_chunk_f_c;
-                        unsafe {
-                            let ptr = signal_hat_chunk_f_buffer.as_ptr()
-                                as *mut <Scalar as AsComplex>::ComplexType;
-                            signal_hat_chunk_f_c = std::slice::from_raw_parts_mut(
-                                ptr,
-                                size_out * NSIBLINGS,
-                            );
-                        }
-
                         for i in 0..size_out {
                             for j in 0..NSIBLINGS {
-                                signal_hat_chunk_f_c[NSIBLINGS * i + j] =
+                                signals_hat_f_chunk[NSIBLINGS * i + j] =
                                     signal_hat_chunk_c[size_out * j + i]
                             }
                         }
 
-                        // // Storing the results of the FFT in frequency order
-                        // unsafe {
-                        //     let sibling_offset = i * NSIBLINGS * chunk_size_pre_proc;
-
-                        //     // Pointer to storage buffer for frequency ordered FFT of signals
-                        //     let ptr = signals_hat_f_ptr;
-
-                        //     for i in 0..size_out {
-                        //         let frequency_offset = i * (nsources + nzeros);
-
-                        //         // Head of buffer for each frequency
-                        //         let head = ptr.raw.add(frequency_offset).add(sibling_offset);
-
-                        //         let signal_hat_f_chunk = std::slice::from_raw_parts_mut(
-                        //             head,
-                        //             NSIBLINGS * chunk_size_pre_proc,
-                        //         );
-
-                        //         // Store results for this frequency for this sibling set chunk
-                        //         let results_i =
-                        //             &signal_hat_chunk_f_c[i * NSIBLINGS * chunk_size_pre_proc
-                        //                 ..(i + 1) * NSIBLINGS * chunk_size_pre_proc];
-
-                        //         signal_hat_f_chunk
-                        //             .iter_mut()
-                        //             .zip(results_i)
-                        //             .for_each(|(c, r)| *c += *r);
-                        //     }
-                        // }
                     });
                 }
                 println!("M2L OP 1 level  {:?} time {:?}", level, s.elapsed());
