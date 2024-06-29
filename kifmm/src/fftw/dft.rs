@@ -206,9 +206,13 @@ impl Dft for f64 {
             let size_in: usize = shape.iter().product();
             let shape_out = [shape[0], shape[1], shape[2] / 2];
             let size_out: usize = shape_out.iter().product();
+            // let shape_i32 = shape.iter().map(|&s| s as i32).collect_vec();
+            // let shape_out_i32 = shape_out.iter().map(|&s| s as i32).collect_vec();
+            // let inembed = shape_i32.as_ptr() as *const i32;
             let inembed = std::ptr::null();
             let istride = 1i32;
             let idist = size_in as i32;
+            // let onembed = shape_out_i32.as_ptr() as *const i32;
             let onembed = std::ptr::null();
             let ostride = 1i32;
             let odist = size_out as i32;

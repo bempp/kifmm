@@ -4,7 +4,7 @@ use std::{collections::HashSet, sync::RwLock, time::Instant};
 use itertools::Itertools;
 use num::{One, Zero};
 
-use crate::{fftw::{array::AlignedAllocable, types::BatchSize}, fmm::types::SendPtr};
+use crate::{fftw::{array::{AlignedAllocable, AlignedVec}, types::BatchSize}, fmm::types::SendPtr};
 use pulp::Scalar;
 use rayon::prelude::*;
 use rlst::{
@@ -443,14 +443,15 @@ where
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
                 let mut signals_hat_f_buffer =
-                    vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
+                    vec![Scalar::Real::zero(); size_out * nsources * 2];
                 let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
                 unsafe {
                     let ptr = signals_hat_f_buffer.as_mut_ptr()
                         as *mut <Scalar as AsComplex>::ComplexType;
                     signals_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
+                        std::slice::from_raw_parts_mut(ptr, size_out * nsources);
                 }
+
                 // // // A thread safe mutable pointer for saving to this vector
                 // // let signals_hat_f_ptr = SendPtrMut {
                 // //     raw: signals_hat_f.as_mut_ptr(),
@@ -508,6 +509,17 @@ where
 
 
 
+                // let mut in_ = vec![Scalar::zero(); NSIBLINGS * size_in];
+                // let mut out = vec![<Scalar as AsComplex>::ComplexType::zero(); NSIBLINGS * size_out];
+
+                // let plan = Scalar::plan_forward(
+                //     &mut in_,
+                //     &mut out,
+                //     &shape_in,
+                //     // None
+                //     Some(BatchSize(NSIBLINGS as i32)),
+                // ).unwrap();
+
                 let mut in_ = vec![Scalar::zero(); size_in];
                 let mut out = vec![<Scalar as AsComplex>::ComplexType::zero(); size_out];
 
@@ -525,11 +537,12 @@ where
                         .par_chunks_exact(
                             ncoeffs_equivalent_surface * NSIBLINGS,
                         )
-                        .zip(signals_hat_f.par_chunks_exact_mut(NSIBLINGS * (size_out + nzeros)))
+                        .zip(signals_hat_f.par_chunks_exact_mut(NSIBLINGS * size_out))
                         .enumerate()
                         .for_each(|(i, (multipole_chunk, signals_hat_f_chunk))| {
-                            let mut signal_chunk =
-                            vec![Scalar::zero(); size_in * NSIBLINGS];
+                            // let mut signal_chunk =
+                            // vec![Scalar::zero(); size_in * NSIBLINGS];
+                            let mut signal_chunk = AlignedVec::new(size_in * NSIBLINGS);
 
                         for i in 0..NSIBLINGS {
                             let multipole = &multipole_chunk[i * ncoeffs_equivalent_surface
@@ -544,26 +557,26 @@ where
                             }
                         }
 
-
-                        // Temporary buffer to hold results of FFT
-                        let signal_hat_chunk_buffer =
-                            vec![
-                                Scalar::Real::zero();
-                                size_out * NSIBLINGS * 2
-                            ];
-                        let signal_hat_chunk_c;
-                        unsafe {
-                            let ptr = signal_hat_chunk_buffer.as_ptr()
-                                as *mut <Scalar as AsComplex>::ComplexType;
-                            signal_hat_chunk_c = std::slice::from_raw_parts_mut(
-                                ptr,
-                                size_out * NSIBLINGS,
-                            );
-                        }
+                        // // Temporary buffer to hold results of FFT
+                        // let signal_hat_chunk_buffer =
+                        //     vec![
+                        //         Scalar::Real::zero();
+                        //         size_out * NSIBLINGS * 2
+                        //     ];
+                        // let signal_hat_chunk_c;
+                        // unsafe {
+                        //     let ptr = signal_hat_chunk_buffer.as_ptr()
+                        //         as *mut <Scalar as AsComplex>::ComplexType;
+                        //     signal_hat_chunk_c = std::slice::from_raw_parts_mut(
+                        //         ptr,
+                        //         size_out * NSIBLINGS,
+                        //     );
+                        // }
+                        let mut signal_hat_chunk_c = AlignedVec::new(size_out * NSIBLINGS);
 
                         let _ = Scalar::forward_dft_batch(
                             &mut signal_chunk,
-                            signal_hat_chunk_c,
+                            &mut signal_hat_chunk_c,
                             &shape_in,
                             &plan
                         );
@@ -571,26 +584,50 @@ where
                         // println!("signal chunk {:?}", &signal_hat_chunk_c[0..100]);
                         // assert!(false);
 
-                        for i in 0..(size_out+nzeros) {
+                        for i in 0..size_out {
                             for j in 0..NSIBLINGS {
-                                if i < size_out {
-                                    signals_hat_f_chunk[NSIBLINGS * i + j] =
-                                        signal_hat_chunk_c[size_out * j + i]
-                                }
+                                signals_hat_f_chunk[NSIBLINGS * i + j] =
+                                    signal_hat_chunk_c[size_out * j + i]
                             }
                         }
 
                     });
                 }
                 println!("M2L OP 1 level  {:?} time {:?}", level, s.elapsed());
-                // println!("signal hat {:?}", &signals_hat_f[0..10]);
+                // assert!(false);
+
+                // Form interaction list
+
+                let zeros = vec![<Scalar as AsComplex>::ComplexType::zero(); nzeros];
+
+                let s = Instant::now();
+                let mut signals_hat_f_ptrs = Vec::new();
+                // Loop over sibling sets
+                for sibling_index in 0..(nsources_parents + 1) {
+                    let sibling_displacement = size_out * NSIBLINGS * sibling_index;
+                    // Loop over all frequencies
+
+                    if sibling_index < nsources_parents {
+                        for freq in 0..size_out {
+                            let freq_displacement = freq*NSIBLINGS;
+                            let ptr = unsafe { SendPtr{raw: signals_hat_f.as_ptr().add(sibling_displacement+freq_displacement)} };
+                            signals_hat_f_ptrs.push(ptr)
+                        }
+                    } else {
+                        for freq in 0..size_out {
+                            let ptr = unsafe { SendPtr{raw: zeros.as_ptr()} };
+                            signals_hat_f_ptrs.push(ptr)
+                        }
+                    }
+                }
+                println!("M2L OP PTRS level  {:?} time {:?}", level, s.elapsed());
                 // assert!(false);
 
                 // 2. Compute the Hadamard product
                 {
                     (0..size_out)
                         .into_par_iter()
-                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
+                        .zip(signals_hat_f_ptrs.par_chunks_exact(nsources + nzeros))
                         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
                         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
@@ -618,8 +655,9 @@ where
 
                                         for j in 0..(chunk_end - chunk_start) {
                                             let displacement = displacements[j];
-                                            let s_f = &signal_hat_f
-                                                [displacement..displacement + NSIBLINGS];
+                                            // let s_f = &signal_hat_f
+                                            //     [displacement..displacement + NSIBLINGS];
+                                            let s_f = unsafe { std::slice::from_raw_parts(signal_hat_f[displacement].raw, 8) };
                                             let s_f_slice = unsafe {
                                                 &*(s_f.as_ptr()
                                                     as *const [<Scalar as AsComplex>::ComplexType;

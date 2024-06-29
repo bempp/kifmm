@@ -289,6 +289,8 @@ impl RealToComplexFft3D for f64 {
         shape: &[usize],
         plan: &Self::Plan,
     ) -> Result<(), FftError> {
+
+        // TODO: Come back to why batch execution is giving wrong results
         // unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
 
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
