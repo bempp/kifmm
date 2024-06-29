@@ -258,65 +258,65 @@ where
                 }
 
                 // 2. Compute the Hadamard product
-                // {
-                //     (0..size_out)
-                //         .into_par_iter()
-                //         .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
-                //         .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
-                //         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
-                //             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
-                //                 |chunk_start| {
-                //                     let chunk_end = std::cmp::min(
-                //                         chunk_start + chunk_size_kernel,
-                //                         ntargets_parents,
-                //                     );
+                {
+                    (0..size_out)
+                        .into_par_iter()
+                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
+                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+                        .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
+                            (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
+                                |chunk_start| {
+                                    let chunk_end = std::cmp::min(
+                                        chunk_start + chunk_size_kernel,
+                                        ntargets_parents,
+                                    );
 
-                //                     let save_locations = &mut check_potential_hat_f
-                //                         [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
+                                    let save_locations = &mut check_potential_hat_f
+                                        [chunk_start * NSIBLINGS..chunk_end * NSIBLINGS];
 
-                //                     for i in 0..NHALO {
-                //                         let frequency_offset = freq * NHALO;
-                //                         let k_f = &kernel_data_ft[i + frequency_offset];
+                                    for i in 0..NHALO {
+                                        let frequency_offset = freq * NHALO;
+                                        let k_f = &kernel_data_ft[i + frequency_offset];
 
-                //                         let k_f_slice = unsafe {
-                //                             &*(k_f.as_slice().as_ptr()
-                //                                 as *const [<Scalar as AsComplex>::ComplexType; 64])
-                //                         };
+                                        let k_f_slice = unsafe {
+                                            &*(k_f.as_slice().as_ptr()
+                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
+                                        };
 
-                //                         // Lookup signals
-                //                         let displacements = &all_displacements[i].read().unwrap()
-                //                             [chunk_start..chunk_end];
+                                        // Lookup signals
+                                        let displacements = &all_displacements[i].read().unwrap()
+                                            [chunk_start..chunk_end];
 
-                //                         for j in 0..(chunk_end - chunk_start) {
-                //                             let displacement = displacements[j];
-                //                             let s_f = &signal_hat_f
-                //                                 [displacement..displacement + NSIBLINGS];
-                //                             let s_f_slice = unsafe {
-                //                                 &*(s_f.as_ptr()
-                //                                     as *const [<Scalar as AsComplex>::ComplexType;
-                //                                         8])
-                //                             };
+                                        for j in 0..(chunk_end - chunk_start) {
+                                            let displacement = displacements[j];
+                                            let s_f = &signal_hat_f
+                                                [displacement..displacement + NSIBLINGS];
+                                            let s_f_slice = unsafe {
+                                                &*(s_f.as_ptr()
+                                                    as *const [<Scalar as AsComplex>::ComplexType;
+                                                        8])
+                                            };
 
-                //                             let save_locations = &mut save_locations
-                //                                 [j * NSIBLINGS..(j + 1) * NSIBLINGS];
-                //                             let save_locations_slice = unsafe {
-                //                                 &mut *(save_locations.as_ptr()
-                //                                     as *mut [<Scalar as AsComplex>::ComplexType; 8])
-                //                             };
+                                            let save_locations = &mut save_locations
+                                                [j * NSIBLINGS..(j + 1) * NSIBLINGS];
+                                            let save_locations_slice = unsafe {
+                                                &mut *(save_locations.as_ptr()
+                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                                            };
 
-                //                             <Scalar as AsComplex>::ComplexType::gemv8x8(
-                //                                 self.isa,
-                //                                 k_f_slice,
-                //                                 s_f_slice,
-                //                                 save_locations_slice,
-                //                                 scale,
-                //                             );
-                //                         }
-                //                     }
-                //                 },
-                //             );
-                //         });
-                // }
+                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
+                                                self.isa,
+                                                k_f_slice,
+                                                s_f_slice,
+                                                save_locations_slice,
+                                                scale,
+                                            );
+                                        }
+                                    }
+                                },
+                            );
+                        });
+                }
 
                 // // 3. Post process to find local expansions at target boxes
                 // {
