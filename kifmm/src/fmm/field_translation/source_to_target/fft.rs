@@ -312,8 +312,9 @@ where
                     check_potential_hat_c
                         .par_chunks_exact_mut(size_out * NSIBLINGS)
                         .zip(check_potentials_hat_f.par_chunks_exact(size_out * NSIBLINGS))
+                        .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
                         .enumerate()
-                        .for_each(|(i, (check_potential_hat_chunk, check_potentials_hat_f_chunk))| {
+                        .for_each(|(i, ((check_potential_hat_chunk, check_potentials_hat_f_chunk), local_ptrs))| {
 
                             // Lookup all frequencies for this target box
                             for j in 0..size_out {
@@ -358,54 +359,22 @@ where
                                 ),
                             );
 
+                            local_chunk
+                                .data()
+                                .chunks_exact(ncoeffs_equivalent_surface)
+                                .zip(local_ptrs)
+                                .for_each(|(result, local)| {
+                                    let local = unsafe {
+                                        std::slice::from_raw_parts_mut(
+                                            local[0].raw,
+                                            ncoeffs_equivalent_surface,
+                                        )
+                                    };
+                                    local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
+                                });
 
                         });
 
-
-                //     check_potential
-                //         .par_chunks_exact(NSIBLINGS * size_in)
-                //         .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
-                //         .for_each(|(check_potential_chunk, local_ptrs)| {
-                //             // Map to surface grid
-                //             let mut potential_chunk = rlst_dynamic_array2!(
-                //                 Scalar,
-                //                 [ncoeffs_equivalent_surface, NSIBLINGS]
-                //             );
-
-                //             for i in 0..NSIBLINGS {
-                //                 for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
-                //                     [fft_map_index]
-                //                     .iter()
-                //                     .enumerate()
-                //                 {
-                //                     *potential_chunk.get_mut([surf_idx, i]).unwrap() =
-                //                         check_potential_chunk[i * size_in + conv_idx];
-                //                 }
-                //             }
-
-                //             // Can now find local expansion coefficients
-                //             let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                //                 self.dc2e_inv_1[c2e_operator_index].view(),
-                //                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                //                     self.dc2e_inv_2[c2e_operator_index].view(),
-                //                     potential_chunk,
-                //                 ),
-                //             );
-
-                //             local_chunk
-                //                 .data()
-                //                 .chunks_exact(ncoeffs_equivalent_surface)
-                //                 .zip(local_ptrs)
-                //                 .for_each(|(result, local)| {
-                //                     let local = unsafe {
-                //                         std::slice::from_raw_parts_mut(
-                //                             local[0].raw,
-                //                             ncoeffs_equivalent_surface,
-                //                         )
-                //                     };
-                //                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
-                //                 });
-                //         });
                 }
 
                 Ok(())
