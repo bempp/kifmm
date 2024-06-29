@@ -325,9 +325,6 @@ impl RealToComplexFft3D for f64 {
                 .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
 
-        // unsafe {
-        //     ffi::fftw_destroy_plan(plan.0);
-        // };
 
         Ok(())
     }

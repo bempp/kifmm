@@ -18,7 +18,7 @@ use rlst::{
 };
 
 use crate::{
-    fftw::array::AlignedAllocable, fmm::{
+    fftw::array::{AlignedAllocable, AlignedVec}, fmm::{
         constants::DEFAULT_M2L_FFT_BLOCK_SIZE,
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::{
@@ -31,7 +31,9 @@ use crate::{
             FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
         KiFmm,
-    }, linalg::{pinv::pinv, rsvd::MatrixRsvd}, traits::{
+    },
+    linalg::{pinv::pinv, rsvd::MatrixRsvd},
+    traits::{
         fftw::{Dft, DftType},
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
@@ -40,13 +42,15 @@ use crate::{
         fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
-    }, tree::{
+    },
+    tree::{
         constants::{
             ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
         types::MortonKey,
-    }, Fmm
+    },
+    Fmm,
 };
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
@@ -1032,15 +1036,8 @@ where
                     let mut kernel_hat =
                         rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-                    let plan = Scalar::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
-                        .unwrap();
-
-                    let _ = Scalar::forward_dft(
-                        kernel.data_mut(),
-                        kernel_hat.data_mut(),
-                        &shape,
-                        &plan,
-                    );
+                    // TODO Fix Helmholtz
+                    // let _ = Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
                     kernel_data_vec[i].push(kernel_hat);
                 } else {
@@ -1239,15 +1236,9 @@ where
                         let mut kernel_hat =
                             rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-                        let plan =
-                            Scalar::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
-                                .unwrap();
-                        let _ = Scalar::forward_dft(
-                            kernel.data_mut(),
-                            kernel_hat.data_mut(),
-                            &shape,
-                            &plan,
-                        );
+                            // TODO Fix helmholtz
+                        // let _ =
+                        //     Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape);
 
                         kernel_data_vec[i].push(kernel_hat);
                     } else {
@@ -1853,7 +1844,7 @@ where
         + Default
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
-    <Scalar as DftType>::OutputType: AlignedAllocable
+    <Scalar as DftType>::OutputType : RlstScalar + Default + AlignedAllocable,
 {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
@@ -2057,15 +2048,9 @@ where
                         let mut kernel_hat =
                             rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
 
-                        let plan =
-                            Scalar::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &shape, None)
-                                .unwrap();
-                        let _ = Scalar::forward_dft(
-                            kernel.data_mut(),
-                            kernel_hat.data_mut(),
-                            &shape,
-                            &plan,
-                        );
+                        let plan = Scalar::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &shape, None).unwrap();
+                        let _ =
+                            Scalar::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &shape, &plan);
 
                         kernel_data_vec[i].push(kernel_hat);
                     } else {
@@ -2128,12 +2113,10 @@ where
                         <Scalar as DftType>::OutputType,
                         [NSIBLINGS, NSIBLINGS]
                     );
-                    k_ft.fill_from(k_f_.view());
-                    kernel_data_ft.push(k_ft.data().to_vec());
-                    // let mut k_ft = unsafe { crate::fftw::helpers::fftw_malloc(NSIBLINGS  * NSIBLINGS) };
-                    // let mut k_ft = crate::fftw::array::AlignedVec::new(NSIBLINGS_SQUARED);
-                    // k_ft.copy_from_slice(k_f_.data());
-                    // kernel_data_ft.push(k_ft);
+                    // k_ft.fill_from(k_f_.view());
+                    let mut k_ft = AlignedVec::new(NSIBLINGS_SQUARED);
+                    k_ft.copy_from_slice(k_f_.data());
+                    kernel_data_ft.push(k_ft);
                 }
             }
 
@@ -2934,11 +2917,14 @@ mod test {
         }
         let mut potentials = rlst_dynamic_array3!(f64, [m, n, o]);
 
-        let _ = f64::backward_dft(
-            hadamard_product.data_mut(),
-            potentials.data_mut(),
-            &[m, n, o],
-        );
+
+        let plan = f64::plan_backward(hadamard_product.data_mut(), potentials.data_mut(), &[m, n, o], None).unwrap();
+        // let _ = f64::backward_dft(
+        //     hadamard_product.data_mut(),
+        //     potentials.data_mut(),
+        //     &[m, n, o],
+        //     &plan
+        // );
 
         let mut result = vec![0f64; ntargets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_idx]
@@ -3035,8 +3021,8 @@ mod test {
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
 
-        let plan = c64::plan_forward(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
-        let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
+        // TODO: fix helmholtz
+        // let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o]);
 
         let source_equivalent_surface = source.surface_grid(
             expansion_order[coeff_index],
@@ -3085,9 +3071,9 @@ mod test {
         let mut kernel = flip3(&kernel);
 
         // Compute FFT of padded kernel
+        // TODO: fix helmholtz
         let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
-        let plan = c64::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
-        let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
+        // let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o]);
 
         let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
         for k in 0..o {
@@ -3100,11 +3086,12 @@ mod test {
         }
         let mut potentials = rlst_dynamic_array3!(c64, [m, n, o]);
 
-        let _ = c64::backward_dft(
-            hadamard_product.data_mut(),
-            potentials.data_mut(),
-            &[m, n, o],
-        );
+        // TODO: fix helmholtz
+        // let _ = c64::backward_dft(
+        //     hadamard_product.data_mut(),
+        //     potentials.data_mut(),
+        //     &[m, n, o],
+        // );
 
         let mut result = vec![c64::zero(); ntargets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_index]

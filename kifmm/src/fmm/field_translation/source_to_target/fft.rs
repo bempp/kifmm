@@ -442,15 +442,16 @@ where
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
-                let mut signals_hat_f_buffer =
-                    vec![Scalar::Real::zero(); size_out * nsources * 2];
-                let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                unsafe {
-                    let ptr = signals_hat_f_buffer.as_mut_ptr()
-                        as *mut <Scalar as AsComplex>::ComplexType;
-                    signals_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, size_out * nsources);
-                }
+                // let mut signals_hat_f_buffer =
+                //     vec![Scalar::Real::zero(); size_out * nsources * 2];
+                // let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
+                // unsafe {
+                //     let ptr = signals_hat_f_buffer.as_mut_ptr()
+                //         as *mut <Scalar as AsComplex>::ComplexType;
+                //     signals_hat_f =
+                //         std::slice::from_raw_parts_mut(ptr, size_out * nsources);
+                // }
+                let mut signals_hat_f = AlignedVec::new(size_out * nsources);
 
                 // // // A thread safe mutable pointer for saving to this vector
                 // // let signals_hat_f_ptr = SendPtrMut {
@@ -470,15 +471,16 @@ where
                 let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
-                let mut check_potentials_hat_f_buffer =
-                    vec![Scalar::Real::zero(); 2 * size_out * ntargets];
-                let mut check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                unsafe {
-                    let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
-                        as *mut <Scalar as AsComplex>::ComplexType;
-                    check_potentials_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
-                }
+                // let mut check_potentials_hat_f_buffer =
+                //     vec![Scalar::Real::zero(); 2 * size_out * ntargets];
+                // let mut check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
+                // unsafe {
+                //     let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
+                //         as *mut <Scalar as AsComplex>::ComplexType;
+                //     check_potentials_hat_f =
+                //         std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
+                // }
+                let mut check_potentials_hat_f = AlignedVec::new(size_out * ntargets);
 
                 // // let mut check_potentials_hat_f = unsafe { crate::fftw::helpers::fftw_malloc::<<Scalar as AsComplex>::ComplexType>(size_out * ntargets)};
                 // let mut check_potentials_hat_f = crate::fftw::array::AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * ntargets);
@@ -496,16 +498,18 @@ where
                     &self.source_to_target.metadata[m2l_operator_index].kernel_data_f;
 
                 // // Allocate buffer to store the check potentials in frequency order
-                let mut check_potential_hat = vec![Scalar::Real::zero(); size_out * ntargets * 2];
+                // let mut check_potential_hat = vec![Scalar::Real::zero(); size_out * ntargets * 2];
 
                 // // Allocate buffer to store the check potentials in box order
-                let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
-                let check_potential_hat_c;
-                unsafe {
-                    let ptr =
-                        check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
-                    check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
-                }
+                // let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
+                // let check_potential_hat_c;
+                // unsafe {
+                //     let ptr =
+                //         check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
+                //     check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
+                // }
+
+                let mut check_potential_hat_c = AlignedVec::new(size_out * ntargets);
 
 
 
@@ -520,8 +524,11 @@ where
                 //     Some(BatchSize(NSIBLINGS as i32)),
                 // ).unwrap();
 
-                let mut in_ = vec![Scalar::zero(); size_in];
-                let mut out = vec![<Scalar as AsComplex>::ComplexType::zero(); size_out];
+                // let mut in_ = vec![Scalar::zero(); size_in];
+                // let mut out = vec![<Scalar as AsComplex>::ComplexType::zero(); size_out];
+
+                let mut in_ = AlignedVec::new(size_in);
+                let mut out = AlignedVec::new(size_out);
 
                 let plan = Scalar::plan_forward(
                     &mut in_,
@@ -558,20 +565,6 @@ where
                         }
 
                         // // Temporary buffer to hold results of FFT
-                        // let signal_hat_chunk_buffer =
-                        //     vec![
-                        //         Scalar::Real::zero();
-                        //         size_out * NSIBLINGS * 2
-                        //     ];
-                        // let signal_hat_chunk_c;
-                        // unsafe {
-                        //     let ptr = signal_hat_chunk_buffer.as_ptr()
-                        //         as *mut <Scalar as AsComplex>::ComplexType;
-                        //     signal_hat_chunk_c = std::slice::from_raw_parts_mut(
-                        //         ptr,
-                        //         size_out * NSIBLINGS,
-                        //     );
-                        // }
                         let mut signal_hat_chunk_c = AlignedVec::new(size_out * NSIBLINGS);
 
                         let _ = Scalar::forward_dft_batch(
@@ -683,8 +676,8 @@ where
 
                 // 3. Post process to find local expansions at target boxes
                 {
-                    let mut in_ = vec![<Scalar as AsComplex>::ComplexType::zero();  size_out];
-                    let mut out = vec![Scalar::zero(); size_in];
+                    let mut out= AlignedVec::new(size_in);
+                    let mut in_ = AlignedVec::new(size_out);
 
                     let plan = Scalar::plan_backward(
                         &mut in_,
@@ -708,7 +701,7 @@ where
                                 }
                             }
 
-                            let mut check_potential_chunk = vec![Scalar::zero(); size_in * NSIBLINGS];
+                            let mut check_potential_chunk = AlignedVec::new(size_in * NSIBLINGS);
 
                             // Compute inverse FFT
                             let _ = Scalar::backward_dft_batch(
