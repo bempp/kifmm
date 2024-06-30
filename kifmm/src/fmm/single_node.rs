@@ -530,7 +530,12 @@ mod test {
             &mut direct,
         );
 
-        println!("err {:?} \nd {:?} \np {:?}", 1.0, &direct[0..3], &potential[0..3]);
+        println!(
+            "err {:?} \nd {:?} \np {:?}",
+            1.0,
+            &direct[0..3],
+            &potential[0..3]
+        );
 
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = RlstScalar::abs(d - p);

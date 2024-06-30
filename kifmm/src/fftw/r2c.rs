@@ -145,7 +145,7 @@ impl RealToComplexFft3D for f32 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
-        plan: &Self::Plan
+        plan: &Self::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
         let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
@@ -289,7 +289,6 @@ impl RealToComplexFft3D for f64 {
         shape: &[usize],
         plan: &Self::Plan,
     ) -> Result<(), FftError> {
-
         // TODO: Come back to why batch execution is giving wrong results
         // unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
 
@@ -309,9 +308,8 @@ impl RealToComplexFft3D for f64 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
-        plan: &Self::Plan
+        plan: &Self::Plan,
     ) -> Result<(), FftError> {
-
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
 
         let it_in_ = in_.chunks_exact_mut(info.n_output);
@@ -324,7 +322,6 @@ impl RealToComplexFft3D for f64 {
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
-
 
         Ok(())
     }

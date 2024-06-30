@@ -1,10 +1,21 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::{collections::HashSet, sync::{Mutex, RwLock}, time::Instant};
+use std::{
+    collections::HashSet,
+    sync::{Mutex, RwLock},
+    time::Instant,
+};
 
 use itertools::Itertools;
 use num::{One, Zero};
 
-use crate::{fftw::{array::{AlignedAllocable, AlignedVec}, types::BatchSize}, fmm::types::SendPtr, tree::constants::NSIBLINGS_SQUARED};
+use crate::{
+    fftw::{
+        array::{AlignedAllocable, AlignedVec},
+        types::BatchSize,
+    },
+    fmm::types::SendPtr,
+    tree::constants::NSIBLINGS_SQUARED,
+};
 use pulp::Scalar;
 use rayon::prelude::*;
 use rlst::{
@@ -46,7 +57,7 @@ where
     Self: FmmOperatorData,
     <Scalar as Dft>::Plan: Send + Sync,
     <Scalar as AsComplex>::ComplexType: AlignedAllocable,
-    Scalar: AlignedAllocable
+    Scalar: AlignedAllocable,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
@@ -126,7 +137,7 @@ where
                 }
                 let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
-                // let chunk_size_pre_proc = 1;
+                let chunk_size_pre_proc = 1;
 
                 let mut check_potentials_hat_f_buffer =
                     vec![Scalar::Real::zero(); 2 * size_out * ntargets];
@@ -165,12 +176,7 @@ where
                 let mut in_ = AlignedVec::new(size_in);
                 let mut out = AlignedVec::new(size_out);
 
-                let plan = Scalar::plan_forward(
-                    &mut in_,
-                    &mut out,
-                    &shape_in,
-                    None,
-                ).unwrap();
+                let plan = Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
 
                 let s = Instant::now();
 
@@ -178,18 +184,19 @@ where
                 {
                     multipoles
                         .par_chunks_exact(
-                            ncoeffs_equivalent_surface * NSIBLINGS * chunk_size_pre_proc,
+                            ncoeffs_equivalent_surface * NSIBLINGS,
                         )
-                        .zip(signals_hat_f.par_chunks_exact_mut((size_in + nzeros) * NSIBLINGS * chunk_size_pre_proc))
+                        .zip(signals_hat_f.par_chunks_exact_mut(
+                            size_out * NSIBLINGS,
+                        ))
                         .enumerate()
                         .for_each(|(i, (multipole_chunk, signal_hat_chunk_f_c))| {
                             // Place Signal on convolution grid
-                            // let mut signal_chunk =
-                            //     vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
 
-                            let mut signal_chunk = AlignedVec::new(size_in * NSIBLINGS * chunk_size_pre_proc);
+                            let mut signal_chunk =
+                                AlignedVec::new(size_in * NSIBLINGS);
 
-                            for i in 0..NSIBLINGS * chunk_size_pre_proc {
+                            for i in 0..NSIBLINGS {
                                 let multipole = &multipole_chunk[i * ncoeffs_equivalent_surface
                                     ..(i + 1) * ncoeffs_equivalent_surface];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
@@ -202,138 +209,186 @@ where
                                 }
                             }
 
-                            let mut signal_hat_chunk_c = AlignedVec::new(size_out * NSIBLINGS * chunk_size_pre_proc);
+                            let mut signal_hat_chunk_c =
+                                AlignedVec::new(size_out * NSIBLINGS);
 
                             let _ = Scalar::forward_dft_batch(
                                 &mut signal_chunk,
                                 &mut signal_hat_chunk_c,
                                 &shape_in,
-                                &plan
+                                &plan,
                             );
 
                             // // Re-order the temporary buffer into frequency order before flushing to main memory
                             for i in 0..size_out {
-                                for j in 0..NSIBLINGS * chunk_size_pre_proc {
-                                    signal_hat_chunk_f_c[NSIBLINGS * chunk_size_pre_proc * i + j] =
+                                for j in 0..NSIBLINGS {
+                                    signal_hat_chunk_f_c[NSIBLINGS * i + j] =
                                         signal_hat_chunk_c[size_out * j + i]
                                 }
                             }
-
-                            // Storing the results of the FFT in frequency order
-                            // unsafe {
-                            //     let sibling_offset = i * NSIBLINGS * chunk_size_pre_proc;
-
-                            //     // Pointer to storage buffer for frequency ordered FFT of signals
-                            //     let ptr = signals_hat_f_ptr;
-
-                            //     for i in 0..size_out {
-                            //         let frequency_offset = i * (nsources + nzeros);
-
-                            //         // Head of buffer for each frequency
-                            //         let head = ptr.raw.add(frequency_offset).add(sibling_offset);
-
-                            //         let signal_hat_f_chunk = std::slice::from_raw_parts_mut(
-                            //             head,
-                            //             NSIBLINGS * chunk_size_pre_proc,
-                            //         );
-
-                            //         // Store results for this frequency for this sibling set chunk
-                            //         let results_i =
-                            //             &signal_hat_chunk_f_c[i * NSIBLINGS * chunk_size_pre_proc
-                            //                 ..(i + 1) * NSIBLINGS * chunk_size_pre_proc];
-
-                            //         signal_hat_f_chunk.copy_from_slice(results_i);
-                            //         // signal_hat_f_chunk
-                            //         //     .iter_mut()
-                            //         //     .zip(results_i)
-                            //         //     .for_each(|(c, r)| *c += *r);
-                            //     }
-                            // }
                         });
                 }
 
-                let zeros = vec![<Scalar as AsComplex>::ComplexType::zero(); NSIBLINGS * chunk_size_pre_proc];
+                let zeros = vec![
+                    <Scalar as AsComplex>::ComplexType::zero();
+                    NSIBLINGS
+                ];
 
+                let s = Instant::now();
+
+                // nfreqs long, each of which is block size long
                 let mut signals_hat_f_ = Vec::new(); // All signal pointers, in clusters, in frequency order
                 let mut check_potentials_hat_f_ = Vec::new();
+                let zero_index = nsources;
+                let nchunks = ntargets_parents / NSIBLINGS;
+                // I want to have, arranged in chunks of chunk_size, the source/target pointers
 
-                for freq in (0..size_out) {
-                    let freq_displacement = freq * NSIBLINGS * chunk_size_pre_proc;
+                for freq in 0..size_out {
+                    let freq_displacement = freq * NSIBLINGS;
 
-                    let mut signals_freq = Vec::new(); // Pointers to signals at this frequency
-                    let mut check_potentials_freq= Vec::new(); // Pointers to check potentials at this frequency
-
-                    for cluster_index in (0..nsources / (NSIBLINGS * chunk_size_pre_proc)) {
-                        let cluster_displacement = cluster_index * NSIBLINGS * chunk_size_pre_proc * size_out;
-                        let ptr = &signals_hat_f[cluster_displacement + freq_displacement] as *const <Scalar as AsComplex>::ComplexType;
-                        signals_freq.push(SendPtr{raw: ptr});
-
-                        let ptr = &check_potentials_hat_f[cluster_displacement + freq_displacement] as *const <Scalar as AsComplex>::ComplexType;
-                        check_potentials_freq.push(SendPtr{raw: ptr});
+                    let mut tmp = Vec::new();
+                    for chunk_index in 0..nchunks {
+                        let chunk_displacement = chunk_index * NSIBLINGS * size_out; // First, then second etc lot of sibling signal data
+                        let check_potential_hat_f_chunk = &mut check_potentials_hat_f[chunk_displacement+freq_displacement];
+                        let ptr = SendPtrMut { raw: check_potential_hat_f_chunk as *mut <Scalar as AsComplex>::ComplexType };
+                        tmp.push(ptr)
                     }
-                    signals_freq.push(SendPtr { raw: zeros.as_ptr() });
 
-                    signals_hat_f_.push(signals_freq);
-                    check_potentials_hat_f_.push(check_potentials_freq);
+                    check_potentials_hat_f_.push(tmp)
                 }
 
-                println!("level {:?}", level);
-                println!("n chunks {:?}", signals_hat_f_.len());
-                println!("chunk size {:?} {:?}", signals_hat_f_[0].len(), chunk_size_pre_proc);
+                // Need matching pointers for matching signals
+                for freq in 0..size_out {
+                    let freq_displacement = freq * NSIBLINGS;
+                    let mut tmp = Vec::new(); // should be n chunks long
+
+                    for chunk_index in 0..nchunks {
+                        // Target clusters in this chunk, defined by parent Morton
+                        let targets = &targets_parents[chunk_index*NSIBLINGS..(chunk_index*NSIBLINGS) + NSIBLINGS];
+
+                        // Find all source clusters for each target cluster, again at parent level
+                        let sources = targets.iter().map(|t| t.all_neighbors()).collect_vec();
+                        let mut tmp2 = Vec::new(); // For each target, should be chunk_size long
+
+                        for source_clusters in sources.iter() {
+
+                            let mut tmp3 = Vec::new(); // For each item in source cluster of this target identify pointers to singal data
+
+                            // These are all the source clusters associated with each target cluster in this chunk
+                            source_clusters.iter().for_each(|s| {
+                                if let Some(s) = s {
+                                    let source_first_child = s.first_child();
+                                    let &source_first_child_index = self.level_index_pointer_multipoles[level as usize].get(&source_first_child).unwrap();
+                                    let source_cluster_index = source_first_child_index / NSIBLINGS;
+                                    let ptr = SendPtr { raw: &signals_hat_f[source_cluster_index + freq_displacement] };
+                                    tmp3.push(ptr)
+                                } else {
+                                    let ptr = SendPtr { raw: &zeros[0] };
+                                    tmp3.push(ptr)
+                                }
+                            });
+
+                            tmp2.push(tmp3)
+                        }
+
+                        tmp.push(tmp2)
+                    }
+
+                    signals_hat_f_.push(tmp)
+
+                }
+
+
+
+                // println!("level {:?} {:?}", level, s.elapsed());
+                // println!("n chunks {:?} == {:?} {:?}=={:?} {:?}=={:?} {:?}=={:?}", signals_hat_f_.len(), size_out, signals_hat_f_[0].len(), nchunks, signals_hat_f_[0][0].len(), 8, signals_hat_f_[0][0][0].len(), 26);
+                // println!("chunk size {:?} {:?}", signals_hat_f_[0].len(), chunk_size_pre_proc);
                 // assert!(false);
 
-                // 2. Compute the Hadamard product
+                // // 2. Compute the Hadamard product
                 (0..size_out)
                     .into_par_iter()
                     .zip(signals_hat_f_.par_iter())
                     .zip(check_potentials_hat_f_.par_iter())
                     .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
+                        let frequency_offset = freq * NHALO;
 
-                        signal_hat_f
-                            .iter()
-                            .zip(check_potential_hat_f.iter())
-                            .for_each(|(s_f, c_f)| {
+                        // Iterate over each chunk of target check potential
+                        check_potential_hat_f.iter()
+                            .zip(signal_hat_f.iter())
+                            .for_each(|(c_f, s_f)| {
 
-                                    // Each s_f and c_f are of NSIBLINGS * chunk_size_pre_proc
+                                let c_f_slice = unsafe {
+                                    &mut **(&mut {
+                                        c_f.raw
+                                            as *mut [<Scalar as AsComplex>::ComplexType;
+                                                NSIBLINGS]
+                                    })
 
-                                    for i in 0..NHALO {
-                                        let frequency_offset = freq*NHALO;
-                                        let k_f: &AlignedVec<<Scalar as AsComplex>::ComplexType> = &kernel_data_ft[i + frequency_offset];
-                                        let k_f_slice = unsafe {
-                                            &*(k_f.as_slice().as_ptr()
-                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
-                                        };
+                                    // Each signal is associated with a direction
 
-                                        for j in 0..chunk_size_pre_proc {
 
-                                            let s_f_j = unsafe { std::slice::from_raw_parts(s_f.raw.add(j*NSIBLINGS), NSIBLINGS)};
-                                            let c_f_j = unsafe { std::slice::from_raw_parts_mut(c_f.raw.add(j*NSIBLINGS) as *mut <Scalar as AsComplex>::ComplexType, NSIBLINGS)};
+                                };
 
-                                            let s_f_j = unsafe {
-                                                &*(s_f_j.as_ptr()
-                                                    as *const [<Scalar as AsComplex>::ComplexType;
-                                                        8])
-                                            };
 
-                                            let c_f_j = unsafe {
-                                                &mut *(c_f_j.as_ptr()
-                                                    as *mut [<Scalar as AsComplex>::ComplexType;
-                                                        8])
-                                            };
-
-                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
-                                                self.isa,
-                                                k_f_slice,
-                                                s_f_j,
-                                                c_f_j,
-                                                scale,
-                                            );
-
-                                        }
-                                    }
 
                             });
 
+                        // signal_hat_f
+                        //     .iter()
+                        //     .zip(check_potential_hat_f.iter())
+                        //     .for_each(|(s_f, c_f)| {
+                        //         for i in 0..chunk_size_pre_proc {
+                        //             // Check potentials at this frequency at this sibling location in a chunk
+                        //             let c_f_i = unsafe {
+                        //                 std::slice::from_raw_parts_mut(
+                        //                     c_f.raw.add(i * NSIBLINGS)
+                        //                         as *mut <Scalar as AsComplex>::ComplexType,
+                        //                     NSIBLINGS,
+                        //                 )
+                        //             };
+                        //             let c_f_i_slice = unsafe {
+                        //                 &mut **(&mut {
+                        //                     c_f_i.as_mut_ptr()
+                        //                         as *mut [<Scalar as AsComplex>::ComplexType;
+                        //                             NSIBLINGS]
+                        //                 })
+                        //             };
+
+                        //             // Going to compute all hadamard products for this particular save location
+
+                        //             for j in 0..NHALO {
+                        //                 // Each halo position associated with kernel matrix
+                        //                 let k_f_j: &AlignedVec<<Scalar as AsComplex>::ComplexType> =
+                        //                     &kernel_data_ft[j + frequency_offset];
+                        //                 let k_f_j_slice = unsafe {
+                        //                     &*(k_f_j.as_slice().as_ptr()
+                        //                         as *const [<Scalar as AsComplex>::ComplexType; 64])
+                        //                 };
+
+                        //                 // Lookup signals
+                        //                 let displacements = &all_displacements[j].read().unwrap(); // Should be n_targets_parents long
+
+                        //                 // Iterate over each signal and perform GEMV
+                        //                 for &k in displacements.iter() {
+                        //                     let s_f_k = &signal_hat_f[k];
+                        //                     let s_f_k_slice = unsafe {
+                        //                         &*(s_f_k.raw
+                        //                             as *const [<Scalar as AsComplex>::ComplexType;
+                        //                                 8])
+                        //                     };
+
+                        //                     <Scalar as AsComplex>::ComplexType::gemv8x8(
+                        //                         self.isa,
+                        //                         k_f_j_slice,
+                        //                         s_f_k_slice,
+                        //                         c_f_i_slice,
+                        //                         scale,
+                        //                     );
+                        //                 }
+                        //             }
+                        //         }
+                        //     });
                     });
 
                 // {
@@ -396,19 +451,12 @@ where
                 //         });
                 // }
 
-
                 // 3. Post process to find local expansions at target boxes
                 {
-
                     let mut out = AlignedVec::new(size_in);
                     let mut in_ = AlignedVec::new(size_out);
 
-                    let plan = Scalar::plan_backward(
-                        &mut in_,
-                        &mut out,
-                        &shape_in,
-                        None,
-                    ).unwrap();
+                    let plan = Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
 
                     check_potential_hat_c
                         .par_chunks_exact_mut(size_out)
@@ -425,7 +473,7 @@ where
                                 check_potential_hat_chunk,
                                 check_potential_chunk,
                                 &shape_in,
-                                &plan
+                                &plan,
                             );
                         });
 

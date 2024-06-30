@@ -6,10 +6,13 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
-    fftw::array::AlignedVec, linalg::rsvd::Normaliser, traits::{
+    fftw::array::AlignedVec,
+    linalg::rsvd::Normaliser,
+    traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
-    }, tree::types::{Domain, MortonKey, SingleNodeTree}
+    },
+    tree::types::{Domain, MortonKey, SingleNodeTree},
 };
 
 #[cfg(feature = "mpi")]

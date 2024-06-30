@@ -108,7 +108,7 @@ where
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
-        plan: &Self::Plan
+        plan: &Self::Plan,
     ) -> Result<(), FftError>;
 
     /// Compute a real-to-complex DFT over an input sequences of dimension `shape`, where shape is of the form `[n1, n2, n3]`. Returns an output sequence of shape [n1, n2, n3/2 + 1].
@@ -301,7 +301,7 @@ where
         in_: &mut [<Self as DftType>::OutputType],
         out: &mut [<Self as DftType>::InputType],
         shape: &[usize],
-        plan: &Self::Plan
+        plan: &Self::Plan,
     ) -> Result<(), FftError>;
 
     /// Backward transform, if real data is used as input computes C2R dft, batched in parallel over multiple datasets

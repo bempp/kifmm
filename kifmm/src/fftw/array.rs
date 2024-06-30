@@ -1,6 +1,6 @@
-use rlst::{c32, c64, RlstScalar};
 use bitflags::bitflags;
 use kifmm_fftw_sys as ffi;
+use rlst::{c32, c64, RlstScalar};
 
 use num::Zero;
 use std::ops::{Deref, DerefMut};
@@ -8,7 +8,6 @@ use std::os::raw::c_void;
 use std::slice::{from_raw_parts, from_raw_parts_mut};
 
 use crate::excall;
-
 
 /// A RAII-wrapper of `fftw_alloc` and `fftw_free` with the [SIMD alignment].
 ///
@@ -19,13 +18,11 @@ pub struct AlignedVec<T> {
     data: *mut T,
 }
 
-
 /// Allocate SIMD-aligned memory of Real/Complex type
 pub trait AlignedAllocable: Zero + Clone + Copy + Sized {
     /// Allocate SIMD-aligned memory
     unsafe fn alloc(n: usize) -> *mut Self;
 }
-
 
 impl AlignedAllocable for f64 {
     unsafe fn alloc(n: usize) -> *mut Self {
@@ -121,5 +118,3 @@ pub type Alignment = i32;
 pub fn alignment_of<T>(a: &[T]) -> Alignment {
     unsafe { ffi::fftw_alignment_of(a.as_ptr() as *mut _) }
 }
-
-
