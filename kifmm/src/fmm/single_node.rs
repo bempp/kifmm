@@ -783,7 +783,7 @@ mod test {
         let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
 
         // FMM parameters
-        let n_crit = Some(150);
+        let n_crit = Some(400);
         let depth = None;
         let expansion_order = [10];
         let prune_empty = true;
