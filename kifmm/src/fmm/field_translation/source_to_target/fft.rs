@@ -26,7 +26,7 @@ use crate::{
         types::FmmError,
     },
     tree::{
-        constants::{NHALO, NSIBLINGS},
+        constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
         types::MortonKey,
     },
     FftFieldTranslation, Fmm,
@@ -257,7 +257,7 @@ where
 
                                         let k_f_slice = unsafe {
                                             &*(k_f.as_slice().as_ptr()
-                                                as *const [<Scalar as AsComplex>::ComplexType; 64])
+                                                as *const [<Scalar as AsComplex>::ComplexType; NSIBLINGS_SQUARED])
                                         };
 
                                         // Lookup signals
@@ -271,14 +271,14 @@ where
                                             let s_f_slice = unsafe {
                                                 &*(s_f.as_ptr()
                                                     as *const [<Scalar as AsComplex>::ComplexType;
-                                                        8])
+                                                        NSIBLINGS])
                                             };
 
                                             let save_locations = &mut save_locations
                                                 [j * NSIBLINGS..(j + 1) * NSIBLINGS];
                                             let save_locations_slice = unsafe {
                                                 &mut *(save_locations.as_ptr()
-                                                    as *mut [<Scalar as AsComplex>::ComplexType; 8])
+                                                    as *mut [<Scalar as AsComplex>::ComplexType; NSIBLINGS])
                                             };
 
                                             <Scalar as AsComplex>::ComplexType::gemv8x8(
