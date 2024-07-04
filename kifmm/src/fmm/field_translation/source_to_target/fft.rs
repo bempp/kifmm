@@ -19,7 +19,8 @@ use crate::{
 use pulp::Scalar;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RandomAccessMut,
+    RawAccess, RawAccessMut, RlstScalar,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -111,15 +112,17 @@ where
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
-                let mut signals_hat_f_buffer =
-                    vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
-                let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                unsafe {
-                    let ptr = signals_hat_f_buffer.as_mut_ptr()
-                        as *mut <Scalar as AsComplex>::ComplexType;
-                    signals_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
-                }
+                                // let mut signals_hat_f_buffer =
+                                // vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
+                                // let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
+                                // unsafe {
+                                //     let ptr = signals_hat_f_buffer.as_mut_ptr()
+                                //         as *mut <Scalar as AsComplex>::ComplexType;
+                                //     signals_hat_f =
+                                //         std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
+                                // }
+
+                let mut signals_hat_f = AlignedVec::new(size_out * (nsources + nzeros));
 
                 // A thread safe mutable pointer for saving to this vector
                 let signals_hat_f_ptr = SendPtrMut {
@@ -138,15 +141,16 @@ where
                 let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
-                let mut check_potentials_hat_f_buffer =
-                    vec![Scalar::Real::zero(); 2 * size_out * ntargets];
-                let check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                unsafe {
-                    let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
-                        as *mut <Scalar as AsComplex>::ComplexType;
-                    check_potentials_hat_f =
-                        std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
-                }
+                // let mut check_potentials_hat_f_buffer =
+                //     vec![Scalar::Real::zero(); 2 * size_out * ntargets];
+                // let check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
+                // unsafe {
+                //     let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
+                //         as *mut <Scalar as AsComplex>::ComplexType;
+                //     check_potentials_hat_f =
+                //         std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
+                // }
+                let mut check_potentials_hat_f = AlignedVec::new(size_out * ntargets);
 
                 // Amount to scale the application of the kernel by
                 let scale = if self.kernel.is_homogenous() {
@@ -229,14 +233,15 @@ where
                 // nfreqs long, each of which is block size long
                 let mut signals_hat_f_ = Vec::new(); // All signal pointers, in clusters, in frequency order
                 let mut check_potentials_hat_f_ = Vec::new();
-                // let nchunks = ntargets_parents;
+                let zero_index = nsources;
+                let nchunks = ntargets_parents;
                 // I want to have, arranged in chunks of chunk_size, the source/target pointers
 
                 for freq in 0..size_out {
                     let freq_displacement = freq * NSIBLINGS;
 
                     let mut tmp = Vec::new();
-                    for chunk_index in 0..ntargets_parents {
+                    for chunk_index in 0..nchunks {
                         let chunk_displacement = chunk_index * NSIBLINGS * size_out; // First, then second etc lot of sibling signal data
                         let check_potential_hat_f_chunk =
                             &mut check_potentials_hat_f[chunk_displacement + freq_displacement];
@@ -288,6 +293,8 @@ where
                 }
 
                 println!("level {:?} {:?}", level, s.elapsed());
+                // println!("n chunks {:?} == {:?} {:?}=={:?} {:?}=={:?} {:?}=={:?}", signals_hat_f_.len(), size_out, signals_hat_f_[0].len(), nchunks, signals_hat_f_[0][0].len(), 8, signals_hat_f_[0][0][0].len(), 26);
+                // println!("chunk size {:?} {:?}", signals_hat_f_[0].len(), chunk_size_pre_proc);
 
                 // frequency [], number of trgets [][] ntargets parents long, number of source clusters for each target 26 long
                 // println!(
@@ -302,7 +309,7 @@ where
                 // );
                 // assert!(false);
 
-                // 2. Compute the Hadamard product
+                // // 2. Compute the Hadamard product
                 (0..size_out)
                     .into_par_iter()
                     .zip(signals_hat_f_.par_iter())
@@ -316,22 +323,20 @@ where
                             .zip(signal_hat_f.chunks_exact(chunk_size_kernel))
                             .enumerate()
                             .for_each(|(i, (c_f_chunk, s_f_chunk))| {
-
                                 for (c_f, s_f) in c_f_chunk.iter().zip(s_f_chunk) {
                                     let c_f_slice = unsafe {
                                         &mut **(&mut {
                                             c_f.raw
-                                                as *mut [<Scalar as AsComplex>::ComplexType; NSIBLINGS]
+                                                as *mut [<Scalar as AsComplex>::ComplexType;
+                                                    NSIBLINGS]
                                         })
                                     };
 
                                     for halo_index in 0..NHALO {
-
                                         let s_f_i = &s_f[halo_index];
                                         let s_f_slice = unsafe {
                                             &*(s_f_i.raw
-                                                as *const [<Scalar as AsComplex>::ComplexType;
-                                                    8])
+                                                as *const [<Scalar as AsComplex>::ComplexType; 8])
                                         };
 
                                         let k_f = &kernel_data_ft[halo_index + frequency_offset];
@@ -342,63 +347,149 @@ where
                                         };
 
                                         <Scalar as AsComplex>::ComplexType::gemv8x8(
-                                            self.isa,
-                                            k_f_slice,
-                                            s_f_slice,
-                                            c_f_slice,
-                                            scale,
+                                            self.isa, k_f_slice, s_f_slice, c_f_slice, scale,
                                         );
-
                                     }
                                 }
-
                             });
-
                     });
-
 
                 // 3. Post process to find local expansions at target boxes
                 {
+                    // let mut out = AlignedVec::new(size_in);
+                    // let mut in_ = AlignedVec::new(size_out);
+
+                    // let plan = Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
+
+                    // check_potential_hat_c
+                    //     .par_chunks_exact_mut(size_out)
+                    //     .zip(check_potential.par_chunks_exact_mut(size_out))
+                    //     .zip(self.level_locals[level as usize].par_iter())
+                    //     .enumerate()
+                    //     .for_each(|(i, ((check_potential_hat_chunk, check_potential_chunk), local_ptrs))| {
+
+                    //         // Lookup all frequencies for this target box
+                    //         for j in 0..size_out {
+                    //             check_potential_hat_chunk[j] =
+                    //                 check_potentials_hat_f[j * ntargets + i]
+                    //         }
+
+                    //         let _ = Scalar::backward_dft_batch(
+                    //             check_potential_hat_chunk,
+                    //             check_potential_chunk,
+                    //             &shape_in,
+                    //             &plan,
+                    //         );
+
+                    //         // Map to surface grid
+                    //         let mut potential_chunk = rlst_dynamic_array2!(
+                    //             Scalar,
+                    //             [ncoeffs_equivalent_surface, 1]
+                    //         );
+
+                    //         for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
+                    //             [fft_map_index]
+                    //             .iter()
+                    //             .enumerate()
+                    //         {
+                    //             *potential_chunk.get_mut([surf_idx, 0]).unwrap() =
+                    //                 check_potential_chunk[conv_idx];
+                    //         }
+
+                    //         // Can now find local expansion coefficients
+                    //         let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    //             self.dc2e_inv_1[c2e_operator_index].view(),
+                    //             empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    //                 self.dc2e_inv_2[c2e_operator_index].view(),
+                    //                 potential_chunk,
+                    //             ),
+                    //         );
+
+                    //         let local = unsafe {
+                    //                 std::slice::from_raw_parts_mut(
+                    //                     local_ptrs[0].raw,
+                    //                     ncoeffs_equivalent_surface,
+                    //                 )
+                    //         };
+
+                    //         local.iter_mut().zip(local_chunk.data()).for_each(|(l, r)| *l += *r);
+
+                    //     });
+
                     let mut out = AlignedVec::new(size_in);
                     let mut in_ = AlignedVec::new(size_out);
 
                     let plan = Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
 
+                    let mut potential =
+                        rlst_dynamic_array2!(Scalar, [ncoeffs_equivalent_surface * ntargets, 1]);
+
                     check_potential_hat_c
                         .par_chunks_exact_mut(size_out)
                         .zip(check_potential.par_chunks_exact_mut(size_out))
-                        .zip(self.level_locals[level as usize].par_iter())
+                        .zip(
+                            potential
+                                .data_mut()
+                                .par_chunks_exact_mut(ncoeffs_equivalent_surface),
+                        )
                         .enumerate()
-                        .for_each(|(i, ((check_potential_hat_chunk, check_potential_chunk), local_ptrs))| {
+                        .for_each(
+                            |(
+                                i,
+                                (
+                                    (check_potential_hat_chunk, check_potential_chunk),
+                                    potential_chunk,
+                                ),
+                            )| {
+                                // Lookup all frequencies for this target box
+                                for j in 0..size_out {
+                                    check_potential_hat_chunk[j] =
+                                        check_potentials_hat_f[j * ntargets + i]
+                                }
 
-                            // Lookup all frequencies for this target box
-                            for j in 0..size_out {
-                                check_potential_hat_chunk[j] =
-                                    check_potentials_hat_f[j * ntargets + i]
-                            }
+                                let _ = Scalar::backward_dft_batch(
+                                    check_potential_hat_chunk,
+                                    check_potential_chunk,
+                                    &shape_in,
+                                    &plan,
+                                );
 
-                            let _ = Scalar::backward_dft_batch(
-                                check_potential_hat_chunk,
+                                // Map to surface grid
+                                for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
+                                    [fft_map_index]
+                                    .iter()
+                                    .enumerate()
+                                {
+                                    potential_chunk[surf_idx] = check_potential_chunk[conv_idx];
+                                }
+                            },
+                        );
+
+                    // Compute inverse FFT
+                    check_potential
+                        .par_chunks_exact(NSIBLINGS * ncoeffs_equivalent_surface)
+                        .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
+                        .for_each(|(check_potential_chunk, local_ptrs)| {
+                            // let mut potential_chunk = rlst_dynamic_array2!(
+                            //     Scalar,
+                            //     [ncoeffs_equivalent_surface, NSIBLINGS]
+                            // );
+
+                            // for i in 0..NSIBLINGS {
+                            //     for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
+                            //         [fft_map_index]
+                            //         .iter()
+                            //         .enumerate()
+                            //     {
+                            //         *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                            //             check_potential_chunk[i * size_in + conv_idx];
+                            //     }
+                            // }
+
+                            let potential_chunk = rlst_array_from_slice2!(
                                 check_potential_chunk,
-                                &shape_in,
-                                &plan,
+                                [ncoeffs_equivalent_surface, NSIBLINGS]
                             );
-
-                            // Map to surface grid
-                            let mut potential_chunk = rlst_dynamic_array2!(
-                                Scalar,
-                                [ncoeffs_equivalent_surface, 1]
-                            );
-
-
-                            for (surf_idx, &conv_idx) in self.source_to_target.conv_to_surf_map
-                                [fft_map_index]
-                                .iter()
-                                .enumerate()
-                            {
-                                *potential_chunk.get_mut([surf_idx, 0]).unwrap() =
-                                    check_potential_chunk[conv_idx];
-                            }
 
                             // Can now find local expansion coefficients
                             let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -409,19 +500,20 @@ where
                                 ),
                             );
 
-                            let local = unsafe {
-                                    std::slice::from_raw_parts_mut(
-                                        local_ptrs[0].raw,
-                                        ncoeffs_equivalent_surface,
-                                    )
-                            };
-
-                            local.iter_mut().zip(local_chunk.data()).for_each(|(l, r)| *l += *r);
-
+                            local_chunk
+                                .data()
+                                .chunks_exact(ncoeffs_equivalent_surface)
+                                .zip(local_ptrs)
+                                .for_each(|(result, local)| {
+                                    let local = unsafe {
+                                        std::slice::from_raw_parts_mut(
+                                            local[0].raw,
+                                            ncoeffs_equivalent_surface,
+                                        )
+                                    };
+                                    local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
+                                });
                         });
-
-                    // Compute inverse FFT
-
                 }
                 Ok(())
             }
