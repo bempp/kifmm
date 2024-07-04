@@ -119,7 +119,7 @@ fn main() {
             flags.push("--enable-sse2");
         }
     } else if target_arch == "aarch64" && target_feature.contains("neon") {
-       flags.push("--enable-neon");
+        flags.push("--enable-neon");
     }
 
     flags.push("--enable-single");
