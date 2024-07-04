@@ -3,6 +3,7 @@ use std::{fs::File, ops::DerefMut, sync::Mutex, time::Instant};
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::EvalType};
 use itertools::{iproduct, Itertools};
 use kifmm::{
+    fftw::array::AlignedAllocable,
     fmm::types::FmmSvdMode,
     linalg::rsvd::{MatrixRsvd, Normaliser},
     traits::{
@@ -251,8 +252,11 @@ fn grid_search_laplace_fft<T>(
         + Dft<InputType = T, OutputType = <T as AsComplex>::ComplexType>
         + SampleUniform
         + Float
-        + Epsilon,
-    <T as AsComplex>::ComplexType: Gemv8x8<Scalar = <T as AsComplex>::ComplexType>,
+        + Epsilon
+        + AlignedAllocable,
+    <T as AsComplex>::ComplexType:
+        Gemv8x8<Scalar = <T as AsComplex>::ComplexType> + AlignedAllocable,
+    <T as Dft>::Plan: Sync,
 {
     // FMM parameters
     let prune_empty = true;

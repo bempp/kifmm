@@ -12,6 +12,7 @@ use rlst::{
 use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
+    fftw::array::{AlignedAllocable, AlignedVec},
     fmm::{
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
@@ -37,11 +38,14 @@ where
     Scalar: RlstScalar
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
-        + Default,
-    <Scalar as AsComplex>::ComplexType: Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType>,
+        + Default
+        + AlignedAllocable,
+    <Scalar as AsComplex>::ComplexType:
+        Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
+    <Scalar as Dft>::Plan: Sync,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
@@ -159,6 +163,10 @@ where
 
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 {
+                    let mut in_ = AlignedVec::new(size_in);
+                    let mut out = AlignedVec::new(size_out);
+                    let plan = Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
+
                     multipoles
                         .par_chunks_exact(
                             ncoeffs_equivalent_surface * NSIBLINGS * chunk_size_pre_proc,
@@ -202,6 +210,7 @@ where
                                 &mut signal_chunk,
                                 signal_hat_chunk_c,
                                 &shape_in,
+                                &plan,
                             );
 
                             // Re-order the temporary buffer into frequency order before flushing to main memory
@@ -334,10 +343,15 @@ where
                         });
 
                     // Compute inverse FFT
+                    let mut out = AlignedVec::new(size_in);
+                    let mut in_ = AlignedVec::new(size_out);
+                    let plan = Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
+
                     let _ = Scalar::backward_dft_batch_par(
                         check_potential_hat_c,
                         &mut check_potential,
                         &shape_in,
+                        &plan,
                     );
 
                     check_potential

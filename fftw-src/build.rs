@@ -92,14 +92,41 @@ fn main() {
         .unwrap();
     }
 
+    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    let target_feature = std::env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
+
+    let mut flags = Vec::new();
+    if target_arch == "x86_64" {
+        if target_feature.contains("avx") {
+            flags.push("--enable-avx");
+        }
+        if target_feature.contains("avx2") {
+            flags.push("--enable-avx2");
+        }
+        if target_feature.contains("fma") {
+            flags.push("--enable-fma");
+        }
+    }
+
     // Build FFTW
     if !out_dir.join("lib/libfftw3.a").exists() {
-        build_fftw(&src_dir, &out_dir, &[]);
+        build_fftw(&src_dir, &out_dir, &flags);
     }
+
+    let mut flags = Vec::new();
+    if target_arch == "x86_64" {
+        if target_feature.contains("sse2") {
+            flags.push("--enable-sse2");
+        }
+    } else if target_arch == "aarch64" && target_feature.contains("neon") {
+       flags.push("--enable-neon");
+    }
+
+    flags.push("--enable-single");
 
     // Build FFTWF
     if !out_dir.join("lib/libfftw3f.a").exists() {
-        build_fftw(&src_dir, &out_dir, &["--enable-single"]);
+        build_fftw(&src_dir, &out_dir, &flags);
     }
 
     // Link built libraries
