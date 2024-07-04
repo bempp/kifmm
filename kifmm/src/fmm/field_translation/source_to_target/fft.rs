@@ -257,7 +257,8 @@ where
 
                                         let k_f_slice = unsafe {
                                             &*(k_f.as_slice().as_ptr()
-                                                as *const [<Scalar as AsComplex>::ComplexType; NSIBLINGS_SQUARED])
+                                                as *const [<Scalar as AsComplex>::ComplexType;
+                                                    NSIBLINGS_SQUARED])
                                         };
 
                                         // Lookup signals
@@ -278,7 +279,8 @@ where
                                                 [j * NSIBLINGS..(j + 1) * NSIBLINGS];
                                             let save_locations_slice = unsafe {
                                                 &mut *(save_locations.as_ptr()
-                                                    as *mut [<Scalar as AsComplex>::ComplexType; NSIBLINGS])
+                                                    as *mut [<Scalar as AsComplex>::ComplexType;
+                                                        NSIBLINGS])
                                             };
 
                                             <Scalar as AsComplex>::ComplexType::gemv8x8(
