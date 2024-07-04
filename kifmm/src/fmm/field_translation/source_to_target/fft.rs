@@ -99,16 +99,8 @@ where
 
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
-                // let mut signals_hat_f_buffer =
-                //     vec![Scalar::Real::zero(); size_out * (nsources + nzeros) * 2];
-                // let signals_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                // unsafe {
-                //     let ptr = signals_hat_f_buffer.as_mut_ptr()
-                //         as *mut <Scalar as AsComplex>::ComplexType;
-                //     signals_hat_f =
-                //         std::slice::from_raw_parts_mut(ptr, size_out * (nsources + nzeros));
-                // }
-                let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> = AlignedVec::new(size_out * (nsources + nzeros));
+                let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> =
+                    AlignedVec::new(size_out * (nsources + nzeros));
 
                 // A thread safe mutable pointer for saving to this vector
                 let signals_hat_f_ptr = SendPtrMut {
@@ -128,17 +120,6 @@ where
                 let chunk_size_pre_proc = chunk_size(nsources_parents, max_chunk_size);
                 let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
 
-                // let mut check_potentials_hat_f_buffer =
-                    // vec![Scalar::Real::zero(); 2 * size_out * ntargets];
-                // let check_potentials_hat_f: &mut [<Scalar as AsComplex>::ComplexType];
-                // unsafe {
-                //     let ptr = check_potentials_hat_f_buffer.as_mut_ptr()
-                //         as *mut <Scalar as AsComplex>::ComplexType;
-                //     check_potentials_hat_f =
-                //         std::slice::from_raw_parts_mut(ptr, size_out * ntargets);
-                // }
-                let mut check_potentials_hat_f = AlignedVec::new(size_out * ntargets);
-
                 // Amount to scale the application of the kernel by
                 let scale = if self.kernel.is_homogenous() {
                     m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
@@ -152,19 +133,10 @@ where
                     &self.source_to_target.metadata[m2l_operator_index].kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
-                // let mut check_potential_hat = vec![Scalar::Real::zero(); size_out * ntargets * 2];
+                let mut check_potentials_hat_f = AlignedVec::new(size_out * ntargets);
 
-                // // Allocate buffer to store the check potentials in box order
-                // let check_potential_hat_c;
-                // unsafe {
-                //     let ptr =
-                //         check_potential_hat.as_mut_ptr() as *mut <Scalar as AsComplex>::ComplexType;
-                //     check_potential_hat_c = std::slice::from_raw_parts_mut(ptr, size_out * ntargets)
-                // }
+                // Allocate buffer to store the check potentials in box order
                 let mut check_potential_hat_c = AlignedVec::new(size_out * ntargets);
-
-                // let mut check_potential = vec![Scalar::zero(); size_in * ntargets];
-
                 let mut check_potential = AlignedVec::new(size_in * ntargets);
 
                 // 1. Compute FFT of all multipoles in source boxes at this level
@@ -180,9 +152,8 @@ where
                         .enumerate()
                         .for_each(|(i, multipole_chunk)| {
                             // Place Signal on convolution grid
-                            // let mut signal_chunk =
-                            //     vec![Scalar::zero(); size_in * NSIBLINGS * chunk_size_pre_proc];
-                            let mut signal_chunk = AlignedVec::new(size_in * NSIBLINGS * chunk_size_pre_proc);
+                            let mut signal_chunk =
+                                AlignedVec::new(size_in * NSIBLINGS * chunk_size_pre_proc);
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
                                 let multipole = &multipole_chunk[i * ncoeffs_equivalent_surface
@@ -198,22 +169,8 @@ where
                             }
 
                             // Temporary buffer to hold results of FFT
-                            // let signal_hat_chunk_buffer =
-                            //     vec![
-                            //         Scalar::Real::zero();
-                            //         size_out * NSIBLINGS * chunk_size_pre_proc * 2
-                            //     ];
-                            // let signal_hat_chunk_c;
-                            // unsafe {
-                            //     let ptr = signal_hat_chunk_buffer.as_ptr()
-                            //         as *mut <Scalar as AsComplex>::ComplexType;
-                            //     signal_hat_chunk_c = std::slice::from_raw_parts_mut(
-                            //         ptr,
-                            //         size_out * NSIBLINGS * chunk_size_pre_proc,
-                            //     );
-                            // }
-
-                            let mut signal_hat_chunk_c = AlignedVec::new(size_out * NSIBLINGS * chunk_size_pre_proc);
+                            let mut signal_hat_chunk_c =
+                                AlignedVec::new(size_out * NSIBLINGS * chunk_size_pre_proc);
 
                             let _ = Scalar::forward_dft_batch(
                                 &mut signal_chunk,
