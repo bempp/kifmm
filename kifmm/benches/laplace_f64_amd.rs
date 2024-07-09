@@ -33,11 +33,11 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         // FFT based M2L for a vector of charges
         // FMM parameters
         let n_crit = None;
-        let depth = Some(5);
+        let depth = Some(4);
         let e = 6;
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
-        let block_size = Some(128);
+        let block_size = Some(32);
 
         let fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -94,7 +94,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let n_crit = None;
         let depth = Some(4);
         let e = 7;
-        let block_size = Some(128);
+        let block_size = Some(32);
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
@@ -153,7 +153,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let n_crit = None;
         let depth = Some(4);
         let e = 8;
-        let block_size = Some(128);
+        let block_size = Some(32);
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
@@ -271,7 +271,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let n_crit = None;
         let depth = Some(4);
         let e = 10;
-        let block_size = Some(64);
+        let block_size = Some(32);
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
