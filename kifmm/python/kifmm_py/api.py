@@ -35,13 +35,14 @@ CONSTRUCTORS = {
 }
 
 class RandomSvdSettings:
-    def __init__(n_iter, n_components, n_oversamples, random_state):
+    def __init__(self, n_iter, n_components, n_oversamples, random_state):
         self.n_iter = n_iter
         self.n_components = n_components
         self.n_oversamples = n_oversamples
         self.random_state = random_state
 
-    def settings(&self):
+    @property
+    def settings(self):
         return (self.n_iter, self.n_components, self.n_oversamples, self.random_state)
 
 class KiFmm:
@@ -230,7 +231,7 @@ class KiFmm:
             if rsvd == None:
                 self.rsvd = None
             else:
-                self.rsvd = rsvd.settings()
+                self.rsvd = rsvd.settings
 
         self.sources = sources
         self.targets = targets

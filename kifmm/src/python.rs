@@ -15,7 +15,7 @@ use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use numpy::{
     ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArrayMethods, PyReadonlyArrayDyn,
-    PyUntypedArrayMethods, ToPyArray,
+    PyUntypedArrayMethods, ToPyArray, PyArray2,
 };
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -636,15 +636,22 @@ macro_rules! define_class_methods {
                 py: Python<'py>,
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
-                let key = self.source_key_map.get(&leaf).unwrap();
-                let slice = self.fmm.tree.source_tree.coordinates(&key).unwrap();
-                let ncoords = slice.len() / self.fmm.dim();
-
-                let coords = slice
-                    .to_pyarray_bound(py)
-                    .reshape([ncoords, self.fmm.dim()])
-                    .unwrap();
-                Ok(coords)
+                if let Some(key) = self.source_key_map.get(&leaf) {
+                    if let Some(slice) = self.fmm.tree.source_tree.coordinates(&key) {
+                        let ncoords = slice.len() / self.fmm.dim();
+                        let coords = slice
+                            .to_pyarray_bound(py)
+                            .reshape([ncoords, self.fmm.dim()])
+                            .unwrap();
+                        Ok(coords)
+                    } else {
+                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                        Ok(empty_array)
+                    }
+                } else {
+                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                    Ok(empty_array)
+                }
             }
 
             fn target_coordinates<'py>(
@@ -652,14 +659,24 @@ macro_rules! define_class_methods {
                 py: Python<'py>,
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
-                let key = self.target_key_map.get(&leaf).unwrap();
-                let slice = self.fmm.tree.target_tree.coordinates(&key).unwrap();
-                let ncoords = slice.len() / self.fmm.dim();
-                let coords = slice
-                    .to_pyarray_bound(py)
-                    .reshape([ncoords, self.fmm.dim()])
-                    .unwrap();
-                Ok(coords)
+
+                if let Some(key) = self.target_key_map.get(&leaf) {
+                    if let Some(slice) = self.fmm.tree.target_tree.coordinates(&key) {
+                        let ncoords = slice.len() / self.fmm.dim();
+                        let coords = slice
+                            .to_pyarray_bound(py)
+                            .reshape([ncoords, self.fmm.dim()])
+                            .unwrap();
+                        Ok(coords)
+                    } else {
+                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                        Ok(empty_array)
+
+                    }
+                } else {
+                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                    Ok(empty_array)
+                }
             }
 
             fn potentials<'py>(
