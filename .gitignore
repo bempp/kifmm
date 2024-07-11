@@ -26,6 +26,7 @@ fftw-src/fftw-*
 *.ipynb_checkpoints/
 *.pyc
 *.so
+*.DS_Store
 
-# Editor 
+# Editor
 .vim/*
