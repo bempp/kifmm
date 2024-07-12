@@ -146,10 +146,12 @@ Indeed, the full API is more extensive, including features that enable for varia
 
 # Benchmarks
 
-We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for particles contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software's performance using our BLAS based field translation method, which can handle multiple sets of source densities for a given set of source and target particles. This is particularly effective in single precision, where required data is smaller and in many high performance CPUs can fit in cache. We repeat the benchmark for the Arm architecture for `kifmm-rs`  in Table (\ref{tab:hardware_and_software}), presented without comparison to competing software due to lack of support.
+We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for particles contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software's performance using our BLAS based field translation method, which can handle multiple sets of source densities for a given set of source and target particles. This is particularly effective in single precision, where required data is smaller and in many high performance CPUs can fit in cache. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Table (\ref{tab:hardware_and_software}), presented without comparison to competing software due to lack of support, we see that the BLAS based field translation approach is effective for handling multiple sets of source densities in single precision due to the large cache sizes available on this architecture.
 
 ![X86 benchmarks against leading kiFMM software for achieving relative error $\epsilon$, for kifmm-rs the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss.jpg)
 
+
+![Arm benchmarks for achieving relative error $\epsilon$, for kifmm-rs the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss2.jpg)
 
 Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we report only the specifications of its 'performance' CPU cores. We report per core cache sizes for L1/L2 and total cache size for L3. \label{tab:hardware_and_software}
 
@@ -167,6 +169,7 @@ Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we rep
 | **LAPACK**    | Apple Accelerate   | Open BLAS  |
 | **FFT**    | FFTW   | FFTW  |
 | **Threading**    | Rayon   | Rayon |
+| **ISA** | Neon | AVX2|
 
 # Acknowledgements
 
