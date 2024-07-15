@@ -3,7 +3,7 @@ use std::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::FmmSvdMode;
-use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
+use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, SingleNodeBuilder};
 use kifmm::traits::fmm::{Fmm, SourceToTargetTranslation, TargetTranslation};
 use kifmm::traits::tree::{FmmTree, Tree};
 use kifmm::tree::helpers::points_fixture;
