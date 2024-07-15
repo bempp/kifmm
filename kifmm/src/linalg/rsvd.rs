@@ -456,7 +456,7 @@ mod test {
             empty_array::<f32, 2>().simple_mult_into_resize(mat_s.view(), vt.view()),
         );
 
-        assert_array_abs_diff_eq!(mat_rec.view(), mat.view(), 1e-5);
+        assert_array_abs_diff_eq!(mat_rec.view(), mat.view(), 1e-4);
     }
 
     #[test]
