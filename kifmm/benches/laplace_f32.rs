@@ -194,38 +194,6 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
-
-    // // 5 Digits
-    // {
-
-    //     // BLAS based M2L for a vector of charges
-    //     // FMM parameters
-    //     let n_crit = None;
-    //     let depth = Some(4);
-    //     let e = 5;
-    //     let expansion_order = vec![e; depth.unwrap() as usize + 1];
-    //     let prune_empty = true;
-    //     let surface_diff = Some(2);
-    //     let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(5), None);
-    //     let svd_threshold = Some(1e-2);
-
-    //     let fmm_blas = SingleNodeBuilder::new()
-    //         .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //         .unwrap()
-    //         .parameters(
-    //             charges.data(),
-    //             &expansion_order,
-    //             Laplace3dKernel::new(),
-    //             EvalType::Value,
-    //             BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
-    //         )
-    //         .unwrap()
-    //         .build()
-    //         .unwrap();
-    //     group.bench_function(format!("M2L=BLAS digits=5"), |b| {
-    //         b.iter(|| fmm_blas.evaluate(false))
-    //     });
-    // }
 }
 
 criterion_group!(laplace_p_f32, laplace_potentials_f32);
