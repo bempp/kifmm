@@ -6,7 +6,6 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
-
 fn multithreaded_f32(c: &mut Criterion) {
     let mut group = c.benchmark_group("Multi Threaded Direct f32");
 

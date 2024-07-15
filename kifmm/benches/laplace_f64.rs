@@ -9,7 +9,6 @@ use kifmm::traits::tree::{FmmTree, Tree};
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
-
 fn laplace_potentials_f64(c: &mut Criterion) {
     let mut group = c.benchmark_group("F64 Potentials");
 
