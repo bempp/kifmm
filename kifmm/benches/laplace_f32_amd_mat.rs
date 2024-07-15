@@ -24,10 +24,8 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let sources = points_fixture::<f32>(nsources, None, None, Some(0));
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
-
     // 3 Digits
     {
-
         let nvecs = 5;
         let tmp = vec![1.0; nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
@@ -63,17 +61,15 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=3, M2L vecs=5"), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=3, P2P vecs=5"), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
 
         let nvecs = 10;
@@ -111,23 +107,20 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=3, M2L vecs=10"), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=3, P2P vecs=10"), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
 
     // 4 Digits
     {
-
         let nvecs = 5;
         let tmp = vec![1.0; nsources * nvecs];
         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
@@ -163,17 +156,15 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=4, M2L vecs=5"), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=4, P2P vecs=5"), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
 
         let nvecs = 10;
@@ -211,17 +202,15 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=4, M2L vecs=10"), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=4, P2P vecs=10"), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
 

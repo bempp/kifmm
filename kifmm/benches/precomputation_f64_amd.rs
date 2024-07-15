@@ -303,7 +303,6 @@ fn precomputation_f64(c: &mut Criterion) {
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
-
         group.bench_function(format!("M2L=BLAS digits=10"), |b| {
             b.iter(|| {
                 SingleNodeBuilder::new()

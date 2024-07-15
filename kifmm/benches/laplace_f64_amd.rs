@@ -59,18 +59,15 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=FFT digits=6, M2L "), |b| {
-            b.iter(||
-                for level in 2..= fmm_fft.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_fft.tree().target_tree().depth() {
                     fmm_fft.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
-
         group.bench_function(format!("M2L=FFT digits=6, P2P "), |b| {
-            b.iter(||
-                fmm_fft.p2p().unwrap()
-            )
+            b.iter(|| fmm_fft.p2p().unwrap())
         });
 
         // BLAS based M2L for a vector of charges
@@ -103,17 +100,15 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=6, M2L "), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=6, P2P "), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
 
@@ -206,17 +201,15 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=FFT digits=8, M2L "), |b| {
-            b.iter(||
-                for level in 2..= fmm_fft.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_fft.tree().target_tree().depth() {
                     fmm_fft.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=FFT digits=8, P2P "), |b| {
-            b.iter(||
-                fmm_fft.p2p().unwrap()
-            )
+            b.iter(|| fmm_fft.p2p().unwrap())
         });
 
         // BLAS based M2L for a vector of charges
@@ -249,19 +242,16 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=8, M2L "), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=8, P2P "), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
-
     }
 
     // // 9 Digits
@@ -353,17 +343,15 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=FFT digits=10, M2L "), |b| {
-            b.iter(||
-                for level in 2..= fmm_fft.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_fft.tree().target_tree().depth() {
                     fmm_fft.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=FFT digits=10, P2P "), |b| {
-            b.iter(||
-                fmm_fft.p2p().unwrap()
-            )
+            b.iter(|| fmm_fft.p2p().unwrap())
         });
         // BLAS based M2L for a vector of charges
         // FMM parameters
@@ -395,17 +383,15 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=10, M2L "), |b| {
-            b.iter(||
-                for level in 2..= fmm_blas.tree().target_tree().depth() {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
                     fmm_blas.m2l(level).unwrap();
                 }
-            )
+            })
         });
 
         group.bench_function(format!("M2L=BLAS digits=10, P2P "), |b| {
-            b.iter(||
-                fmm_blas.p2p().unwrap()
-            )
+            b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
 }

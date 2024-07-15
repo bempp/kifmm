@@ -14,8 +14,8 @@ use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use numpy::{
-    ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArrayMethods, PyReadonlyArrayDyn,
-    PyUntypedArrayMethods, ToPyArray, PyArray2,
+    ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArray2, PyArrayMethods, PyReadonlyArrayDyn,
+    PyUntypedArrayMethods, ToPyArray,
 };
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
@@ -645,11 +645,19 @@ macro_rules! define_class_methods {
                             .unwrap();
                         Ok(coords)
                     } else {
-                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                            py,
+                            [0, self.fmm.dim()],
+                            true,
+                        );
                         Ok(empty_array)
                     }
                 } else {
-                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                        py,
+                        [0, self.fmm.dim()],
+                        true,
+                    );
                     Ok(empty_array)
                 }
             }
@@ -659,7 +667,6 @@ macro_rules! define_class_methods {
                 py: Python<'py>,
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
-
                 if let Some(key) = self.target_key_map.get(&leaf) {
                     if let Some(slice) = self.fmm.tree.target_tree.coordinates(&key) {
                         let ncoords = slice.len() / self.fmm.dim();
@@ -669,12 +676,19 @@ macro_rules! define_class_methods {
                             .unwrap();
                         Ok(coords)
                     } else {
-                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                            py,
+                            [0, self.fmm.dim()],
+                            true,
+                        );
                         Ok(empty_array)
-
                     }
                 } else {
-                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(py, [0, self.fmm.dim()], true);
+                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                        py,
+                        [0, self.fmm.dim()],
+                        true,
+                    );
                     Ok(empty_array)
                 }
             }
