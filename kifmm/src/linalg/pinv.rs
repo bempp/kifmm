@@ -26,8 +26,7 @@ pub fn pinv<T>(
     rtol: Option<T::Real>,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon,
-    Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>: MatrixSvd<Item = T>,
+    T: RlstScalar + Epsilon + MatrixSvd,
 {
     let shape = mat.shape();
 

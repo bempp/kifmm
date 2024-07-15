@@ -73,8 +73,7 @@ fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
 impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
 where
-    Scalar: RlstScalar + Default + Epsilon,
-    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
@@ -304,8 +303,7 @@ where
 impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon,
-    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
+    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: SourceToTargetTranslation,
@@ -606,9 +604,8 @@ where
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default,
+    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
-    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
@@ -1365,7 +1362,6 @@ impl<Scalar> SourceToTargetTranslationMetadata
 where
     Scalar: RlstScalar + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
-    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
 {
     fn displacements(&mut self) {
         let mut displacements = Vec::new();

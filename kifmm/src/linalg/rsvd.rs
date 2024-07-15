@@ -3,8 +3,8 @@ use num::traits::FloatConst;
 use rand_distr::{Standard, StandardNormal};
 use rlst::{
     c32, c64, dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray,
-    MatrixQrDecomposition, MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RlstResult,
-    RlstScalar, Shape, VectorContainer,
+    MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RlstResult, RlstScalar, Shape,
+    VectorContainer,
 };
 
 /// Matrix type
@@ -22,8 +22,7 @@ pub enum Normaliser {
 /// Trait for rSVD implementation
 pub trait MatrixRsvd
 where
-    Self: RlstScalar + RandScalar,
-    Array<Self, BaseArray<Self, VectorContainer<Self>, 2>, 2>: MatrixSvd<Item = Self>,
+    Self: RlstScalar + RandScalar + MatrixSvd,
 {
     /// Compute randomised SVD when target rank is known.
     fn rsvd_fixed_rank(
@@ -47,8 +46,7 @@ macro_rules! impl_matrix_rsvd {
     ($ty:ty, $fixed_rank:ident, $fixed_err:ident) => {
         impl MatrixRsvd for $ty
         where
-            $ty: RlstScalar + RandScalar,
-            Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2>: MatrixSvd<Item = $ty>,
+            $ty: RlstScalar + RandScalar + MatrixSvd,
         {
             fn rsvd_fixed_rank(
                 mat: &RsvdMatrix<Self>,
@@ -180,7 +178,7 @@ macro_rules! generate_rsvd_fixed_rank {
             random_state: Option<usize>,
         ) -> RsvdReturnType<$ty>
         where
-            Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2>: MatrixSvd<Item = $ty>,
+            $ty: MatrixSvd,
         {
             let n_oversamples = n_oversamples.unwrap_or(10);
             let n_random = n_components + n_oversamples;
@@ -245,8 +243,7 @@ macro_rules! generate_randomised_range_finder_fixed_error {
             random_state: Option<usize>,
         ) -> RsvdMatrix<$type>
         where
-            $type: RlstScalar,
-            Array<$type, BaseArray<$type, VectorContainer<$type>, 2>, 2>: MatrixSvd<Item = $type>,
+            $type: RlstScalar + MatrixSvd,
         {
             let [_m, n] = mat.shape();
 
@@ -332,8 +329,7 @@ macro_rules! generate_rsvd_fixed_error {
             random_state: Option<usize>,
         ) -> RsvdReturnType<$type>
         where
-            $type: RlstScalar,
-            Array<$type, BaseArray<$type, VectorContainer<$type>, 2>, 2>: MatrixSvd<Item = $type>,
+            $type: RlstScalar + MatrixSvd,
         {
             let q = $randomised_range_finder(mat, tol, k_block, random_state);
 

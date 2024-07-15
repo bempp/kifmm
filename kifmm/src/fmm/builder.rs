@@ -3,7 +3,7 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
-use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
+use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
@@ -24,11 +24,10 @@ use crate::{
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
-    Scalar: RlstScalar + Default + Epsilon,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
-    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
     KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
         + FmmMetadata<Scalar = Scalar>,

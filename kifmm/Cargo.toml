@@ -28,7 +28,7 @@ approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
 kifmm-fftw-sys = { path = "../fftw-sys" }
-green-kernels = { git = "https://github.com/skailasa/green-kernels.git", branch = "simd"}
+green-kernels = { version = "0.2.0"}
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
@@ -40,14 +40,13 @@ pulp = "0.18.12"
 bytemuck = "1.16.0"
 rand_distr = "0.4.3"
 bitflags = "2.6.0"
+rlst = {version = "0.2.0"}
 
 [target.aarch64-apple-darwin.dependencies]
-rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd", features = ["metal"]}
 blas-src = { version = "0.10", features = ["accelerate"], optional = true }
 lapack-src = { version = "0.10", features = ["accelerate"], optional = true }
 
 [target.x86_64-unknown-linux-gnu.dependencies]
-rlst = { git = "https://github.com/skailasa/rlst.git", branch = "simd"}
 blas-src = { version = "0.10", features = ["openblas"], optional = true}
 lapack-src = { version = "0.10", features = ["openblas"], optional = true}
 
