@@ -26,8 +26,6 @@ use rlst::{
 
 use pyo3::{pymodule, types::PyModule, Bound, PyResult};
 
-extern crate blas_src;
-extern crate lapack_src;
 
 macro_rules! define_pyclass {
     ($name: ident, $type: ident, $kernel: ident, $field_translation: ident) => {
