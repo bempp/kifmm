@@ -395,8 +395,6 @@ pub enum FmmEvalType {
 ///
 /// # Example
 /// ```
-/// # extern crate blas_src;
-/// # extern crate lapack_src;
 /// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;

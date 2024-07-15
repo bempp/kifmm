@@ -15,9 +15,6 @@
 //! Basic usage for evaluating an FMM between a set of source and target points
 //!
 //! ```rust
-//! # extern crate blas_src;
-//! # extern crate lapack_src;
-//!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 //! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
