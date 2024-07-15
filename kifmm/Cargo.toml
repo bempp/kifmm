@@ -2,7 +2,7 @@
 # Treat warnings as a build error.
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
-python = ["dep:pyo3", "dep:numpy", "dep:blas-src", "dep:lapack-src"]
+python = ["dep:pyo3", "dep:numpy"]
 
 [package]
 name = "kifmm"
@@ -42,14 +42,6 @@ rand_distr = "0.4.3"
 bitflags = "2.6.0"
 rlst = {version = "0.2.0"}
 
-[target.aarch64-apple-darwin.dependencies]
-blas-src = { version = "0.10", features = ["accelerate"], optional = true }
-lapack-src = { version = "0.10", features = ["accelerate"], optional = true }
-
-[target.x86_64-unknown-linux-gnu.dependencies]
-blas-src = { version = "0.10", features = ["openblas"], optional = true}
-lapack-src = { version = "0.10", features = ["openblas"], optional = true}
-
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}
 csv = "1.3.0"
@@ -82,14 +74,6 @@ harness = false
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
-
-[target.aarch64-apple-darwin.dev-dependencies]
-blas-src = { version = "0.10", features = ["accelerate"]}
-lapack-src = { version = "0.10", features = ["accelerate"]}
-
-[target.x86_64-unknown-linux-gnu.dev-dependencies]
-blas-src = { version = "0.10", features = ["openblas"]}
-lapack-src = { version = "0.10", features = ["openblas"]}
 
 [lints.clippy]
 wildcard_imports = "forbid"
