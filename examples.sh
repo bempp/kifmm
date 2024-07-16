@@ -41,6 +41,18 @@ Running mpi_test_hyksort_unique on 4 processes
 " && \
 cargo mpirun --example mpi_test_hyksort_unique --release -n 4 --features "mpi" && \
 echo "
+==============================================
+Running single_node_laplace_variable_expansion
+==============================================
+" && \
+cargo run --example single_node_laplace_variable_expansion --release && \
+echo "
+=============================
+Running single_node_helmholtz
+=============================
+" && \
+cargo run --example single_node_helmholtz --release && \
+echo "
 =================================================
 Running mpi_test_hyksort_redundant on 2 processes
 =================================================

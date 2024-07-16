@@ -1,5 +1,5 @@
 //! Helper functions
-use super::types::FftError;
+use crate::fftw::types::FftError;
 
 /// Validate a DFT plan created with FFTW
 ///
@@ -17,6 +17,7 @@ pub fn validate_plan<T: Sized>(plan: *mut T) -> Result<*mut T, FftError> {
 #[macro_export]
 macro_rules! excall {
     ($call:expr) => {{
+        use $crate::fftw::types::FFTW_MUTEX;
         let _lock = FFTW_MUTEX.lock().expect("Cannot get lock");
         unsafe { $call }
     }};

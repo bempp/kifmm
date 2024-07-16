@@ -4,9 +4,6 @@ use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuil
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
-extern crate blas_src;
-extern crate lapack_src;
-
 fn main() {
     // Setup random sources and targets
     let nsources = 1000;
@@ -35,7 +32,7 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -64,7 +61,11 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                BlasFieldTranslationSaRcmp::new(
+                    singular_value_threshold,
+                    None,
+                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -89,7 +90,11 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                BlasFieldTranslationSaRcmp::new(
+                    singular_value_threshold,
+                    None,
+                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()

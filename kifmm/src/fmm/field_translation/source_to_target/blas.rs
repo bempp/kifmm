@@ -126,14 +126,10 @@ where
                 // 1. Compute the SVD compressed multipole expansions at this level
                 let mut compressed_multipoles;
                 {
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
                     );
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::disable_threading();
 
                     if self.kernel.is_homogenous() {
                         compressed_multipoles.data_mut().iter_mut().for_each(|d| {
@@ -211,8 +207,6 @@ where
 
                 // 3. Compute local expansions from compressed check potentials
                 {
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -223,8 +217,6 @@ where
                             ),
                         ),
                     );
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::disable_threading();
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
@@ -283,14 +275,10 @@ where
                 // 1. Compute the SVD compressed multipole expansions at this level
                 let mut compressed_multipoles;
                 {
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::enable_threading();
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.source_to_target.metadata[m2l_operator_index].st.view(),
                         multipoles,
                     );
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::disable_threading();
 
                     if self.kernel.is_homogenous() {
                         compressed_multipoles.data_mut().iter_mut().for_each(|d| {
@@ -402,8 +390,6 @@ where
 
                 // 3. Compute local expansions from compressed check potentials
                 {
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -414,8 +400,6 @@ where
                             ),
                         ),
                     );
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::disable_threading();
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
                         std::slice::from_raw_parts_mut(
@@ -606,8 +590,6 @@ where
 
                 // 2. Compute local expansions from compressed check potentials
                 {
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -615,8 +597,6 @@ where
                             check_potentials,
                         ),
                     );
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::disable_threading();
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
@@ -759,8 +739,6 @@ where
 
                 // 2. Compute local expansions from compressed check potentials
                 {
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::enable_threading();
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
                         self.dc2e_inv_1[c2e_operator_index].view(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -768,8 +746,6 @@ where
                             check_potentials,
                         ),
                     );
-                    #[cfg(target_os = "linux")]
-                    rlst::threading::disable_threading();
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {

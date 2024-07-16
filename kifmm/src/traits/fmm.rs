@@ -116,6 +116,9 @@ where
     /// Get the expansion order associated with this FMM, used to discretise the check surface.
     fn check_surface_order(&self, level: u64) -> usize;
 
+    /// Check whether or not expansion order is set variably
+    fn variable_expansion_order(&self) -> bool;
+
     /// Get the number of multipole/local coefficients associated with this FMM
     fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
 

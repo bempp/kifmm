@@ -39,6 +39,10 @@ where
         self.dim
     }
 
+    fn variable_expansion_order(&self) -> bool {
+        self.variable_expansion_order
+    }
+
     fn equivalent_surface_order(&self, level: u64) -> usize {
         self.equivalent_surface_order[self.expansion_index(level)]
     }
@@ -181,9 +185,6 @@ where
     fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
-
-        #[cfg(target_os = "linux")]
-        rlst::threading::disable_threading();
 
         if timed {
             {
@@ -330,8 +331,8 @@ mod test {
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, rlst_array_from_slice2, rlst_dynamic_array2, Array, BaseArray, RawAccess,
-        RawAccessMut, RlstScalar, Shape, VectorContainer,
+        c64, rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
+        VectorContainer,
     };
 
     use crate::{
@@ -368,12 +369,6 @@ mod test {
 
         let ntargets = leaf_targets.len() / fmm.dim();
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         let [nsources, nmatvecs] = charges.shape();
 
         for i in 0..nmatvecs {
@@ -383,7 +378,7 @@ mod test {
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
-                leaf_coordinates_col_major.data(),
+                leaf_targets,
                 charges_i,
                 &mut direct_i,
             );
@@ -423,12 +418,6 @@ mod test {
 
         let ntargets = leaf_targets.len() / fmm.dim();
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         let [nsources, nmatvecs] = charges.shape();
 
         for i in 0..nmatvecs {
@@ -438,7 +427,7 @@ mod test {
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
-                leaf_coordinates_col_major.data(),
+                leaf_targets,
                 charges_i,
                 &mut direct_i,
             );
@@ -480,15 +469,10 @@ mod test {
         let ntargets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::zero(); ntargets * eval_size];
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         fmm.kernel().evaluate_st(
             eval_type,
             sources.data(),
-            leaf_coordinates_col_major.data(),
+            leaf_targets,
             charges.data(),
             &mut direct,
         );
@@ -536,15 +520,10 @@ mod test {
         let ntargets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::Real::zero(); ntargets * eval_size];
 
-        let leaf_coordinates_row_major =
-            rlst_array_from_slice2!(leaf_targets, [ntargets, fmm.dim()], [fmm.dim(), 1]);
-        let mut leaf_coordinates_col_major = rlst_dynamic_array2!(T::Real, [ntargets, fmm.dim()]);
-        leaf_coordinates_col_major.fill_from(leaf_coordinates_row_major.view());
-
         fmm.kernel().evaluate_st(
             eval_type,
             sources.data(),
-            leaf_coordinates_col_major.data(),
+            leaf_targets,
             charges.data(),
             &mut direct,
         );
@@ -552,12 +531,7 @@ mod test {
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = RlstScalar::abs(d - p);
             let rel_error = abs_error / p;
-            println!(
-                "err {:?} \nd {:?} \np {:?}",
-                rel_error,
-                &direct[0..3],
-                &potential[0..3]
-            );
+            // println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
             assert!(rel_error <= threshold)
         });
     }
@@ -712,7 +686,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -728,7 +702,11 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold, None),
+                BlasFieldTranslationSaRcmp::new(
+                    svd_threshold,
+                    None,
+                    crate::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -775,7 +753,11 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(svd_threshold, None),
+                BlasFieldTranslationSaRcmp::new(
+                    svd_threshold,
+                    None,
+                    crate::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -810,6 +792,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
+        let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
         let mut fmm = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
@@ -818,7 +801,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None),
+                BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
             )
             .unwrap()
             .build()
@@ -840,142 +823,6 @@ mod test {
             &charges,
             threshold_pot,
         );
-    }
-
-    #[test]
-    fn test_laplace_fmm_vector() {
-        // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-
-        let min = None;
-        let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
-
-        // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
-
-        let prune_empty = true;
-        let threshold_pot = 1e-3;
-        let threshold_deriv = 1e-4;
-        let threshold_deriv_blas = 1e-3;
-        let singular_value_threshold = Some(1e-2);
-
-        // Charge data
-        let nvecs = 1;
-        let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
-
-        // FFT based field translation
-        {
-            // Evaluate potentials
-            let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    EvalType::Value,
-                    FftFieldTranslation::new(),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_fft.evaluate(false).unwrap();
-            let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_fft,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_pot,
-            );
-
-            // Evaluate potentials + derivatives
-            let fmm_fft = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_fft.evaluate(false).unwrap();
-
-            let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_fft,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv,
-            );
-        }
-
-        // BLAS based field translation
-        {
-            // Evaluate potentials
-            let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_pot,
-            );
-
-            // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-                .unwrap()
-                .parameters(
-                    charges.data(),
-                    &expansion_order,
-                    Laplace3dKernel::new(),
-                    eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-            fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
-            test_single_node_laplace_fmm_vector_helper::<f64>(
-                fmm_blas,
-                eval_type,
-                &sources,
-                &charges,
-                threshold_deriv_blas,
-            );
-        }
     }
 
     #[test]
@@ -1017,7 +864,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1042,7 +889,7 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1072,7 +919,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1097,7 +948,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1153,7 +1008,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        surface_diff,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1179,7 +1038,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1234,7 +1097,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        surface_diff,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1291,7 +1158,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, surface_diff),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        surface_diff,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1317,7 +1188,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1368,7 +1243,7 @@ mod test {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -1464,7 +1339,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1486,7 +1361,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1589,7 +1464,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::Value,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1611,7 +1486,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     EvalType::ValueDeriv,
-                    FftFieldTranslation::new(),
+                    FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
@@ -1799,7 +1674,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1821,7 +1700,11 @@ mod test {
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
-                    BlasFieldTranslationSaRcmp::new(singular_value_threshold, None),
+                    BlasFieldTranslationSaRcmp::new(
+                        singular_value_threshold,
+                        None,
+                        crate::fmm::types::FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
