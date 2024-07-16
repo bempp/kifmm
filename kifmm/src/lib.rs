@@ -103,3 +103,5 @@ pub use fmm::types::MultiNodeFmmTree;
 
 #[doc(inline)]
 pub use traits::fmm::Fmm;
+
+pub mod bindings;

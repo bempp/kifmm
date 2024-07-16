@@ -5,6 +5,7 @@ CC = clang++
 CFLAGS = -std=c++11
 
 # Directories
+BUILD_DIR = build
 TARGET_DIR = $(abspath ../../target)
 DEBUG_DIR = $(TARGET_DIR)/debug
 RELEASE_DIR = $(TARGET_DIR)/release
@@ -16,8 +17,8 @@ LIB_NAME = kifmm
 
 # Source and Object files
 SRC = main.cpp
-OBJ = main.o
-EXE = main
+OBJ = $(BUILD_DIR)/main.o
+EXE = $(BUILD_DIR)/main
 
 # Default build mode
 BUILD ?= release
@@ -37,6 +38,7 @@ $(EXE): $(OBJ) | $(INCLUDE_DIR)/kifmm.h
 
 # Rule to compile the source file
 $(OBJ): $(SRC) | $(INCLUDE_DIR)/kifmm.h
+	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
 
 # Ensure the Rust library and header file are built before compiling C++
@@ -45,7 +47,7 @@ $(INCLUDE_DIR)/kifmm.h:
 
 # Clean rule to remove generated files
 clean:
-	rm -f $(OBJ) $(EXE)
+	rm -rf $(BUILD_DIR)
 
 # Rule to build the Rust library and C++ executable in debug mode
 debug:
