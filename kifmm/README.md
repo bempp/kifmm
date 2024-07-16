@@ -10,12 +10,6 @@ In order to enable plotting with MayaVi only Python 3.10.* is currently supporte
 uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
 ```
 
-On linux one also has to install patchelf.
-
-```
-uv pip install patchelf
-```
-
 2. Use the Maturin CLI to install the Python bindings into this virtual environment.
 
 Note that Maturin must be run from the `kifmm` crate root, not the workspace root.
