@@ -1,17 +1,12 @@
 //! # Real to Complex Transform
 use kifmm_fftw_sys as ffi;
 
-use itertools::Itertools;
 use num_complex::Complex;
 
 use rayon::prelude::*;
 
-use super::helpers::validate_plan;
-use super::types::{FftError, Plan32, Plan64, ShapeInfo};
-use crate::traits::fftw::RealToComplexFft3D;
-
-use crate::excall;
-use crate::fftw::types::{FFTW_ESTIMATE, FFTW_MUTEX};
+use super::types::{FftError, ShapeInfo};
+use crate::traits::fftw::{Dft, RealToComplexFft3D};
 
 /// Validate the dimensions of the (batch) input and output sequences in real-to-complex DFTs
 ///
@@ -70,27 +65,16 @@ impl RealToComplexFft3D for f32 {
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-        let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE,
-        )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n_input);
         let it_out = out.par_chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            let p = plan;
-            unsafe { ffi::fftwf_execute_dft_r2c(p.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+            unsafe { ffi::fftwf_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
         });
-
-        unsafe {
-            ffi::fftwf_destroy_plan(plan.0);
-        };
 
         Ok(())
     }
@@ -99,31 +83,20 @@ impl RealToComplexFft3D for f32 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE,
-        )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n_output);
         let it_out = out.par_chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            let p = plan;
-            unsafe { ffi::fftwf_execute_dft_c2r(p.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+            unsafe { ffi::fftwf_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (info.n_input as f32));
         });
-
-        unsafe {
-            ffi::fftwf_destroy_plan(plan.0);
-        };
 
         Ok(())
     }
@@ -132,26 +105,16 @@ impl RealToComplexFft3D for f32 {
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-        let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_input);
         let it_out = out.chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            unsafe { ffi::fftwf_execute_dft_r2c(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+            unsafe { ffi::fftwf_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
         });
-
-        unsafe {
-            ffi::fftwf_destroy_plan(plan.0);
-        };
 
         Ok(())
     }
@@ -160,74 +123,53 @@ impl RealToComplexFft3D for f32 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_output);
         let it_out = out.chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            unsafe { ffi::fftwf_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+            unsafe { ffi::fftwf_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (info.n_input as f32));
         });
 
-        unsafe {
-            ffi::fftwf_destroy_plan(plan.0);
-        };
-
         Ok(())
     }
 
-    fn r2c(in_: &mut [Self], out: &mut [Complex<Self>], shape: &[usize]) -> Result<(), FftError> {
+    fn r2c(
+        in_: &mut [Self],
+        out: &mut [Complex<Self>],
+        shape: &[usize],
+        plan: &<Self as Dft>::Plan,
+    ) -> Result<(), FftError> {
         let _info = validate_shape_r2c(shape, in_.len(), out.len())?;
-        let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_r2c(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         unsafe {
-            ffi::fftwf_execute_dft_r2c(plan.0, in_.as_mut_ptr(), out.as_mut_ptr());
-        };
-
-        unsafe {
-            ffi::fftwf_destroy_plan(plan.0);
+            ffi::fftwf_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr());
         };
 
         Ok(())
     }
 
-    fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize]) -> Result<(), FftError> {
+    fn c2r(
+        in_: &mut [Complex<Self>],
+        out: &mut [Self],
+        shape: &[usize],
+        plan: &<Self as Dft>::Plan,
+    ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan32(validate_plan(excall!(ffi::fftwf_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
-        unsafe { ffi::fftwf_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+        unsafe { ffi::fftwf_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
         // Normalise
         out.iter_mut()
             .for_each(|value| *value *= 1.0 / (info.n_input as f32));
 
-        unsafe {
-            ffi::fftwf_destroy_plan(plan.0);
-        };
         Ok(())
     }
 }
@@ -237,27 +179,16 @@ impl RealToComplexFft3D for f64 {
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_r2c(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE,
-        )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n_input);
         let it_out = out.par_chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            let p = plan;
-            unsafe { ffi::fftw_execute_dft_r2c(p.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+            unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
         });
-
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
-        };
 
         Ok(())
     }
@@ -266,31 +197,20 @@ impl RealToComplexFft3D for f64 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE,
-        )))?);
 
         let it_in_ = in_.par_chunks_exact_mut(info.n_output);
         let it_out = out.par_chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            let p = plan;
-            unsafe { ffi::fftw_execute_dft_c2r(p.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+            unsafe { ffi::fftw_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
-
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
-        };
 
         Ok(())
     }
@@ -299,26 +219,16 @@ impl RealToComplexFft3D for f64 {
         in_: &mut [Self],
         out: &mut [Complex<Self>],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_r2c(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_r2c(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_input);
         let it_out = out.chunks_exact_mut(info.n_output);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            unsafe { ffi::fftw_execute_dft_r2c(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
+            unsafe { ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) };
         });
-
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
-        };
 
         Ok(())
     }
@@ -327,74 +237,53 @@ impl RealToComplexFft3D for f64 {
         in_: &mut [Complex<Self>],
         out: &mut [Self],
         shape: &[usize],
+        plan: &<Self as Dft>::Plan,
     ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         let it_in_ = in_.chunks_exact_mut(info.n_output);
         let it_out = out.chunks_exact_mut(info.n_input);
 
         it_in_.zip(it_out).for_each(|(in_, out)| {
-            unsafe { ffi::fftw_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+            unsafe { ffi::fftw_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
             // Normalise output
             out.iter_mut()
                 .for_each(|value| *value *= 1.0 / (info.n_input as f64));
         });
 
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
-        };
-
         Ok(())
     }
 
-    fn r2c(in_: &mut [Self], out: &mut [Complex<Self>], shape: &[usize]) -> Result<(), FftError> {
+    fn r2c(
+        in_: &mut [Self],
+        out: &mut [Complex<Self>],
+        shape: &[usize],
+        plan: &<Self as Dft>::Plan,
+    ) -> Result<(), FftError> {
         let _info = validate_shape_r2c(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_r2c(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
         unsafe {
-            ffi::fftw_execute_dft_r2c(plan.0, in_.as_mut_ptr(), out.as_mut_ptr());
-        };
-
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
+            ffi::fftw_execute_dft_r2c(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr());
         };
 
         Ok(())
     }
 
-    fn c2r(in_: &mut [Complex<Self>], out: &mut [Self], shape: &[usize]) -> Result<(), FftError> {
+    fn c2r(
+        in_: &mut [Complex<Self>],
+        out: &mut [Self],
+        shape: &[usize],
+        plan: &<Self as Dft>::Plan,
+    ) -> Result<(), FftError> {
         let info = validate_shape_c2r(shape, in_.len(), out.len())?;
-        let plan = Plan64(validate_plan(excall!(ffi::fftw_plan_dft_c2r(
-            shape.len() as i32,
-            shape.iter().map(|&x| x as i32).collect_vec().as_mut_ptr() as *mut _,
-            in_.as_mut_ptr(),
-            out.as_mut_ptr(),
-            FFTW_ESTIMATE
-        )))?);
 
-        unsafe { ffi::fftw_execute_dft_c2r(plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
+        unsafe { ffi::fftw_execute_dft_c2r(plan.plan.0, in_.as_mut_ptr(), out.as_mut_ptr()) }
 
         // Normalise
         out.iter_mut()
             .for_each(|value| *value *= 1.0 / (info.n_input as f64));
 
-        unsafe {
-            ffi::fftw_destroy_plan(plan.0);
-        };
         Ok(())
     }
 }
@@ -402,7 +291,7 @@ impl RealToComplexFft3D for f64 {
 #[cfg(test)]
 mod test {
 
-    use super::RealToComplexFft3D;
+    use super::{Dft, RealToComplexFft3D};
     use num::traits::Zero;
     use rlst::c64;
 
@@ -418,8 +307,11 @@ mod test {
             *a_i = i as f64;
         }
 
-        f64::r2c(&mut a, &mut b, &[nd, nd, nd]).unwrap();
-        f64::c2r(&mut b, &mut a, &[nd, nd, nd]).unwrap();
+        let plan = f64::plan_forward(&mut a, &mut b, &[nd, nd, nd], None).unwrap();
+        f64::r2c(&mut a, &mut b, &[nd, nd, nd], &plan).unwrap();
+
+        let plan = f64::plan_backward(&mut b, &mut a, &[nd, nd, nd], None).unwrap();
+        f64::c2r(&mut b, &mut a, &[nd, nd, nd], &plan).unwrap();
 
         for (i, &v) in a.iter().enumerate() {
             let expected = i as f64;

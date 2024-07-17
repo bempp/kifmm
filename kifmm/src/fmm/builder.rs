@@ -1,7 +1,9 @@
 //! Builder objects to construct FMMs
+use std::collections::HashSet;
+
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
-use rlst::{Array, BaseArray, MatrixSvd, RlstScalar, VectorContainer};
+use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
@@ -22,11 +24,10 @@ use crate::{
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
-    Scalar: RlstScalar + Default + Epsilon,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
-    Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>: MatrixSvd<Item = Scalar>,
     KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
         + FmmMetadata<Scalar = Scalar>,
@@ -42,6 +43,7 @@ where
             domain: None,
             equivalent_surface_order: None,
             check_surface_order: None,
+            variable_expansion_order: None,
             ncoeffs_equivalent_surface: None,
             ncoeffs_check_surface: None,
             kernel_eval_type: None,
@@ -53,8 +55,8 @@ where
     /// Associate FMM builder with an FMM Tree
     ///
     /// # Arguments
-    /// * `sources` - Source coordinates, data expected in column major order such that the shape is [n_coords, dim]
-    /// * `target` - Target coordinates,  data expected in column major order such that the shape is [n_coords, dim]
+    /// * `sources` - Source coordinates, data expected in row major order such that the shape is [dim, n_coords]
+    /// * `target` - Target coordinates,  data expected in row major order such that the shape is [dim, n_coords]
     /// * `n_crit` - Maximum number of particles per leaf box, if none specified a default of 150 is used.
     /// * `prune_empty` - Optionally drop empty leaf boxes for performance.`
     pub fn tree(
@@ -188,6 +190,14 @@ where
                 ));
             }
 
+            let unique_expansion_orders: HashSet<_> = expansion_order.iter().cloned().collect();
+
+            if unique_expansion_orders.len() > 1 {
+                self.variable_expansion_order = Some(true)
+            } else {
+                self.variable_expansion_order = Some(false)
+            }
+
             let check_surface_order = if source_to_target.overdetermined() {
                 expansion_order
                     .iter()
@@ -239,6 +249,7 @@ where
                 tree: self.tree.unwrap(),
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
+                variable_expansion_order: self.variable_expansion_order.unwrap(),
                 ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
                 ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),

@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::fmm::types::FmmSvdMode;
 use crate::fmm::KiFmm;
 use crate::traits::fmm::Fmm;
 use crate::traits::tree::Tree;
@@ -13,7 +14,7 @@ use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::traits::Kernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use numpy::{
-    ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArrayMethods, PyReadonlyArrayDyn,
+    ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArray2, PyArrayMethods, PyReadonlyArrayDyn,
     PyUntypedArrayMethods, ToPyArray,
 };
 use pyo3::exceptions::PyTypeError;
@@ -87,6 +88,7 @@ macro_rules! laplace_fft_constructors {
                 kernel_eval_type: usize,
                 n_crit: Option<u64>,
                 depth: Option<u64>,
+                block_size: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -124,8 +126,8 @@ macro_rules! laplace_fft_constructors {
                     .tree(
                         sources.as_slice().unwrap(),
                         targets.as_slice().unwrap(),
-                        depth,
                         n_crit,
+                        depth,
                         prune_empty,
                     )
                     .unwrap()
@@ -134,7 +136,7 @@ macro_rules! laplace_fft_constructors {
                         expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        FftFieldTranslation::new(),
+                        FftFieldTranslation::new(block_size),
                     )
                     .unwrap()
                     .build()
@@ -200,7 +202,8 @@ macro_rules! laplace_blas_constructors {
                 svd_threshold: Option<<$type as RlstScalar>::Real>,
                 n_crit: Option<u64>,
                 depth: Option<u64>,
-                surface_diff: Option<usize>
+                surface_diff: Option<usize>,
+                rsvd: Option<(Option<usize>, Option<usize>, Option<usize>, Option<usize>)>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -226,6 +229,12 @@ macro_rules! laplace_blas_constructors {
                     }
                 }
 
+                let svd_settings;
+                if let Some(rsvd) = rsvd {
+                    svd_settings = FmmSvdMode::new(true, rsvd.0, rsvd.1, rsvd.2, rsvd.3)
+                } else {
+                    svd_settings = FmmSvdMode::new(false, None, None, None, None)
+                }
 
                 let fmm = SingleNodeBuilder::new()
                     .tree(
@@ -241,7 +250,7 @@ macro_rules! laplace_blas_constructors {
                         expansion_order.as_slice(),
                         Laplace3dKernel::new(),
                         kernel_eval_type,
-                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff),
+                        BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_settings),
                     )
                     .unwrap()
                     .build()
@@ -318,7 +327,8 @@ macro_rules! helmholtz_fft_constructors {
                 kernel_eval_type: usize,
                 wavenumber: <$type as RlstScalar>::Real,
                 n_crit: Option<u64>,
-                depth: Option<u64>
+                depth: Option<u64>,
+                block_size: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
                     EvalType::Value
@@ -366,7 +376,7 @@ macro_rules! helmholtz_fft_constructors {
                         expansion_order.as_slice(),
                         Helmholtz3dKernel::new(wavenumber),
                         kernel_eval_type,
-                        FftFieldTranslation::new(),
+                        FftFieldTranslation::new(block_size),
                     )
                     .unwrap()
                     .build()
@@ -586,7 +596,7 @@ macro_rules! define_class_methods {
                     .data()
                     .to_pyarray_bound(py)
                     .reshape_with_order(
-                        [ntargets, self.fmm.kernel_eval_size],
+                        [self.fmm.kernel_eval_size, ntargets],
                         NPY_ORDER::NPY_FORTRANORDER,
                     )
                     .unwrap();
@@ -623,20 +633,30 @@ macro_rules! define_class_methods {
                 py: Python<'py>,
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
-                let key = self.source_key_map.get(&leaf).unwrap();
-                let slice = self.fmm.tree.source_tree.coordinates(&key).unwrap();
-                let ncoords = slice.len() / self.fmm.dim();
-                let coords_row_major =
-                    rlst_array_from_slice2!(slice, [ncoords, self.fmm.dim()], [self.fmm.dim(), 1]);
-                let mut coords_col_major =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [ncoords, self.fmm.dim()]);
-                coords_col_major.fill_from(coords_row_major.view());
-                let coords = coords_col_major
-                    .data()
-                    .to_pyarray_bound(py)
-                    .reshape_with_order([ncoords, self.fmm.dim()], NPY_ORDER::NPY_FORTRANORDER)
-                    .unwrap();
-                Ok(coords)
+                if let Some(key) = self.source_key_map.get(&leaf) {
+                    if let Some(slice) = self.fmm.tree.source_tree.coordinates(&key) {
+                        let ncoords = slice.len() / self.fmm.dim();
+                        let coords = slice
+                            .to_pyarray_bound(py)
+                            .reshape([ncoords, self.fmm.dim()])
+                            .unwrap();
+                        Ok(coords)
+                    } else {
+                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                            py,
+                            [0, self.fmm.dim()],
+                            true,
+                        );
+                        Ok(empty_array)
+                    }
+                } else {
+                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                        py,
+                        [0, self.fmm.dim()],
+                        true,
+                    );
+                    Ok(empty_array)
+                }
             }
 
             fn target_coordinates<'py>(
@@ -644,20 +664,30 @@ macro_rules! define_class_methods {
                 py: Python<'py>,
                 leaf: u64,
             ) -> PyResult<Bound<'py, PyArray<<$type as RlstScalar>::Real, Dim<[usize; 2]>>>> {
-                let key = self.target_key_map.get(&leaf).unwrap();
-                let slice = self.fmm.tree.target_tree.coordinates(&key).unwrap();
-                let ncoords = slice.len() / self.fmm.dim();
-                let coords_row_major =
-                    rlst_array_from_slice2!(slice, [ncoords, self.fmm.dim()], [self.fmm.dim(), 1]);
-                let mut coords_col_major =
-                    rlst_dynamic_array2!(<$type as RlstScalar>::Real, [ncoords, self.fmm.dim()]);
-                coords_col_major.fill_from(coords_row_major.view());
-                let coords = coords_col_major
-                    .data()
-                    .to_pyarray_bound(py)
-                    .reshape_with_order([ncoords, self.fmm.dim()], NPY_ORDER::NPY_FORTRANORDER)
-                    .unwrap();
-                Ok(coords)
+                if let Some(key) = self.target_key_map.get(&leaf) {
+                    if let Some(slice) = self.fmm.tree.target_tree.coordinates(&key) {
+                        let ncoords = slice.len() / self.fmm.dim();
+                        let coords = slice
+                            .to_pyarray_bound(py)
+                            .reshape([ncoords, self.fmm.dim()])
+                            .unwrap();
+                        Ok(coords)
+                    } else {
+                        let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                            py,
+                            [0, self.fmm.dim()],
+                            true,
+                        );
+                        Ok(empty_array)
+                    }
+                } else {
+                    let empty_array = PyArray2::<<$type as RlstScalar>::Real>::zeros_bound(
+                        py,
+                        [0, self.fmm.dim()],
+                        true,
+                    );
+                    Ok(empty_array)
+                }
             }
 
             fn potentials<'py>(
@@ -676,7 +706,7 @@ macro_rules! define_class_methods {
 
                     let potentials_i = potentials_i
                         .reshape_with_order(
-                            [n_potentials, self.fmm.kernel_eval_size],
+                            [self.fmm.kernel_eval_size, n_potentials],
                             NPY_ORDER::NPY_FORTRANORDER,
                         )
                         .unwrap();
@@ -696,7 +726,7 @@ macro_rules! define_class_methods {
                     .potentials
                     .to_pyarray_bound(py)
                     .reshape_with_order(
-                        [n_potentials, self.fmm.kernel_eval_size],
+                        [self.fmm.kernel_eval_size, n_potentials],
                         NPY_ORDER::NPY_FORTRANORDER,
                     )
                     .unwrap();

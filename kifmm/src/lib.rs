@@ -15,9 +15,6 @@
 //! Basic usage for evaluating an FMM between a set of source and target points
 //!
 //! ```rust
-//! # extern crate blas_src;
-//! # extern crate lapack_src;
-//!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 //! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
@@ -51,7 +48,7 @@
 //!             &expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
-//!             FftFieldTranslation::new(), // Choose a field translation method, could replace with BLAS field translation
+//!             FftFieldTranslation::new(None), // Choose a field translation method, could replace with BLAS field translation
 //!         )
 //!         .unwrap()
 //!         .build()
@@ -82,6 +79,7 @@ pub mod fftw;
 pub mod fmm;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
+pub mod linalg;
 #[cfg(feature = "python")]
 pub mod python;
 pub mod traits;

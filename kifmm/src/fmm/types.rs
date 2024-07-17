@@ -6,6 +6,7 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
+    linalg::rsvd::Normaliser,
     traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex,
@@ -20,15 +21,15 @@ use crate::tree::types::MultiNodeTree;
 use mpi::traits::{Communicator, Equivalence};
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
-/// organized in column-major order.
+/// organized in row-major order.
 pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
-/// stored in column-major order.
+/// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
+/// stored in row-major order.
 pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 
-/// Represents coordinate data in a two-dimensional array with shape `[n_coords, dim]`,
-/// stored in column-major order.
+/// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
+/// stored in row-major order.
 pub type CoordinatesSlice<'slc, T> = Array<T, BaseArray<T, SliceContainer<'slc, T>, 2>, 2>;
 
 /// Represents a threadsafe mutable raw pointer to`T`.
@@ -186,6 +187,9 @@ where
     /// The charge data at each target leaf box.
     pub charges: Vec<Scalar>,
 
+    /// Set to true if expansion order varies by level
+    pub variable_expansion_order: bool,
+
     /// The expansion order of the FMM, used to construct equivalent surfaces.
     pub equivalent_surface_order: Vec<usize>, // Index corresponds to level
 
@@ -296,6 +300,7 @@ where
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),
             kernel: Kernel::default(),
+            variable_expansion_order: false,
             equivalent_surface_order: Vec::default(),
             check_surface_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
@@ -390,8 +395,6 @@ pub enum FmmEvalType {
 ///
 /// # Example
 /// ```
-/// # extern crate blas_src;
-/// # extern crate lapack_src;
 /// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 /// use kifmm::traits::fmm::Fmm;
 /// use kifmm::traits::tree::FmmTree;
@@ -429,7 +432,7 @@ pub enum FmmEvalType {
 ///         &expansion_order,
 ///         Laplace3dKernel::new(),
 ///         EvalType::Value,
-///         FftFieldTranslation::new(),
+///         FftFieldTranslation::new(None),
 ///     )
 ///     .unwrap()
 ///     .build()
@@ -463,6 +466,9 @@ where
 
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
+
+    /// Variable expansion order by level
+    pub variable_expansion_order: Option<bool>,
 
     /// Expansion order used to discretise equivalent surface
     pub equivalent_surface_order: Option<Vec<usize>>,
@@ -562,13 +568,16 @@ where
     /// Map between indices of convolution and surface grid points.
     pub conv_to_surf_map: Vec<Vec<usize>>, // Indexed by level
 
+    /// Maximum block size when grouping interactions
+    pub block_size: usize,
+
     /// Precomputed data required for FFT compressed M2L interaction.
     pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
 
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// The map between sources/targets in
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
@@ -613,11 +622,69 @@ where
     /// Directional cutoff ranks
     pub directional_cutoff_ranks: Vec<Vec<usize>>,
 
-    /// The map between sources/targets in
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
+
+    /// Select SVD algorithm for compression, either deterministic or randomised
+    pub svd_mode: FmmSvdMode,
+}
+
+/// Variants of SVD algorithms
+#[derive(Default, Clone, Copy)]
+pub enum FmmSvdMode {
+    /// Use randomised SVD with optional power iteration for additional accuracy
+    Random {
+        /// Number of singular values/vectors sought
+        n_components: Option<usize>,
+
+        /// Set normaliser
+        normaliser: Option<Normaliser>,
+
+        /// Set number of additional samples, in addition to n_components
+        n_oversamples: Option<usize>,
+
+        /// Set a random state.
+        random_state: Option<usize>,
+    },
+
+    /// Use DGESVD from Lapack bindings
+    #[default]
+    Deterministic,
+}
+
+impl FmmSvdMode {
+    /// Constructor for SVD settings
+    pub fn new(
+        random: bool,
+        n_iter: Option<usize>,
+        n_components: Option<usize>,
+        n_oversamples: Option<usize>,
+        random_state: Option<usize>,
+    ) -> Self {
+        if random {
+            let n_iter = n_iter.unwrap_or_default();
+            if n_iter > 0 {
+                FmmSvdMode::Random {
+                    n_components,
+                    normaliser: Some(Normaliser::Qr(n_iter)),
+                    n_oversamples,
+                    random_state,
+                }
+            } else {
+                FmmSvdMode::Random {
+                    n_components,
+                    normaliser: None,
+                    n_oversamples,
+                    random_state,
+                }
+            }
+        } else {
+            FmmSvdMode::Deterministic
+        }
+    }
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
@@ -653,7 +720,7 @@ where
     /// Cutoff ranks
     pub cutoff_ranks: Vec<Vec<usize>>,
 
-    /// The map between sources/targets in
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0

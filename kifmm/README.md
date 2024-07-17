@@ -19,6 +19,7 @@ Note that Maturin must be run from the `kifmm` crate root, not the workspace roo
 cd /path/to/kifmm/crate && maturin develop --release --features python
 ```
 
+
 We provide example usage of the Python API, as well as visualisation, in the `python/examples` directory.
 
 ## Note

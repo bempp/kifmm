@@ -2,4 +2,4 @@
 Python bindings for KiFMM
 """
 
-from .api import KiFmm
+from .api import KiFmm, RandomSvdSettings
