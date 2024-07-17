@@ -80,8 +80,6 @@ pub mod fmm;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
 pub mod linalg;
-#[cfg(feature = "python")]
-pub mod python;
 pub mod traits;
 pub mod tree;
 

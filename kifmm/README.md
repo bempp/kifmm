@@ -14,11 +14,14 @@ uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
 
 Note that Maturin must be run from the `kifmm` crate root, not the workspace root.
 
-```bash
+<!-- ```bash
 # Building bindings in release mode, enable Python binding
 cd /path/to/kifmm/crate && maturin develop --release --features python
-```
+``` -->
 
+```bash
+maturin develop --release -b cffi
+```
 
 We provide example usage of the Python API, as well as visualisation, in the `python/examples` directory.
 
