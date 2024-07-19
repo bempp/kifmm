@@ -2,7 +2,7 @@
 CC = clang++
 
 # Compiler Flags
-CFLAGS = -std=c++11
+CFLAGS = -std=c++20
 
 # Directories
 BUILD_DIR = build

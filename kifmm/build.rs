@@ -18,7 +18,7 @@ fn main() {
     fs::create_dir_all(&target_dir).expect("Unable to create target directory");
 
     // Create the header file path
-    let header_path = target_dir.join("kifmm.h");
+    let header_path = target_dir.join("kifmm_rs.h");
 
     let config_path = Path::new(&crate_dir).join("cbindgen.toml");
     let config = cbindgen::Config::from_file(config_path).expect("Unable to load cbindgen config");
