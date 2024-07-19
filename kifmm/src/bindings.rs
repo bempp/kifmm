@@ -46,9 +46,12 @@ pub mod types {
     pub struct HelmholtzFft64;
 }
 
+
 /// All constructors
 pub mod constructors {
     use rlst::rlst_array_from_slice1;
+
+    use crate::FftFieldTranslation;
 
     use super::*;
 
@@ -61,6 +64,7 @@ pub mod constructors {
         ntargets: usize,
         charges: *const f32,
         ncharges: usize,
+        singular_value_threshold: f32
     ) -> *mut LaplaceBlas32 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
@@ -72,13 +76,12 @@ pub mod constructors {
             rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
         };
 
-        // Vector of charges
-        let singular_value_threshold = Some(1e-5);
         // FMM parameters
         let n_crit = Some(150);
         let depth = None;
         let expansion_order = [5];
         let prune_empty = true;
+        let singular_value_threshold = Some(singular_value_threshold);
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -114,6 +117,7 @@ pub mod constructors {
         ntargets: usize,
         charges: *const f64,
         ncharges: usize,
+        singular_value_threshold: f64
     ) -> *mut LaplaceBlas64 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
@@ -125,13 +129,12 @@ pub mod constructors {
             rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
         };
 
-        // Vector of charges
-        let singular_value_threshold = Some(1e-5);
         // FMM parameters
         let n_crit = Some(150);
         let depth = None;
         let expansion_order = [5];
         let prune_empty = true;
+        let singular_value_threshold = Some(singular_value_threshold);
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -155,11 +158,106 @@ pub mod constructors {
 
         Box::into_raw(fmm) as *mut LaplaceBlas64
     }
+
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_fft_f32(
+        sources: *const f32,
+        nsources: usize,
+        targets: *const f32,
+        ntargets: usize,
+        charges: *const f32,
+        ncharges: usize,
+        block_size: usize
+    ) -> *mut LaplaceFft32 {
+        let sources = unsafe {
+            rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
+        };
+        let targets = unsafe {
+            rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
+        };
+        let charges = unsafe {
+            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
+        };
+
+        // FMM parameters
+        let n_crit = Some(150);
+        let depth = None;
+        let expansion_order = [5];
+        let prune_empty = true;
+
+        let fmm = Box::new(
+            SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    green_kernels::types::EvalType::Value,
+                    FftFieldTranslation::new(Some(block_size)),
+                )
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+
+        println!("NLEAVES {:?}", fmm.tree.target_tree.leaves.len());
+
+        Box::into_raw(fmm) as *mut LaplaceFft32
+    }
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_fft_f64(
+        sources: *const f64,
+        nsources: usize,
+        targets: *const f64,
+        ntargets: usize,
+        charges: *const f64,
+        ncharges: usize,
+        block_size: usize
+    ) -> *mut LaplaceFft64 {
+        let sources = unsafe {
+            rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
+        };
+        let targets = unsafe {
+            rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
+        };
+        let charges = unsafe {
+            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
+        };
+
+        // FMM parameters
+        let n_crit = Some(150);
+        let depth = None;
+        let expansion_order = [5];
+        let prune_empty = true;
+
+        let fmm = Box::new(
+            SingleNodeBuilder::new()
+                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    green_kernels::types::EvalType::Value,
+                    FftFieldTranslation::new(Some(block_size)),
+                )
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+
+        Box::into_raw(fmm) as *mut LaplaceFft64
+    }
 }
 
 /// FMM API
 pub mod api {
-    use crate::Fmm;
+    use crate::{FftFieldTranslation, Fmm};
 
     use super::*;
 
@@ -187,6 +285,37 @@ pub mod api {
                     f64,
                     Laplace3dKernel<f64>,
                     BlasFieldTranslationSaRcmp<f64>,
+                >)
+            };
+            fmm.evaluate(timed).unwrap();
+        }
+    }
+
+
+    #[no_mangle]
+    pub extern "C" fn evaluate_laplace_fft_f32(fmm: *mut LaplaceFft32, timed: bool) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<
+                    f32,
+                    Laplace3dKernel<f32>,
+                    FftFieldTranslation<f32>,
+                >)
+            };
+            fmm.evaluate(timed).unwrap();
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn evaluate_laplace_fft_f64(fmm: *mut LaplaceFft64, timed: bool) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<
+                    f64,
+                    Laplace3dKernel<f64>,
+                    FftFieldTranslation<f64>,
                 >)
             };
             fmm.evaluate(timed).unwrap();

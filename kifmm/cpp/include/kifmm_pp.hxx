@@ -3,26 +3,29 @@
 
 #include <iostream>
 #include <kifmm_rs.h>
+#include <memory>
 #include <vector>
 
 class FmmPointer {
 public:
-  enum class Type { None, Blas32, Blas64 };
+  // enum class Type { None, Blas32, Blas64 Fft32, };
 
   FmmPointer();
   ~FmmPointer();
 
   void set(LaplaceBlas32 *ptr);
   void set(LaplaceBlas64 *ptr);
+  void set(LaplaceFft32 *ptr);
+  void set(LaplaceFft64 *ptr);
 
   void *get() const;
-  Type getType() const;
+  // Type getType() const;
 
 private:
   void clear();
 
   void *ptr;
-  Type type;
+  // Type type;
 };
 
 template <typename T> struct BlasFieldTranslation {
@@ -54,12 +57,15 @@ enum class FieldTranslationType { Blas, Fft };
 
 // Define a struct to encapsulate the enum and data
 template <typename T> struct FieldTranslation {
+
+public:
   FieldTranslationType type;
   FieldTranslationData<T> data;
-
-  FieldTranslation<T>(FieldTranslationType type, size_t target_rank,
-                      T singular_value_threshold);
-  FieldTranslation<T>(FieldTranslationType type, size_t block_size);
+  T singularValueThreshold;
+  size_t blockSize;
+  FieldTranslation<T>(FieldTranslationType type, size_t targetRank,
+                      T singularValueThreshold);
+  FieldTranslation<T>(FieldTranslationType type, size_t blockSize);
   ~FieldTranslation<T>();
 };
 

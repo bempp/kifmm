@@ -33,3 +33,4 @@ fftw-src/fftw-*
 # CPP
 *.o
 **/build/*
+*.clang-format

@@ -85,7 +85,7 @@ int main(void) {
       FieldTranslation<double>(FieldTranslationType::Fft, 10);
 
   // Generate FMM
-  KiFmm<double> fmm(coordinates, coordinates, charges, blas);
+  KiFmm<double> fmm(coordinates, coordinates, charges, fft);
 
   // Run FMM
   fmm.evaluate(false);
