@@ -6,17 +6,19 @@ CFLAGS = -std=c++11
 
 # Directories
 BUILD_DIR = build
-TARGET_DIR = $(abspath ../../target)
-DEBUG_DIR = $(TARGET_DIR)/debug
-RELEASE_DIR = $(TARGET_DIR)/release
-INCLUDE_DIR = $(TARGET_DIR)/
-LIB_DIR = $(TARGET_DIR)/$(BUILD)
+SOURCE_DIR = src
+INCLUDE_DIR = include
+RUST_TARGET_DIR = $(abspath ../../target)
+RUST_DEBUG_DIR = $(RUST_TARGET_DIR)/debug
+RUST_RELEASE_DIR = $(RUST_TARGET_DIR)/release
+RUST_INCLUDE_DIR = $(RUST_TARGET_DIR)/
+RUST_LIB_DIR = $(RUST_TARGET_DIR)/$(BUILD)
 
 # Library name (without the 'lib' prefix and '.dylib' suffix)
 LIB_NAME = kifmm
 
 # Source and Object files
-SRC = main.cpp
+SRC = ${SOURCE_DIR}/main.cpp
 OBJ = $(BUILD_DIR)/main.o
 EXE = $(BUILD_DIR)/main
 
@@ -24,25 +26,25 @@ EXE = $(BUILD_DIR)/main
 BUILD ?= release
 
 # Print debugging information
-$(info TARGET_DIR: $(TARGET_DIR))
-$(info INCLUDE_DIR: $(INCLUDE_DIR))
-$(info LIB_DIR: $(LIB_DIR))
+$(info RUST_TARGET_DIR: $(RUST_TARGET_DIR))
+$(info RUST_INCLUDE_DIR: $(RUST_INCLUDE_DIR))
+$(info RUST_LIB_DIR: $(RUST_LIB_DIR))
 $(info BUILD: $(BUILD))
 
 # Default rule to build the executable
 all: $(EXE)
 
 # Rule to recompile and link the executable
-$(EXE): $(OBJ) | $(INCLUDE_DIR)/kifmm.h
-	$(CC) -o $@ $^ -L$(LIB_DIR) -l$(LIB_NAME)
+$(EXE): $(OBJ) | $(RUST_INCLUDE_DIR)/kifmm.h
+	$(CC) -o $@ $^ -L$(RUST_LIB_DIR) -l$(LIB_NAME)
 
 # Rule to compile the source file
-$(OBJ): $(SRC) | $(INCLUDE_DIR)/kifmm.h
+$(OBJ): $(SRC) | $(RUST_INCLUDE_DIR)/kifmm.h
 	@mkdir -p $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(INCLUDE_DIR) -c $< -o $@
+	$(CC) $(CFLAGS) -I$(RUST_INCLUDE_DIR) -I${INCLUDE_DIR} -c $< -o $@
 
 # Ensure the Rust library and header file are built before compiling C++
-$(INCLUDE_DIR)/kifmm.h:
+$(RUST_INCLUDE_DIR)/kifmm.h:
 	cargo build --$(BUILD)
 
 # Clean rule to remove generated files
@@ -56,3 +58,8 @@ debug:
 # Rule to build the Rust library and C++ executable in release mode
 release:
 	$(MAKE) BUILD=release
+
+# Format the source files
+SOURCES := $(wildcard src/*.cpp include/*.hxx include/*txx)
+format:
+	clang-format -i $(SOURCES)
