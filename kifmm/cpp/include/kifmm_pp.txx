@@ -1,45 +1,70 @@
 
 // Constructor implementation
 template <typename T>
-KiFmm<T>::KiFmm(const std::vector<T> &source, const std::vector<T> &target,
+KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
+                const std::vector<T> &sources, const std::vector<T> &targets,
                 const std::vector<T> &charges,
-                const FieldTranslation<T> &fieldTranslation)
-    : sourceCoordinates(source), targetCoordinates(target),
-      sourceCharges(charges), fieldTranslation(fieldTranslation) {
+                const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
+                std::optional<uint64_t> nCrit, std::optional<uint64_t> depth)
+    : expansionOrder(expansionOrder), sourceCoordinates(sources),
+      targetCoordinates(targets), sourceCharges(charges),
+      fieldTranslation(fieldTranslation), pruneEmpty(pruneEmpty),
+      nCrit(nCrit.value_or(0)), depth(depth.value_or(0)) {
 
-  T *sources_ptr = sourceCoordinates.data();
-  size_t num_sources = sourceCoordinates.size();
-  size_t num_targets = targetCoordinates.size();
-  size_t num_charges = charges.size();
+  T *sourcesPtr = sourceCoordinates.data();
+  T *targetsPtr = targetCoordinates.data();
+  T *chargesPtr = sourceCharges.data();
+  size_t nSources = sourceCoordinates.size();
+  size_t nTargets = targetCoordinates.size();
+  size_t nCharges = charges.size();
+  size_t *expansionOrderPtr = this->expansionOrder.data();
 
-  T *targets_ptr = targetCoordinates.data();
-  T *charges_ptr = sourceCharges.data();
+  if (depth.has_value()) {
+    if (expansionOrder.size() != this->depth + 1) {
+      throw std::invalid_argument("expansionOrder must have exactly depth + 1 "
+                                  "elements when depth is set.");
+    }
+  } else {
+    if (this->nCrit == 0) {
+      throw std::invalid_argument("nCrit must be set if depth is not set.");
+    }
+    if (expansionOrder.size() != 1) {
+      throw std::invalid_argument(
+          "expansionOrder must have exactly one element when used with nCrit.");
+    }
+  }
 
   switch (this->fieldTranslation.type) {
   case FieldTranslationType::Blas:
 
     if constexpr (std::is_same_v<T, float>) {
       LaplaceBlas32 *fmm = laplace_blas_f32(
-          sources_ptr, num_sources, targets_ptr, num_targets, charges_ptr,
-          num_charges, this->fieldTranslation.singularValueThreshold);
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth,
+          this->fieldTranslation.singularValueThreshold);
       fmmInstance.set(fmm);
     } else if constexpr (std::is_same_v<T, double>) {
       LaplaceBlas64 *fmm = laplace_blas_f64(
-          sources_ptr, num_sources, targets_ptr, num_targets, charges_ptr,
-          num_charges, this->fieldTranslation.singularValueThreshold);
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth,
+          this->fieldTranslation.singularValueThreshold);
       fmmInstance.set(fmm);
     }
     break;
   case FieldTranslationType::Fft:
     if constexpr (std::is_same_v<T, float>) {
-      LaplaceFft32 *fmm = laplace_fft_f32(sources_ptr, num_sources, targets_ptr,
-                                          num_targets, charges_ptr, num_charges,
-                                          this->fieldTranslation.blockSize);
+      LaplaceFft32 *fmm = laplace_fft_f32(
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth, this->fieldTranslation.blockSize);
       fmmInstance.set(fmm);
     } else if constexpr (std::is_same_v<T, double>) {
-      LaplaceFft64 *fmm = laplace_fft_f64(sources_ptr, num_sources, targets_ptr,
-                                          num_targets, charges_ptr, num_charges,
-                                          this->fieldTranslation.blockSize);
+      LaplaceFft64 *fmm = laplace_fft_f64(
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth, this->fieldTranslation.blockSize);
       fmmInstance.set(fmm);
     }
 

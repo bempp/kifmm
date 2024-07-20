@@ -3,7 +3,9 @@
 
 #include <iostream>
 #include <kifmm_rs.h>
+#include <limits>
 #include <memory>
+#include <optional>
 #include <vector>
 
 class FmmPointer {
@@ -32,7 +34,9 @@ template <typename T> struct BlasFieldTranslation {
   size_t target_rank;
   T singular_value_threshold;
 
-  BlasFieldTranslation(size_t target_rank, T singular_value_threshold)
+  BlasFieldTranslation(
+      size_t target_rank,
+      T singular_value_threshold = std::numeric_limits<T>::epsilon())
       : target_rank(target_rank),
         singular_value_threshold(singular_value_threshold) {}
 };
@@ -72,9 +76,12 @@ public:
 template <typename T> class KiFmm {
 public:
   // Constructor
-  KiFmm(const std::vector<T> &sources, const std::vector<T> &targets,
+  KiFmm(const std::vector<size_t> &expansionOrder,
+        const std::vector<T> &sources, const std::vector<T> &targets,
         const std::vector<T> &charges,
-        const FieldTranslation<T> &fieldTranslation);
+        const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
+        std::optional<uint64_t> nCrit = std::nullopt,
+        std::optional<uint64_t> depth = std::nullopt);
 
   void evaluate(bool timed);
 
@@ -85,6 +92,10 @@ private:
   std::vector<T> sourceCharges;
   FmmPointer fmmInstance;
   FieldTranslation<T> fieldTranslation;
+  bool pruneEmpty;
+  uint64_t nCrit;
+  uint64_t depth;
+  std::vector<size_t> expansionOrder;
 };
 
 // Include the template implementation file

@@ -65,8 +65,6 @@ int main(void) {
   // Generate random coordinates
   std::vector<double> coordinates =
       generate_random_coordinates<double>(num_points, min_range, max_range);
-  double *sources_ptr = coordinates.data();
-  double *targets_ptr = coordinates.data();
 
   // Generate charge data
   size_t nvecs = 1;
@@ -84,8 +82,13 @@ int main(void) {
   FieldTranslation<double> fft =
       FieldTranslation<double>(FieldTranslationType::Fft, 10);
 
-  // Generate FMM
-  KiFmm<double> fmm(coordinates, coordinates, charges, fft);
+  bool pruneEmpty = true; // prune empty boxes in tree
+  u_int64_t nCrit = 150;  // Critical value of points per leaf box
+  std::vector<size_t> expansion_order = {5}; // Expansion order of FMM
+
+  // Generate FMM runtime object
+  KiFmm<double> fmm(expansion_order, coordinates, coordinates, charges, fft,
+                    pruneEmpty, nCrit);
 
   // Run FMM
   fmm.evaluate(false);
