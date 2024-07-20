@@ -1,11 +1,13 @@
 #ifndef KIFMM_HXX
 #define KIFMM_HXX
 
+#include <cstdarg>
 #include <iostream>
 #include <kifmm_rs.h>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <random>
 #include <vector>
 
 class FmmPointer {
@@ -97,6 +99,56 @@ private:
   uint64_t depth;
   std::vector<size_t> expansionOrder;
 };
+
+// Function to generate random 3D coordinate data
+template <typename T>
+std::vector<T> generate_random_coordinates(size_t num_points, T min_range,
+                                           T max_range) {
+  // Random number generation
+  std::random_device rd;  // Obtain a random number from hardware
+  std::mt19937 gen(rd()); // Seed the generator
+  std::uniform_real_distribution<> dis(min_range,
+                                       max_range); // Define the range
+
+  std::vector<T> coordinates;
+  coordinates.reserve(num_points * 3); // Reserve space for N*3 elements
+
+  for (size_t i = 0; i < num_points; ++i) {
+    T x = dis(gen);
+    T y = dis(gen);
+    T z = dis(gen);
+    coordinates.push_back(x);
+    coordinates.push_back(y);
+    coordinates.push_back(z);
+  }
+
+  return coordinates;
+}
+
+// Function to generate random 3D coordinate data
+template <typename T>
+std::vector<T> generate_random_charges(size_t num_points, T min_range,
+                                       T max_range) {
+  // Random number generation
+  std::random_device rd;  // Obtain a random number from hardware
+  std::mt19937 gen(rd()); // Seed the generator
+  std::uniform_real_distribution<> dis(min_range,
+                                       max_range); // Define the range
+
+  std::vector<T> coordinates;
+  coordinates.reserve(num_points * 3); // Reserve space for N*3 elements
+
+  for (size_t i = 0; i < num_points; ++i) {
+    T x = dis(gen);
+    T y = dis(gen);
+    T z = dis(gen);
+    coordinates.push_back(x);
+    coordinates.push_back(y);
+    coordinates.push_back(z);
+  }
+
+  return coordinates;
+}
 
 // Include the template implementation file
 #include "kifmm_pp.txx"

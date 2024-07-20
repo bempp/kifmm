@@ -8,6 +8,7 @@ CFLAGS = -std=c++20
 BUILD_DIR = build
 SOURCE_DIR = src
 INCLUDE_DIR = include
+EXAMPLES_DIR = examples
 RUST_TARGET_DIR = $(abspath ../../target)
 RUST_DEBUG_DIR = $(RUST_TARGET_DIR)/debug
 RUST_RELEASE_DIR = $(RUST_TARGET_DIR)/release
@@ -25,21 +26,35 @@ EXE = $(BUILD_DIR)/main
 # Default build mode
 BUILD ?= release
 
-# Print debugging information
-$(info RUST_TARGET_DIR: $(RUST_TARGET_DIR))
-$(info RUST_INCLUDE_DIR: $(RUST_INCLUDE_DIR))
-$(info RUST_LIB_DIR: $(RUST_LIB_DIR))
-$(info BUILD: $(BUILD))
+# Example source files
+EXAMPLE_SOURCES := $(wildcard $(EXAMPLES_DIR)/*.cpp)
+EXAMPLE_OBJECTS := $(patsubst $(EXAMPLES_DIR)/%.cpp,$(BUILD_DIR)/%.o,$(EXAMPLE_SOURCES))
+EXAMPLE_EXECUTABLES := $(patsubst $(EXAMPLES_DIR)/%.cpp,$(BUILD_DIR)/%,$(EXAMPLE_SOURCES))
 
-# Default rule to build the executable
-all: $(EXE)
+# Default rule to build everything
+all: main examples
 
-# Rule to recompile and link the executable
+# Rule to build the main executable
+main: $(EXE)
+
+# Rule to build all examples
+examples: $(EXAMPLE_EXECUTABLES)
+
+# Rule to recompile and link the main executable
 $(EXE): $(OBJ) | $(RUST_INCLUDE_DIR)/kifmm.h
 	$(CC) -o $@ $^ -L$(RUST_LIB_DIR) -l$(LIB_NAME)
 
-# Rule to compile the source file
+# Rule to compile the main source file
 $(OBJ): $(SRC) | $(RUST_INCLUDE_DIR)/kifmm.h
+	@mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -I$(RUST_INCLUDE_DIR) -I${INCLUDE_DIR} -c $< -o $@
+
+# Rule to compile and link each example
+$(BUILD_DIR)/%: $(BUILD_DIR)/%.o | $(RUST_INCLUDE_DIR)/kifmm.h
+	$(CC) -o $@ $^ -L$(RUST_LIB_DIR) -l$(LIB_NAME)
+
+# Rule to compile each example source file
+$(BUILD_DIR)/%.o: $(EXAMPLES_DIR)/%.cpp | $(RUST_INCLUDE_DIR)/kifmm.h
 	@mkdir -p $(BUILD_DIR)
 	$(CC) $(CFLAGS) -I$(RUST_INCLUDE_DIR) -I${INCLUDE_DIR} -c $< -o $@
 
@@ -60,6 +75,6 @@ release:
 	$(MAKE) BUILD=release
 
 # Format the source files
-SOURCES := $(wildcard src/*.cpp include/*.hxx include/*txx)
+SOURCES := $(wildcard src/*.cpp include/*.hxx include/*txx, examples/*.cpp)
 format:
 	clang-format -i $(SOURCES)
