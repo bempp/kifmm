@@ -11,23 +11,22 @@
 #include <vector>
 
 // Variants of SVD algorithms
-class FmmSvdMode {
+template <typename T> class FmmSvdMode {
 public:
   // Enum for the types of modes
   enum class Mode { Random, Deterministic };
 
   // Struct for Random mode's parameters
   struct RandomParams {
-    size_t nComponents;  // Default value 10
-    size_t nOversamples; // Default value 5
-    size_t randomState;  // Default value 42
+    size_t nComponents;
+    size_t nOversamples;
+    size_t randomState;
     RandomParams(size_t nComponents, std::optional<size_t> nOversamples,
                  std::optional<size_t> randomState);
   };
 
-  size_t targetRank;
+  T singularValueThreshold;
 
-private:
   Mode mode;
   union {
     RandomParams randomParams;
@@ -35,13 +34,13 @@ private:
 
 public:
   // Default constructor sets to Deterministic mode
-  FmmSvdMode() : targetRank(0), mode(Mode::Deterministic) {}
+  FmmSvdMode() : singularValueThreshold(0), mode(Mode::Deterministic) {}
 
   // Deterministic mode
-  FmmSvdMode(size_t targetRank);
+  FmmSvdMode(T singularValueThreshold);
 
   // Constructor for Random mode
-  FmmSvdMode(size_t targetRank, RandomParams params);
+  FmmSvdMode(T singularValueThreshold, RandomParams params);
 
   // Copy constructor
   FmmSvdMode(const FmmSvdMode &other);
@@ -53,11 +52,11 @@ public:
   ~FmmSvdMode();
 
   // Methods to set and get the mode
-  void setMode(Mode newMode);
+  // void setMode(Mode newMode);
   Mode getMode() const;
 
   // Methods to set and get RandomParams
-  void setRandomParams(RandomParams params);
+  // void setRandomParams(RandomParams params);
 };
 
 class FmmPointer {
@@ -82,32 +81,6 @@ private:
   // Type type;
 };
 
-// template <typename T> struct BlasFieldTranslation {
-//   T singular_value_threshold;
-
-//   BlasFieldTranslation(
-//       T singular_value_threshold = std::numeric_limits<T>::epsilon())
-//       : singular_value_threshold(singular_value_threshold) {}
-// };
-
-// struct FftFieldTranslation {
-//   size_t block_size;
-
-//   FftFieldTranslation(size_t block_size) : block_size(block_size) {}
-// };
-
-// Define a union to hold the data
-// template <typename T> union FieldTranslationData {
-//   BlasFieldTranslation<T> blas;
-//   FftFieldTranslation fft;
-
-//   FieldTranslationData() {}
-//   ~FieldTranslationData() {}
-// };
-
-// Define the enum
-// enum class FieldTranslationType { Blas, Fft };
-
 // Define a struct to encapsulate the enum and data
 template <typename T> struct FieldTranslation {
 
@@ -120,24 +93,21 @@ public:
   };
 
   struct BlasFieldTranslation {
-    FmmSvdMode svdMode;
-    BlasFieldTranslation(FmmSvdMode svdMode) : svdMode(svdMode) {};
+    FmmSvdMode<T> svdMode;
+    BlasFieldTranslation(FmmSvdMode<T> svdMode) : svdMode(svdMode) {};
   };
 
-  T singularValueThreshold;
   size_t blockSize;
-  FmmSvdMode fmmSvdMode;
+  FmmSvdMode<T> fmmSvdMode;
   Mode mode;
 
-  FieldTranslation<T>(Mode mode, T singularValueThreshold,
-                      FmmSvdMode fmmSvdMode);
+  FieldTranslation<T>(Mode mode, FmmSvdMode<T> fmmSvdMode);
   FieldTranslation<T>(Mode mode, size_t blockSize);
   ~FieldTranslation<T>();
 
   // Copy constructor
   FieldTranslation(const FieldTranslation &other);
 
-private:
   union {
     FftFieldTranslation fft;
     BlasFieldTranslation blas;

@@ -24,12 +24,12 @@ int main(void) {
   // Choose FMM parameters
 
   // BLAS Field Translations
-  size_t targetRank = 10;
-  FmmSvdMode svdModeRandom(targetRank, FmmSvdMode::RandomParams(10, 10, 10));
-  FmmSvdMode svdModeDeterministic(targetRank);
-  FieldTranslation<double> blas =
-      FieldTranslation<double>(FieldTranslation<double>::Mode::Blas,
-                               static_cast<double>(0.001), svdModeRandom);
+  double singularValueThreshold = 0.001;
+  FmmSvdMode<double> svdModeRandom(
+      singularValueThreshold, FmmSvdMode<double>::RandomParams(10, 10, 10));
+  FmmSvdMode<double> svdModeDeterministic(singularValueThreshold);
+  FieldTranslation<double> blas = FieldTranslation<double>(
+      FieldTranslation<double>::Mode::Blas, svdModeRandom);
 
   // FFT field translations
   FieldTranslation<double> fft = FieldTranslation<double>(
@@ -44,7 +44,7 @@ int main(void) {
   KiFmm<double> fmm(expansion_order, coordinates, coordinates, charges, fft,
                     pruneEmpty, nCrit);
 
-  // // Run FMM
+  // Run FMM
   // fmm.evaluate(false);
 
   return 0;
