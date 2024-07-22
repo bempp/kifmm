@@ -28,7 +28,7 @@ int main(void) {
   FmmSvdMode svdModeRandom(targetRank, FmmSvdMode::RandomParams(10, 10, 10));
   FmmSvdMode svdModeDeterministic(targetRank);
   FieldTranslation<double> blas = FieldTranslation<double>(
-      FieldTranslationType::Blas, static_cast<double>(0.001));
+      FieldTranslationType::Blas, static_cast<double>(0.001), svdModeRandom);
 
   // FFT field translations
   FieldTranslation<double> fft = FieldTranslation<double>(

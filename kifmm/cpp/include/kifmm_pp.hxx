@@ -10,6 +10,59 @@
 #include <random>
 #include <vector>
 
+
+
+// Variants of SVD algorithms
+class FmmSvdMode {
+public:
+  // Enum for the types of modes
+  enum class Mode { Random, Deterministic };
+
+  // Struct for Random mode's parameters
+  struct RandomParams {
+    size_t nComponents;  // Default value 10
+    size_t nOversamples; // Default value 5
+    size_t randomState;  // Default value 42
+    RandomParams(size_t nComponents, std::optional<size_t> nOversamples,
+                 std::optional<size_t> randomState);
+  };
+
+  size_t targetRank;
+
+private:
+  Mode mode;
+  union {
+    RandomParams randomParams;
+  };
+
+public:
+  // Default constructor sets to Deterministic mode
+  FmmSvdMode() : targetRank(0), mode(Mode::Deterministic) {}
+
+  // Deterministic mode
+  FmmSvdMode(size_t targetRank): targetRank(targetRank), mode(Mode::Deterministic) {};
+
+  // Constructor for Random mode
+  FmmSvdMode(size_t targetRank, RandomParams params);
+
+  // Copy constructor
+  FmmSvdMode(const FmmSvdMode &other);
+
+  // Copy assignment operator
+  FmmSvdMode &operator=(const FmmSvdMode &other);
+
+  // Destructor
+  ~FmmSvdMode();
+
+  // Methods to set and get the mode
+  void setMode(Mode newMode);
+  Mode getMode() const;
+
+  // Methods to set and get RandomParams
+  void setRandomParams(RandomParams params);
+};
+
+
 class FmmPointer {
 public:
   // enum class Type { None, Blas32, Blas64 Fft32, };
@@ -66,7 +119,9 @@ public:
   FieldTranslationData<T> data;
   T singularValueThreshold;
   size_t blockSize;
-  FieldTranslation<T>(FieldTranslationType type, T singularValueThreshold);
+  FmmSvdMode fmmSvdMode;
+
+  FieldTranslation<T>(FieldTranslationType type, T singularValueThreshold, FmmSvdMode fmmSvdMode);
   FieldTranslation<T>(FieldTranslationType type, size_t blockSize);
   ~FieldTranslation<T>();
 };
@@ -145,53 +200,6 @@ std::vector<T> generate_random_charges(size_t num_points, T min_range,
 
   return coordinates;
 }
-
-// Variants of SVD algorithms
-class FmmSvdMode {
-public:
-  // Enum for the types of modes
-  enum class Mode { Random, Deterministic };
-
-  // Struct for Random mode's parameters
-  struct RandomParams {
-    size_t nComponents;  // Default value 10
-    size_t nOversamples; // Default value 5
-    size_t randomState;  // Default value 42
-    RandomParams(size_t nComponents, std::optional<size_t> nOversamples,
-                 std::optional<size_t> randomState);
-  };
-
-  size_t targetRank;
-
-private:
-  Mode mode;
-  union {
-    RandomParams randomParams;
-  };
-
-public:
-  // Default constructor sets to Deterministic mode
-  FmmSvdMode(size_t targetRank);
-
-  // Constructor for Random mode
-  FmmSvdMode(size_t targetRank, RandomParams params);
-
-  // Copy constructor
-  FmmSvdMode(const FmmSvdMode &other);
-
-  // Copy assignment operator
-  FmmSvdMode &operator=(const FmmSvdMode &other);
-
-  // Destructor
-  ~FmmSvdMode();
-
-  // Methods to set and get the mode
-  void setMode(Mode newMode);
-  Mode getMode() const;
-
-  // Methods to set and get RandomParams
-  void setRandomParams(RandomParams params);
-};
 
 // Include the template implementation file
 #include "kifmm_pp.txx"

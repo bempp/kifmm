@@ -145,8 +145,8 @@ void FmmPointer::clear() {
 
 // Constructor for FieldTranslation
 template <typename T>
-FieldTranslation<T>::FieldTranslation(FieldTranslationType type, T singularValueThreshold)
-    : type(type), singularValueThreshold(singularValueThreshold) {
+FieldTranslation<T>::FieldTranslation(FieldTranslationType type, T singularValueThreshold, FmmSvdMode fmmSvdMode)
+    : type(type), singularValueThreshold(singularValueThreshold), fmmSvdMode(fmmSvdMode) {
   if (type == FieldTranslationType::Blas) {
     new (&data.blas) BlasFieldTranslation<T>(
         singularValueThreshold); // Placement new with initializer list
@@ -180,7 +180,7 @@ template <typename T> FieldTranslation<T>::~FieldTranslation() {
 
 
 // Default constructor sets to Deterministic mode
-FmmSvdMode::FmmSvdMode(size_t targetRank) : targetRank(targetRank), mode(Mode::Deterministic) {}
+// FmmSvdMode::FmmSvdMode(size_t targetRank) : targetRank(targetRank), mode(Mode::Deterministic) {}
 
 // Constructor for Random mode
 FmmSvdMode::FmmSvdMode(size_t targetRank, RandomParams params) : targetRank(targetRank), mode(Mode::Random), randomParams(params) {}
