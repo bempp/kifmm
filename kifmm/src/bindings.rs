@@ -69,6 +69,11 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f32,
+        // svd_mode: bool,
+        // rsvd_ncomponents: usize,
+        // rsvd_noversamples: usize,
+        // rsvd_random_state: usize
+
     ) -> *mut LaplaceBlas32 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
@@ -86,6 +91,14 @@ pub mod constructors {
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
 
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            None,
+            crate::fmm::types::FmmSvdMode::Deterministic,
+        );
+
+        // crate::fmm::types::FmmSvdMode::Random { n_components: (), normaliser: (), n_oversamples: (), random_state: () }
+
         let fmm = Box::new(
             SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -95,11 +108,7 @@ pub mod constructors {
                     expansion_order,
                     Laplace3dKernel::new(),
                     green_kernels::types::EvalType::Value,
-                    BlasFieldTranslationSaRcmp::new(
-                        singular_value_threshold,
-                        None,
-                        crate::fmm::types::FmmSvdMode::Deterministic,
-                    ),
+                    field_translation,
                 )
                 .unwrap()
                 .build()
@@ -124,6 +133,10 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f64,
+        // svd_mode: bool,
+        // rsvd_ncomponents: usize,
+        // rsvd_noversamples: usize,
+        // rsvd_random_state: usize
     ) -> *mut LaplaceBlas64 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
@@ -141,6 +154,12 @@ pub mod constructors {
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
 
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            None,
+            crate::fmm::types::FmmSvdMode::Deterministic,
+        );
+
         let fmm = Box::new(
             SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -150,11 +169,7 @@ pub mod constructors {
                     expansion_order,
                     Laplace3dKernel::new(),
                     green_kernels::types::EvalType::Value,
-                    BlasFieldTranslationSaRcmp::new(
-                        singular_value_threshold,
-                        None,
-                        crate::fmm::types::FmmSvdMode::Deterministic,
-                    ),
+                    field_translation,
                 )
                 .unwrap()
                 .build()

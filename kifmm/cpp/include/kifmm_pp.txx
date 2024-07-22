@@ -145,13 +145,10 @@ void FmmPointer::clear() {
 
 // Constructor for FieldTranslation
 template <typename T>
-FieldTranslation<T>::FieldTranslation(FieldTranslationType type,
-                                      size_t targetRank,
-                                      T singularValueThreshold)
+FieldTranslation<T>::FieldTranslation(FieldTranslationType type, T singularValueThreshold)
     : type(type), singularValueThreshold(singularValueThreshold) {
   if (type == FieldTranslationType::Blas) {
     new (&data.blas) BlasFieldTranslation<T>(
-        targetRank,
         singularValueThreshold); // Placement new with initializer list
   } else {
     throw std::invalid_argument("Invalid type for Blas constructor");
@@ -159,8 +156,7 @@ FieldTranslation<T>::FieldTranslation(FieldTranslationType type,
 }
 
 template <typename T>
-FieldTranslation<T>::FieldTranslation(FieldTranslationType type,
-                                      size_t blockSize)
+FieldTranslation<T>::FieldTranslation(FieldTranslationType type, size_t blockSize)
     : type(type), blockSize(blockSize) {
   if (type == FieldTranslationType::Fft) {
     new (&data.fft)
@@ -181,3 +177,70 @@ template <typename T> FieldTranslation<T>::~FieldTranslation() {
     break;
   }
 }
+
+
+// Default constructor sets to Deterministic mode
+FmmSvdMode::FmmSvdMode(size_t targetRank) : targetRank(targetRank), mode(Mode::Deterministic) {}
+
+// Constructor for Random mode
+FmmSvdMode::FmmSvdMode(size_t targetRank, RandomParams params) : targetRank(targetRank), mode(Mode::Random), randomParams(params) {}
+
+// Copy constructor
+FmmSvdMode::FmmSvdMode(const FmmSvdMode& other) : mode(other.mode) {
+    if (mode == Mode::Random) {
+        new(&randomParams) RandomParams(other.randomParams);
+    }
+}
+
+// Copy assignment operator
+FmmSvdMode& FmmSvdMode::operator=(const FmmSvdMode& other) {
+    if (this != &other) {  // Self-assignment check
+        // Destroy current value if it is RandomParams
+        if (mode == Mode::Random) {
+            randomParams.~RandomParams();
+        }
+
+        mode = other.mode;  // Copy the mode
+        if (mode == Mode::Random) {
+            // Construct a new RandomParams in place
+            new(&randomParams) RandomParams(other.randomParams);
+        }
+    }
+    return *this;  // Return *this to allow chaining
+}
+
+// Destructor
+FmmSvdMode::~FmmSvdMode() {
+    if (mode == Mode::Random) {
+        randomParams.~RandomParams();
+    }
+}
+
+// Methods to set and get the mode
+void FmmSvdMode::setMode(Mode newMode) {
+    if (mode == Mode::Random && newMode != Mode::Random) {
+        randomParams.~RandomParams();
+    }
+    mode = newMode;
+}
+
+FmmSvdMode::Mode FmmSvdMode::getMode() const {
+    return mode;
+}
+
+// Methods to set and get RandomParams
+void FmmSvdMode::setRandomParams(RandomParams params) {
+    if (mode == Mode::Random) {
+        randomParams = params;
+    } else {
+        new(&randomParams) RandomParams(params);
+        mode = Mode::Random;
+    }
+}
+
+FmmSvdMode::RandomParams::RandomParams(size_t nComponents,
+                                       std::optional<size_t> nOversamples,
+                                       std::optional<size_t> randomState)
+    : nComponents(nComponents),
+      nOversamples(nOversamples.value_or(10)),
+      randomState(randomState.value_or(1)) {}

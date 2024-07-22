@@ -22,12 +22,19 @@ int main(void) {
   }
 
   // Choose FMM parameters
-  FieldTranslation<double> blas =
-      FieldTranslation<double>(FieldTranslationType::Blas, 10, 0.001);
 
-  FieldTranslation<double> fft =
-      FieldTranslation<double>(FieldTranslationType::Fft, 10);
+  // BLAS Field Translations
+  size_t targetRank = 10;
+  FmmSvdMode svdModeRandom(targetRank, FmmSvdMode::RandomParams(10, 10, 10));
+  FmmSvdMode svdModeDeterministic(targetRank);
+  FieldTranslation<double> blas = FieldTranslation<double>(
+      FieldTranslationType::Blas, static_cast<double>(0.001));
 
+  // FFT field translations
+  FieldTranslation<double> fft = FieldTranslation<double>(
+      FieldTranslationType::Fft, static_cast<size_t>(10));
+
+  // Tree parameters
   bool pruneEmpty = true; // prune empty boxes in tree
   u_int64_t nCrit = 150;  // Critical value of points per leaf box
   std::vector<size_t> expansion_order = {5}; // Expansion order of FMM
