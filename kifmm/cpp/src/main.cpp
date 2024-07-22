@@ -27,12 +27,13 @@ int main(void) {
   size_t targetRank = 10;
   FmmSvdMode svdModeRandom(targetRank, FmmSvdMode::RandomParams(10, 10, 10));
   FmmSvdMode svdModeDeterministic(targetRank);
-  FieldTranslation<double> blas = FieldTranslation<double>(
-      FieldTranslationType::Blas, static_cast<double>(0.001), svdModeRandom);
+  FieldTranslation<double> blas =
+      FieldTranslation<double>(FieldTranslation<double>::Mode::Blas,
+                               static_cast<double>(0.001), svdModeRandom);
 
   // FFT field translations
   FieldTranslation<double> fft = FieldTranslation<double>(
-      FieldTranslationType::Fft, static_cast<size_t>(10));
+      FieldTranslation<double>::Mode::Fft, static_cast<size_t>(10));
 
   // Tree parameters
   bool pruneEmpty = true; // prune empty boxes in tree
@@ -43,8 +44,8 @@ int main(void) {
   KiFmm<double> fmm(expansion_order, coordinates, coordinates, charges, fft,
                     pruneEmpty, nCrit);
 
-  // Run FMM
-  fmm.evaluate(false);
+  // // Run FMM
+  // fmm.evaluate(false);
 
   return 0;
 }

@@ -34,8 +34,8 @@ KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
     }
   }
 
-  switch (this->fieldTranslation.type) {
-  case FieldTranslationType::Blas:
+  switch (this->fieldTranslation.mode) {
+  case FieldTranslation<T>::Mode::Blas:
 
     if constexpr (std::is_same_v<T, float>) {
       LaplaceBlas32 *fmm = laplace_blas_f32(
@@ -53,7 +53,7 @@ KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
       fmmInstance.set(fmm);
     }
     break;
-  case FieldTranslationType::Fft:
+  case FieldTranslation<T>::Mode::Fft:
     if constexpr (std::is_same_v<T, float>) {
       LaplaceFft32 *fmm = laplace_fft_f32(
           expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
@@ -77,8 +77,8 @@ KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
 
 template <typename T> void KiFmm<T>::evaluate(bool timed) {
 
-  switch (this->fieldTranslation.type) {
-  case FieldTranslationType::Blas:
+  switch (this->fieldTranslation.mode) {
+  case FieldTranslation<T>::Mode::Blas:
     if constexpr (std::is_same_v<T, float>) {
       LaplaceBlas32 *fmm =
           static_cast<LaplaceBlas32 *>(this->fmmInstance.get());
@@ -91,7 +91,7 @@ template <typename T> void KiFmm<T>::evaluate(bool timed) {
       std::cout << "Running FMM double precision" << std::endl;
     }
     break;
-  case FieldTranslationType::Fft:
+  case FieldTranslation<T>::Mode::Fft:
     if constexpr (std::is_same_v<T, float>) {
       LaplaceFft32 *fmm = static_cast<LaplaceFft32 *>(this->fmmInstance.get());
       evaluate_laplace_fft_f32(fmm, timed);
@@ -134,9 +134,9 @@ void *FmmPointer::get() const { return ptr; }
 // FmmPointer::Type FmmPointer::getType() const { return type; }
 
 void FmmPointer::clear() {
-  //   if (type == Type::Blas32) {
+  //   if (mode == Type::Blas32) {
   //     // destroyLaplaceBlas32(static_cast<LaplaceBlas32*>(ptr));
-  //   } else if (type == Type::Blas64) {
+  //   } else if (mode == Type::Blas64) {
   //     // destroyLaplaceBlas64(static_cast<LaplaceBlas64*>(ptr));
   //   }
   ptr = nullptr;
@@ -144,43 +144,20 @@ void FmmPointer::clear() {
 }
 
 // Constructor for FieldTranslation
-template <typename T>
-FieldTranslation<T>::FieldTranslation(FieldTranslationType type, T singularValueThreshold, FmmSvdMode fmmSvdMode)
-    : type(type), singularValueThreshold(singularValueThreshold), fmmSvdMode(fmmSvdMode) {
-  if (type == FieldTranslationType::Blas) {
-    new (&data.blas) BlasFieldTranslation<T>(
-        singularValueThreshold); // Placement new with initializer list
-  } else {
-    throw std::invalid_argument("Invalid type for Blas constructor");
-  }
-}
+// template <typename T>
+// FieldTranslation<T>::FieldTranslation(FieldTranslation<T>::Mode mode, T singularValueThreshold, FmmSvdMode fmmSvdMode)
+//     : mode(mode), singularValueThreshold(singularValueThreshold), fmmSvdMode(fmmSvdMode) {}
 
-template <typename T>
-FieldTranslation<T>::FieldTranslation(FieldTranslationType type, size_t blockSize)
-    : type(type), blockSize(blockSize) {
-  if (type == FieldTranslationType::Fft) {
-    new (&data.fft)
-        FftFieldTranslation(blockSize); // Placement new with initializer list
-  } else {
-    throw std::invalid_argument("Invalid type for Fft constructor");
-  }
-}
+// template <typename T>
+// FieldTranslation<T>::FieldTranslation(FieldTranslation<T>::Mode mode, size_t blockSize)
+//     : mode(mode), blockSize(blockSize) {}
 
 // Destructor
-template <typename T> FieldTranslation<T>::~FieldTranslation() {
-  switch (type) {
-  case FieldTranslationType::Blas:
-    data.blas.~BlasFieldTranslation<T>();
-    break;
-  case FieldTranslationType::Fft:
-    data.fft.~FftFieldTranslation();
-    break;
-  }
-}
+template <typename T> FieldTranslation<T>::~FieldTranslation() {}
 
 
 // Default constructor sets to Deterministic mode
-// FmmSvdMode::FmmSvdMode(size_t targetRank) : targetRank(targetRank), mode(Mode::Deterministic) {}
+FmmSvdMode::FmmSvdMode(size_t targetRank) : targetRank(targetRank), mode(Mode::Deterministic) {}
 
 // Constructor for Random mode
 FmmSvdMode::FmmSvdMode(size_t targetRank, RandomParams params) : targetRank(targetRank), mode(Mode::Random), randomParams(params) {}
@@ -192,22 +169,41 @@ FmmSvdMode::FmmSvdMode(const FmmSvdMode& other) : mode(other.mode) {
     }
 }
 
-// Copy assignment operator
-FmmSvdMode& FmmSvdMode::operator=(const FmmSvdMode& other) {
-    if (this != &other) {  // Self-assignment check
-        // Destroy current value if it is RandomParams
-        if (mode == Mode::Random) {
-            randomParams.~RandomParams();
-        }
-
-        mode = other.mode;  // Copy the mode
-        if (mode == Mode::Random) {
-            // Construct a new RandomParams in place
-            new(&randomParams) RandomParams(other.randomParams);
-        }
-    }
-    return *this;  // Return *this to allow chaining
+template <typename T>
+FieldTranslation<T>::FieldTranslation(Mode mode, T singularValueThreshold, FmmSvdMode fmmSvdMode)
+    : mode(mode), singularValueThreshold(singularValueThreshold), fmmSvdMode(fmmSvdMode) {
+        new (&blas) BlasFieldTranslation(fmmSvdMode);
 }
+
+// Constructor for FieldTranslation with blockSize
+template <typename T>
+FieldTranslation<T>::FieldTranslation(Mode mode, size_t blockSize)
+    : mode(mode), blockSize(blockSize) {
+        new (&fft) FftFieldTranslation(blockSize);
+}
+
+template <typename T>
+FieldTranslation<T>::FieldTranslation(const FieldTranslation& other) {
+  new(&blas) BlasFieldTranslation(other.blas);
+  new (&fft) FftFieldTranslation(other.fft);
+}
+
+// Copy assignment operator
+// FmmSvdMode& FmmSvdMode::operator=(const FmmSvdMode& other) {
+//     if (this != &other) {  // Self-assignment check
+//         // Destroy current value if it is RandomParams
+//         if (mode == Mode::Random) {
+//             randomParams.~RandomParams();
+//         }
+
+//         mode = other.mode;  // Copy the mode
+//         if (mode == Mode::Random) {
+//             // Construct a new RandomParams in place
+//             new(&randomParams) RandomParams(other.randomParams);
+//         }
+//     }
+//     return *this;  // Return *this to allow chaining
+// }
 
 // Destructor
 FmmSvdMode::~FmmSvdMode() {
