@@ -607,9 +607,12 @@ pub mod api {
         }
     }
 
-
     #[no_mangle]
-    pub extern "C" fn clear_laplace_blas_f32(fmm: *mut LaplaceBlas32, charges: *const f32, ncharges: usize) {
+    pub extern "C" fn clear_laplace_blas_f32(
+        fmm: *mut LaplaceBlas32,
+        charges: *const f32,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -625,7 +628,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_laplace_blas_f64(fmm: *mut LaplaceBlas64, charges: *const f64, ncharges: usize) {
+    pub extern "C" fn clear_laplace_blas_f64(
+        fmm: *mut LaplaceBlas64,
+        charges: *const f64,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -641,7 +648,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_laplace_fft_f32(fmm: *mut LaplaceFft32, charges: *const f32, ncharges: usize) {
+    pub extern "C" fn clear_laplace_fft_f32(
+        fmm: *mut LaplaceFft32,
+        charges: *const f32,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -653,7 +664,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_laplace_fft_f64(fmm: *mut LaplaceFft64, charges: *const f64, ncharges: usize) {
+    pub extern "C" fn clear_laplace_fft_f64(
+        fmm: *mut LaplaceFft64,
+        charges: *const f64,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -665,7 +680,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_helmholtz_blas_f32(fmm: *mut HelmholtzBlas32, charges: *const f32, ncharges: usize) {
+    pub extern "C" fn clear_helmholtz_blas_f32(
+        fmm: *mut HelmholtzBlas32,
+        charges: *const f32,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -677,7 +696,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_helmholtz_blas_f64(fmm: *mut HelmholtzBlas64, charges: *const f64, ncharges: usize) {
+    pub extern "C" fn clear_helmholtz_blas_f64(
+        fmm: *mut HelmholtzBlas64,
+        charges: *const f64,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -689,7 +712,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_helmholtz_fft_f32(fmm: *mut HelmholtzFft32, charges: *const f32, ncharges: usize) {
+    pub extern "C" fn clear_helmholtz_fft_f32(
+        fmm: *mut HelmholtzFft32,
+        charges: *const f32,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
@@ -701,7 +728,11 @@ pub mod api {
     }
 
     #[no_mangle]
-    pub extern "C" fn clear_helmholtz_fft_f64(fmm: *mut HelmholtzFft64, charges: *const f64, ncharges: usize) {
+    pub extern "C" fn clear_helmholtz_fft_f64(
+        fmm: *mut HelmholtzFft64,
+        charges: *const f64,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
