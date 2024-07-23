@@ -1,8 +1,8 @@
-//! Implementations of 8x8 matrix vector product operation during Hadamard product in FFT based M2L operations.
-use crate::{fmm::types::Isa, traits::general::Gemv8x8};
+//! Implementations of 8x8 operation during Hadamard product in FFT based M2L operations.
+use crate::{fmm::types::Isa, traits::general::Hadamard8x8};
 use rlst::{c32, c64, RlstScalar};
 
-/// The 8x8 gemv operation, always inlined.
+/// The 8x8 Hadamard operation, always inlined.
 ///
 /// # Arguments
 /// * - `matrix` - 8x8 matrix.
@@ -11,7 +11,7 @@ use rlst::{c32, c64, RlstScalar};
 /// * - `scale` - Scalar scaling factor.
 #[allow(unused)]
 #[inline(always)]
-pub fn gemv8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], scale: U)
+pub fn hadamard8x8_auto<U>(matrix: &[U; 64], vector: &[U; 8], result: &mut [U; 8], scale: U)
 where
     U: RlstScalar,
 {
@@ -32,7 +32,7 @@ where
 
 #[derive(Debug)]
 #[allow(dead_code)]
-pub struct Gemv8x8Data<'a, T: RlstScalar> {
+pub struct Hadamard8x8Data<'a, T: RlstScalar> {
     pub isa: Isa,
     pub matrix: &'a [T; 64],
     pub vector: &'a [T; 8],
@@ -40,19 +40,19 @@ pub struct Gemv8x8Data<'a, T: RlstScalar> {
     pub scale: T::Real,
 }
 
-impl Gemv8x8 for c32 {
+impl Hadamard8x8 for c32 {
     type Scalar = Self;
 
     #[inline(always)]
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn gemv8x8(
+    fn hadamard8x8(
         isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        isa.isa().unwrap().vectorize(Gemv8x8Data {
+        isa.isa().unwrap().vectorize(Hadamard8x8Data {
             isa,
             scale: scale.re(),
             matrix,
@@ -63,14 +63,14 @@ impl Gemv8x8 for c32 {
 
     #[inline(always)]
     #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
-    fn gemv8x8(
+    fn hadamard8x8(
         isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        isa.isa().unwrap().vectorize(Gemv8x8Data {
+        isa.isa().unwrap().vectorize(Hadamard8x8Data {
             isa,
             scale: scale.re(),
             matrix,
@@ -84,30 +84,30 @@ impl Gemv8x8 for c32 {
         all(target_arch = "aarch64", target_feature = "neon"),
         all(target_arch = "x86_64", target_feature = "avx")
     )))]
-    fn gemv8x8(
+    fn hadamard8x8(
         _isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        gemv8x8_auto(matrix, vector, result, scale)
+        hadamard8x8_auto(matrix, vector, result, scale)
     }
 }
 
-impl Gemv8x8 for c64 {
+impl Hadamard8x8 for c64 {
     type Scalar = Self;
 
     #[inline(always)]
     #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
-    fn gemv8x8(
+    fn hadamard8x8(
         isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        isa.isa().unwrap().vectorize(Gemv8x8Data {
+        isa.isa().unwrap().vectorize(Hadamard8x8Data {
             isa,
             scale: scale.re(),
             matrix,
@@ -118,14 +118,14 @@ impl Gemv8x8 for c64 {
 
     #[inline(always)]
     #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
-    fn gemv8x8(
+    fn hadamard8x8(
         isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        isa.isa().unwrap().vectorize(Gemv8x8Data {
+        isa.isa().unwrap().vectorize(Hadamard8x8Data {
             isa,
             scale: scale.re(),
             matrix,
@@ -139,24 +139,24 @@ impl Gemv8x8 for c64 {
         all(target_arch = "aarch64", target_feature = "neon"),
         all(target_arch = "x86_64", target_feature = "avx")
     )))]
-    fn gemv8x8(
+    fn hadamard8x8(
         _isa: Isa,
         matrix: &[Self::Scalar; 64],
         vector: &[Self::Scalar; 8],
         result: &mut [Self::Scalar; 8],
         scale: Self::Scalar,
     ) {
-        gemv8x8_auto(matrix, vector, result, scale)
+        hadamard8x8_auto(matrix, vector, result, scale)
     }
 }
 
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod aarch64 {
-    use super::{c32, c64, Gemv8x8Data};
+    use super::{c32, c64, Hadamard8x8Data};
     use pulp::{f32x4, f64x2, Simd};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
-    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c64> {
+    impl<'a> pulp::NullaryFnOnce for Hadamard8x8Data<'a, c64> {
         type Output = ();
 
         #[inline(always)]
@@ -297,7 +297,7 @@ pub mod aarch64 {
         }
     }
 
-    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c32> {
+    impl<'a> pulp::NullaryFnOnce for Hadamard8x8Data<'a, c32> {
         type Output = ();
 
         #[inline(always)]
@@ -401,7 +401,7 @@ pub mod aarch64 {
 
 #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
 pub mod x86 {
-    use super::{c32, c64, Gemv8x8Data};
+    use super::{c32, c64, Hadamard8x8Data};
     use pulp::x86::V3;
     use pulp::{f32x8, f64x4};
 
@@ -430,7 +430,7 @@ pub mod x86 {
     generate_deinterleave_fn!(deinterleave_avx_f32, V3, f32x8, splat_f32x8, f32);
     generate_deinterleave_fn!(deinterleave_avx_f64, V3, f64x4, splat_f64x4, f64);
 
-    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c32> {
+    impl<'a> pulp::NullaryFnOnce for Hadamard8x8Data<'a, c32> {
         type Output = ();
 
         #[inline(always)]
@@ -678,7 +678,7 @@ pub mod x86 {
         }
     }
 
-    impl<'a> pulp::NullaryFnOnce for Gemv8x8Data<'a, c64> {
+    impl<'a> pulp::NullaryFnOnce for Hadamard8x8Data<'a, c64> {
         type Output = ();
 
         #[inline(always)]

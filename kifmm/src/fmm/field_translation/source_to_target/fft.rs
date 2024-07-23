@@ -21,7 +21,7 @@ use crate::{
     traits::{
         fftw::Dft,
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
-        general::{AsComplex, Gemv8x8},
+        general::{AsComplex, Hadamard8x8},
         tree::{FmmTree, Tree},
         types::FmmError,
     },
@@ -41,7 +41,7 @@ where
         + Default
         + AlignedAllocable,
     <Scalar as AsComplex>::ComplexType:
-        Gemv8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
+        Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: FmmOperatorData,
@@ -283,7 +283,7 @@ where
                                                         NSIBLINGS])
                                             };
 
-                                            <Scalar as AsComplex>::ComplexType::gemv8x8(
+                                            <Scalar as AsComplex>::ComplexType::hadamard8x8(
                                                 self.isa,
                                                 k_f_slice,
                                                 s_f_slice,
