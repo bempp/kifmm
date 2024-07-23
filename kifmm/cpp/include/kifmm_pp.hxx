@@ -3,12 +3,13 @@
 
 #include <cstdarg>
 #include <iostream>
-#include <kifmm_rs.h>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <random>
 #include <vector>
+#include <complex>
+#include <kifmm_rs.h>
 
 // Variants of SVD algorithms
 template <typename T> class SvdMode {
@@ -50,6 +51,19 @@ public:
 
   // Destructor
   ~SvdMode();
+};
+
+template <typename T> class Kernel {
+public:
+  virtual ~Kernel() = default;
+};
+
+template <typename T> class Laplace : public Kernel<T> {};
+
+template <typename T> class Helmholtz : public Kernel<T> {
+public:
+  explicit Helmholtz(T wavenumber) : wavenumber(wavenumber) {}
+  T wavenumber;
 };
 
 class FmmPointer {
@@ -102,24 +116,32 @@ public:
   };
 };
 
-template <typename T> class KiFmm {
+template <typename T, typename V> class KiFmm {
 public:
   // Constructor
   KiFmm(const std::vector<size_t> &expansionOrder,
         const std::vector<T> &sources, const std::vector<T> &targets,
-        const std::vector<T> &charges,
+        const std::vector<V> &charges,
+        const Laplace<T> &kernel,
+        const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
+        std::optional<uint64_t> nCrit = std::nullopt,
+        std::optional<uint64_t> depth = std::nullopt);
+
+  KiFmm(const std::vector<size_t> &expansionOrder,
+        const std::vector<T> &sources, const std::vector<T> &targets,
+        const std::vector<V> &charges,
+        const Helmholtz<T> &kernel,
         const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
         std::optional<uint64_t> nCrit = std::nullopt,
         std::optional<uint64_t> depth = std::nullopt);
 
   void evaluate(bool timed);
-
-  void clear();
+  void clear(const std::vector<V> &charges);
 
   const std::vector<size_t> &expansionOrder;
   const std::vector<T> &sourceCoordinates;
   const std::vector<T> &targetCoordinates;
-  const std::vector<T> &sourceCharges;
+  const std::vector<V> &sourceCharges;
   FmmPointer fmmInstance;
   FieldTranslation<T> fieldTranslation;
   bool pruneEmpty;
