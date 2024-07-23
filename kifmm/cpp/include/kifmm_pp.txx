@@ -111,6 +111,7 @@ KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
   size_t nSources = sourceCoordinates.size();
   size_t nTargets = targetCoordinates.size();
   size_t nCharges = charges.size();
+  T wavenumber = kernel.wavenumber;
 
   if (depth.has_value()) {
     if (expansionOrder.size() != this->depth + 1) {
@@ -146,7 +147,7 @@ KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
       HelmholtzBlas32 *fmm = helmholtz_blas_f32(
           expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
           targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-          this->nCrit, this->depth,
+          this->nCrit, this->depth, wavenumber,
           this->fieldTranslation.blas.svdMode.singularValueThreshold,
           rSvd, nComponents, nOversamples, randomState);
       fmmInstance.set(fmm);
@@ -155,7 +156,7 @@ KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
       HelmholtzBlas64 *fmm = helmholtz_blas_f64(
           expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
           targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-          this->nCrit, this->depth,
+          this->nCrit, this->depth, wavenumber,
           this->fieldTranslation.blas.svdMode.singularValueThreshold,
           rSvd, nComponents, nOversamples, randomState);
       fmmInstance.set(fmm);
@@ -168,13 +169,13 @@ KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
       HelmholtzFft32 *fmm = helmholtz_fft_f32(
           expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
           targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-          this->nCrit, this->depth, this->fieldTranslation.blockSize);
+          this->nCrit, this->depth, wavenumber, this->fieldTranslation.blockSize);
       fmmInstance.set(fmm);
     } else if constexpr (std::is_same_v<T, double>) {
       HelmholtzFft64 *fmm = helmholtz_fft_f64(
           expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
           targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-          this->nCrit, this->depth, this->fieldTranslation.blockSize);
+          this->nCrit, this->depth, wavenumber, this->fieldTranslation.blockSize);
       fmmInstance.set(fmm);
     }
 

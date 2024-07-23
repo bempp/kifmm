@@ -43,9 +43,10 @@ pub mod types {
 
 /// All constructors
 pub mod constructors {
+    use green_kernels::helmholtz_3d::Helmholtz3dKernel;
     use rlst::rlst_array_from_slice1;
 
-    use crate::FftFieldTranslation;
+    use crate::{BlasFieldTranslationIa, FftFieldTranslation};
 
     use super::*;
 
@@ -285,11 +286,12 @@ pub mod constructors {
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
+        wavenumber: f32,
         singular_value_threshold: f32,
-        svd_mode: bool,
-        rsvd_ncomponents: usize,
-        rsvd_noversamples: usize,
-        rsvd_random_state: usize,
+        _svd_mode: bool,
+        _rsvd_ncomponents: usize,
+        _rsvd_noversamples: usize,
+        _rsvd_random_state: usize,
     ) -> *mut HelmholtzBlas32 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
@@ -310,11 +312,7 @@ pub mod constructors {
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
 
-        let field_translation = BlasFieldTranslationSaRcmp::new(
-            singular_value_threshold,
-            None,
-            crate::fmm::types::FmmSvdMode::Deterministic,
-        );
+        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -323,7 +321,7 @@ pub mod constructors {
                 .parameters(
                     charges.data(),
                     expansion_order,
-                    Laplace3dKernel::new(),
+                    Helmholtz3dKernel::new(wavenumber),
                     green_kernels::types::EvalType::Value,
                     field_translation,
                 )
@@ -349,11 +347,12 @@ pub mod constructors {
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
+        wavenumber: f64,
         singular_value_threshold: f64,
-        svd_mode: bool,
-        rsvd_ncomponents: usize,
-        rsvd_noversamples: usize,
-        rsvd_random_state: usize,
+        _svd_mode: bool,
+        _rsvd_ncomponents: usize,
+        _rsvd_noversamples: usize,
+        _rsvd_random_state: usize,
     ) -> *mut HelmholtzBlas64 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
@@ -374,11 +373,7 @@ pub mod constructors {
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
 
-        let field_translation = BlasFieldTranslationSaRcmp::new(
-            singular_value_threshold,
-            None,
-            crate::fmm::types::FmmSvdMode::Deterministic,
-        );
+        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -387,7 +382,7 @@ pub mod constructors {
                 .parameters(
                     charges.data(),
                     expansion_order,
-                    Laplace3dKernel::new(),
+                    Helmholtz3dKernel::new(wavenumber),
                     green_kernels::types::EvalType::Value,
                     field_translation,
                 )
@@ -413,6 +408,7 @@ pub mod constructors {
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
+        wavenumber: f32,
         block_size: usize,
     ) -> *mut HelmholtzFft32 {
         let sources = unsafe {
@@ -440,7 +436,7 @@ pub mod constructors {
                 .parameters(
                     charges.data(),
                     expansion_order,
-                    Laplace3dKernel::new(),
+                    Helmholtz3dKernel::new(wavenumber),
                     green_kernels::types::EvalType::Value,
                     FftFieldTranslation::new(Some(block_size)),
                 )
@@ -466,6 +462,7 @@ pub mod constructors {
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
+        wavenumber: f64,
         block_size: usize,
     ) -> *mut HelmholtzFft64 {
         let sources = unsafe {
@@ -493,7 +490,7 @@ pub mod constructors {
                 .parameters(
                     charges.data(),
                     expansion_order,
-                    Laplace3dKernel::new(),
+                    Helmholtz3dKernel::new(wavenumber),
                     green_kernels::types::EvalType::Value,
                     FftFieldTranslation::new(Some(block_size)),
                 )
@@ -607,6 +604,111 @@ pub mod api {
                 &mut *(fmm as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>)
             };
             let times = fmm.evaluate(timed).unwrap();
+        }
+    }
+
+
+    #[no_mangle]
+    pub extern "C" fn clear_laplace_blas_f32(fmm: *mut LaplaceBlas32, charges: *const f32, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<
+                    f32,
+                    Laplace3dKernel<f32>,
+                    BlasFieldTranslationSaRcmp<f32>,
+                >)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_laplace_blas_f64(fmm: *mut LaplaceBlas64, charges: *const f64, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<
+                    f64,
+                    Laplace3dKernel<f64>,
+                    BlasFieldTranslationSaRcmp<f64>,
+                >)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_laplace_fft_f32(fmm: *mut LaplaceFft32, charges: *const f32, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_laplace_fft_f64(fmm: *mut LaplaceFft64, charges: *const f64, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_helmholtz_blas_f32(fmm: *mut HelmholtzBlas32, charges: *const f32, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_helmholtz_blas_f64(fmm: *mut HelmholtzBlas64, charges: *const f64, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_helmholtz_fft_f32(fmm: *mut HelmholtzFft32, charges: *const f32, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+            fmm.clear(charges);
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn clear_helmholtz_fft_f64(fmm: *mut HelmholtzFft64, charges: *const f64, ncharges: usize) {
+        if !fmm.is_null() {
+            // Cast back to the original type
+            let fmm = unsafe {
+                &mut *(fmm as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>)
+            };
+            let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+            fmm.clear(charges);
         }
     }
 }
