@@ -25,9 +25,10 @@ int main(void) {
 
   // BLAS Field Translations
   double singularValueThreshold = 0.001;
-  FmmSvdMode<double> svdModeRandom(
-      singularValueThreshold, FmmSvdMode<double>::RandomParams(10, 10, 10));
-  FmmSvdMode<double> svdModeDeterministic(singularValueThreshold);
+  SvdMode<double> svdModeRandom(singularValueThreshold,
+                                SvdMode<double>::RandomParams(10, 10, 10));
+  SvdMode<double> svdModeDeterministic(singularValueThreshold);
+
   FieldTranslation<double> blas = FieldTranslation<double>(
       FieldTranslation<double>::Mode::Blas, svdModeRandom);
 
@@ -38,14 +39,14 @@ int main(void) {
   // Tree parameters
   bool pruneEmpty = true; // prune empty boxes in tree
   u_int64_t nCrit = 150;  // Critical value of points per leaf box
-  std::vector<size_t> expansion_order = {5}; // Expansion order of FMM
+  std::vector<size_t> expansionOrder = {5}; // Expansion order of FMM
 
   // Generate FMM runtime object
-  KiFmm<double> fmm(expansion_order, coordinates, coordinates, charges, fft,
+  KiFmm<double> fmm(expansionOrder, coordinates, coordinates, charges, fft,
                     pruneEmpty, nCrit);
 
   // Run FMM
-  // fmm.evaluate(false);
+  fmm.evaluate(false);
 
   return 0;
 }

@@ -2,8 +2,8 @@
 // Constructor implementation
 template <typename T>
 KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
-                const std::vector<T> &sources, const std::vector<T> &targets,
-                const std::vector<T> &charges,
+                const std::vector<T>& sources, const std::vector<T>& targets,
+                const std::vector<T>& charges,
                 const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
                 std::optional<uint64_t> nCrit, std::optional<uint64_t> depth)
     : expansionOrder(expansionOrder), sourceCoordinates(sources),
@@ -11,13 +11,13 @@ KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
       fieldTranslation(fieldTranslation), pruneEmpty(pruneEmpty),
       nCrit(nCrit.value_or(0)), depth(depth.value_or(0)) {
 
-  T *sourcesPtr = sourceCoordinates.data();
-  T *targetsPtr = targetCoordinates.data();
-  T *chargesPtr = sourceCharges.data();
+  const T *sourcesPtr = sourceCoordinates.data();
+  const T *targetsPtr = targetCoordinates.data();
+  const T *chargesPtr = sourceCharges.data();
+  const size_t *expansionOrderPtr = expansionOrder.data();
   size_t nSources = sourceCoordinates.size();
   size_t nTargets = targetCoordinates.size();
   size_t nCharges = charges.size();
-  size_t *expansionOrderPtr = this->expansionOrder.data();
 
   if (depth.has_value()) {
     if (expansionOrder.size() != this->depth + 1) {
@@ -38,7 +38,7 @@ KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
   case FieldTranslation<T>::Mode::Blas: {
 
     // Check if SVD is being done in Random mode
-    bool rSvd = (this->fieldTranslation.blas.svdMode.mode == FmmSvdMode<T>::Mode::Random);
+    bool rSvd = (this->fieldTranslation.blas.svdMode.mode == SvdMode<T>::Mode::Random);
 
     size_t nComponents = 0;
     size_t nOversamples = 0;
@@ -165,27 +165,22 @@ template <typename T> FieldTranslation<T>::~FieldTranslation() {}
 
 // Default constructor sets to Deterministic mode
 template <typename T>
-FmmSvdMode<T>::FmmSvdMode(T singularValueThreshold) : singularValueThreshold(singularValueThreshold), mode(Mode::Deterministic) {}
+SvdMode<T>::SvdMode(T singularValueThreshold) : singularValueThreshold(singularValueThreshold), mode(Mode::Deterministic) {}
 
 // Constructor for Random mode
 template <typename T>
-FmmSvdMode<T>::FmmSvdMode(T singularValueThreshold, RandomParams params) : singularValueThreshold(singularValueThreshold), mode(Mode::Random), randomParams(params) {}
+SvdMode<T>::SvdMode(T singularValueThreshold, RandomParams params) : singularValueThreshold(singularValueThreshold), mode(Mode::Random), randomParams(params) {}
 
 // Copy constructor
 template <typename T>
-FmmSvdMode<T>::FmmSvdMode(const FmmSvdMode<T>& other) : mode(other.mode) {
+SvdMode<T>::SvdMode(const SvdMode<T>& other) : mode(other.mode) {
     if (mode == Mode::Random) {
         new(&randomParams) RandomParams(other.randomParams);
     }
 }
 
-// Method to get the current mode
 template <typename T>
-typename FmmSvdMode<T>::Mode FmmSvdMode<T>::getMode() const {
-    return mode;
-}
-template <typename T>
-FieldTranslation<T>::FieldTranslation(Mode mode, FmmSvdMode<T> fmmSvdMode)
+FieldTranslation<T>::FieldTranslation(Mode mode, SvdMode<T> fmmSvdMode)
     : mode(mode), fmmSvdMode(fmmSvdMode) {
         new (&blas) BlasFieldTranslation(fmmSvdMode);
 }
@@ -206,38 +201,14 @@ FieldTranslation<T>::FieldTranslation(const FieldTranslation& other) {
 
 // Destructor
 template <typename T>
-FmmSvdMode<T>::~FmmSvdMode() {
+SvdMode<T>::~SvdMode() {
     if (mode == Mode::Random) {
         randomParams.~RandomParams();
     }
 }
 
-// // Methods to set and get the mode
-// void FmmSvdMode::setMode(Mode newMode) {
-//     if (mode == Mode::Random && newMode != Mode::Random) {
-//         randomParams.~RandomParams();
-//     }
-//     mode = newMode;
-// }
-
-// template <typename T>
-// FmmSvdMode::Mode FmmSvdMode::getMode() const {
-//     return mode;
-// }
-
-// // Methods to set and get RandomParams
-// template <typename T>
-// void FmmSvdMode::setRandomParams(RandomParams params) {
-//     if (mode == Mode::Random) {
-//         randomParams = params;
-//     } else {
-//         new(&randomParams) RandomParams(params);
-//         mode = Mode::Random;
-//     }
-// }
-
 template <typename T>
-FmmSvdMode<T>::RandomParams::RandomParams(size_t nComponents,
+SvdMode<T>::RandomParams::RandomParams(size_t nComponents,
                                        std::optional<size_t> nOversamples,
                                        std::optional<size_t> randomState)
     : nComponents(nComponents),

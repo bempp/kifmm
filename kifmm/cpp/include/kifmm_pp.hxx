@@ -11,7 +11,7 @@
 #include <vector>
 
 // Variants of SVD algorithms
-template <typename T> class FmmSvdMode {
+template <typename T> class SvdMode {
 public:
   // Enum for the types of modes
   enum class Mode { Random, Deterministic };
@@ -34,35 +34,26 @@ public:
 
 public:
   // Default constructor sets to Deterministic mode
-  FmmSvdMode() : singularValueThreshold(0), mode(Mode::Deterministic) {}
+  SvdMode() : singularValueThreshold(0), mode(Mode::Deterministic) {}
 
   // Deterministic mode
-  FmmSvdMode(T singularValueThreshold);
+  SvdMode(T singularValueThreshold);
 
   // Constructor for Random mode
-  FmmSvdMode(T singularValueThreshold, RandomParams params);
+  SvdMode(T singularValueThreshold, RandomParams params);
 
   // Copy constructor
-  FmmSvdMode(const FmmSvdMode &other);
+  SvdMode(const SvdMode &other);
 
   // Copy assignment operator
-  // FmmSvdMode &operator=(const FmmSvdMode &other);
+  // SvdMode &operator=(const SvdMode &other);
 
   // Destructor
-  ~FmmSvdMode();
-
-  // Methods to set and get the mode
-  // void setMode(Mode newMode);
-  Mode getMode() const;
-
-  // Methods to set and get RandomParams
-  // void setRandomParams(RandomParams params);
+  ~SvdMode();
 };
 
 class FmmPointer {
 public:
-  // enum class Type { None, Blas32, Blas64 Fft32, };
-
   FmmPointer();
   ~FmmPointer();
 
@@ -72,13 +63,10 @@ public:
   void set(LaplaceFft64 *ptr);
 
   void *get() const;
-  // Type getType() const;
 
 private:
   void clear();
-
   void *ptr;
-  // Type type;
 };
 
 // Define a struct to encapsulate the enum and data
@@ -93,15 +81,15 @@ public:
   };
 
   struct BlasFieldTranslation {
-    FmmSvdMode<T> svdMode;
-    BlasFieldTranslation(FmmSvdMode<T> svdMode) : svdMode(svdMode) {};
+    SvdMode<T> svdMode;
+    BlasFieldTranslation(SvdMode<T> svdMode) : svdMode(svdMode) {};
   };
 
   size_t blockSize;
-  FmmSvdMode<T> fmmSvdMode;
+  SvdMode<T> fmmSvdMode;
   Mode mode;
 
-  FieldTranslation<T>(Mode mode, FmmSvdMode<T> fmmSvdMode);
+  FieldTranslation<T>(Mode mode, SvdMode<T> fmmSvdMode);
   FieldTranslation<T>(Mode mode, size_t blockSize);
   ~FieldTranslation<T>();
 
@@ -126,17 +114,15 @@ public:
 
   void evaluate(bool timed);
 
-private:
-  // Member variables to store source and target coordinates
-  std::vector<T> sourceCoordinates;
-  std::vector<T> targetCoordinates;
-  std::vector<T> sourceCharges;
+  const std::vector<size_t> &expansionOrder;
+  const std::vector<T> &sourceCoordinates;
+  const std::vector<T> &targetCoordinates;
+  const std::vector<T> &sourceCharges;
   FmmPointer fmmInstance;
   FieldTranslation<T> fieldTranslation;
   bool pruneEmpty;
   uint64_t nCrit;
   uint64_t depth;
-  std::vector<size_t> expansionOrder;
 };
 
 // Function to generate random 3D coordinate data
