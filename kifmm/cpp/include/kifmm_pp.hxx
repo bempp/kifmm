@@ -114,6 +114,8 @@ public:
 
   void evaluate(bool timed);
 
+  void clear();
+
   const std::vector<size_t> &expansionOrder;
   const std::vector<T> &sourceCoordinates;
   const std::vector<T> &targetCoordinates;

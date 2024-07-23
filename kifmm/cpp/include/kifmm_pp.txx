@@ -92,6 +92,10 @@ KiFmm<T>::KiFmm(const std::vector<size_t> &expansionOrder,
   }
 }
 
+template <typename T> void KiFmm<T>::clear() {
+
+}
+
 template <typename T> void KiFmm<T>::evaluate(bool timed) {
 
   switch (this->fieldTranslation.mode) {

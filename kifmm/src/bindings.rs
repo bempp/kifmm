@@ -69,10 +69,10 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f32,
-        // svd_mode: bool,
-        // rsvd_ncomponents: usize,
-        // rsvd_noversamples: usize,
-        // rsvd_random_state: usize
+        svd_mode: bool,
+        rsvd_ncomponents: usize,
+        rsvd_noversamples: usize,
+        rsvd_random_state: usize
 
     ) -> *mut LaplaceBlas32 {
         let sources = unsafe {
@@ -96,8 +96,6 @@ pub mod constructors {
             None,
             crate::fmm::types::FmmSvdMode::Deterministic,
         );
-
-        // crate::fmm::types::FmmSvdMode::Random { n_components: (), normaliser: (), n_oversamples: (), random_state: () }
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -133,10 +131,10 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f64,
-        // svd_mode: bool,
-        // rsvd_ncomponents: usize,
-        // rsvd_noversamples: usize,
-        // rsvd_random_state: usize
+        svd_mode: bool,
+        rsvd_ncomponents: usize,
+        rsvd_noversamples: usize,
+        rsvd_random_state: usize
     ) -> *mut LaplaceBlas64 {
         let sources = unsafe {
             rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
