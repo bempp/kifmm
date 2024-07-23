@@ -3,17 +3,18 @@
 template <typename T, typename V>
 KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
                 const std::vector<T>& sources, const std::vector<T>& targets,
-                const std::vector<V>& charges, const Laplace<T> &kernel,
+                std::vector<V>& charges, const Laplace<T> &kernel,
                 const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
                 std::optional<uint64_t> nCrit, std::optional<uint64_t> depth)
     : expansionOrder(expansionOrder), sourceCoordinates(sources),
       targetCoordinates(targets), sourceCharges(charges),
       fieldTranslation(fieldTranslation), pruneEmpty(pruneEmpty),
-      nCrit(nCrit.value_or(0)), depth(depth.value_or(0)) {
+      nCrit(nCrit.value_or(0)), depth(depth.value_or(0)), kernel(kernel) {
 
   const T *sourcesPtr = sourceCoordinates.data();
   const T *targetsPtr = targetCoordinates.data();
-  const V *chargesPtr = sourceCharges.data();
+  // const T *chargesPtr = sourceCharges.data();
+  T *chargesPtr = static_cast<T *>(sourceCharges.data());
   const size_t *expansionOrderPtr = expansionOrder.data();
   size_t nSources = sourceCoordinates.size();
   size_t nTargets = targetCoordinates.size();
@@ -95,17 +96,17 @@ KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
 template <typename T, typename V>
 KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
                 const std::vector<T>& sources, const std::vector<T>& targets,
-                const std::vector<V>& charges, const Helmholtz<T> &kernel,
+                std::vector<V>& charges, const Helmholtz<T> &kernel,
                 const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
                 std::optional<uint64_t> nCrit, std::optional<uint64_t> depth)
     : expansionOrder(expansionOrder), sourceCoordinates(sources),
       targetCoordinates(targets), sourceCharges(charges),
       fieldTranslation(fieldTranslation), pruneEmpty(pruneEmpty),
-      nCrit(nCrit.value_or(0)), depth(depth.value_or(0)) {
+      nCrit(nCrit.value_or(0)), depth(depth.value_or(0)), kernel(kernel) {
 
   const T *sourcesPtr = sourceCoordinates.data();
   const T *targetsPtr = targetCoordinates.data();
-  const V *chargesPtr = sourceCharges.data();
+  T *chargesPtr = reinterpret_cast<T *>(sourceCharges.data());
   const size_t *expansionOrderPtr = expansionOrder.data();
   size_t nSources = sourceCoordinates.size();
   size_t nTargets = targetCoordinates.size();
@@ -126,62 +127,62 @@ KiFmm<T, V>::KiFmm(const std::vector<size_t> &expansionOrder,
     }
   }
 
-  // switch (this->fieldTranslation.mode) {
-  // case FieldTranslation<T>::Mode::Blas: {
+  switch (this->fieldTranslation.mode) {
+  case FieldTranslation<T>::Mode::Blas: {
 
-  //   // Check if SVD is being done in Random mode
-  //   bool rSvd = (this->fieldTranslation.blas.svdMode.mode == SvdMode<T>::Mode::Random);
+    // Check if SVD is being done in Random mode
+    bool rSvd = (this->fieldTranslation.blas.svdMode.mode == SvdMode<T>::Mode::Random);
 
-  //   size_t nComponents = 0;
-  //   size_t nOversamples = 0;
-  //   size_t randomState = 0;
-  //   if (rSvd) {
-  //     nComponents = this->fieldTranslation.blas.svdMode.randomParams.nComponents;
-  //     nOversamples = this->fieldTranslation.blas.svdMode.randomParams.nOversamples;
-  //     randomState = this->fieldTranslation.blas.svdMode.randomParams.randomState;
-  //   };
+    size_t nComponents = 0;
+    size_t nOversamples = 0;
+    size_t randomState = 0;
+    if (rSvd) {
+      nComponents = this->fieldTranslation.blas.svdMode.randomParams.nComponents;
+      nOversamples = this->fieldTranslation.blas.svdMode.randomParams.nOversamples;
+      randomState = this->fieldTranslation.blas.svdMode.randomParams.randomState;
+    };
 
-  //   if constexpr (std::is_same_v<T, float>) {
-  //     LaplaceBlas32 *fmm = laplace_blas_f32(
-  //         expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
-  //         targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-  //         this->nCrit, this->depth,
-  //         this->fieldTranslation.blas.svdMode.singularValueThreshold,
-  //         rSvd, nComponents, nOversamples, randomState);
-  //     fmmInstance.set(fmm);
-  //   } else if constexpr (std::is_same_v<T, double>) {
+    if constexpr (std::is_same_v<T, float>) {
+      HelmholtzBlas32 *fmm = helmholtz_blas_f32(
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth,
+          this->fieldTranslation.blas.svdMode.singularValueThreshold,
+          rSvd, nComponents, nOversamples, randomState);
+      fmmInstance.set(fmm);
+    } else if constexpr (std::is_same_v<T, double>) {
 
-  //     LaplaceBlas64 *fmm = laplace_blas_f64(
-  //         expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
-  //         targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-  //         this->nCrit, this->depth,
-  //         this->fieldTranslation.blas.svdMode.singularValueThreshold,
-  //         rSvd, nComponents, nOversamples, randomState);
-  //     fmmInstance.set(fmm);
-  //   }
-  //   break;
-  // }
+      HelmholtzBlas64 *fmm = helmholtz_blas_f64(
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth,
+          this->fieldTranslation.blas.svdMode.singularValueThreshold,
+          rSvd, nComponents, nOversamples, randomState);
+      fmmInstance.set(fmm);
+    }
+    break;
+  }
 
-  // case FieldTranslation<T>::Mode::Fft:
-  //   if constexpr (std::is_same_v<T, float>) {
-  //     LaplaceFft32 *fmm = laplace_fft_f32(
-  //         expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
-  //         targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-  //         this->nCrit, this->depth, this->fieldTranslation.blockSize);
-  //     fmmInstance.set(fmm);
-  //   } else if constexpr (std::is_same_v<T, double>) {
-  //     LaplaceFft64 *fmm = laplace_fft_f64(
-  //         expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
-  //         targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
-  //         this->nCrit, this->depth, this->fieldTranslation.blockSize);
-  //     fmmInstance.set(fmm);
-  //   }
+  case FieldTranslation<T>::Mode::Fft:
+    if constexpr (std::is_same_v<T, float>) {
+      HelmholtzFft32 *fmm = helmholtz_fft_f32(
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth, this->fieldTranslation.blockSize);
+      fmmInstance.set(fmm);
+    } else if constexpr (std::is_same_v<T, double>) {
+      HelmholtzFft64 *fmm = helmholtz_fft_f64(
+          expansionOrderPtr, this->expansionOrder.size(), sourcesPtr, nSources,
+          targetsPtr, nTargets, chargesPtr, nCharges, this->pruneEmpty,
+          this->nCrit, this->depth, this->fieldTranslation.blockSize);
+      fmmInstance.set(fmm);
+    }
 
-  //   std::cout << "FFT " << std::endl;
-  //   break;
-  // default:
-  //   break;
-  // }
+    std::cout << "FFT " << std::endl;
+    break;
+  default:
+    break;
+  }
 }
 
 template <typename T, typename V> void KiFmm<T, V>::clear(const std::vector<V> &charges) {}
@@ -236,6 +237,26 @@ void FmmPointer::set(LaplaceFft32 *ptr) {
 }
 
 void FmmPointer::set(LaplaceFft64 *ptr) {
+  // clear();
+  this->ptr = ptr;
+}
+
+void FmmPointer::set(HelmholtzBlas32 *ptr) {
+  // clear();
+  this->ptr = ptr;
+}
+
+void FmmPointer::set(HelmholtzBlas64 *ptr) {
+  // clear();
+  this->ptr = ptr;
+}
+
+void FmmPointer::set(HelmholtzFft32 *ptr) {
+  // clear();
+  this->ptr = ptr;
+}
+
+void FmmPointer::set(HelmholtzFft64 *ptr) {
   // clear();
   this->ptr = ptr;
 }

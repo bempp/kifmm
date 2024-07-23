@@ -280,7 +280,7 @@ pub mod constructors {
         nsources: usize,
         targets: *const f32,
         ntargets: usize,
-        charges: *const c32,
+        charges: *const f32,
         ncharges: usize,
         prune_empty: bool,
         n_crit: u64,
@@ -298,7 +298,10 @@ pub mod constructors {
             rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
         };
         let charges = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
+            rlst_array_from_slice1!(
+                std::slice::from_raw_parts(charges as *const c32, ncharges),
+                [ncharges]
+            )
         };
 
         let expansion_order =
@@ -341,7 +344,7 @@ pub mod constructors {
         nsources: usize,
         targets: *const f64,
         ntargets: usize,
-        charges: *const c64,
+        charges: *const f64,
         ncharges: usize,
         prune_empty: bool,
         n_crit: u64,
@@ -359,7 +362,10 @@ pub mod constructors {
             rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
         };
         let charges = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
+            rlst_array_from_slice1!(
+                std::slice::from_raw_parts(charges as *const c64, ncharges),
+                [ncharges]
+            )
         };
 
         let expansion_order =
@@ -402,7 +408,7 @@ pub mod constructors {
         nsources: usize,
         targets: *const f32,
         ntargets: usize,
-        charges: *const c32,
+        charges: *const f32,
         ncharges: usize,
         prune_empty: bool,
         n_crit: u64,
@@ -416,7 +422,10 @@ pub mod constructors {
             rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
         };
         let charges = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
+            rlst_array_from_slice1!(
+                std::slice::from_raw_parts(charges as *const c32, ncharges),
+                [ncharges]
+            )
         };
 
         let expansion_order =
@@ -452,7 +461,7 @@ pub mod constructors {
         nsources: usize,
         targets: *const f64,
         ntargets: usize,
-        charges: *const c64,
+        charges: *const f64,
         ncharges: usize,
         prune_empty: bool,
         n_crit: u64,
@@ -466,7 +475,10 @@ pub mod constructors {
             rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
         };
         let charges = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
+            rlst_array_from_slice1!(
+                std::slice::from_raw_parts(charges as *const c64, ncharges),
+                [ncharges]
+            )
         };
 
         let expansion_order =
@@ -559,7 +571,7 @@ pub mod api {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
-                &mut *(fmm as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>)
+                &mut *(fmm as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>)
             };
             let times = fmm.evaluate(timed).unwrap();
         }
@@ -581,7 +593,7 @@ pub mod api {
         if !fmm.is_null() {
             // Cast back to the original type
             let fmm = unsafe {
-                &mut *(fmm as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>)
+                &mut *(fmm as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>)
             };
             let times = fmm.evaluate(timed).unwrap();
         }

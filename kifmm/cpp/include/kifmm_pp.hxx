@@ -75,6 +75,10 @@ public:
   void set(LaplaceBlas64 *ptr);
   void set(LaplaceFft32 *ptr);
   void set(LaplaceFft64 *ptr);
+  void set(HelmholtzBlas32 *ptr);
+  void set(HelmholtzBlas64 *ptr);
+  void set(HelmholtzFft32 *ptr);
+  void set(HelmholtzFft64 *ptr);
 
   void *get() const;
 
@@ -121,14 +125,14 @@ public:
   // Constructor
   KiFmm(const std::vector<size_t> &expansionOrder,
         const std::vector<T> &sources, const std::vector<T> &targets,
-        const std::vector<V> &charges, const Laplace<T> &kernel,
+        std::vector<V> &charges, const Laplace<T> &kernel,
         const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
         std::optional<uint64_t> nCrit = std::nullopt,
         std::optional<uint64_t> depth = std::nullopt);
 
   KiFmm(const std::vector<size_t> &expansionOrder,
         const std::vector<T> &sources, const std::vector<T> &targets,
-        const std::vector<V> &charges, const Helmholtz<T> &kernel,
+        std::vector<V> &charges, const Helmholtz<T> &kernel,
         const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
         std::optional<uint64_t> nCrit = std::nullopt,
         std::optional<uint64_t> depth = std::nullopt);
@@ -139,7 +143,8 @@ public:
   const std::vector<size_t> &expansionOrder;
   const std::vector<T> &sourceCoordinates;
   const std::vector<T> &targetCoordinates;
-  const std::vector<V> &sourceCharges;
+  std::vector<V> &sourceCharges;
+  const Kernel<T> &kernel;
   FmmPointer fmmInstance;
   FieldTranslation<T> fieldTranslation;
   bool pruneEmpty;
