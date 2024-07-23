@@ -1,15 +1,15 @@
 #ifndef KIFMM_HXX
 #define KIFMM_HXX
 
+#include <complex>
 #include <cstdarg>
 #include <iostream>
+#include <kifmm_rs.h>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <random>
 #include <vector>
-#include <complex>
-#include <kifmm_rs.h>
 
 // Variants of SVD algorithms
 template <typename T> class SvdMode {
@@ -121,16 +121,14 @@ public:
   // Constructor
   KiFmm(const std::vector<size_t> &expansionOrder,
         const std::vector<T> &sources, const std::vector<T> &targets,
-        const std::vector<V> &charges,
-        const Laplace<T> &kernel,
+        const std::vector<V> &charges, const Laplace<T> &kernel,
         const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
         std::optional<uint64_t> nCrit = std::nullopt,
         std::optional<uint64_t> depth = std::nullopt);
 
   KiFmm(const std::vector<size_t> &expansionOrder,
         const std::vector<T> &sources, const std::vector<T> &targets,
-        const std::vector<V> &charges,
-        const Helmholtz<T> &kernel,
+        const std::vector<V> &charges, const Helmholtz<T> &kernel,
         const FieldTranslation<T> &fieldTranslation, bool pruneEmpty,
         std::optional<uint64_t> nCrit = std::nullopt,
         std::optional<uint64_t> depth = std::nullopt);

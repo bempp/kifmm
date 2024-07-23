@@ -41,11 +41,12 @@ int main(void) {
   u_int64_t nCrit = 150;  // Critical value of points per leaf box
   std::vector<size_t> expansionOrder = {5}; // Expansion order of FMM
 
-  Laplace<double> kernel;
+  Laplace<double> laplaceKernel;
+  Helmholtz<std::complex<double>> helmholtzKernel(10.);
 
   // Generate FMM runtime object
-  KiFmm<double, double> fmm(expansionOrder, coordinates, coordinates, charges, kernel, fft,
-                    pruneEmpty, nCrit);
+  KiFmm<double, double> fmm(expansionOrder, coordinates, coordinates, charges,
+                            laplaceKernel, fft, pruneEmpty, nCrit);
 
   // Run FMM
   fmm.evaluate(false);
