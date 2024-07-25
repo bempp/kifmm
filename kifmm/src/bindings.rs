@@ -66,6 +66,12 @@ pub mod types {
         pub len: usize,
         pub data: *const c_void,
     }
+
+    #[repr(C)]
+    pub struct MortonKeys {
+        pub len: usize,
+        pub data: *const u64,
+    }
 }
 
 /// All constructors
@@ -1465,6 +1471,176 @@ pub mod api {
                         len: fmm.tree.target_tree.global_indices.len(),
                         data: unsafe {
                             fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
+                        },
+                    }
+                }
+            },
+        }
+    }
+
+    #[no_mangle]
+    pub extern "C" fn all_leaves_source_tree(fmm: *mut FmmEvaluator) -> MortonKeys {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
+                        },
+                    }
+                }
+
+                FmmTranslationCType::Blas => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<
+                                    f32,
+                                    Laplace3dKernel<f32>,
+                                    BlasFieldTranslationSaRcmp<f32>,
+                                >,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
+                        },
+                    }
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const c_void
+                        },
+                    }
+                }
+
+                FmmTranslationCType::Blas => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<
+                                    f64,
+                                    Laplace3dKernel<f64>,
+                                    BlasFieldTranslationSaRcmp<f64>,
+                                >,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
+                        },
+                    }
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<
+                                    c32,
+                                    Helmholtz3dKernel<c32>,
+                                    FftFieldTranslation<c32>,
+                                >,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
+                        },
+                    }
+                }
+
+                FmmTranslationCType::Blas => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<
+                                    c32,
+                                    Helmholtz3dKernel<c32>,
+                                    BlasFieldTranslationIa<c32>,
+                                >,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
+                        },
+                    }
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<
+                                    c64,
+                                    Helmholtz3dKernel<c64>,
+                                    FftFieldTranslation<c64>,
+                                >,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
+                        },
+                    }
+                }
+
+                FmmTranslationCType::Blas => {
+                    let mut fmm = unsafe {
+                        Box::from_raw(
+                            pointer
+                                as *mut KiFmm<
+                                    c64,
+                                    Helmholtz3dKernel<c64>,
+                                    BlasFieldTranslationIa<c64>,
+                                >,
+                        )
+                    };
+
+                    MortonKeys {
+                        len: fmm.tree.source_tree.leaves.len(),
+                        data: unsafe {
+                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
                         },
                     }
                 }
