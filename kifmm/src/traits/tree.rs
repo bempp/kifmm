@@ -137,6 +137,7 @@ where
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
 
+    /// Raw representation of a node
     fn raw(&self) -> u64;
 
     /// The parent of this node

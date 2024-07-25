@@ -1,3 +1,8 @@
+language = "C"
+
 [export]
 exclude = ["ALPHA_INNER", "ALPHA_OUTER", "FFTW_ESTIMATE"]
 
+
+[enum]
+prefix_with_name = true

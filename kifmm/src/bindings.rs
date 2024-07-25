@@ -1,14 +1,18 @@
+#![allow(missing_docs)]
+
 use green_kernels::laplace_3d::Laplace3dKernel;
-use rlst::{c32, c64, rlst_dynamic_array2, RawAccess, RawAccessMut};
+use rlst::{c32, c64};
 
 use crate::{
-    fmm::KiFmm, tree::helpers::points_fixture, BlasFieldTranslationSaRcmp, SingleNodeBuilder,
+    fmm::KiFmm, BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation,
+    SingleNodeBuilder,
 };
 
 /// All types
 pub mod types {
     use std::ffi::c_void;
 
+    /// Fmm Type
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
     pub enum FmmCType {
@@ -18,6 +22,7 @@ pub mod types {
         Helmholtz64,
     }
 
+    /// Translation type
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
     pub enum FmmTranslationCType {
@@ -25,6 +30,7 @@ pub mod types {
         Fft,
     }
 
+    /// Runtime FMM object
     #[repr(C)]
     pub struct FmmEvaluator {
         pub ctype: FmmCType,
@@ -46,6 +52,7 @@ pub mod types {
         }
     }
 
+    /// Scalar type
     #[repr(C)]
     pub enum ScalarType {
         F32,
@@ -54,6 +61,7 @@ pub mod types {
         C64,
     }
 
+    /// Potentials
     #[repr(C)]
     pub struct Potentials {
         pub len: usize,
@@ -61,12 +69,14 @@ pub mod types {
         pub scalar: ScalarType,
     }
 
+    /// Global indices
     #[repr(C)]
     pub struct GlobalIndices {
         pub len: usize,
         pub data: *const c_void,
     }
 
+    /// Morton keys
     #[repr(C)]
     pub struct MortonKeys {
         pub len: usize,
@@ -74,12 +84,134 @@ pub mod types {
     }
 }
 
+impl Drop for FmmEvaluator {
+    fn drop(&mut self) {
+        let Self {
+            ctype,
+            ctranslation_type,
+            data,
+        } = self;
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Blas => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<
+                                        f32,
+                                        Laplace3dKernel<f32>,
+                                        BlasFieldTranslationSaRcmp<f32>,
+                                    >,
+                                >,
+                        )
+                    });
+                }
+
+                FmmTranslationCType::Fft => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>,
+                                >,
+                        )
+                    });
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Blas => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<
+                                        f64,
+                                        Laplace3dKernel<f64>,
+                                        BlasFieldTranslationSaRcmp<f64>,
+                                    >,
+                                >,
+                        )
+                    });
+                }
+
+                FmmTranslationCType::Fft => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>,
+                                >,
+                        )
+                    });
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Blas => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<c32, Laplace3dKernel<c32>, BlasFieldTranslationIa<c32>>,
+                                >,
+                        )
+                    });
+                }
+
+                FmmTranslationCType::Fft => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<c32, Laplace3dKernel<c32>, FftFieldTranslation<c32>>,
+                                >,
+                        )
+                    });
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Blas => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<c64, Laplace3dKernel<c64>, BlasFieldTranslationIa<c64>>,
+                                >,
+                        )
+                    });
+                }
+
+                FmmTranslationCType::Fft => {
+                    drop(unsafe {
+                        Box::from_raw(
+                            *data
+                                as *mut Box<
+                                    KiFmm<c64, Laplace3dKernel<c64>, FftFieldTranslation<c64>>,
+                                >,
+                        )
+                    });
+                }
+            },
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
+    assert!(!fmm_p.is_null());
+    unsafe { drop(Box::from_raw(fmm_p)) }
+}
+
+
 /// All constructors
 pub mod constructors {
-    use std::{f32::consts::E, ffi::c_void};
+    use std::ffi::c_void;
 
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
-    use rlst::rlst_array_from_slice1;
 
     use crate::{BlasFieldTranslationIa, FftFieldTranslation};
 
@@ -134,13 +266,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Blas,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -192,13 +324,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Laplace64,
             ctranslation_type: FmmTranslationCType::Blas,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -264,13 +396,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Blas,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -336,13 +468,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Laplace64,
             ctranslation_type: FmmTranslationCType::Blas,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -388,13 +520,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Fft,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -440,13 +572,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Laplace64,
             ctranslation_type: FmmTranslationCType::Fft,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -495,13 +627,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Helmholtz32,
             ctranslation_type: FmmTranslationCType::Blas,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -551,13 +683,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Helmholtz64,
             ctranslation_type: FmmTranslationCType::Blas,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -604,13 +736,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Helmholtz32,
             ctranslation_type: FmmTranslationCType::Fft,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 
     /// Constructor
@@ -657,13 +789,13 @@ pub mod constructors {
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-        let evaluator = Box::new(FmmEvaluator {
+        let evaluator = FmmEvaluator {
             data: data,
             ctype: FmmCType::Helmholtz64,
             ctranslation_type: FmmTranslationCType::Fft,
-        });
+        };
 
-        Box::into_raw(evaluator) as *mut FmmEvaluator
+        Box::into_raw(Box::new(evaluator))
     }
 }
 
@@ -672,15 +804,12 @@ pub mod api {
     use std::os::raw::c_void;
 
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
-    use itertools::Itertools;
 
-    use crate::{
-        traits::tree::{FmmTree, Tree, TreeNode},
-        BlasFieldTranslationIa, FftFieldTranslation, Fmm,
-    };
+    use crate::{BlasFieldTranslationIa, FftFieldTranslation, Fmm};
 
     use super::*;
 
+    /// Evaluate FMM
     #[no_mangle]
     pub extern "C" fn evaluate(fmm: *mut FmmEvaluator, timed: bool) {
         if !fmm.is_null() {
@@ -691,135 +820,82 @@ pub mod api {
             match ctype {
                 FmmCType::Laplace32 => match ctranslation_type {
                     FmmTranslationCType::Fft => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        f32,
-                                        Laplace3dKernel<f32>,
-                                        FftFieldTranslation<f32>,
-                                    >,
-                            )
-                        };
-
-                        fmm.evaluate(timed);
+                        let fmm = pointer
+                            as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
 
                     FmmTranslationCType::Blas => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        f32,
-                                        Laplace3dKernel<f32>,
-                                        BlasFieldTranslationSaRcmp<f32>,
-                                    >,
-                            )
-                        };
-
-                        fmm.evaluate(timed);
+                        let fmm = pointer
+                            as *mut Box<
+                                KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>,
+                            >;
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
                 },
 
                 FmmCType::Laplace64 => match ctranslation_type {
                     FmmTranslationCType::Fft => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        f64,
-                                        Laplace3dKernel<f64>,
-                                        FftFieldTranslation<f64>,
-                                    >,
-                            )
-                        };
+                        let fmm = pointer
+                            as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
 
-                        fmm.evaluate(timed);
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
 
                     FmmTranslationCType::Blas => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        f64,
-                                        Laplace3dKernel<f64>,
-                                        BlasFieldTranslationSaRcmp<f64>,
-                                    >,
-                            )
-                        };
+                        let fmm = pointer
+                            as *mut Box<
+                                KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                            >;
 
-                        fmm.evaluate(timed);
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
                 },
 
                 FmmCType::Helmholtz32 => match ctranslation_type {
                     FmmTranslationCType::Fft => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        c32,
-                                        Helmholtz3dKernel<c32>,
-                                        FftFieldTranslation<c32>,
-                                    >,
-                            )
-                        };
+                        let fmm = pointer
+                            as *mut Box<
+                                KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>,
+                            >;
 
-                        fmm.evaluate(timed);
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
 
                     FmmTranslationCType::Blas => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        c32,
-                                        Helmholtz3dKernel<c32>,
-                                        BlasFieldTranslationIa<c32>,
-                                    >,
-                            )
-                        };
+                        let fmm = pointer
+                            as *mut Box<
+                                KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>,
+                            >;
 
-                        fmm.evaluate(timed);
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
                 },
 
                 FmmCType::Helmholtz64 => match ctranslation_type {
                     FmmTranslationCType::Fft => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        c64,
-                                        Helmholtz3dKernel<c64>,
-                                        FftFieldTranslation<c64>,
-                                    >,
-                            )
-                        };
+                        let fmm = pointer
+                            as *mut Box<
+                                KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>,
+                            >;
 
-                        fmm.evaluate(timed);
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
 
                     FmmTranslationCType::Blas => {
-                        let fmm = unsafe {
-                            Box::from_raw(
-                                pointer
-                                    as *mut KiFmm<
-                                        c64,
-                                        Helmholtz3dKernel<c64>,
-                                        BlasFieldTranslationIa<c64>,
-                                    >,
-                            )
-                        };
+                        let fmm = pointer
+                            as *mut Box<
+                                KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>,
+                            >;
 
-                        fmm.evaluate(timed);
+                        let times = unsafe { (*fmm).evaluate(timed) };
                     }
                 },
             }
         }
     }
 
+    /// Clear charges, and re-attach
     #[no_mangle]
     pub extern "C" fn clear(fmm: *mut FmmEvaluator, charges: *const c_void, ncharges: usize) {
         if !fmm.is_null() {
@@ -975,6 +1051,7 @@ pub mod api {
         }
     }
 
+    /// All potentials
     #[no_mangle]
     pub extern "C" fn potentials(fmm: *mut FmmEvaluator) -> Potentials {
         assert!(!fmm.is_null());
@@ -986,328 +1063,127 @@ pub mod api {
         match ctype {
             FmmCType::Laplace32 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::F32,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::F32,
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f32,
-                                    Laplace3dKernel<f32>,
-                                    BlasFieldTranslationSaRcmp<f32>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>,
+                        >;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::F32,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::F32,
+                        }
                     }
                 }
             },
 
             FmmCType::Laplace64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::F64,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::F64,
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f64,
-                                    Laplace3dKernel<f64>,
-                                    BlasFieldTranslationSaRcmp<f64>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                        >;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::F64,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::F64,
+                        }
                     }
                 }
             },
 
             FmmCType::Helmholtz32 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    FftFieldTranslation<c32>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>>;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::C32,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::C32,
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    BlasFieldTranslationIa<c32>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>,
+                        >;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::C32,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::C32,
+                        }
                     }
                 }
             },
 
             FmmCType::Helmholtz64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    FftFieldTranslation<c64>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>>;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::C64,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::C64,
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    BlasFieldTranslationIa<c64>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>,
+                        >;
 
-                    Potentials {
-                        len: fmm.potentials.len(),
-                        data: unsafe { fmm.potentials.as_ptr() as *const c_void },
-                        scalar: ScalarType::C64,
+                    unsafe {
+                        Potentials {
+                            len: (*fmm).potentials.len(),
+                            data: (*fmm).potentials.as_ptr() as *const c_void,
+                            scalar: ScalarType::C64,
+                        }
                     }
                 }
             },
         }
     }
 
-    #[no_mangle]
-    pub extern "C" fn global_indices_source_tree(fmm: *mut FmmEvaluator) -> GlobalIndices {
-        assert!(!fmm.is_null());
-        let ctype = unsafe { (*fmm).get_ctype() };
-        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
-        let pointer = unsafe { (*fmm).get_pointer() };
-
-        match ctype {
-            FmmCType::Laplace32 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f32,
-                                    Laplace3dKernel<f32>,
-                                    BlasFieldTranslationSaRcmp<f32>,
-                                >,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-            },
-
-            FmmCType::Laplace64 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f64,
-                                    Laplace3dKernel<f64>,
-                                    BlasFieldTranslationSaRcmp<f64>,
-                                >,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-            },
-
-            FmmCType::Helmholtz32 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    FftFieldTranslation<c32>,
-                                >,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    BlasFieldTranslationIa<c32>,
-                                >,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-            },
-
-            FmmCType::Helmholtz64 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    FftFieldTranslation<c64>,
-                                >,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    BlasFieldTranslationIa<c64>,
-                                >,
-                        )
-                    };
-
-                    GlobalIndices {
-                        len: fmm.tree.source_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-            },
-        }
-    }
-
+    /// Global indices of target points
     #[no_mangle]
     pub extern "C" fn global_indices_target_tree(fmm: *mut FmmEvaluator) -> GlobalIndices {
         assert!(!fmm.is_null());
@@ -1318,330 +1194,128 @@ pub mod api {
         match ctype {
             FmmCType::Laplace32 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f32,
-                                    Laplace3dKernel<f32>,
-                                    BlasFieldTranslationSaRcmp<f32>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>,
+                        >;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
             },
 
             FmmCType::Laplace64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f64,
-                                    Laplace3dKernel<f64>,
-                                    BlasFieldTranslationSaRcmp<f64>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                        >;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
             },
 
             FmmCType::Helmholtz32 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    FftFieldTranslation<c32>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>>;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    BlasFieldTranslationIa<c32>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>,
+                        >;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
             },
 
             FmmCType::Helmholtz64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    FftFieldTranslation<c64>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>>;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
 
                 FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    BlasFieldTranslationIa<c64>,
-                                >,
-                        )
-                    };
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>,
+                        >;
 
-                    GlobalIndices {
-                        len: fmm.tree.target_tree.global_indices.len(),
-                        data: unsafe {
-                            fmm.tree.target_tree.global_indices.as_ptr() as *const c_void
-                        },
-                    }
-                }
-            },
-        }
-    }
-
-    #[no_mangle]
-    pub extern "C" fn all_leaves_source_tree(fmm: *mut FmmEvaluator) -> MortonKeys {
-        assert!(!fmm.is_null());
-        let ctype = unsafe { (*fmm).get_ctype() };
-        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
-        let pointer = unsafe { (*fmm).get_pointer() };
-
-        match ctype {
-            FmmCType::Laplace32 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f32,
-                                    Laplace3dKernel<f32>,
-                                    BlasFieldTranslationSaRcmp<f32>,
-                                >,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
-                    }
-                }
-            },
-
-            FmmCType::Laplace64 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const c_void
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    f64,
-                                    Laplace3dKernel<f64>,
-                                    BlasFieldTranslationSaRcmp<f64>,
-                                >,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
-                    }
-                }
-            },
-
-            FmmCType::Helmholtz32 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    FftFieldTranslation<c32>,
-                                >,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c32,
-                                    Helmholtz3dKernel<c32>,
-                                    BlasFieldTranslationIa<c32>,
-                                >,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
-                    }
-                }
-            },
-
-            FmmCType::Helmholtz64 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    FftFieldTranslation<c64>,
-                                >,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
-                    }
-                }
-
-                FmmTranslationCType::Blas => {
-                    let mut fmm = unsafe {
-                        Box::from_raw(
-                            pointer
-                                as *mut KiFmm<
-                                    c64,
-                                    Helmholtz3dKernel<c64>,
-                                    BlasFieldTranslationIa<c64>,
-                                >,
-                        )
-                    };
-
-                    MortonKeys {
-                        len: fmm.tree.source_tree.leaves.len(),
-                        data: unsafe {
-                            fmm.tree.source_tree.leaves.as_ptr() as *const u64
-                        },
+                    unsafe {
+                        GlobalIndices {
+                            len: (*fmm).tree.target_tree.global_indices.len(),
+                            data: {
+                                (*fmm).tree.target_tree.global_indices.as_ptr() as *const c_void
+                            },
+                        }
                     }
                 }
             },
