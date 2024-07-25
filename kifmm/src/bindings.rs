@@ -894,7 +894,7 @@ pub mod api {
         }
     }
 
-    /// Clear charges, and re-attach
+    /// Clear charges, and attach new charges
     #[no_mangle]
     pub extern "C" fn clear(fmm: *mut FmmEvaluator, charges: *const c_void, ncharges: usize) {
         if !fmm.is_null() {
@@ -1050,7 +1050,7 @@ pub mod api {
         }
     }
 
-    /// All potentials
+    /// Query for all potentials
     #[no_mangle]
     pub extern "C" fn potentials(fmm: *mut FmmEvaluator) -> Potentials {
         assert!(!fmm.is_null());
@@ -1182,7 +1182,7 @@ pub mod api {
         }
     }
 
-    /// Global indices of target points
+    /// Query for global indices of target points
     #[no_mangle]
     pub extern "C" fn global_indices_target_tree(fmm: *mut FmmEvaluator) -> GlobalIndices {
         assert!(!fmm.is_null());

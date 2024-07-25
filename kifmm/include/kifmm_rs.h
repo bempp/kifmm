@@ -318,16 +318,16 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
 void evaluate(struct FmmEvaluator *fmm, bool timed);
 
 /**
- * Clear charges, and re-attach
+ * Clear charges, and attach new charges
  */
 void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
 
 /**
- * All potentials
+ * Query for all potentials
  */
 struct Potentials potentials(struct FmmEvaluator *fmm);
 
 /**
- * Global indices of target points
+ * Query for global indices of target points
  */
 struct GlobalIndices global_indices_target_tree(struct FmmEvaluator *fmm);
