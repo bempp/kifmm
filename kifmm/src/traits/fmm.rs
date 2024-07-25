@@ -110,6 +110,8 @@ where
         leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
 
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>>;
+
     /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
     fn equivalent_surface_order(&self, level: u64) -> usize;
 

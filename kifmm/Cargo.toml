@@ -38,6 +38,7 @@ bytemuck = "1.16.0"
 rand_distr = "0.4.3"
 bitflags = "2.6.0"
 rlst = {version = "0.2.0"}
+coe-rs = "0.1.2"
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}

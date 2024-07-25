@@ -182,6 +182,10 @@ where
         }
     }
 
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>> {
+        Some(&self.potentials)
+    }
+
     fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
         // Upward pass
         let mut times = FmmTime::new();
