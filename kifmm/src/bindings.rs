@@ -206,7 +206,6 @@ pub extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
     unsafe { drop(Box::from_raw(fmm_p)) }
 }
 
-
 /// All constructors
 pub mod constructors {
     use std::ffi::c_void;
