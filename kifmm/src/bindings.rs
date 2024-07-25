@@ -70,7 +70,7 @@ pub mod types {
 
 /// All constructors
 pub mod constructors {
-    use std::os::raw::c_void;
+    use std::{f32::consts::E, ffi::c_void};
 
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
     use rlst::rlst_array_from_slice1;
@@ -81,37 +81,28 @@ pub mod constructors {
 
     /// Constructor
     #[no_mangle]
-    pub extern "C" fn laplace_blas_rsvd_f32_alloc(
+    pub extern "C" fn laplace_blas_svd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
-        sources: *const f32,
+        sources: *const c_void,
         nsources: usize,
-        targets: *const f32,
+        targets: *const c_void,
         ntargets: usize,
-        charges: *const f32,
+        charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f32,
-        svd_mode: bool,
-        rsvd_ncomponents: usize,
-        rsvd_noversamples: usize,
-        rsvd_random_state: usize,
     ) -> *mut FmmEvaluator {
-        let sources = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-        };
-        let targets = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-        };
-        let charges = unsafe {
-            rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
-        };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
 
         let expansion_order =
             unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
 
@@ -122,10 +113,10 @@ pub mod constructors {
         );
 
         let fmm = SingleNodeBuilder::new()
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                charges.data(),
+                charges,
                 expansion_order,
                 Laplace3dKernel::new(),
                 green_kernels::types::EvalType::Value,
@@ -146,396 +137,528 @@ pub mod constructors {
         Box::into_raw(evaluator) as *mut FmmEvaluator
     }
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn laplace_blas_f64(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f64,
-    //     nsources: usize,
-    //     targets: *const f64,
-    //     ntargets: usize,
-    //     charges: *const f64,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     singular_value_threshold: f64,
-    //     svd_mode: bool,
-    //     rsvd_ncomponents: usize,
-    //     rsvd_noversamples: usize,
-    //     rsvd_random_state: usize,
-    // ) -> *mut LaplaceBlas64 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
-    //     };
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_blas_svd_f64_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f64,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
-    //     let singular_value_threshold = Some(singular_value_threshold);
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
-    //     let field_translation = BlasFieldTranslationSaRcmp::new(
-    //         singular_value_threshold,
-    //         None,
-    //         crate::fmm::types::FmmSvdMode::Deterministic,
-    //     );
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Laplace3dKernel::new(),
-    //                 green_kernels::types::EvalType::Value,
-    //                 field_translation,
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            None,
+            crate::fmm::types::FmmSvdMode::Deterministic,
+        );
 
-    //     Box::into_raw(fmm) as *mut LaplaceBlas64
-    // }
+        let fmm = SingleNodeBuilder::new()
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                green_kernels::types::EvalType::Value,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn laplace_fft_f32(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f32,
-    //     nsources: usize,
-    //     targets: *const f32,
-    //     ntargets: usize,
-    //     charges: *const f32,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     block_size: usize,
-    // ) -> *mut LaplaceFft32 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
-    //     };
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Laplace64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        });
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Laplace3dKernel::new(),
-    //                 green_kernels::types::EvalType::Value,
-    //                 FftFieldTranslation::new(Some(block_size)),
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
 
-    //     Box::into_raw(fmm) as *mut LaplaceFft32
-    // }
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_blas_rsvd_f32_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f32,
+        n_components: usize,
+        n_oversamples: usize,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn laplace_fft_f64(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f64,
-    //     nsources: usize,
-    //     targets: *const f64,
-    //     ntargets: usize,
-    //     charges: *const f64,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     block_size: usize,
-    // ) -> *mut LaplaceFft64 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(charges, ncharges), [ncharges])
-    //     };
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Laplace3dKernel::new(),
-    //                 green_kernels::types::EvalType::Value,
-    //                 FftFieldTranslation::new(Some(block_size)),
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
 
-    //     Box::into_raw(fmm) as *mut LaplaceFft64
-    // }
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn helmholtz_blas_f32(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f32,
-    //     nsources: usize,
-    //     targets: *const f32,
-    //     ntargets: usize,
-    //     charges: *const f32,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     wavenumber: f32,
-    //     singular_value_threshold: f32,
-    //     _svd_mode: bool,
-    //     _rsvd_ncomponents: usize,
-    //     _rsvd_noversamples: usize,
-    //     _rsvd_random_state: usize,
-    // ) -> *mut HelmholtzBlas32 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(
-    //             std::slice::from_raw_parts(charges as *const c32, ncharges),
-    //             [ncharges]
-    //         )
-    //     };
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            None,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
-    //     let singular_value_threshold = Some(singular_value_threshold);
+        let fmm = SingleNodeBuilder::new()
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                green_kernels::types::EvalType::Value,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    //     let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Helmholtz3dKernel::new(wavenumber),
-    //                 green_kernels::types::EvalType::Value,
-    //                 field_translation,
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Laplace32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        });
 
-    //     Box::into_raw(fmm) as *mut HelmholtzBlas32
-    // }
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn helmholtz_blas_f64(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f64,
-    //     nsources: usize,
-    //     targets: *const f64,
-    //     ntargets: usize,
-    //     charges: *const f64,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     wavenumber: f64,
-    //     singular_value_threshold: f64,
-    //     _svd_mode: bool,
-    //     _rsvd_ncomponents: usize,
-    //     _rsvd_noversamples: usize,
-    //     _rsvd_random_state: usize,
-    // ) -> *mut HelmholtzBlas64 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(
-    //             std::slice::from_raw_parts(charges as *const c64, ncharges),
-    //             [ncharges]
-    //         )
-    //     };
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_blas_rsvd_f64_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f64,
+        n_components: usize,
+        n_oversamples: usize,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
-    //     let singular_value_threshold = Some(singular_value_threshold);
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
-    //     let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Helmholtz3dKernel::new(wavenumber),
-    //                 green_kernels::types::EvalType::Value,
-    //                 field_translation,
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
 
-    //     Box::into_raw(fmm) as *mut HelmholtzBlas64
-    // }
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn helmholtz_fft_f32(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f32,
-    //     nsources: usize,
-    //     targets: *const f32,
-    //     ntargets: usize,
-    //     charges: *const f32,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     wavenumber: f32,
-    //     block_size: usize,
-    // ) -> *mut HelmholtzFft32 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(
-    //             std::slice::from_raw_parts(charges as *const c32, ncharges),
-    //             [ncharges]
-    //         )
-    //     };
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            None,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
+        let fmm = SingleNodeBuilder::new()
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                green_kernels::types::EvalType::Value,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Helmholtz3dKernel::new(wavenumber),
-    //                 green_kernels::types::EvalType::Value,
-    //                 FftFieldTranslation::new(Some(block_size)),
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
-    //     Box::into_raw(fmm) as *mut HelmholtzFft32
-    // }
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Laplace64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        });
 
-    // /// Constructor
-    // #[no_mangle]
-    // pub extern "C" fn helmholtz_fft_f64(
-    //     expansion_order: *const usize,
-    //     nexpansion_order: usize,
-    //     sources: *const f64,
-    //     nsources: usize,
-    //     targets: *const f64,
-    //     ntargets: usize,
-    //     charges: *const f64,
-    //     ncharges: usize,
-    //     prune_empty: bool,
-    //     n_crit: u64,
-    //     depth: u64,
-    //     wavenumber: f64,
-    //     block_size: usize,
-    // ) -> *mut HelmholtzFft64 {
-    //     let sources = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(sources, nsources), [nsources])
-    //     };
-    //     let targets = unsafe {
-    //         rlst_array_from_slice1!(std::slice::from_raw_parts(targets, ntargets), [ntargets])
-    //     };
-    //     let charges = unsafe {
-    //         rlst_array_from_slice1!(
-    //             std::slice::from_raw_parts(charges as *const c64, ncharges),
-    //             [ncharges]
-    //         )
-    //     };
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
 
-    //     let expansion_order =
-    //         unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
-    //     let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-    //     let depth = if depth > 0 { Some(depth) } else { None };
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_fft_f32_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        block_size: usize,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
 
-    //     let fmm = Box::new(
-    //         SingleNodeBuilder::new()
-    //             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-    //             .unwrap()
-    //             .parameters(
-    //                 charges.data(),
-    //                 expansion_order,
-    //                 Helmholtz3dKernel::new(wavenumber),
-    //                 green_kernels::types::EvalType::Value,
-    //                 FftFieldTranslation::new(Some(block_size)),
-    //             )
-    //             .unwrap()
-    //             .build()
-    //             .unwrap(),
-    //     );
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let depth = if depth > 0 { Some(depth) } else { None };
 
-    //     Box::into_raw(fmm) as *mut HelmholtzFft64
-    // }
+        let fmm = Box::new(
+            SingleNodeBuilder::new()
+                .tree(sources, targets, n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    green_kernels::types::EvalType::Value,
+                    FftFieldTranslation::new(Some(block_size)),
+                )
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Laplace32,
+            ctranslation_type: FmmTranslationCType::Fft,
+        });
+
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn laplace_fft_f64_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        block_size: usize,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let depth = if depth > 0 { Some(depth) } else { None };
+
+        let fmm = Box::new(
+            SingleNodeBuilder::new()
+                .tree(sources, targets, n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges,
+                    expansion_order,
+                    Laplace3dKernel::new(),
+                    green_kernels::types::EvalType::Value,
+                    FftFieldTranslation::new(Some(block_size)),
+                )
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Laplace64,
+            ctranslation_type: FmmTranslationCType::Fft,
+        });
+
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn helmholtz_blas_svd_f32_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        wavenumber: f32,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f32,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
+
+        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                green_kernels::types::EvalType::Value,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Helmholtz32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        });
+
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn helmholtz_blas_svd_f64_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        wavenumber: f64,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f64,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
+
+        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
+
+        let fmm = SingleNodeBuilder::new()
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                green_kernels::types::EvalType::Value,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Helmholtz64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        });
+
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn helmholtz_fft_f32_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        wavenumber: f32,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        block_size: usize,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let depth = if depth > 0 { Some(depth) } else { None };
+
+        let fmm = Box::new(
+            SingleNodeBuilder::new()
+                .tree(sources, targets, n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    green_kernels::types::EvalType::Value,
+                    FftFieldTranslation::new(Some(block_size)),
+                )
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Helmholtz32,
+            ctranslation_type: FmmTranslationCType::Fft,
+        });
+
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
+
+    /// Constructor
+    #[no_mangle]
+    pub extern "C" fn helmholtz_fft_f64_alloc(
+        expansion_order: *const usize,
+        nexpansion_order: usize,
+        wavenumber: f64,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        block_size: usize,
+    ) -> *mut FmmEvaluator {
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let depth = if depth > 0 { Some(depth) } else { None };
+
+        let fmm = Box::new(
+            SingleNodeBuilder::new()
+                .tree(sources, targets, n_crit, depth, prune_empty)
+                .unwrap()
+                .parameters(
+                    charges,
+                    expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    green_kernels::types::EvalType::Value,
+                    FftFieldTranslation::new(Some(block_size)),
+                )
+                .unwrap()
+                .build()
+                .unwrap(),
+        );
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = Box::new(FmmEvaluator {
+            data: data,
+            ctype: FmmCType::Helmholtz64,
+            ctranslation_type: FmmTranslationCType::Fft,
+        });
+
+        Box::into_raw(evaluator) as *mut FmmEvaluator
+    }
 }
 
 /// FMM API
