@@ -1,4 +1,3 @@
-use cbindgen;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,7 +14,7 @@ fn main() {
         .unwrap_or_else(|_| workspace_root.join("target"));
 
     // Ensure the target directory exists
-    fs::create_dir_all(&target_dir).expect("Unable to create target directory");
+    fs::create_dir_all(target_dir).expect("Unable to create target directory");
 
     // Create the header file path
     let header_path = Path::new(&crate_dir).join("include").join("kifmm_rs.h");

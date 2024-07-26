@@ -249,8 +249,13 @@ impl Drop for FmmEvaluator {
 }
 
 /// Free the FmmEvaluator object
+///
+/// # Safety
+/// This function is intended to be called from C. The caller must ensure that:
+/// - `fmm_p` is a valid pointer to a properly initialized `FmmEvaluator` instance.
+/// - The `fmm_p` pointer remains valid for the duration of the function call.
 #[no_mangle]
-pub extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
+pub unsafe extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
     assert!(!fmm_p.is_null());
     unsafe { drop(Box::from_raw(fmm_p)) }
 }
@@ -261,9 +266,11 @@ pub mod constructors {
 
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 
-    use crate::{BlasFieldTranslationIa, FftFieldTranslation};
+    use crate::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 
-    use super::*;
+    use super::{
+        c32, c64, FmmCType, FmmEvaluator, FmmTranslationCType, Laplace3dKernel, SingleNodeBuilder,
+    };
 
     /// Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
     /// with deterministic SVD.
@@ -288,8 +295,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn laplace_blas_svd_f32_alloc(
+    pub unsafe extern "C" fn laplace_blas_svd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         sources: *const c_void,
@@ -337,7 +349,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Blas,
         };
@@ -368,8 +380,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn laplace_blas_svd_f64_alloc(
+    pub unsafe extern "C" fn laplace_blas_svd_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         sources: *const c_void,
@@ -417,7 +434,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Laplace64,
             ctranslation_type: FmmTranslationCType::Blas,
         };
@@ -450,8 +467,13 @@ pub mod constructors {
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
     /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn laplace_blas_rsvd_f32_alloc(
+    pub unsafe extern "C" fn laplace_blas_rsvd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         sources: *const c_void,
@@ -513,7 +535,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Blas,
         };
@@ -546,8 +568,13 @@ pub mod constructors {
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
     /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn laplace_blas_rsvd_f64_alloc(
+    pub unsafe extern "C" fn laplace_blas_rsvd_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         sources: *const c_void,
@@ -609,7 +636,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Laplace64,
             ctranslation_type: FmmTranslationCType::Blas,
         };
@@ -639,8 +666,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn laplace_fft_f32_alloc(
+    pub unsafe extern "C" fn laplace_fft_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         sources: *const c_void,
@@ -687,7 +719,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Fft,
         };
@@ -717,8 +749,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn laplace_fft_f64_alloc(
+    pub unsafe extern "C" fn laplace_fft_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         sources: *const c_void,
@@ -765,7 +802,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Laplace64,
             ctranslation_type: FmmTranslationCType::Fft,
         };
@@ -797,8 +834,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn helmholtz_blas_svd_f32_alloc(
+    pub unsafe extern "C" fn helmholtz_blas_svd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         wavenumber: f32,
@@ -843,7 +885,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Helmholtz32,
             ctranslation_type: FmmTranslationCType::Blas,
         };
@@ -875,8 +917,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn helmholtz_blas_svd_f64_alloc(
+    pub unsafe extern "C" fn helmholtz_blas_svd_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         wavenumber: f64,
@@ -922,7 +969,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Helmholtz64,
             ctranslation_type: FmmTranslationCType::Blas,
         };
@@ -953,8 +1000,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn helmholtz_fft_f32_alloc(
+    pub unsafe extern "C" fn helmholtz_fft_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         wavenumber: f32,
@@ -1002,7 +1054,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Helmholtz32,
             ctranslation_type: FmmTranslationCType::Fft,
         };
@@ -1033,8 +1085,13 @@ pub mod constructors {
     /// reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn helmholtz_fft_f64_alloc(
+    pub unsafe extern "C" fn helmholtz_fft_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
         wavenumber: f64,
@@ -1082,7 +1139,7 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
-            data: data,
+            data,
             ctype: FmmCType::Helmholtz64,
             ctranslation_type: FmmTranslationCType::Fft,
         };
@@ -1105,7 +1162,11 @@ pub mod api {
         BlasFieldTranslationIa, FftFieldTranslation, Fmm,
     };
 
-    use super::*;
+    use super::{
+        c32, c64, BlasFieldTranslationSaRcmp, Coordinates, FmmCType, FmmEvaluator,
+        FmmTranslationCType, GlobalIndices, KiFmm, Laplace3dKernel, MortonKeys, Potential,
+        Potentials, ScalarType,
+    };
 
     /// Evaluate the Fast Multipole Method (FMM).
     ///
@@ -1113,8 +1174,13 @@ pub mod api {
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `timed`: Boolean flag to time each operator.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn evaluate(fmm: *mut FmmEvaluator, timed: bool) {
+    pub unsafe extern "C" fn evaluate(fmm: *mut FmmEvaluator, timed: bool) {
         if !fmm.is_null() {
             let ctype = unsafe { (*fmm).get_ctype() };
             let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
@@ -1205,8 +1271,17 @@ pub mod api {
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `charges`: A pointer to the new charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn clear(fmm: *mut FmmEvaluator, charges: *const c_void, ncharges: usize) {
+    pub unsafe extern "C" fn clear(
+        fmm: *mut FmmEvaluator,
+        charges: *const c_void,
+        ncharges: usize,
+    ) {
         if !fmm.is_null() {
             let ctype = unsafe { (*fmm).get_ctype() };
             let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
@@ -1365,8 +1440,13 @@ pub mod api {
     /// # Parameters
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn all_potentials(fmm: *mut FmmEvaluator) -> *mut Potential {
+    pub unsafe extern "C" fn all_potentials(fmm: *mut FmmEvaluator) -> *mut Potential {
         assert!(!fmm.is_null());
 
         let ctype = unsafe { (*fmm).get_ctype() };
@@ -1512,8 +1592,13 @@ pub mod api {
     }
 
     /// Free Morton keys
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn free_morton_keys(keys_p: *mut MortonKeys) {
+    pub unsafe extern "C" fn free_morton_keys(keys_p: *mut MortonKeys) {
         if !keys_p.is_null() {
             unsafe { drop(Box::from_raw(keys_p)) }
         }
@@ -1526,8 +1611,15 @@ pub mod api {
     /// # Parameters
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn global_indices_target_tree(fmm: *mut FmmEvaluator) -> *mut GlobalIndices {
+    pub unsafe extern "C" fn global_indices_target_tree(
+        fmm: *mut FmmEvaluator,
+    ) -> *mut GlobalIndices {
         assert!(!fmm.is_null());
         let ctype = unsafe { (*fmm).get_ctype() };
         let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
@@ -1686,7 +1778,14 @@ pub mod api {
     /// # Parameters
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
-    pub extern "C" fn global_indices_source_tree(fmm: *mut FmmEvaluator) -> *mut GlobalIndices {
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    pub unsafe extern "C" fn global_indices_source_tree(
+        fmm: *mut FmmEvaluator,
+    ) -> *mut GlobalIndices {
         assert!(!fmm.is_null());
         let ctype = unsafe { (*fmm).get_ctype() };
         let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
@@ -1846,8 +1945,12 @@ pub mod api {
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `leaf`: The identifier of a leaf node.
     ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn leaf_potentials(fmm: *mut FmmEvaluator, leaf: u64) -> *mut Potentials {
+    pub unsafe extern "C" fn leaf_potentials(fmm: *mut FmmEvaluator, leaf: u64) -> *mut Potentials {
         assert!(!fmm.is_null());
         let ctype = unsafe { (*fmm).get_ctype() };
         let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
@@ -2191,8 +2294,13 @@ pub mod api {
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `leaf`: The identifier of the leaf node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn coordinates_source_tree(
+    pub unsafe extern "C" fn coordinates_source_tree(
         fmm: *mut FmmEvaluator,
         leaf: u64,
     ) -> *mut Coordinates {
@@ -2458,8 +2566,13 @@ pub mod api {
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `leaf`: The identifier of the leaf node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn coordinates_target_tree(
+    pub unsafe extern "C" fn coordinates_target_tree(
         fmm: *mut FmmEvaluator,
         leaf: u64,
     ) -> *mut Coordinates {
@@ -2725,8 +2838,13 @@ pub mod api {
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `leaf`: The identifier of the leaf node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn leaves_target_tree(fmm: *mut FmmEvaluator) -> *mut MortonKeys {
+    pub unsafe extern "C" fn leaves_target_tree(fmm: *mut FmmEvaluator) -> *mut MortonKeys {
         assert!(!fmm.is_null());
         let ctype = unsafe { (*fmm).get_ctype() };
         let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
@@ -2949,8 +3067,13 @@ pub mod api {
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `leaf`: The identifier of the leaf node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub extern "C" fn leaves_source_tree(fmm: *mut FmmEvaluator) -> *mut MortonKeys {
+    pub unsafe extern "C" fn leaves_source_tree(fmm: *mut FmmEvaluator) -> *mut MortonKeys {
         assert!(!fmm.is_null());
         let ctype = unsafe { (*fmm).get_ctype() };
         let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };

@@ -139,6 +139,11 @@ typedef struct Coordinates {
 
 /**
  * Free the FmmEvaluator object
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - `fmm_p` is a valid pointer to a properly initialized `FmmEvaluator` instance.
+ * - The `fmm_p` pointer remains valid for the duration of the function call.
  */
 void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
 
@@ -166,6 +171,11 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order,
                                                 uintptr_t nexpansion_order,
@@ -204,6 +214,11 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order,
                                                 uintptr_t nexpansion_order,
@@ -244,6 +259,11 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
  * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_order,
                                                  uintptr_t nexpansion_order,
@@ -286,6 +306,11 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
  * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_order,
                                                  uintptr_t nexpansion_order,
@@ -325,6 +350,11 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
@@ -362,6 +392,11 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
@@ -401,6 +436,11 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_order,
                                                   uintptr_t nexpansion_order,
@@ -441,6 +481,11 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_order,
                                                   uintptr_t nexpansion_order,
@@ -480,6 +525,11 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
                                              uintptr_t nexpansion_order,
@@ -519,6 +569,11 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  * reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              uintptr_t nexpansion_order,
@@ -541,6 +596,11 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `timed`: Boolean flag to time each operator.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 void evaluate(struct FmmEvaluator *fmm, bool timed);
 
@@ -552,6 +612,11 @@ void evaluate(struct FmmEvaluator *fmm, bool timed);
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `charges`: A pointer to the new charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
 
@@ -561,11 +626,21 @@ void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
  * # Parameters
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct Potential *all_potentials(struct FmmEvaluator *fmm);
 
 /**
  * Free Morton keys
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 void free_morton_keys(struct MortonKeys *keys_p);
 
@@ -577,6 +652,11 @@ void free_morton_keys(struct MortonKeys *keys_p);
  * # Parameters
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
 
@@ -588,6 +668,10 @@ struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `leaf`: The identifier of a leaf node.
  *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct Potentials *leaf_potentials(struct FmmEvaluator *fmm, uint64_t leaf);
 
@@ -598,6 +682,11 @@ struct Potentials *leaf_potentials(struct FmmEvaluator *fmm, uint64_t leaf);
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `leaf`: The identifier of the leaf node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct Coordinates *coordinates_source_tree(struct FmmEvaluator *fmm, uint64_t leaf);
 
@@ -608,6 +697,11 @@ struct Coordinates *coordinates_source_tree(struct FmmEvaluator *fmm, uint64_t l
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `leaf`: The identifier of the leaf node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct Coordinates *coordinates_target_tree(struct FmmEvaluator *fmm, uint64_t leaf);
 
@@ -618,6 +712,11 @@ struct Coordinates *coordinates_target_tree(struct FmmEvaluator *fmm, uint64_t l
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `leaf`: The identifier of the leaf node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
 
@@ -628,5 +727,10 @@ struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `leaf`: The identifier of the leaf node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
  */
 struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
