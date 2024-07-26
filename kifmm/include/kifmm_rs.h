@@ -4,91 +4,6 @@
 #include <stdlib.h>
 
 /**
- * Maximum block size to use to process leaf boxes during P2M kernel.
- */
-#define P2M_MAX_BLOCK_SIZE 32
-
-/**
- * Maximum block size to use to process boxes by level during M2M kernel.
- */
-#define M2M_MAX_BLOCK_SIZE 16
-
-/**
- * Maximum block size to use to process boxes by level during L2L kernel.
- */
-#define L2L_MAX_BLOCK_SIZE 16
-
-/**
- * Default value chosen for maximum number of particles per leaf.
- */
-#define DEFAULT_NCRIT 150
-
-/**
- * Default maximum block size to use to process multiple child clusters during FFT M2L
- */
-#define DEFAULT_M2L_FFT_BLOCK_SIZE 128
-
-/**
- * Maximum possible level of octree recursion, by definition.
- */
-#define DEEPEST_LEVEL 16
-
-/**
- * The 'size' of each level in terms of octants along each axis, at the maximum depth of recursion.
- */
-#define LEVEL_SIZE 65536
-
-/**
- * Number of bits used for Level information.
- */
-#define LEVEL_DISPLACEMENT 15
-
-/**
- * Mask for the last 15 bits.
- */
-#define LEVEL_MASK 32767
-
-/**
- * Mask for lowest order byte.
- */
-#define BYTE_MASK 255
-
-/**
- * Number of bits in a byte.
- */
-#define BYTE_DISPLACEMENT 8
-
-/**
- * Mask encapsulating a bit.
- */
-#define NINE_BIT_MASK 511
-
-/**
- * Number of siblings for each node in octree
- */
-#define NSIBLINGS 8
-
-/**
- * Number of siblings squared for each node in octree.
- */
-#define NSIBLINGS_SQUARED 64
-
-/**
- * Number of corners for each box.
- */
-#define NCORNERS 8
-
-/**
- * Number of unique transfer vectors for homogenous, scale invariant, kernels.
- */
-#define NTRANSFER_VECTORS_KIFMM 316
-
-/**
- * Maximum number of boxes in a 1 box deep halo around a given box in 3D.
- */
-#define NHALO 26
-
-/**
  * Fmm Type
  */
 typedef enum FmmCType {
@@ -126,11 +41,20 @@ typedef struct FmmEvaluator {
 } FmmEvaluator;
 
 /**
- * Potentials
+ * potentials
  */
-typedef struct Potentials {
+typedef struct Potential {
   uintptr_t len;
   const void *data;
+  enum ScalarType scalar;
+} Potential;
+
+/**
+ * potentials
+ */
+typedef struct Potentials {
+  uintptr_t n;
+  const struct Potential *data;
   enum ScalarType scalar;
 } Potentials;
 
@@ -141,6 +65,23 @@ typedef struct GlobalIndices {
   uintptr_t len;
   const void *data;
 } GlobalIndices;
+
+/**
+ * Potentials
+ */
+typedef struct Coordinates {
+  uintptr_t len;
+  const void *data;
+  enum ScalarType scalar;
+} Coordinates;
+
+/**
+ * Morton keys
+ */
+typedef struct MortonKeys {
+  uintptr_t len;
+  const uint64_t *data;
+} MortonKeys;
 
 void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
 
@@ -325,9 +266,28 @@ void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
 /**
  * Query for all potentials
  */
-struct Potentials potentials(struct FmmEvaluator *fmm);
+struct Potential *all_potentials(struct FmmEvaluator *fmm);
+
+/**
+ * Free potential
+ */
+void free_potential(struct Potential *potential_p);
+
+/**
+ * Free potentials
+ */
+void free_potentials(struct Potentials *potentials_p);
+
+void free_global_indices(struct GlobalIndices *global_indices_p);
 
 /**
  * Query for global indices of target points
  */
-struct GlobalIndices global_indices_target_tree(struct FmmEvaluator *fmm);
+struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
+
+/**
+ * Query source tree for coordinates contained in a leaf box
+ */
+struct Coordinates *coordinates_source_tree(struct FmmEvaluator *fmm, uint64_t leaf);
+
+struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
