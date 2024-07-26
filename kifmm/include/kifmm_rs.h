@@ -535,17 +535,32 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              uintptr_t block_size);
 
 /**
- * Evaluate
+ * Evaluate the Fast Multipole Method (FMM).
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `timed`: Boolean flag to time each operator.
  */
 void evaluate(struct FmmEvaluator *fmm, bool timed);
 
 /**
- * Clear charges, and attach new charges
+ * Clear charges and attach new charges.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `charges`: A pointer to the new charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
  */
 void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
 
 /**
- * Query for all potentials
+ * Query for all evaluated potentials, returned in order of global index.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
  */
 struct Potential *all_potentials(struct FmmEvaluator *fmm);
 
@@ -555,15 +570,63 @@ struct Potential *all_potentials(struct FmmEvaluator *fmm);
 void free_morton_keys(struct MortonKeys *keys_p);
 
 /**
- * Query for global indices of target points
+ * Query for global indices of target points, where each index position corresponds to input
+ * coordinate data index, and the elements correspond to the index as stored in the target tree
+ * and therefore in the evaluated potentials.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
  */
 struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
 
+/**
+ * Query for potentials at a specific leaf.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `leaf`: The identifier of a leaf node.
+ *
+ */
 struct Potentials *leaf_potentials(struct FmmEvaluator *fmm, uint64_t leaf);
 
 /**
- * Query source tree for coordinates contained in a leaf box
+ * Query source tree for coordinates contained in a leaf box.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `leaf`: The identifier of the leaf node.
  */
 struct Coordinates *coordinates_source_tree(struct FmmEvaluator *fmm, uint64_t leaf);
 
+/**
+ * Query target tree for coordinates contained in a leaf box.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `leaf`: The identifier of the leaf node.
+ */
+struct Coordinates *coordinates_target_tree(struct FmmEvaluator *fmm, uint64_t leaf);
+
+/**
+ * Query target tree for coordinates contained in a leaf box.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `leaf`: The identifier of the leaf node.
+ */
 struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
+
+/**
+ * Query source tree for coordinates contained in a leaf box.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `leaf`: The identifier of the leaf node.
+ */
+struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
