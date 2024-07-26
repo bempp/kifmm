@@ -583,7 +583,7 @@ where
     /// # Arguments
     ///
     /// - `points` - Mutable reference to points, used to count occupancy within blocks, contain
-    /// Morton encoding.
+    ///     Morton encoding.
     /// - `block_tree` - Initially constructed block_tree, subject to refinement through splitting.
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
     pub fn split_blocks(

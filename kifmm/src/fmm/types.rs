@@ -76,94 +76,94 @@ pub struct SendPtr<T> {
 /// - `dim` - Dimension of FMM, defaults to 3.
 ///
 /// - `tree`- Holds an octree structure (`SingleNodeFmmTree`) representing
-/// the sources and targets within the computational domain.
+///     the sources and targets within the computational domain.
 ///
 /// - `kernel`- Specifies the kernel to be used for the FMM calculations.
 ///
 /// - `charges`- Holds the charge data associated with the source points, stored as a buffer
-/// where each item is associated with a leaf in Morton order and looked up using `charge_index_pointer_targets`.
-/// The displacement must be correctly calculated if using without the provided trait interface and multiple input charges
-/// are used in the FMM.
+///    where each item is associated with a leaf in Morton order and looked up using `charge_index_pointer_targets`.
+///    The displacement must be correctly calculated if using without the provided trait interface and multiple input charges
+///    are used in the FMM.
 ///
 /// - `expansion_order`- Specifies the expansion order for the multipole/local expansions,
-/// used to control the accuracy and computational complexity of the FMM.
+///    used to control the accuracy and computational complexity of the FMM.
 ///
 /// - `ncoeffs`- the number of quadrature points associated with the `exansion_order`.
 ///
 /// - `kernel_eval_type`- Specifies the evaluation type of the kernel, either evaluating potentials
-/// or potentials as well as gradients.
+///    or potentials as well as gradients.
 ///
 /// - `fmm_eval_type`- Defines the evaluation type for the FMM algorithm, either for a single charge
-/// vector or multiple charge vectors.
+///    vector or multiple charge vectors.
 ///
 /// - `kernel_eval_size` - Set by the kernel eval type.
 ///
 /// - `charge_index_pointer_sources` - Index pointer providing left and right indices of source points
-/// contained within a source leaf. This vector is `n_sources` long.
+///    contained within a source leaf. This vector is `n_sources` long.
 ///
 /// - `charge_index_pointer_targets` - Index pointer providing left and right indices of target points
-/// contained within a target leaf. This vector is `n_targets` long.
+///    contained within a target leaf. This vector is `n_targets` long.
 ///
 /// - `leaf_upward_surfaces_sources` - Upward surface associated with each source leaf, in Morton order, precomputed
-/// for performance during loops.
+///    for performance during loops.
 ///
 /// - `leaf_upward_surfaces_targets` - Upward surface associated with each target leaf, in Morton order, precomputed
-/// for performance during loops.
+///    for performance during loops.
 ///
 /// - `leaf_scales_sources` - Scale factor for operators when applying to a each source leaf box, precomputed for
-/// performance during loops.
+///    performance during loops.
 ///
 /// - `uc2e_inv_1` - First component of pseudo-inverse of interaction matrix between upward check and equivalent surfaces, stored
-/// in two parts for stability purposes.
+///    in two parts for stability purposes.
 ///
 /// - `uc2e_inv_2` - Second component of pseudo-inverse of interaction matrix between upward check and equivalent surfaces, stored
-/// in two parts for stability purposes.
+///    in two parts for stability purposes.
 ///
 /// - `dc2e_inv_1` - First component of pseudo-inverse of interaction matrix between downward check and equivalent surfaces, stored
-/// in two parts for stability purposes.
+///    in two parts for stability purposes.
 ///
 /// - `dc2e_inv_2` - Second component of pseudo-inverse of interaction matrix between downward check and equivalent surfaces, stored
-/// in two parts for stability purposes.
+///    in two parts for stability purposes.
 ///
 /// - `source` -  The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order as a single matrix
-/// for ease of application.
+///    for ease of application.
 ///
 /// - `source_vec` -  The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order where each
-/// index corresponds to a child box.
+///    index corresponds to a child box.
 ///
 /// - `target_vec` - The local translation matrices, for a cluster of eight children and their parent. Stored in Morton order where each
-/// index corresponds to a child box.
+///    index corresponds to a child box.
 ///
 /// - `multipoles` - Buffer containing multipole data of all source boxes stored in Morton order. If `n` charge vectors are used in
-/// the FMM, their associated multipole data is displaced by `nsources * ncoeffs` in `multipole` where `ncoeffs` is the length of each
-/// sequence corresponding to a multipole expansion and there are `nsources` boxes in the source tree.
+///    the FMM, their associated multipole data is displaced by `nsources * ncoeffs` in `multipole` where `ncoeffs` is the length of each
+///    sequence corresponding to a multipole expansion and there are `nsources` boxes in the source tree.
 ///
 /// - `locals` - Buffer containing local data of all target boxes stored in Morton order. If `n` charge vectors are used in
-/// the FMM, their associated local data is displaced by `ntargets * ncoeffs` in `locals` where `ncoeffs` is the length of each
-/// sequence corresponding to a local expansion and there are `ntargets` boxes in the target tree.
+///    the FMM, their associated local data is displaced by `ntargets * ncoeffs` in `locals` where `ncoeffs` is the length of each
+///    sequence corresponding to a local expansion and there are `ntargets` boxes in the target tree.
 ///
-/// `potentials` - Buffer containing evaluated potentials of all target boxes stored in Morton order. If `n` charge vectors are used in
-/// the FMM, their associated potential data is displaced by `ntargets * nparticles` in `potentials` where `nparticles` is the number of
-/// target particles and there are `ntargets` boxes in the target tree.
+/// - `potentials` - Buffer containing evaluated potentials of all target boxes stored in Morton order. If `n` charge vectors are used in
+///    the FMM, their associated potential data is displaced by `ntargets * nparticles` in `potentials` where `nparticles` is the number of
+///    target particles and there are `ntargets` boxes in the target tree.
 ///
 /// - `leaf_multipoles` - Thread safe pointers to beginning of buffer containing leaf multipole data, where the outer index is set by the number
-/// of evaluations being computed by the FMM.
+///    of evaluations being computed by the FMM.
 ///
 /// - `level_multipoles` - Thread safe pointers to beginning of buffer containing multipole data at each level, where the outer index is set by the
-/// the level of the source tree, and the inner index is set by the number of evaluations being computed by the FMM.
+///    the level of the source tree, and the inner index is set by the number of evaluations being computed by the FMM.
 ///
 /// - `leaf_locals` - Thread safe pointers to beginning of buffer containing leaf local data, where the outer index is set by the number
-/// of evaluations being computed by the FMM.
+///    of evaluations being computed by the FMM.
 ///
 /// - `level_locals` - Thread safe pointers to beginning of buffer containing local data at each level, where the outer index is set by the
-/// the level of the target tree, and the inner index is set by the number of evaluations being computed by the FMM.
+///    the level of the target tree, and the inner index is set by the number of evaluations being computed by the FMM.
 ///
 /// - `level_index_pointer_locals - Index of each key in target tree at a given level within the Morton sorted keys at that level.
 ///
 /// - `level_index_pointer_multipoles- Index of each key in source tree at a given level within the Morton sorted keys at that level.
 ///
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
-/// If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
+///    If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
 #[allow(clippy::type_complexity)]
 pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where

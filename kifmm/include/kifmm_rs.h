@@ -168,7 +168,7 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  *
@@ -211,7 +211,7 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  *
@@ -254,7 +254,7 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
@@ -301,7 +301,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
@@ -347,7 +347,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  *
@@ -389,7 +389,7 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  *
@@ -433,7 +433,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  *
@@ -478,7 +478,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  *
@@ -522,7 +522,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  *
@@ -566,7 +566,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
- * reached based on a uniform particle distribution.
+ *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  *
