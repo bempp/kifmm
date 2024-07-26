@@ -61,7 +61,7 @@ pub mod types {
         C64,
     }
 
-    /// Potentials
+    /// Coordinates
     #[repr(C)]
     pub struct Coordinates {
         pub len: usize,
@@ -81,7 +81,7 @@ pub mod types {
     #[repr(C)]
     pub struct Potentials {
         pub n: usize,
-        pub data: *const Potential,
+        pub data: *mut Potential,
         pub scalar: ScalarType,
     }
 
@@ -97,6 +97,15 @@ pub mod types {
     pub struct MortonKeys {
         pub len: usize,
         pub data: *const u64,
+    }
+}
+
+impl Drop for MortonKeys {
+    fn drop(&mut self) {
+        let Self { len, data } = self;
+
+        let tmp = unsafe { Vec::from_raw_parts(*data as *mut u64, *len, *len) };
+        drop(tmp);
     }
 }
 
@@ -1219,21 +1228,13 @@ pub mod api {
         }
     }
 
-    /// Free potential
-    #[no_mangle]
-    pub extern "C" fn free_potential(potential_p: *mut Potential) {
-        unsafe { drop(Box::from_raw(potential_p)) }
-    }
 
-    /// Free potentials
+    /// Free Morton keys
     #[no_mangle]
-    pub extern "C" fn free_potentials(potentials_p: *mut Potentials) {
-        unsafe { drop(Box::from_raw(potentials_p)) }
-    }
-
-    #[no_mangle]
-    pub extern "C" fn free_global_indices(global_indices_p: *mut GlobalIndices) {
-        unsafe { drop(Box::from_raw(global_indices_p)) }
+    pub extern "C" fn free_morton_keys(keys_p: *mut MortonKeys) {
+        if !keys_p.is_null() {
+            unsafe { drop(Box::from_raw(keys_p)) }
+        }
     }
 
     /// Query for global indices of target points
@@ -1544,6 +1545,7 @@ pub mod api {
         }
     }
 
+    #[no_mangle]
     pub extern "C" fn leaf_potentials(fmm: *mut FmmEvaluator, leaf: u64) -> *mut Potentials {
         assert!(!fmm.is_null());
         let ctype = unsafe { (*fmm).get_ctype() };
@@ -1580,9 +1582,12 @@ pub mod api {
                             nvecs = 0
                         }
                     }
+
+                    let mut potentials = ManuallyDrop::new(potentials);
+
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::F32,
                     };
 
@@ -1620,9 +1625,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::F32,
                     };
 
@@ -1660,9 +1666,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::F64,
                     };
 
@@ -1700,9 +1707,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::F64,
                     };
 
@@ -1740,9 +1748,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::F32,
                     };
 
@@ -1780,9 +1789,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::C32,
                     };
 
@@ -1820,9 +1830,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::C64,
                     };
 
@@ -1860,9 +1871,10 @@ pub mod api {
                         }
                     }
 
+                    let mut potentials = ManuallyDrop::new(potentials);
                     let potentials = Potentials {
                         n: nvecs,
-                        data: potentials.as_ptr(),
+                        data: potentials.as_mut_ptr(),
                         scalar: ScalarType::C64,
                     };
 
@@ -2147,7 +2159,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
 
-                    let leaves = unsafe {
+                    let leaves: Vec<u64> = unsafe {
                         (*fmm)
                             .tree()
                             .target_tree()

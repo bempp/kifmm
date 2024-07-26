@@ -42,36 +42,39 @@ int main() {
   bool timed = true;
   evaluate(evaluator, timed);
 
-  // Potentials pot = potentials(evaluator);
-
-  // const double *array = (const double *)pot.data;
-
-  // // Print the array
-  // for (uintptr_t i = 0; i < 5; ++i) {
-  //   printf("%lf ", array[i]);
-  // }
-
   MortonKeys *leaves = leaves_target_tree(evaluator);
 
-    printf("Number of leaf keys (n): %zu\n", leaves->len);
+  printf("Number of leaf keys (n): %zu\n", leaves->len);
   for (uintptr_t i = 0; i < 5; ++i) {
-      printf("Element %zu: %llu\n", i, leaves->data[i]);
+    printf("Element %zu: %llu\n", i, leaves->data[i]);
   }
 
-  Coordinates *coordinates = coordinates_source_tree(evaluator, leaves->data[123]);
+  Potentials *potentials = leaf_potentials(evaluator, leaves->data[123]);
+
+  Coordinates *coordinates =
+      coordinates_source_tree(evaluator, leaves->data[123]);
   printf("Number of coordinates: %zu\n", coordinates->len);
 
   const double *coords = (const double *)coordinates->data;
-  for (uintptr_t i=0; i<5; ++i) {
-      printf("Element %zu: [%f, %f, %f]\n", i, coords[i*3], coords[i*3 + 1], coords[i*3+2]);
+  for (uintptr_t i = 0; i < 5; ++i) {
+    printf("Element %zu: [%f, %f, %f]\n", i, coords[i * 3], coords[i * 3 + 1],
+           coords[i * 3 + 2]);
   }
-  // const uint64_t *array = (const uint64_t*)leaves.data;
+
+  printf("Number of potentials: %zu\n", potentials->n);
+  Potential *pot = &potentials->data[0];
+  const double *data = (const double *)pot->data;
+  for (uintptr_t i = 0; i < 5; ++i) {
+    printf("Element %zu: %f\n", i, data[i]);
+  }
 
   // Cleanup
   free(sources);
   free(targets);
   free(charges);
   free_fmm_evaluator(evaluator);
+  free_morton_keys(leaves);
+  free(potentials);
 
   return 0;
 }

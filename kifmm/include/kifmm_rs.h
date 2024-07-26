@@ -50,13 +50,12 @@ typedef struct Potential {
 } Potential;
 
 /**
- * potentials
+ * Morton keys
  */
-typedef struct Potentials {
-  uintptr_t n;
-  const struct Potential *data;
-  enum ScalarType scalar;
-} Potentials;
+typedef struct MortonKeys {
+  uintptr_t len;
+  const uint64_t *data;
+} MortonKeys;
 
 /**
  * Global indices
@@ -67,21 +66,22 @@ typedef struct GlobalIndices {
 } GlobalIndices;
 
 /**
- * Potentials
+ * potentials
+ */
+typedef struct Potentials {
+  uintptr_t n;
+  struct Potential *data;
+  enum ScalarType scalar;
+} Potentials;
+
+/**
+ * Coordinates
  */
 typedef struct Coordinates {
   uintptr_t len;
   const void *data;
   enum ScalarType scalar;
 } Coordinates;
-
-/**
- * Morton keys
- */
-typedef struct MortonKeys {
-  uintptr_t len;
-  const uint64_t *data;
-} MortonKeys;
 
 void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
 
@@ -269,21 +269,16 @@ void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
 struct Potential *all_potentials(struct FmmEvaluator *fmm);
 
 /**
- * Free potential
+ * Free Morton keys
  */
-void free_potential(struct Potential *potential_p);
-
-/**
- * Free potentials
- */
-void free_potentials(struct Potentials *potentials_p);
-
-void free_global_indices(struct GlobalIndices *global_indices_p);
+void free_morton_keys(struct MortonKeys *keys_p);
 
 /**
  * Query for global indices of target points
  */
 struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
+
+struct Potentials *leaf_potentials(struct FmmEvaluator *fmm, uint64_t leaf);
 
 /**
  * Query source tree for coordinates contained in a leaf box
