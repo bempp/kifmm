@@ -4,7 +4,7 @@
 #include <stdlib.h>
 
 /**
- * Fmm Type
+ * Static FMM type
  */
 typedef enum FmmCType {
   FmmCType_Laplace32,
@@ -14,7 +14,7 @@ typedef enum FmmCType {
 } FmmCType;
 
 /**
- * Translation type
+ * M2L field translation mode
  */
 typedef enum FmmTranslationCType {
   FmmTranslationCType_Blas,
@@ -25,14 +25,26 @@ typedef enum FmmTranslationCType {
  * Scalar type
  */
 typedef enum ScalarType {
+  /**
+   * Float
+   */
   ScalarType_F32,
+  /**
+   * Double
+   */
   ScalarType_F64,
+  /**
+   * Complex FLoat
+   */
   ScalarType_C32,
+  /**
+   * Complex Double
+   */
   ScalarType_C64,
 } ScalarType;
 
 /**
- * Runtime FMM object
+ * Runtime FMM type constructed from C
  */
 typedef struct FmmEvaluator {
   enum FmmCType ctype;
@@ -41,36 +53,69 @@ typedef struct FmmEvaluator {
 } FmmEvaluator;
 
 /**
- * potentials
+ * Potential data
  */
 typedef struct Potential {
+  /**
+   * Length of underlying buffer, of length n_eval_mode*n_coordinates
+   * currently only support n_eval_mode=1, i.e. potentials
+   */
   uintptr_t len;
+  /**
+   * Pointer to underlying buffer
+   */
   const void *data;
+  /**
+   * Associated scalar type
+   */
   enum ScalarType scalar;
 } Potential;
 
 /**
- * Morton keys
+ * Morton keys, used to describe octree boxes, each represented as unique u64.
  */
 typedef struct MortonKeys {
+  /**
+   * Number of morton keys
+   */
   uintptr_t len;
+  /**
+   * Pointer to underlying buffer
+   */
   const uint64_t *data;
 } MortonKeys;
 
 /**
- * Global indices
+ * Implicit map between input coordinate index and global index
+ * after sorting during octree construction
  */
 typedef struct GlobalIndices {
+  /**
+   * Number of global indices
+   */
   uintptr_t len;
+  /**
+   * Pointer to underlying buffer
+   */
   const void *data;
 } GlobalIndices;
 
 /**
- * potentials
+ * Container for multiple Potentials. Used when FMM run over multiple
+ * charge vectors.
  */
 typedef struct Potentials {
+  /**
+   * Number of charge vectors associated with FMM call ()
+   */
   uintptr_t n;
+  /**
+   * Pointer to underlying buffer
+   */
   struct Potential *data;
+  /**
+   * Associated scalar type
+   */
   enum ScalarType scalar;
 } Potentials;
 
@@ -78,15 +123,49 @@ typedef struct Potentials {
  * Coordinates
  */
 typedef struct Coordinates {
+  /**
+   * Length of coordinates buffer of length 3*n_coordinates
+   */
   uintptr_t len;
+  /**
+   * Pointer to underlying buffer
+   */
   const void *data;
+  /**
+   * Associated scalar type
+   */
   enum ScalarType scalar;
 } Coordinates;
 
+/**
+ * Free the FmmEvaluator object
+ */
 void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
 
 /**
- * Constructor
+ * Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  */
 struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order,
                                                 uintptr_t nexpansion_order,
@@ -102,7 +181,29 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
                                                 float singular_value_threshold);
 
 /**
- * Constructor
+ * Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  */
 struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order,
                                                 uintptr_t nexpansion_order,
@@ -118,7 +219,31 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
                                                 double singular_value_threshold);
 
 /**
- * Constructor
+ * Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+ * with randomised SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+ * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
  */
 struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_order,
                                                  uintptr_t nexpansion_order,
@@ -136,7 +261,31 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
                                                  uintptr_t n_oversamples);
 
 /**
- * Constructor
+ * Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+ * with randomised SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+ * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
  */
 struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_order,
                                                  uintptr_t nexpansion_order,
@@ -154,7 +303,28 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
                                                  uintptr_t n_oversamples);
 
 /**
- * Constructor
+ * Constructor for F32 Laplace FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  */
 struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
@@ -170,7 +340,28 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
                                            uintptr_t block_size);
 
 /**
- * Constructor
+ * Constructor for F64 Laplace FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  */
 struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
@@ -186,7 +377,30 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
                                            uintptr_t block_size);
 
 /**
- * Constructor
+ * Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  */
 struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_order,
                                                   uintptr_t nexpansion_order,
@@ -203,7 +417,30 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
                                                   float singular_value_threshold);
 
 /**
- * Constructor
+ * Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
  */
 struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_order,
                                                   uintptr_t nexpansion_order,
@@ -220,7 +457,29 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
                                                   double singular_value_threshold);
 
 /**
- * Constructor
+ * Constructor for F32 Helmholtz FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  */
 struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
                                              uintptr_t nexpansion_order,
@@ -237,7 +496,29 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
                                              uintptr_t block_size);
 
 /**
- * Constructor
+ * Constructor for F64 Helmholtz FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ *
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `nexpansion_order`: The number of expansion orders.
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ * reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
  */
 struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              uintptr_t nexpansion_order,
@@ -254,7 +535,7 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              uintptr_t block_size);
 
 /**
- * Evaluate FMM
+ * Evaluate
  */
 void evaluate(struct FmmEvaluator *fmm, bool timed);
 

@@ -12,7 +12,7 @@ use crate::{
 pub mod types {
     use std::ffi::c_void;
 
-    /// Fmm Type
+    /// Static FMM type
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
     pub enum FmmCType {
@@ -22,7 +22,7 @@ pub mod types {
         Helmholtz64,
     }
 
-    /// Translation type
+    /// M2L field translation mode
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
     pub enum FmmTranslationCType {
@@ -30,7 +30,7 @@ pub mod types {
         Fft,
     }
 
-    /// Runtime FMM object
+    /// Runtime FMM type constructed from C
     #[repr(C)]
     pub struct FmmEvaluator {
         pub ctype: FmmCType,
@@ -38,15 +38,20 @@ pub mod types {
         pub data: *mut c_void,
     }
 
+
     impl FmmEvaluator {
+
+        /// Get the static FMM type
         pub fn get_ctype(&self) -> FmmCType {
             self.ctype
         }
 
+        /// Get the M2L field translation type
         pub fn get_ctranslation_type(&self) -> FmmTranslationCType {
             self.ctranslation_type
         }
 
+        /// Get the pointer to underlying runtime object
         pub fn get_pointer(&self) -> *mut c_void {
             self.data
         }
@@ -55,47 +60,67 @@ pub mod types {
     /// Scalar type
     #[repr(C)]
     pub enum ScalarType {
+        /// Float
         F32,
+        /// Double
         F64,
+        /// Complex FLoat
         C32,
+        /// Complex Double
         C64,
     }
 
     /// Coordinates
     #[repr(C)]
     pub struct Coordinates {
+        /// Length of coordinates buffer of length 3*n_coordinates
         pub len: usize,
+        /// Pointer to underlying buffer
         pub data: *const c_void,
+        /// Associated scalar type
         pub scalar: ScalarType,
     }
 
-    /// potentials
+    /// Potential data
     #[repr(C)]
     pub struct Potential {
+        /// Length of underlying buffer, of length n_eval_mode*n_coordinates
+        /// currently only support n_eval_mode=1, i.e. potentials
         pub len: usize,
+        /// Pointer to underlying buffer
         pub data: *const c_void,
+        /// Associated scalar type
         pub scalar: ScalarType,
     }
 
-    /// potentials
+    /// Container for multiple Potentials. Used when FMM run over multiple
+    /// charge vectors.
     #[repr(C)]
     pub struct Potentials {
+        /// Number of charge vectors associated with FMM call ()
         pub n: usize,
+        /// Pointer to underlying buffer
         pub data: *mut Potential,
+        /// Associated scalar type
         pub scalar: ScalarType,
     }
 
-    /// Global indices
+    /// Implicit map between input coordinate index and global index
+    /// after sorting during octree construction
     #[repr(C)]
     pub struct GlobalIndices {
+        /// Number of global indices
         pub len: usize,
+        /// Pointer to underlying buffer
         pub data: *const c_void,
     }
 
-    /// Morton keys
+    /// Morton keys, used to describe octree boxes, each represented as unique u64.
     #[repr(C)]
     pub struct MortonKeys {
+        /// Number of morton keys
         pub len: usize,
+        /// Pointer to underlying buffer
         pub data: *const u64,
     }
 }
@@ -225,6 +250,7 @@ impl Drop for FmmEvaluator {
     }
 }
 
+/// Free the FmmEvaluator object
 #[no_mangle]
 pub extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
     assert!(!fmm_p.is_null());
@@ -241,7 +267,29 @@ pub mod constructors {
 
     use super::*;
 
-    /// Constructor
+    /// Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     #[no_mangle]
     pub extern "C" fn laplace_blas_svd_f32_alloc(
         expansion_order: *const usize,
@@ -299,7 +347,29 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     #[no_mangle]
     pub extern "C" fn laplace_blas_svd_f64_alloc(
         expansion_order: *const usize,
@@ -357,7 +427,31 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+    /// with randomised SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
     #[no_mangle]
     pub extern "C" fn laplace_blas_rsvd_f32_alloc(
         expansion_order: *const usize,
@@ -429,7 +523,31 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+    /// with randomised SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
     #[no_mangle]
     pub extern "C" fn laplace_blas_rsvd_f64_alloc(
         expansion_order: *const usize,
@@ -501,7 +619,28 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F32 Laplace FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
     #[no_mangle]
     pub extern "C" fn laplace_fft_f32_alloc(
         expansion_order: *const usize,
@@ -525,6 +664,7 @@ pub mod constructors {
             unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
+        let block_size = if block_size > 0 { Some(block_size)} else {None};
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -535,7 +675,7 @@ pub mod constructors {
                     expansion_order,
                     Laplace3dKernel::new(),
                     green_kernels::types::EvalType::Value,
-                    FftFieldTranslation::new(Some(block_size)),
+                    FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
                 .build()
@@ -553,7 +693,28 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F64 Laplace FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
     #[no_mangle]
     pub extern "C" fn laplace_fft_f64_alloc(
         expansion_order: *const usize,
@@ -577,6 +738,7 @@ pub mod constructors {
             unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
+        let block_size = if block_size > 0 { Some(block_size)} else {None};
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -587,7 +749,7 @@ pub mod constructors {
                     expansion_order,
                     Laplace3dKernel::new(),
                     green_kernels::types::EvalType::Value,
-                    FftFieldTranslation::new(Some(block_size)),
+                    FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
                 .build()
@@ -605,7 +767,30 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     #[no_mangle]
     pub extern "C" fn helmholtz_blas_svd_f32_alloc(
         expansion_order: *const usize,
@@ -660,7 +845,30 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     #[no_mangle]
     pub extern "C" fn helmholtz_blas_svd_f64_alloc(
         expansion_order: *const usize,
@@ -716,7 +924,29 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F32 Helmholtz FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
     #[no_mangle]
     pub extern "C" fn helmholtz_fft_f32_alloc(
         expansion_order: *const usize,
@@ -741,6 +971,7 @@ pub mod constructors {
             unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
+        let block_size = if block_size > 0 { Some(block_size)} else {None};
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -751,7 +982,7 @@ pub mod constructors {
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     green_kernels::types::EvalType::Value,
-                    FftFieldTranslation::new(Some(block_size)),
+                    FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
                 .build()
@@ -769,7 +1000,29 @@ pub mod constructors {
         Box::into_raw(Box::new(evaluator))
     }
 
-    /// Constructor
+    /// Constructor for F64 Helmholtz FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    ///
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    /// reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
     #[no_mangle]
     pub extern "C" fn helmholtz_fft_f64_alloc(
         expansion_order: *const usize,
@@ -794,6 +1047,7 @@ pub mod constructors {
             unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
+        let block_size = if block_size > 0 { Some(block_size)} else {None};
 
         let fmm = Box::new(
             SingleNodeBuilder::new()
@@ -804,7 +1058,7 @@ pub mod constructors {
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     green_kernels::types::EvalType::Value,
-                    FftFieldTranslation::new(Some(block_size)),
+                    FftFieldTranslation::new(block_size)
                 )
                 .unwrap()
                 .build()
@@ -839,7 +1093,7 @@ pub mod api {
 
     use super::*;
 
-    /// Evaluate FMM
+    /// Evaluate
     #[no_mangle]
     pub extern "C" fn evaluate(fmm: *mut FmmEvaluator, timed: bool) {
         if !fmm.is_null() {
