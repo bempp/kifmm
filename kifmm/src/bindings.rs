@@ -272,7 +272,7 @@ pub unsafe extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
 pub mod constructors {
     use std::ffi::c_void;
 
-    use green_kernels::helmholtz_3d::Helmholtz3dKernel;
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
 
     use crate::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 
@@ -292,6 +292,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
@@ -303,6 +304,7 @@ pub mod constructors {
     ///    reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -312,6 +314,7 @@ pub mod constructors {
     pub unsafe extern "C" fn laplace_blas_svd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         sources: *const c_void,
         nsources: usize,
         targets: *const c_void,
@@ -322,7 +325,14 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f32,
+        surface_diff: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
@@ -333,10 +343,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
 
         let field_translation = BlasFieldTranslationSaRcmp::new(
             singular_value_threshold,
-            None,
+            surface_diff,
             crate::fmm::types::FmmSvdMode::Deterministic,
         );
 
@@ -347,7 +358,7 @@ pub mod constructors {
                 charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                green_kernels::types::EvalType::Value,
+                eval_type,
                 field_translation,
             )
             .unwrap()
@@ -377,6 +388,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
@@ -388,6 +400,7 @@ pub mod constructors {
     ///    reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -397,6 +410,7 @@ pub mod constructors {
     pub unsafe extern "C" fn laplace_blas_svd_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         sources: *const c_void,
         nsources: usize,
         targets: *const c_void,
@@ -407,7 +421,14 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f64,
+        surface_diff: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
@@ -418,10 +439,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
 
         let field_translation = BlasFieldTranslationSaRcmp::new(
             singular_value_threshold,
-            None,
+            surface_diff,
             crate::fmm::types::FmmSvdMode::Deterministic,
         );
 
@@ -432,7 +454,7 @@ pub mod constructors {
                 charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                green_kernels::types::EvalType::Value,
+                eval_type,
                 field_translation,
             )
             .unwrap()
@@ -462,6 +484,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
@@ -473,6 +496,7 @@ pub mod constructors {
     ///    reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
     /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
     ///
@@ -484,6 +508,7 @@ pub mod constructors {
     pub unsafe extern "C" fn laplace_blas_rsvd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         sources: *const c_void,
         nsources: usize,
         targets: *const c_void,
@@ -494,9 +519,16 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f32,
+        surface_diff: usize,
         n_components: usize,
         n_oversamples: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
@@ -507,6 +539,7 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
 
         let n_components = if n_components > 0 {
             Some(n_components)
@@ -522,7 +555,7 @@ pub mod constructors {
 
         let field_translation = BlasFieldTranslationSaRcmp::new(
             singular_value_threshold,
-            None,
+            surface_diff,
             crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
         );
 
@@ -533,7 +566,7 @@ pub mod constructors {
                 charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                green_kernels::types::EvalType::Value,
+                eval_type,
                 field_translation,
             )
             .unwrap()
@@ -563,6 +596,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
@@ -574,6 +608,7 @@ pub mod constructors {
     ///    reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
     /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
     ///
@@ -585,6 +620,7 @@ pub mod constructors {
     pub unsafe extern "C" fn laplace_blas_rsvd_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         sources: *const c_void,
         nsources: usize,
         targets: *const c_void,
@@ -595,9 +631,16 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f64,
+        surface_diff: usize,
         n_components: usize,
         n_oversamples: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
@@ -608,6 +651,7 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
 
         let n_components = if n_components > 0 {
             Some(n_components)
@@ -623,7 +667,7 @@ pub mod constructors {
 
         let field_translation = BlasFieldTranslationSaRcmp::new(
             singular_value_threshold,
-            None,
+            surface_diff,
             crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
         );
 
@@ -634,7 +678,7 @@ pub mod constructors {
                 charges,
                 expansion_order,
                 Laplace3dKernel::new(),
-                green_kernels::types::EvalType::Value,
+                eval_type,
                 field_translation,
             )
             .unwrap()
@@ -663,6 +707,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
@@ -683,6 +728,7 @@ pub mod constructors {
     pub unsafe extern "C" fn laplace_fft_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         sources: *const c_void,
         nsources: usize,
         targets: *const c_void,
@@ -694,6 +740,12 @@ pub mod constructors {
         depth: u64,
         block_size: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
@@ -716,7 +768,7 @@ pub mod constructors {
                     charges,
                     expansion_order,
                     Laplace3dKernel::new(),
-                    green_kernels::types::EvalType::Value,
+                    eval_type,
                     FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
@@ -766,6 +818,7 @@ pub mod constructors {
     pub unsafe extern "C" fn laplace_fft_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         sources: *const c_void,
         nsources: usize,
         targets: *const c_void,
@@ -777,6 +830,12 @@ pub mod constructors {
         depth: u64,
         block_size: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
@@ -799,7 +858,7 @@ pub mod constructors {
                     charges,
                     expansion_order,
                     Laplace3dKernel::new(),
-                    green_kernels::types::EvalType::Value,
+                    eval_type,
                     FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
@@ -830,6 +889,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
@@ -842,6 +902,7 @@ pub mod constructors {
     ///    reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -851,6 +912,7 @@ pub mod constructors {
     pub unsafe extern "C" fn helmholtz_blas_svd_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
         nsources: usize,
@@ -862,7 +924,14 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f32,
+        surface_diff: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
@@ -873,8 +942,9 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
 
-        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
+        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
 
         let fmm = SingleNodeBuilder::new()
             .tree(sources, targets, n_crit, depth, prune_empty)
@@ -883,7 +953,7 @@ pub mod constructors {
                 charges,
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                green_kernels::types::EvalType::Value,
+                eval_type,
                 field_translation,
             )
             .unwrap()
@@ -913,6 +983,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
@@ -925,6 +996,7 @@ pub mod constructors {
     ///    reached based on a uniform particle distribution.
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -934,6 +1006,7 @@ pub mod constructors {
     pub unsafe extern "C" fn helmholtz_blas_svd_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
         nsources: usize,
@@ -945,7 +1018,14 @@ pub mod constructors {
         n_crit: u64,
         depth: u64,
         singular_value_threshold: f64,
+        surface_diff: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
 
@@ -957,8 +1037,9 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
 
-        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, None);
+        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
 
         let fmm = SingleNodeBuilder::new()
             .tree(sources, targets, n_crit, depth, prune_empty)
@@ -967,7 +1048,7 @@ pub mod constructors {
                 charges,
                 expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                green_kernels::types::EvalType::Value,
+                eval_type,
                 field_translation,
             )
             .unwrap()
@@ -996,6 +1077,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
@@ -1017,6 +1099,7 @@ pub mod constructors {
     pub unsafe extern "C" fn helmholtz_fft_f32_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
         nsources: usize,
@@ -1029,6 +1112,12 @@ pub mod constructors {
         depth: u64,
         block_size: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
@@ -1051,7 +1140,7 @@ pub mod constructors {
                     charges,
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    green_kernels::types::EvalType::Value,
+                    eval_type,
                     FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
@@ -1081,6 +1170,7 @@ pub mod constructors {
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
     /// - `nsources`: The length of the source points buffer
@@ -1102,6 +1192,7 @@ pub mod constructors {
     pub unsafe extern "C" fn helmholtz_fft_f64_alloc(
         expansion_order: *const usize,
         nexpansion_order: usize,
+        eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
         nsources: usize,
@@ -1114,6 +1205,12 @@ pub mod constructors {
         depth: u64,
         block_size: usize,
     ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
@@ -1136,7 +1233,7 @@ pub mod constructors {
                     charges,
                     expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    green_kernels::types::EvalType::Value,
+                    eval_type,
                     FftFieldTranslation::new(block_size),
                 )
                 .unwrap()
@@ -1160,7 +1257,7 @@ pub mod constructors {
 pub mod api {
     use std::{mem::ManuallyDrop, os::raw::c_void};
 
-    use green_kernels::helmholtz_3d::Helmholtz3dKernel;
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::EvalType};
     use itertools::Itertools;
 
     use crate::{
@@ -1319,24 +1416,6 @@ pub mod api {
                 }
             },
         }
-
-        // match times {
-        //     Ok(times) => {
-        //         let length = times.len();
-        //         let times: *mut crate::traits::types::FmmOperatorTime = times.into_boxed_slice().as_mut_ptr();
-        //         FmmOperatorTimesResult {
-        //             result: FmmOperatorTimes { times, length },
-        //             error: FmmError::None,
-        //         }
-        //     }
-        //     Err(_e) => FmmOperatorTimesResult {
-        //         result: FmmOperatorTimes {
-        //             times: std::ptr::null_mut(),
-        //             length: 0,
-        //         },
-        //         error: FmmError::EvaluationFailed,
-        //     },
-        // }
     }
 
     /// Clear charges and attach new charges.
@@ -3360,6 +3439,228 @@ pub mod api {
                     };
 
                     Box::into_raw(Box::new(leaves))
+                }
+            },
+        }
+    }
+
+    /// Evaluate the kernel
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `nsources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `ntargets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `ncharges`: The length of the charges buffer.
+    /// - `result`: A pointer to the results associated with the target points.
+    /// - `ncharges`: The length of the charges buffer.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn evaluate_kernel_st(
+        fmm: *mut FmmEvaluator,
+        eval_type: bool,
+        sources: *const c_void,
+        nsources: usize,
+        targets: *const c_void,
+        ntargets: usize,
+        charges: *const c_void,
+        ncharges: usize,
+        result: *mut c_void,
+        nresult: usize,
+    ) {
+        assert!(!fmm.is_null());
+
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+        let eval_type = if eval_type {
+            EvalType::Value
+        } else {
+            EvalType::ValueDeriv
+        };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>,
+                        >;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                        >;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>,
+                        >;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>,
+                        >;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
                 }
             },
         }

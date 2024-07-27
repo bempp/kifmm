@@ -28,6 +28,7 @@ int main() {
   uint64_t n_crit = 150;
   uint64_t depth = 0;
   double singular_value_threshold = 0.001;
+  bool eval_type = true; // evaluate potentials
 
   uintptr_t expansion_order[] = {6};
   uintptr_t nexpansion_order = 1;
@@ -35,7 +36,7 @@ int main() {
 
   // Instantiate a Laplace evaluator
   struct FmmEvaluator *evaluator = laplace_fft_f64_alloc(
-      expansion_order, nexpansion_order, (const void *)sources, NSOURCES * 3,
+      expansion_order, nexpansion_order, eval_type, (const void *)sources, NSOURCES * 3,
       (const void *)targets, NTARGETS * 3, (const void *)charges, NSOURCES,
       prune_empty, n_crit, depth, block_size);
 

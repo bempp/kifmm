@@ -224,6 +224,7 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
@@ -235,6 +236,7 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
@@ -243,6 +245,7 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  */
 struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order,
                                                 uintptr_t nexpansion_order,
+                                                bool eval_type,
                                                 const void *sources,
                                                 uintptr_t nsources,
                                                 const void *targets,
@@ -252,7 +255,8 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
                                                 bool prune_empty,
                                                 uint64_t n_crit,
                                                 uint64_t depth,
-                                                float singular_value_threshold);
+                                                float singular_value_threshold,
+                                                uintptr_t surface_diff);
 
 /**
  * Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
@@ -267,6 +271,7 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
@@ -278,6 +283,7 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
@@ -286,6 +292,7 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  */
 struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order,
                                                 uintptr_t nexpansion_order,
+                                                bool eval_type,
                                                 const void *sources,
                                                 uintptr_t nsources,
                                                 const void *targets,
@@ -295,7 +302,8 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
                                                 bool prune_empty,
                                                 uint64_t n_crit,
                                                 uint64_t depth,
-                                                double singular_value_threshold);
+                                                double singular_value_threshold,
+                                                uintptr_t surface_diff);
 
 /**
  * Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
@@ -310,6 +318,7 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
@@ -321,6 +330,7 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
  * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
  * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
  *
@@ -331,6 +341,7 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  */
 struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_order,
                                                  uintptr_t nexpansion_order,
+                                                 bool eval_type,
                                                  const void *sources,
                                                  uintptr_t nsources,
                                                  const void *targets,
@@ -341,6 +352,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
                                                  uint64_t n_crit,
                                                  uint64_t depth,
                                                  float singular_value_threshold,
+                                                 uintptr_t surface_diff,
                                                  uintptr_t n_components,
                                                  uintptr_t n_oversamples);
 
@@ -357,6 +369,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
@@ -368,6 +381,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
  * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
  * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
  *
@@ -378,6 +392,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  */
 struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_order,
                                                  uintptr_t nexpansion_order,
+                                                 bool eval_type,
                                                  const void *sources,
                                                  uintptr_t nsources,
                                                  const void *targets,
@@ -388,6 +403,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
                                                  uint64_t n_crit,
                                                  uint64_t depth,
                                                  double singular_value_threshold,
+                                                 uintptr_t surface_diff,
                                                  uintptr_t n_components,
                                                  uintptr_t n_oversamples);
 
@@ -403,6 +419,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
@@ -422,6 +439,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  */
 struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
+                                           bool eval_type,
                                            const void *sources,
                                            uintptr_t nsources,
                                            const void *targets,
@@ -464,6 +482,7 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
  */
 struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
+                                           bool eval_type,
                                            const void *sources,
                                            uintptr_t nsources,
                                            const void *targets,
@@ -488,6 +507,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
@@ -500,6 +520,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
@@ -508,6 +529,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  */
 struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_order,
                                                   uintptr_t nexpansion_order,
+                                                  bool eval_type,
                                                   float wavenumber,
                                                   const void *sources,
                                                   uintptr_t nsources,
@@ -518,7 +540,8 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
                                                   bool prune_empty,
                                                   uint64_t n_crit,
                                                   uint64_t depth,
-                                                  float singular_value_threshold);
+                                                  float singular_value_threshold,
+                                                  uintptr_t surface_diff);
 
 /**
  * Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
@@ -533,6 +556,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
@@ -545,6 +569,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  *    reached based on a uniform particle distribution.
  * - `depth`: The maximum depth of the tree, max supported depth is 16.
  * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
@@ -553,6 +578,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  */
 struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_order,
                                                   uintptr_t nexpansion_order,
+                                                  bool eval_type,
                                                   double wavenumber,
                                                   const void *sources,
                                                   uintptr_t nsources,
@@ -563,7 +589,8 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
                                                   bool prune_empty,
                                                   uint64_t n_crit,
                                                   uint64_t depth,
-                                                  double singular_value_threshold);
+                                                  double singular_value_threshold,
+                                                  uintptr_t surface_diff);
 
 /**
  * Constructor for F32 Helmholtz FMM with FFT based M2L translations
@@ -577,6 +604,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
@@ -597,6 +625,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  */
 struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
                                              uintptr_t nexpansion_order,
+                                             bool eval_type,
                                              float wavenumber,
                                              const void *sources,
                                              uintptr_t nsources,
@@ -621,6 +650,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
  * - `nsources`: The length of the source points buffer
@@ -641,6 +671,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  */
 struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              uintptr_t nexpansion_order,
+                                             bool eval_type,
                                              double wavenumber,
                                              const void *sources,
                                              uintptr_t nsources,
@@ -798,3 +829,35 @@ struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
  * - That they remain valid for the duration of the function call
  */
 struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
+
+/**
+ * Evaluate the kernel
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `nsources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `ntargets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `ncharges`: The length of the charges buffer.
+ * - `result`: A pointer to the results associated with the target points.
+ * - `ncharges`: The length of the charges buffer.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+void evaluate_kernel_st(struct FmmEvaluator *fmm,
+                        bool eval_type,
+                        const void *sources,
+                        uintptr_t nsources,
+                        const void *targets,
+                        uintptr_t ntargets,
+                        const void *charges,
+                        uintptr_t ncharges,
+                        void *result,
+                        uintptr_t nresult);
