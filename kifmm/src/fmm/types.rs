@@ -6,12 +6,10 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
-    linalg::rsvd::Normaliser,
-    traits::{
+        linalg::rsvd::Normaliser, traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
-        general::AsComplex,
-    },
-    tree::types::{Domain, MortonKey, SingleNodeTree},
+        general::AsComplex, types::FmmOperatorTime,
+    }, tree::types::{Domain, MortonKey, SingleNodeTree}
 };
 
 #[cfg(feature = "mpi")]
@@ -172,6 +170,9 @@ where
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Operator runtimes
+    pub times: Vec<FmmOperatorTime>,
+
     /// Dimension of the FMM
     pub dim: usize,
 
@@ -296,6 +297,7 @@ where
 {
     fn default() -> Self {
         KiFmm {
+            times: Vec::default(),
             isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: SourceToTargetData::default(),

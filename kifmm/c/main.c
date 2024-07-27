@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-const int NSOURCES = 10000;
-const int NTARGETS = 10000;
+const int NSOURCES = 100000;
+const int NTARGETS = 100000;
 
 double drand() { return (double)rand() / RAND_MAX; }
 
@@ -40,32 +40,74 @@ int main() {
       prune_empty, n_crit, depth, block_size);
 
   bool timed = true;
-  evaluate(evaluator, timed);
+  FmmOperatorTimes *times = evaluate(evaluator, timed);
 
-  MortonKeys *leaves = leaves_target_tree(evaluator);
+  if (times->length > 0) {
+    MortonKeys *leaves = leaves_target_tree(evaluator);
 
-  printf("Number of leaf keys (n): %zu\n", leaves->len);
-  for (uintptr_t i = 0; i < 5; ++i) {
-    printf("Element %zu: %llu\n", i, leaves->data[i]);
-  }
+    printf("\n");
+    printf("Number of leaf keys (n): %zu\n", leaves->len);
+    for (uintptr_t i = 0; i < 5; ++i) {
+      printf("Element %zu: %llu\n", i, leaves->data[i]);
+    }
 
-  Potentials *potentials = leaf_potentials(evaluator, leaves->data[123]);
+    Potentials *potentials = leaf_potentials(evaluator, leaves->data[123]);
 
-  Coordinates *coordinates =
-      coordinates_source_tree(evaluator, leaves->data[123]);
-  printf("Number of coordinates: %zu\n", coordinates->len);
+    Coordinates *coordinates =
+        coordinates_source_tree(evaluator, leaves->data[123]);
 
-  const double *coords = (const double *)coordinates->data;
-  for (uintptr_t i = 0; i < 5; ++i) {
-    printf("Element %zu: [%f, %f, %f]\n", i, coords[i * 3], coords[i * 3 + 1],
-           coords[i * 3 + 2]);
-  }
+    printf("\n");
+    printf("Number of coordinates: %zu\n", coordinates->len);
+    const double *coords = (const double *)coordinates->data;
+    for (uintptr_t i = 0; i < 5; ++i) {
+      printf("Element %zu: [%f, %f, %f]\n", i, coords[i * 3], coords[i * 3 + 1],
+             coords[i * 3 + 2]);
+    }
 
-  printf("Number of potentials: %zu\n", potentials->n);
-  Potential *pot = &potentials->data[0];
-  const double *data = (const double *)pot->data;
-  for (uintptr_t i = 0; i < 5; ++i) {
-    printf("Element %zu: %f\n", i, data[i]);
+    printf("\n");
+    printf("Number of potentials: %zu\n", potentials->n);
+    Potential *pot = &potentials->data[0];
+    const double *data = (const double *)pot->data;
+    for (uintptr_t i = 0; i < 5; ++i) {
+      printf("Element %zu: %f\n", i, data[i]);
+    }
+
+    printf("\n");
+    printf("Time Operators\n");
+    for (uintptr_t i = 0; i < times->length; i++) {
+      FmmOperatorTime op_time = times->times[i];
+      printf("Time: %llu ms, Operator: ", op_time.time);
+
+      switch (op_time.operator_.tag) {
+      case FmmOperatorType_P2M:
+        printf("P2M\n");
+        break;
+      case FmmOperatorType_M2M:
+        printf("M2M (%llu)\n", op_time.operator_.m2m);
+        break;
+      case FmmOperatorType_M2L:
+        printf("M2L (%llu)\n", op_time.operator_.m2l);
+        break;
+      case FmmOperatorType_L2L:
+        printf("L2L (%llu)\n", op_time.operator_.l2l);
+        break;
+      case FmmOperatorType_L2P:
+        printf("L2P\n");
+        break;
+      case FmmOperatorType_P2P:
+        printf("P2P\n");
+        break;
+      default:
+        printf("Unknown operator\n");
+        break;
+      }
+    }
+
+    // Cleanup
+    free_morton_keys(leaves);
+    free(potentials);
+  } else {
+    printf("FMM not timed \n");
   }
 
   // Cleanup
@@ -73,8 +115,6 @@ int main() {
   free(targets);
   free(charges);
   free_fmm_evaluator(evaluator);
-  free_morton_keys(leaves);
-  free(potentials);
 
   return 0;
 }

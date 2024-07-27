@@ -5,7 +5,7 @@ use rlst::RlstScalar;
 
 use super::{
     tree::Tree,
-    types::{FmmError, FmmTime},
+    types::FmmError,
 };
 
 /// Interface for source field translations.
@@ -138,7 +138,7 @@ where
     fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError>;
+    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///

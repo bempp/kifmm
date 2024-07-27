@@ -14,7 +14,7 @@ use crate::{
             TargetTranslation,
         },
         tree::{FmmTree, Tree},
-        types::{FmmError, FmmTime},
+        types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
     Fmm, SingleNodeFmmTree,
 };
@@ -186,21 +186,21 @@ where
         Some(&self.potentials)
     }
 
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
+    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
         // Upward pass
-        let mut times = FmmTime::new();
-
         if timed {
             {
                 let s = Instant::now();
                 self.p2m()?;
-                times.insert("p2m".to_string(), s.elapsed());
+                self.times.push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
 
                 for level in (1..=self.tree().source_tree().depth()).rev() {
                     let s = Instant::now();
                     self.m2m(level)?;
-                    let label = "m2m".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
+                    self.times.push(FmmOperatorTime::from_instant(
+                        FmmOperatorType::M2M(level),
+                        s,
+                    ));
                 }
             }
 
@@ -210,23 +210,28 @@ where
                     if level > 2 {
                         let s = Instant::now();
                         self.l2l(level)?;
-                        let label = "l2l".to_string() + &format!("_level_{}", level);
-                        times.insert(label, s.elapsed());
+                        self.times.push(FmmOperatorTime::from_instant(
+                            FmmOperatorType::L2L(level),
+                            s,
+                        ));
                     }
                     let s = Instant::now();
                     self.m2l(level)?;
-                    let label = "m2l".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
+                    self.times.push(FmmOperatorTime::from_instant(
+                        FmmOperatorType::M2L(level),
+                        s,
+                    ));
                 }
 
                 // Leaf level computation
                 let s = Instant::now();
                 self.p2p()?;
-                times.insert("p2p".to_string(), s.elapsed());
+                self.times.push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
                 let s = Instant::now();
                 self.l2p()?;
-                times.insert("l2p".to_string(), s.elapsed());
+                self.times.push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
             }
+            Ok(())
         } else {
             // Upward pass
             {
@@ -250,9 +255,9 @@ where
                 self.p2p()?;
                 self.l2p()?;
             }
+            Ok(())
         }
 
-        Ok(times)
     }
 
     fn clear(&mut self, charges: &[Self::Scalar]) {
@@ -682,7 +687,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -698,7 +703,7 @@ mod test {
         fmm_fft.evaluate(false).unwrap();
 
         let svd_threshold = Some(1e-5);
-        let fmm_svd = SingleNodeBuilder::new()
+        let mut fmm_svd = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -717,8 +722,8 @@ mod test {
             .unwrap();
         fmm_svd.evaluate(false).unwrap();
 
-        let fmm_fft = Box::new(fmm_fft);
-        let fmm_svd = Box::new(fmm_svd);
+        let mut fmm_fft = Box::new(fmm_fft);
+        let mut fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_fft, &sources, &charges, 1e-5);
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
@@ -749,7 +754,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
-        let fmm_svd = SingleNodeBuilder::new()
+        let mut fmm_svd = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -768,7 +773,7 @@ mod test {
             .unwrap();
         fmm_svd.evaluate(false).unwrap();
 
-        let fmm_svd = Box::new(fmm_svd);
+        let mut fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
@@ -819,7 +824,7 @@ mod test {
         fmm.clear(charges.data());
         fmm.evaluate(false).unwrap();
 
-        let fmm = Box::new(fmm);
+        let mut fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
             fmm,
             EvalType::Value,
@@ -860,7 +865,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let fmm_fft = SingleNodeBuilder::new()
+            let mut fmm_fft = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -875,7 +880,7 @@ mod test {
                 .unwrap();
             fmm_fft.evaluate(false).unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
+            let mut fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_fft,
                 eval_type,
@@ -885,7 +890,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm_fft = SingleNodeBuilder::new()
+            let mut fmm_fft = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -901,7 +906,7 @@ mod test {
             fmm_fft.evaluate(false).unwrap();
 
             let eval_type = fmm_fft.kernel_eval_type;
-            let fmm_fft = Box::new(fmm_fft);
+            let mut fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_fft,
                 eval_type,
@@ -915,7 +920,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -933,7 +938,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -944,7 +949,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -962,7 +967,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1004,7 +1009,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1022,7 +1027,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -1034,7 +1039,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1052,7 +1057,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1093,7 +1098,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1111,7 +1116,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
@@ -1154,7 +1159,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1172,7 +1177,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -1184,7 +1189,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1202,7 +1207,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1239,7 +1244,7 @@ mod test {
 
         let wavenumber = 2.5;
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -1254,7 +1259,7 @@ mod test {
             .unwrap();
 
         fmm_fft.evaluate(false).unwrap();
-        let fmm_fft = Box::new(fmm_fft);
+        let mut fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
     }
 
@@ -1285,7 +1290,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1300,14 +1305,14 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let fmm: Box<_> = Box::new(fmm);
+            let mut fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, threshold,
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1322,7 +1327,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
+            let mut fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1335,7 +1340,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1350,14 +1355,14 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let fmm: Box<_> = Box::new(fmm);
+            let mut fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, 1e-5,
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1372,7 +1377,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
+            let mut fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1410,7 +1415,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1425,14 +1430,14 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let fmm: Box<_> = Box::new(fmm);
+            let mut fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, threshold,
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1447,7 +1452,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
+            let mut fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1460,7 +1465,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1475,14 +1480,14 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let fmm: Box<_> = Box::new(fmm);
+            let mut fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, 1e-5,
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1497,7 +1502,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
+            let mut fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1536,7 +1541,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1551,7 +1556,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let fmm: Box<_> = Box::new(fmm);
+            let mut fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
 
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1559,7 +1564,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1574,7 +1579,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let fmm = Box::new(fmm);
+            let mut fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1612,7 +1617,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1627,7 +1632,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let fmm: Box<_> = Box::new(fmm);
+            let mut fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
 
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
@@ -1670,7 +1675,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1689,14 +1694,14 @@ mod test {
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
 
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas, eval_type, &sources, &charges, threshold,
             );
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1714,7 +1719,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1760,7 +1765,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1775,14 +1780,14 @@ mod test {
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
 
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas, eval_type, &sources, &charges, threshold,
             );
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1796,7 +1801,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let fmm_blas = Box::new(fmm_blas);
+            let mut fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas,
                 eval_type,

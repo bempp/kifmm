@@ -12,6 +12,8 @@ use crate::{
 pub mod types {
     use std::ffi::c_void;
 
+    use crate::traits::types::FmmOperatorTime;
+
     /// Static FMM type
     #[repr(C)]
     #[derive(Copy, Clone, Debug)]
@@ -121,6 +123,13 @@ pub mod types {
         /// Pointer to underlying buffer
         pub data: *const u64,
     }
+
+    #[repr(C)]
+    pub struct FmmOperatorTimes {
+        pub times: *mut FmmOperatorTime,
+        pub length: usize,
+    }
+
 }
 
 impl Drop for MortonKeys {
@@ -1164,9 +1173,11 @@ pub mod api {
 
     use super::{
         c32, c64, BlasFieldTranslationSaRcmp, Coordinates, FmmCType, FmmEvaluator,
-        FmmTranslationCType, GlobalIndices, KiFmm, Laplace3dKernel, MortonKeys, Potential,
-        Potentials, ScalarType,
+        FmmOperatorTimes, FmmTranslationCType, GlobalIndices, KiFmm, Laplace3dKernel, MortonKeys,
+        Potential, Potentials, ScalarType,
     };
+
+
 
     /// Evaluate the Fast Multipole Method (FMM).
     ///
@@ -1180,88 +1191,180 @@ pub mod api {
     /// - Input data corresponds to valid pointers
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub unsafe extern "C" fn evaluate(fmm: *mut FmmEvaluator, timed: bool) {
-        if !fmm.is_null() {
-            let ctype = unsafe { (*fmm).get_ctype() };
-            let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
-            let pointer = unsafe { (*fmm).get_pointer() };
+    pub unsafe extern "C" fn evaluate(
+        fmm: *mut FmmEvaluator,
+        timed: bool,
+    )  -> *mut FmmOperatorTimes {
+        assert!(!fmm.is_null());
 
-            match ctype {
-                FmmCType::Laplace32 => match ctranslation_type {
-                    FmmTranslationCType::Fft => {
-                        let fmm = pointer
-                            as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
 
-                    FmmTranslationCType::Blas => {
-                        let fmm = pointer
-                            as *mut Box<
-                                KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>,
-                            >;
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
-                },
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>>;
+                    let _ = unsafe { (*fmm).evaluate(timed) };
 
-                FmmCType::Laplace64 => match ctranslation_type {
-                    FmmTranslationCType::Fft => {
-                        let fmm = pointer
-                            as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
 
-                    FmmTranslationCType::Blas => {
-                        let fmm = pointer
-                            as *mut Box<
-                                KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                            >;
+                    Box::into_raw(Box::new(times))
 
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
-                },
+                }
 
-                FmmCType::Helmholtz32 => match ctranslation_type {
-                    FmmTranslationCType::Fft => {
-                        let fmm = pointer
-                            as *mut Box<
-                                KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>,
-                            >;
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>,
+                        >;
 
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    FmmTranslationCType::Blas => {
-                        let fmm = pointer
-                            as *mut Box<
-                                KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>,
-                            >;
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
 
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
-                },
+                    Box::into_raw(Box::new(times))
+                }
+            },
 
-                FmmCType::Helmholtz64 => match ctranslation_type {
-                    FmmTranslationCType::Fft => {
-                        let fmm = pointer
-                            as *mut Box<
-                                KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>,
-                            >;
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
 
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    FmmTranslationCType::Blas => {
-                        let fmm = pointer
-                            as *mut Box<
-                                KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>,
-                            >;
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
 
-                        let _times = unsafe { (*fmm).evaluate(timed) };
-                    }
-                },
-            }
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                        >;
+
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>>;
+
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>,
+                        >;
+
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut Box<KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>>;
+
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut Box<
+                            KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>,
+                        >;
+
+                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let length = unsafe { (*fmm).times.len() };
+                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes {
+                        times,
+                        length
+                    };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
         }
+
+        // match times {
+        //     Ok(times) => {
+        //         let length = times.len();
+        //         let times: *mut crate::traits::types::FmmOperatorTime = times.into_boxed_slice().as_mut_ptr();
+        //         FmmOperatorTimesResult {
+        //             result: FmmOperatorTimes { times, length },
+        //             error: FmmError::None,
+        //         }
+        //     }
+        //     Err(_e) => FmmOperatorTimesResult {
+        //         result: FmmOperatorTimes {
+        //             times: std::ptr::null_mut(),
+        //             length: 0,
+        //         },
+        //         error: FmmError::EvaluationFailed,
+        //     },
+        // }
     }
 
     /// Clear charges and attach new charges.

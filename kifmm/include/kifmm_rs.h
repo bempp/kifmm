@@ -53,6 +53,70 @@ typedef struct FmmEvaluator {
 } FmmEvaluator;
 
 /**
+ * Enumeration of operator types for timing
+ */
+typedef enum FmmOperatorType_Tag {
+  /**
+   * particle to multipole
+   */
+  FmmOperatorType_P2M,
+  /**
+   * multipole to multipole (level)
+   */
+  FmmOperatorType_M2M,
+  /**
+   * multipole to local (level)
+   */
+  FmmOperatorType_M2L,
+  /**
+   * local to local (level)
+   */
+  FmmOperatorType_L2L,
+  /**
+   * local to particle
+   */
+  FmmOperatorType_L2P,
+  /**
+   * particle to particle
+   */
+  FmmOperatorType_P2P,
+} FmmOperatorType_Tag;
+
+typedef struct FmmOperatorType {
+  FmmOperatorType_Tag tag;
+  union {
+    struct {
+      uint64_t m2m;
+    };
+    struct {
+      uint64_t m2l;
+    };
+    struct {
+      uint64_t l2l;
+    };
+  };
+} FmmOperatorType;
+
+/**
+ * C compatible struct for operator timing
+ */
+typedef struct FmmOperatorTime {
+  /**
+   * Operator name
+   */
+  struct FmmOperatorType operator_;
+  /**
+   * Time in milliseconds
+   */
+  uint64_t time;
+} FmmOperatorTime;
+
+typedef struct FmmOperatorTimes {
+  struct FmmOperatorTime *times;
+  uintptr_t length;
+} FmmOperatorTimes;
+
+/**
  * Potential data
  */
 typedef struct Potential {
@@ -602,7 +666,7 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-void evaluate(struct FmmEvaluator *fmm, bool timed);
+struct FmmOperatorTimes *evaluate(struct FmmEvaluator *fmm, bool timed);
 
 /**
  * Clear charges and attach new charges.
