@@ -724,8 +724,8 @@ mod test {
             .unwrap();
         fmm_svd.evaluate(false).unwrap();
 
-        let mut fmm_fft = Box::new(fmm_fft);
-        let mut fmm_svd = Box::new(fmm_svd);
+        let fmm_fft = Box::new(fmm_fft);
+        let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_fft, &sources, &charges, 1e-5);
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
@@ -775,7 +775,7 @@ mod test {
             .unwrap();
         fmm_svd.evaluate(false).unwrap();
 
-        let mut fmm_svd = Box::new(fmm_svd);
+        let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
     }
 
@@ -826,7 +826,7 @@ mod test {
         fmm.clear(charges.data());
         fmm.evaluate(false).unwrap();
 
-        let mut fmm = Box::new(fmm);
+        let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
             fmm,
             EvalType::Value,
@@ -882,7 +882,7 @@ mod test {
                 .unwrap();
             fmm_fft.evaluate(false).unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
-            let mut fmm_fft = Box::new(fmm_fft);
+            let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_fft,
                 eval_type,
@@ -908,7 +908,7 @@ mod test {
             fmm_fft.evaluate(false).unwrap();
 
             let eval_type = fmm_fft.kernel_eval_type;
-            let mut fmm_fft = Box::new(fmm_fft);
+            let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_fft,
                 eval_type,
@@ -940,7 +940,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -969,7 +969,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1029,7 +1029,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -1059,7 +1059,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1118,7 +1118,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
@@ -1179,7 +1179,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -1209,7 +1209,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1261,7 +1261,7 @@ mod test {
             .unwrap();
 
         fmm_fft.evaluate(false).unwrap();
-        let mut fmm_fft = Box::new(fmm_fft);
+        let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
     }
 
@@ -1307,7 +1307,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let mut fmm: Box<_> = Box::new(fmm);
+            let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, threshold,
@@ -1329,7 +1329,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let mut fmm = Box::new(fmm);
+            let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1357,7 +1357,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let mut fmm: Box<_> = Box::new(fmm);
+            let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, 1e-5,
@@ -1379,7 +1379,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let mut fmm = Box::new(fmm);
+            let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1432,7 +1432,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let mut fmm: Box<_> = Box::new(fmm);
+            let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, threshold,
@@ -1454,7 +1454,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let mut fmm = Box::new(fmm);
+            let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1482,7 +1482,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let mut fmm: Box<_> = Box::new(fmm);
+            let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm, eval_type, &sources, &charges, 1e-5,
@@ -1504,7 +1504,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let mut fmm = Box::new(fmm);
+            let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1558,7 +1558,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let mut fmm: Box<_> = Box::new(fmm);
+            let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
 
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1581,7 +1581,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
             let eval_type = fmm.kernel_eval_type;
-            let mut fmm = Box::new(fmm);
+            let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
                 fmm,
                 eval_type,
@@ -1634,7 +1634,7 @@ mod test {
                 .unwrap();
             fmm.evaluate(false).unwrap();
 
-            let mut fmm: Box<_> = Box::new(fmm);
+            let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
 
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
@@ -1696,7 +1696,7 @@ mod test {
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
 
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas, eval_type, &sources, &charges, threshold,
             );
@@ -1721,7 +1721,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
                 eval_type,
@@ -1782,7 +1782,7 @@ mod test {
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
 
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas, eval_type, &sources, &charges, threshold,
             );
@@ -1803,7 +1803,7 @@ mod test {
                 .build()
                 .unwrap();
             fmm_blas.evaluate(false).unwrap();
-            let mut fmm_blas = Box::new(fmm_blas);
+            let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas,
                 eval_type,

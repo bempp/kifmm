@@ -343,7 +343,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
-        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
 
         let field_translation = BlasFieldTranslationSaRcmp::new(
             singular_value_threshold,
@@ -439,7 +443,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
-        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
 
         let field_translation = BlasFieldTranslationSaRcmp::new(
             singular_value_threshold,
@@ -539,7 +547,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
-        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
 
         let n_components = if n_components > 0 {
             Some(n_components)
@@ -651,7 +663,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
-        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
 
         let n_components = if n_components > 0 {
             Some(n_components)
@@ -942,7 +958,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
-        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
 
         let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
 
@@ -1037,7 +1057,11 @@ pub mod constructors {
 
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
-        let surface_diff = if surface_diff > 0 { Some(surface_diff)} else { None };
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
 
         let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
 
