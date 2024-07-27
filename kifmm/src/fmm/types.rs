@@ -6,10 +6,12 @@ use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
-        linalg::rsvd::Normaliser, traits::{
+    linalg::rsvd::Normaliser,
+    traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex, types::FmmOperatorTime,
-    }, tree::types::{Domain, MortonKey, SingleNodeTree}
+    },
+    tree::types::{Domain, MortonKey, SingleNodeTree},
 };
 
 #[cfg(feature = "mpi")]

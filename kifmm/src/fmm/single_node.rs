@@ -192,7 +192,8 @@ where
             {
                 let s = Instant::now();
                 self.p2m()?;
-                self.times.push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
 
                 for level in (1..=self.tree().source_tree().depth()).rev() {
                     let s = Instant::now();
@@ -226,10 +227,12 @@ where
                 // Leaf level computation
                 let s = Instant::now();
                 self.p2p()?;
-                self.times.push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
                 let s = Instant::now();
                 self.l2p()?;
-                self.times.push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
             }
             Ok(())
         } else {
@@ -257,7 +260,6 @@ where
             }
             Ok(())
         }
-
     }
 
     fn clear(&mut self, charges: &[Self::Scalar]) {

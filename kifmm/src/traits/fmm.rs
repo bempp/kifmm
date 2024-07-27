@@ -3,10 +3,7 @@ use crate::traits::tree::FmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{
-    tree::Tree,
-    types::FmmError,
-};
+use super::{tree::Tree, types::FmmError};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {

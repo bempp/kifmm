@@ -129,7 +129,6 @@ pub mod types {
         pub times: *mut FmmOperatorTime,
         pub length: usize,
     }
-
 }
 
 impl Drop for MortonKeys {
@@ -1177,8 +1176,6 @@ pub mod api {
         Potential, Potentials, ScalarType,
     };
 
-
-
     /// Evaluate the Fast Multipole Method (FMM).
     ///
     /// # Parameters
@@ -1194,7 +1191,7 @@ pub mod api {
     pub unsafe extern "C" fn evaluate(
         fmm: *mut FmmEvaluator,
         timed: bool,
-    )  -> *mut FmmOperatorTimes {
+    ) -> *mut FmmOperatorTimes {
         assert!(!fmm.is_null());
 
         let ctype = unsafe { (*fmm).get_ctype() };
@@ -1211,13 +1208,9 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
-
                 }
 
                 FmmTranslationCType::Blas => {
@@ -1230,10 +1223,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
@@ -1248,10 +1238,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
@@ -1266,10 +1253,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
@@ -1284,10 +1268,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
@@ -1302,10 +1283,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
@@ -1320,10 +1298,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
@@ -1338,10 +1313,7 @@ pub mod api {
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes {
-                        times,
-                        length
-                    };
+                    let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
                 }
