@@ -26,6 +26,7 @@ fftw-src/fftw-*
 *.pyc
 *.so
 *.DS_Store
+**/_kifmm_rs/*
 
 # Editor
 .vim/*

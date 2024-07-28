@@ -77,55 +77,53 @@ class BlasFieldTranslation:
 
 class FftFieldTranslation:
     def __init__(self, kernel, block_size=None):
-        self.kernel = kernel
-        self.block_size = block_size
-        self.block_size_c = ffi.cast("uintptr_t", self.block_size)
 
-        if isinstance(self.kernel, HelmholtzKernel) or isinstance(
-            self.kernel, LaplaceKernel
-        ):
+        if block_size is None:
+            self.block_size = 32
+
+        try:
+            assert isinstance(block_size, int)
+        except:
+            raise TypeError("block_size must be an integer")
+
+        if isinstance(kernel, HelmholtzKernel) or isinstance(kernel, LaplaceKernel):
             pass
         else:
             raise TypeError("Unsupported Kernel")
+
+        self.block_size = block_size
+        self.kernel = kernel
 
 
 class LaplaceKernel:
     def __init__(self, dtype, eval_type):
         self.dtype = dtype
-        self.eval_type = eval_type
 
-        if self.eval_type == EvalType.Value:
-            self.eval_type_c = ffi.cast("bool", True)
-        elif self.eval_type == EvalType.Value:
-            self.eval_type_c = ffi.cast("bool", False)
+        if eval_type == EvalType.Value:
+            self.eval_type = True
+        elif eval_type == EvalType.Value:
+            self.eval_type = False
         else:
             raise TypeError("Unrecognised eval_type")
 
 
 class HelmholtzKernel:
     def __init__(self, dtype, wavenumber, eval_type):
-        self.dtype = dtype
-        self.wavenumber = wavenumber
-        self.eval_type = eval_type
 
         try:
-            assert type(self.wavenumber) == self.dtype
+            assert type(wavenumber) == self.dtype
         except:
             raise TypeError("Invalid wavenumber type")
 
-        if self.eval_type == EvalType.Value:
-            self.eval_type_c = ffi.cast("bool", True)
-        elif self.eval_type == EvalType.Value:
-            self.eval_type_c = ffi.cast("bool", False)
+        if eval_type == EvalType.Value:
+            self.eval_type = True
+        elif eval_type == EvalType.Value:
+            self.eval_type = False
         else:
             raise TypeError("Unrecognised eval_type")
 
-        if self.dtype == np.float32:
-            self.wavenumber_c = ffi.cast("float", self.wavenumber)
-        elif self.dtype == np.float64:
-            self.wavenumber_c = ffi.cast("double", self.wavenumber)
-        else:
-            raise TypeError("Invalid dtype")
+        self.dtype = dtype
+        self.wavenumber = wavenumber
 
 
 class SingleNodeTree:
@@ -165,30 +163,25 @@ class SingleNodeTree:
         except:
             raise TypeError("prune_empty must be set to a boolean")
 
+        if n_crit is not None:
+            self.n_crit = n_crit
+        else:
+            self.n_crit = 0
+        if depth is not None:
+            self.depth = depth
+        else:
+            self.depth = 0
+
         self.sources = sources
         self.targets = targets
         self.charges = charges
-        self.n_crit = n_crit
-        self.depth = depth
         self.prune_empty = prune_empty
-
-        self.nsources_c = ffi.cast("uintptr_t", np.uint64(len(sources)))
-        self.sources_c = ffi.cast("void * ", self.sources.ctypes.data)
-        self.ntargets_c = ffi.cast("uintptr_t", np.uint64(len(targets)))
-        self.targets_c = ffi.cast("void * ", self.targets.ctypes.data)
-        self.ncharges_c = ffi.cast("uintptr_t", np.uint64(len(charges)))
-        self.charges_c = ffi.cast("void * ", self.charges.ctypes.data)
-        self.prune_empty_c = ffi.cast("bool", prune_empty)
-
-        if self.n_crit is not None:
-            self.n_crit_c = ffi.cast("uint64_t", n_crit)
-        else:
-            self.n_crit_c = ffi.cast("uint64_t", 0)
-
-        if self.depth is not None:
-            self.depth_c = ffi.cast("uint64_t", depth)
-        else:
-            self.depth_c = ffi.cast("uint64_t", 0)
+        self.nsources = len(sources)
+        self.ntargets = len(targets)
+        self.ncharges = len(charges)
+        self.sources_c = ffi.cast("void* ", self.sources.ctypes.data)
+        self.targets_c = ffi.cast("void* ", self.targets.ctypes.data)
+        self.charges_c = ffi.cast("void* ", self.charges.ctypes.data)
 
 
 class KiFmm:
@@ -211,102 +204,104 @@ class KiFmm:
             field_translation (obj): Either 'FftFieldTranslation' or 'BlasFieldTranslation'.
             timed (bool): Optionally return operator runtimes.
         """
-        self.expansion_order = expansion_order
-        self.tree = tree
-        self.field_translation = field_translation
-        self.timed = timed
+        self._expansion_order = expansion_order
+        self._tree = tree
+        self._field_translation = field_translation
+        self._timed = timed
 
         try:
-            if self.tree.depth is None:
+            if self._tree.depth is None:
                 assert len(expansion_order) == 1
             else:
-                assert len(expansion_order) == self.tree.depth + 1
+                assert len(expansion_order) == (self._tree.depth + 1)
         except:
             raise TypeError(
                 "expansion_order length must be depth + 1 if specified, otherwise of length 1 if n_crit specified"
             )
 
-        self.expansion_order_c = ffi.cast("uintptr_t *", self.expansion_order)
-        self.nexpansion_order_c = ffi.cast("uintptr_t", len(self.expansion_order))
+        self._nexpansion_order = len(self._expansion_order)
+        self._expansion_order_c = ffi.cast(
+            "uintptr_t*", self._expansion_order.ctypes.data
+        )
 
         # Build FMM runtime object
         self._construct()
 
     def _construct(self):
-        if isinstance(self.field_translation, FftFieldTranslation):
-            if isinstance(self.field_translation.kernel, LaplaceKernel):
-                if self.field_translation.kernel.dtype == np.float32:
-                    self.fmm = lib.laplace_fft_f32_alloc(
-                        self.expansion_order_c,
-                        self.nexpansion_order_c,
-                        self.kernel.eval_type_c,
-                        self.tree.sources_c,
-                        self.tree.nsources_c,
-                        self.tree.targets_c,
-                        self.tree.ntargets_c,
-                        self.tree.charges_c,
-                        self.tree.ncharges_c,
-                        self.tree.prune_empty_c,
-                        self.tree.n_crit_c,
-                        self.tree.depth_c,
-                        self.field_translation.block_size_c,
+        if isinstance(self._field_translation, FftFieldTranslation):
+            if isinstance(self._field_translation.kernel, LaplaceKernel):
+                if self._field_translation.kernel.dtype == np.float32:
+                    self._fmm = lib.laplace_fft_f32_alloc(
+                        self._expansion_order_c,
+                        self._nexpansion_order,
+                        self._field_translation.kernel.eval_type,
+                        self._tree.sources_c,
+                        self._tree.nsources,
+                        self._tree.targets_c,
+                        self._tree.ntargets,
+                        self._tree.charges_c,
+                        self._tree.ncharges,
+                        self._tree.prune_empty,
+                        self._tree.n_crit,
+                        self._tree.depth,
+                        self._field_translation.block_size,
                     )
 
-                elif self.field_translation.kernel.dtype == np.float64:
-                    self.fmm = lib.laplace_fft_f64_alloc(
-                        self.expansion_order_c,
-                        self.nexpansion_order_c,
-                        self.kernel.eval_type_c,
-                        self.tree.sources_c,
-                        self.tree.nsources_c,
-                        self.tree.targets_c,
-                        self.tree.ntargets_c,
-                        self.tree.charges_c,
-                        self.tree.ncharges_c,
-                        self.tree.prune_empty_c,
-                        self.tree.n_crit_c,
-                        self.tree.depth_c,
-                        self.field_translation.block_size_c,
+                elif self._field_translation.kernel.dtype == np.float64:
+                    self._fmm = lib.laplace_fft_f64_alloc(
+                        self._expansion_order_c,
+                        self._nexpansion_order,
+                        self._field_translation.kernel.eval_type,
+                        self._tree.sources_c,
+                        self._tree.nsources,
+                        self._tree.targets_c,
+                        self._tree.ntargets,
+                        self._tree.charges_c,
+                        self._tree.ncharges,
+                        self._tree.prune_empty,
+                        self._tree.n_crit,
+                        self._tree.depth,
+                        self._field_translation.block_size,
                     )
 
                 else:
                     raise TypeError("Unsupported datatype")
 
-            elif isinstance(self.field_translation.kernel, HelmholtzKernel):
-                if self.field_translation.kernel.dtype == np.float32:
-                    self.fmm = lib.helmholtz_fft_f32_alloc(
-                        self.expansion_order_c,
-                        self.nexpansion_order_c,
-                        self.kernel.eval_type_c,
-                        self.kernel.wavenumber_c,
-                        self.tree.sources_c,
-                        self.tree.nsources_c,
-                        self.tree.targets_c,
-                        self.tree.ntargets_c,
-                        self.tree.charges_c,
-                        self.tree.ncharges_c,
-                        self.tree.prune_empty_c,
-                        self.tree.n_crit_c,
-                        self.tree.depth_c,
-                        self.field_translation.block_size_c,
+            elif isinstance(self._field_translation.kernel, HelmholtzKernel):
+                if self._field_translation.kernel.dtype == np.float32:
+                    self._fmm = lib.helmholtz_fft_f32_alloc(
+                        self._expansion_order_c,
+                        self._nexpansion_order,
+                        self._field_translation.kernel.eval_type,
+                        self.kernel.wavenumber,
+                        self._tree.sources_c,
+                        self._tree.nsources,
+                        self._tree.targets_c,
+                        self._tree.ntargets,
+                        self._tree.charges_c,
+                        self._tree.ncharges,
+                        self._tree.prune_empty,
+                        self._tree.n_crit,
+                        self._tree.depth,
+                        self._field_translation.block_size,
                     )
 
-                elif self.field_translation.kernel.dtype == np.float64:
-                    self.fmm = lib.helmholtz_fft_f64_alloc(
-                        self.expansion_order_c,
-                        self.nexpansion_order_c,
-                        self.kernel.eval_type_c,
-                        self.kernel.wavenumber_c,
-                        self.tree.sources_c,
-                        self.tree.nsources_c,
-                        self.tree.targets_c,
-                        self.tree.ntargets_c,
-                        self.tree.charges_c,
-                        self.tree.ncharges_c,
-                        self.tree.prune_empty_c,
-                        self.tree.n_crit_c,
-                        self.tree.depth_c,
-                        self.field_translation.block_size_c,
+                elif self._field_translation.kernel.dtype == np.float64:
+                    self._fmm = lib.helmholtz_fft_f64_alloc(
+                        self._expansion_order_c,
+                        self._nexpansion_order,
+                        self._field_translation.kernel.eval_type,
+                        self.kernel.wavenumber,
+                        self._tree.sources_c,
+                        self._tree.nsources,
+                        self._tree.targets_c,
+                        self._tree.ntargets,
+                        self._tree.charges_c,
+                        self._tree.ncharges,
+                        self._tree.prune_empty,
+                        self._tree.n_crit,
+                        self._tree.depth,
+                        self._field_translation.block_size,
                     )
 
                 else:
@@ -315,137 +310,137 @@ class KiFmm:
             else:
                 raise TypeError("Unsupported kernel")
 
-        elif isinstance(self.field_translation, BlasFieldTranslation):
+        elif isinstance(self._field_translation, BlasFieldTranslation):
 
-            if isinstance(self.field_translation.kernel, LaplaceKernel):
+            if isinstance(self._field_translation.kernel, LaplaceKernel):
 
-                if self.field_translation.random:
-                    if self.field_translation.kernel.dtype == np.float32:
-                        self.fmm = lib.laplace_blas_rsvd_f32_alloc(
-                            self.expansion_order_c,
-                            self.nexpansion_order_c,
-                            self.kernel_eval_type_c,
-                            self.tree.sources_c,
-                            self.tree.nsources_c,
-                            self.tree.targets_c,
-                            self.tree.ntargets_c,
-                            self.tree.charges_c,
-                            self.tree.ncharges_c,
-                            self.tree.prune_empty_c,
-                            self.tree.n_crit_c,
-                            self.tree.depth_c,
-                            self.field_translation.svd_threshold_c,
-                            self.field_translation.surface_diff_c,
-                            self.field_translation.rsvd.n_components_c,
-                            self.field_translation.rsvd.n_oversamples_c,
+                if self._field_translation.random:
+                    if self._field_translation.kernel.dtype == np.float32:
+                        self._fmm = lib.laplace_blas_rsvd_f32_alloc(
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self.kernel_eval_type,
+                            self._tree.sources_c,
+                            self._tree.nsources,
+                            self._tree.targets_c,
+                            self._tree.ntargets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold_c,
+                            self._field_translation.surface_diff_c,
+                            self._field_translation.rsvd.n_components_c,
+                            self._field_translation.rsvd.n_oversamples_c,
                         )
 
-                    elif self.field_translation.kernel.dtype == np.float64:
-                        self.fmm = lib.laplace_blas_rsvd_f64_alloc(
-                            self.expansion_order_c,
-                            self.nexpansion_order_c,
-                            self.kernel_eval_type_c,
-                            self.tree.sources_c,
-                            self.tree.nsources_c,
-                            self.tree.targets_c,
-                            self.tree.ntargets_c,
-                            self.tree.charges_c,
-                            self.tree.ncharges_c,
-                            self.tree.prune_empty_c,
-                            self.tree.n_crit_c,
-                            self.tree.depth_c,
-                            self.field_translation.svd_threshold_c,
-                            self.field_translation.surface_diff_c,
-                            self.field_translation.rsvd.n_components_c,
-                            self.field_translation.rsvd.n_oversamples_c,
+                    elif self._field_translation.kernel.dtype == np.float64:
+                        self._fmm = lib.laplace_blas_rsvd_f64_alloc(
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self.kernel_eval_type,
+                            self._tree.sources_c,
+                            self._tree.nsources,
+                            self._tree.targets_c,
+                            self._tree.ntargets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold_c,
+                            self._field_translation.surface_diff_c,
+                            self._field_translation.rsvd.n_components_c,
+                            self._field_translation.rsvd.n_oversamples_c,
                         )
 
                     else:
                         raise TypeError("Unsupported datatype")
 
                 else:
-                    if self.field_translation.kernel.dtype == np.float32:
-                        self.fmm = lib.laplace_blas_svd_f32_alloc(
-                            self.expansion_order_c,
-                            self.nexpansion_order_c,
-                            self.kernel_eval_type_c,
-                            self.tree.sources_c,
-                            self.tree.nsources_c,
-                            self.tree.targets_c,
-                            self.tree.ntargets_c,
-                            self.tree.charges_c,
-                            self.tree.ncharges_c,
-                            self.tree.prune_empty_c,
-                            self.tree.n_crit_c,
-                            self.tree.depth_c,
-                            self.field_translation.svd_threshold_c,
-                            self.field_translation.surface_diff_c,
+                    if self._field_translation.kernel.dtype == np.float32:
+                        self._fmm = lib.laplace_blas_svd_f32_alloc(
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self.kernel_eval_type,
+                            self._tree.sources_c,
+                            self._tree.nsources,
+                            self._tree.targets_c,
+                            self._tree.ntargets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold_c,
+                            self._field_translation.surface_diff_c,
                         )
 
-                    elif self.field_translation.kernel.dtype == np.float64:
-                        self.fmm = lib.laplace_blas_svd_f64_alloc(
-                            self.expansion_order_c,
-                            self.nexpansion_order_c,
-                            self.kernel_eval_type_c,
-                            self.tree.sources_c,
-                            self.tree.nsources_c,
-                            self.tree.targets_c,
-                            self.tree.ntargets_c,
-                            self.tree.charges_c,
-                            self.tree.ncharges_c,
-                            self.tree.prune_empty_c,
-                            self.tree.n_crit_c,
-                            self.tree.depth_c,
-                            self.field_translation.svd_threshold_c,
-                            self.field_translation.surface_diff_c,
+                    elif self._field_translation.kernel.dtype == np.float64:
+                        self._fmm = lib.laplace_blas_svd_f64_alloc(
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self.kernel_eval_type,
+                            self._tree.sources_c,
+                            self._tree.nsources,
+                            self._tree.targets_c,
+                            self._tree.ntargets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold_c,
+                            self._field_translation.surface_diff_c,
                         )
 
                     else:
                         raise TypeError("Unsupported datatype")
 
-            elif isinstance(self.field_translation.kernel, HelmholtzKernel):
+            elif isinstance(self._field_translation.kernel, HelmholtzKernel):
 
-                if self.field_translation.random:
+                if self._field_translation.random:
                     raise TypeError(
                         "Randomised SVD not yet supported for Helmholtz Kernel"
                     )
                 else:
-                    if self.field_translation.kernel.dtype == np.float32:
-                        self.fmm = lib.helmholtz_blas_svd_f32_alloc(
-                            self.expansion_order_c,
-                            self.nexpansion_order_c,
-                            self.kernel_eval_type_c,
-                            self.kernel.wavenumber_c,
-                            self.tree.sources_c,
-                            self.tree.nsources_c,
-                            self.tree.targets_c,
-                            self.tree.ntargets_c,
-                            self.tree.charges_c,
-                            self.tree.ncharges_c,
-                            self.tree.prune_empty_c,
-                            self.tree.n_crit_c,
-                            self.tree.depth_c,
-                            self.field_translation.svd_threshold_c,
-                            self.field_translation.surface_diff_c,
+                    if self._field_translation.kernel.dtype == np.float32:
+                        self._fmm = lib.helmholtz_blas_svd_f32_alloc(
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self.kernel_eval_type,
+                            self.kernel.wavenumber,
+                            self._tree.sources_c,
+                            self._tree.nsources,
+                            self._tree.targets_c,
+                            self._tree.ntargets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold_c,
+                            self._field_translation.surface_diff_c,
                         )
 
-                    elif self.field_translation.kernel.dtype == np.float64:
-                        self.fmm = lib.helmholtz_blas_svd_f64_alloc(
-                            self.expansion_order_c,
-                            self.nexpansion_order_c,
-                            self.kernel_eval_type_c,
-                            self.kernel.wavenumber_c,
-                            self.tree.sources_c,
-                            self.tree.nsources_c,
-                            self.tree.targets_c,
-                            self.tree.ntargets_c,
-                            self.tree.charges_c,
-                            self.tree.ncharges_c,
-                            self.tree.prune_empty_c,
-                            self.tree.n_crit_c,
-                            self.tree.depth_c,
-                            self.field_translation.svd_threshold_c,
-                            self.field_translation.surface_diff_c,
+                    elif self._field_translation.kernel.dtype == np.float64:
+                        self._fmm = lib.helmholtz_blas_svd_f64_alloc(
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self.kernel_eval_type,
+                            self.kernel.wavenumber,
+                            self._tree.sources_c,
+                            self._tree.nsources,
+                            self._tree.targets_c,
+                            self._tree.ntargets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold_c,
+                            self._field_translation.surface_diff_c,
                         )
 
                     else:
@@ -455,7 +450,7 @@ class KiFmm:
                 raise TypeError("Unsupported kernel")
 
         else:
-            raise TypeError(f"Unsupported field translation {self.field_translation}")
+            raise TypeError(f"Unsupported field translation {self._field_translation}")
 
     @property
     def target_global_indices(self):
@@ -477,7 +472,7 @@ class KiFmm:
     def all_potentials(self):
         pass
 
-    def potential(self, key):
+    def potential(self, leaf):
         pass
 
     def evaluate(self):
