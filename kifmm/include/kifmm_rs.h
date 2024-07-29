@@ -121,8 +121,7 @@ typedef struct FmmOperatorTimes {
  */
 typedef struct Potential {
   /**
-   * Length of underlying buffer, of length n_eval_mode*n_coordinates
-   * currently only support n_eval_mode=1, i.e. potentials
+   * Length of underlying buffer, of length n_eval_mode*n_coordinates*n_evals
    */
   uintptr_t len;
   /**

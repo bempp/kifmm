@@ -14,9 +14,6 @@ pub enum FmmError {
     Io(std::io::Error),
 }
 
-/// Type to handle FMM related errors
-pub type FmmTime = Vec<FmmOperatorTime>;
-
 /// Enumeration of operator types for timing
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]

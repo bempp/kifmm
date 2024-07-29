@@ -84,8 +84,7 @@ pub mod types {
     /// Potential data
     #[repr(C)]
     pub struct Potential {
-        /// Length of underlying buffer, of length n_eval_mode*n_coordinates
-        /// currently only support n_eval_mode=1, i.e. potentials
+        /// Length of underlying buffer, of length n_eval_mode*n_coordinates*n_evals
         pub len: usize,
         /// Pointer to underlying buffer
         pub data: *const c_void,
@@ -274,7 +273,7 @@ pub mod constructors {
 
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
 
-    use crate::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
+    use crate::{traits::tree::{FmmTree, Tree}, BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm};
 
     use super::{
         c32, c64, FmmCType, FmmEvaluator, FmmTranslationCType, Laplace3dKernel, SingleNodeBuilder,
@@ -700,6 +699,8 @@ pub mod constructors {
             .unwrap()
             .build()
             .unwrap();
+
+        println!("CONSTRUCTOR SUCCESFUL {:?}", fmm.tree().source_tree().n_leaves());
 
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
@@ -1286,7 +1287,7 @@ pub mod api {
 
     use crate::{
         fmm::types::FmmEvalType,
-        traits::tree::{FmmTree, Tree, TreeNode},
+        traits::{tree::{FmmTree, Tree, TreeNode}, types::FmmOperatorTime},
         tree::types::MortonKey,
         BlasFieldTranslationIa, FftFieldTranslation, Fmm,
     };
@@ -1365,17 +1366,33 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
+
+                    // let mut fmm = unsafe {
+                    //     Box::from_raw(
+                    //         pointer
+                    //             as *mut KiFmm<
+                    //                 f64,
+                    //                 Laplace3dKernel<f64>,
+                    //                 BlasFieldTranslationSaRcmp<f64>,
+                    //             >,
+                    //     )
+                    // };
+
+                    // let _  = fmm.evaluate(timed);
+                    // let length = fmm.times.len();
+                    // let times = fmm.times.as_mut_ptr();
+
+
                     let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+                    println!("Reconstructed");
 
                     let _ = unsafe { (*fmm).evaluate(timed) };
                     let length = unsafe { (*fmm).times.len() };
                     let times = unsafe { (*fmm).times.as_mut_ptr() };
-
                     let times = FmmOperatorTimes { times, length };
 
+                    println!("Evaluated");
                     Box::into_raw(Box::new(times))
                 }
             },
@@ -1683,10 +1700,14 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
+                    // let fmm = pointer
+                    //     as *mut Box<
+                    //         KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                    //     >;
+
                     let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+                    println!("Reconstructed Potentials");
 
                     let potentials = unsafe {
                         Potential {
@@ -1845,6 +1866,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
 
+
                     let global_indices = unsafe {
                         GlobalIndices {
                             len: (*fmm).tree.target_tree.global_indices.len(),
@@ -1858,10 +1880,15 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
+                    // let fmm = pointer
+                    //     as *mut Box<
+                    //         KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                    //     >;
+
                     let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    println!("Reconstructed global indices");
 
                     let global_indices = unsafe {
                         GlobalIndices {
@@ -2260,9 +2287,7 @@ pub mod api {
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
                     let mut nvecs = unsafe {
                         match (*fmm).fmm_eval_type {
@@ -2552,8 +2577,7 @@ pub mod api {
 
             FmmCType::Laplace64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
-                    let fmm = pointer
-                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+                    let fmm = pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
                     let leaf = MortonKey::from_morton(leaf);
 
@@ -2581,10 +2605,7 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
-                    let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                    let fmm = pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
                     let leaf = MortonKey::from_morton(leaf);
 
@@ -2853,10 +2874,9 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
-                    let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+
+                    // println!("Finding coordinates");
+                    let fmm = pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
                     let leaf = MortonKey::from_morton(leaf);
 
@@ -3083,8 +3103,12 @@ pub mod api {
 
             FmmCType::Laplace64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
+                    // let fmm = pointer
+                    //     as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+
                     let fmm = pointer
-                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+                    println!("Reconstructed leaves target tree");
 
                     let leaves = unsafe {
                         (*fmm)
@@ -3107,10 +3131,13 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
+                    // let fmm = pointer
+                    //     as *mut Box<
+                    //         KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                    //     >;
                     let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+                    println!("Reconstructed leaves target tree");
 
                     let leaves = unsafe {
                         (*fmm)
@@ -3312,8 +3339,12 @@ pub mod api {
 
             FmmCType::Laplace64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
+                    // let fmm = pointer
+                    //     as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+
                     let fmm = pointer
-                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+                    println!("reconstructed source tree");
 
                     let leaves = unsafe {
                         (*fmm)
@@ -3336,10 +3367,13 @@ pub mod api {
                 }
 
                 FmmTranslationCType::Blas => {
+                    // let fmm = pointer
+                    //     as *mut Box<
+                    //         KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
+                    //     >;
                     let fmm = pointer
-                        as *mut Box<
-                            KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>,
-                        >;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+                    println!("Reconstructed leaves source treee");
 
                     let leaves = unsafe {
                         (*fmm)
@@ -3694,3 +3728,64 @@ pub mod api {
 pub use api::*;
 pub use constructors::*;
 pub use types::*;
+
+#[cfg(test)]
+mod test {
+    use std::ffi::c_void;
+
+    use rlst::RawAccess;
+
+    use crate::tree::helpers::points_fixture;
+
+    use super::{evaluate, laplace_blas_rsvd_f64_alloc};
+
+
+    #[test]
+    fn test_raw_constructor() {
+
+        let n_points = 1000;
+        let sources = points_fixture::<f64>(n_points, None, None, None);
+        let targets = points_fixture::<f64>(n_points, None, None, None);
+        let charges= vec![1.0; n_points];
+
+        let nsources = n_points * 3;
+        let sources_p = sources.data().as_ptr() as *const c_void;
+
+        let ntargets= n_points * 3;
+        let targets_p = targets.data().as_ptr() as *const c_void;
+
+        let ncharges = n_points;
+        let charges_p = charges.as_ptr() as *const c_void;
+
+        let expansion_order = [6usize];
+        let expansion_order_p = expansion_order.as_ptr() as *const usize;
+        let nexpansion_order = 1;
+
+        let evaluator = unsafe { laplace_blas_rsvd_f64_alloc(
+            expansion_order_p,
+            nexpansion_order,
+            true,
+            sources_p,
+            nsources,
+            targets_p,
+            ntargets,
+            charges_p,
+            ncharges,
+            true,
+            150,
+            0,
+            1e-10,
+            2,
+            10,
+           10
+        )
+    };
+
+
+    unsafe { evaluate(evaluator, false) };
+
+    assert!(false);
+
+
+    }
+}

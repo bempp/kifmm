@@ -8,10 +8,22 @@ requires-python = "==3.10.*"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
-dependencies = ["maturin==1.5.1", "numpy==1.26.2", "mayavi==4.8.1", "vtk==9.3.0", "pyqt5==5.15.10", "numpy-stl==3.1.1", "jupyter", 'patchelf; platform_system == "Linux"', "cffi"]
+dependencies = [
+    "maturin==1.5.1",
+    "numpy==1.26.2",
+    "mayavi==4.8.1",
+    "vtk==9.3.0",
+    "pyqt5==5.15.10",
+    "numpy-stl==3.1.1",
+    "jupyter",
+    "configobj",
+    'patchelf; platform_system == "Linux"',
+    "cffi",
+    "pandas==2.2.2",
+    "seaborn==0.13.2"
+]
 
 [tool.maturin]
 python-source = "python"
