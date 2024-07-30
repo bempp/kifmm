@@ -611,7 +611,6 @@ class KiFmm:
 
         self._morton_keys_refs.add(morton_keys_p)
 
-
     def _leaves_source_tree(self):
         morton_keys_p = lib.leaves_source_tree(self._fmm)
         ptr = ffi.cast("uint64_t*", morton_keys_p.data)
