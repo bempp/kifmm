@@ -3547,53 +3547,326 @@ pub use types::*;
 mod test {
     use std::ffi::c_void;
 
+    use num::{Complex, One};
     use rlst::RawAccess;
 
     use crate::tree::helpers::points_fixture;
 
-    use super::{evaluate, laplace_blas_rsvd_f64_alloc};
+    use super::{
+        evaluate, free_fmm_evaluator, helmholtz_blas_svd_f32_alloc, helmholtz_blas_svd_f64_alloc,
+        helmholtz_fft_f32_alloc, helmholtz_fft_f64_alloc, laplace_blas_rsvd_f32_alloc,
+        laplace_blas_rsvd_f64_alloc, laplace_blas_svd_f32_alloc, laplace_blas_svd_f64_alloc,
+        laplace_fft_f32_alloc, laplace_fft_f64_alloc,
+    };
 
     #[test]
-    fn test_raw_constructors() {
-        let n_points = 1000;
-        let sources = points_fixture::<f64>(n_points, None, None, None);
-        let targets = points_fixture::<f64>(n_points, None, None, None);
-        let charges = vec![1.0; n_points];
+    fn test_raw_laplace_constructors() {
+        // f32
+        {
+            let n_points = 1000;
+            let sources = points_fixture::<f32>(n_points, None, None, None);
+            let targets = points_fixture::<f32>(n_points, None, None, None);
+            let charges = vec![1.0; n_points];
 
-        let nsources = n_points * 3;
-        let sources_p = sources.data().as_ptr() as *const c_void;
+            let nsources = n_points * 3;
+            let sources_p = sources.data().as_ptr() as *const c_void;
 
-        let ntargets = n_points * 3;
-        let targets_p = targets.data().as_ptr() as *const c_void;
+            let ntargets = n_points * 3;
+            let targets_p = targets.data().as_ptr() as *const c_void;
 
-        let ncharges = n_points;
-        let charges_p = charges.as_ptr() as *const c_void;
+            let ncharges = n_points;
+            let charges_p = charges.as_ptr() as *const c_void;
 
-        let expansion_order = [6usize];
-        let expansion_order_p = expansion_order.as_ptr();
-        let nexpansion_order = 1;
+            let expansion_order = [6usize];
+            let expansion_order_p = expansion_order.as_ptr();
+            let nexpansion_order = 1;
 
-        let evaluator = unsafe {
-            laplace_blas_rsvd_f64_alloc(
-                expansion_order_p,
-                nexpansion_order,
-                true,
-                sources_p,
-                nsources,
-                targets_p,
-                ntargets,
-                charges_p,
-                ncharges,
-                true,
-                150,
-                0,
-                1e-10,
-                2,
-                10,
-                10,
-            )
-        };
+            let laplace_blas_rsvd_f32 = unsafe {
+                laplace_blas_rsvd_f32_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    1e-10,
+                    2,
+                    10,
+                    10,
+                )
+            };
 
-        unsafe { evaluate(evaluator, false) };
+            let laplace_blas_svd_f32 = unsafe {
+                laplace_blas_svd_f32_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    1e-10,
+                    2,
+                )
+            };
+
+            let laplace_fft_f32 = unsafe {
+                laplace_fft_f32_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    32,
+                )
+            };
+
+            unsafe { evaluate(laplace_blas_rsvd_f32, false) };
+            unsafe { evaluate(laplace_blas_svd_f32, false) };
+            unsafe { evaluate(laplace_fft_f32, false) };
+            unsafe { free_fmm_evaluator(laplace_blas_rsvd_f32) };
+            unsafe { free_fmm_evaluator(laplace_blas_svd_f32) };
+            unsafe { free_fmm_evaluator(laplace_fft_f32) };
+        }
+
+        // f64
+        {
+            let n_points = 1000;
+            let sources = points_fixture::<f64>(n_points, None, None, None);
+            let targets = points_fixture::<f64>(n_points, None, None, None);
+            let charges = vec![1.0; n_points];
+
+            let nsources = n_points * 3;
+            let sources_p = sources.data().as_ptr() as *const c_void;
+
+            let ntargets = n_points * 3;
+            let targets_p = targets.data().as_ptr() as *const c_void;
+
+            let ncharges = n_points;
+            let charges_p = charges.as_ptr() as *const c_void;
+
+            let expansion_order = [6usize];
+            let expansion_order_p = expansion_order.as_ptr();
+            let nexpansion_order = 1;
+
+            let laplace_blas_rsvd_f64 = unsafe {
+                laplace_blas_rsvd_f64_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    1e-10,
+                    2,
+                    10,
+                    10,
+                )
+            };
+
+            let laplace_blas_svd_f64 = unsafe {
+                laplace_blas_svd_f64_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    1e-10,
+                    2,
+                )
+            };
+
+            let laplace_fft_f64 = unsafe {
+                laplace_fft_f64_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    32,
+                )
+            };
+
+            unsafe { evaluate(laplace_blas_rsvd_f64, false) };
+            unsafe { evaluate(laplace_blas_svd_f64, false) };
+            unsafe { evaluate(laplace_fft_f64, false) };
+
+            unsafe { free_fmm_evaluator(laplace_blas_rsvd_f64) };
+            unsafe { free_fmm_evaluator(laplace_blas_svd_f64) };
+            unsafe { free_fmm_evaluator(laplace_fft_f64) };
+        }
+    }
+
+    #[test]
+    fn test_raw_helmholtz_constructors() {
+        // f32
+        {
+            let n_points = 1000;
+            let sources = points_fixture::<f32>(n_points, None, None, None);
+            let targets = points_fixture::<f32>(n_points, None, None, None);
+            let charges = vec![Complex::<f32>::one(); n_points];
+            let wavenumber = 10.;
+
+            let nsources = n_points * 3;
+            let sources_p = sources.data().as_ptr() as *const c_void;
+
+            let ntargets = n_points * 3;
+            let targets_p = targets.data().as_ptr() as *const c_void;
+
+            let ncharges = n_points;
+            let charges_p = charges.as_ptr() as *const c_void;
+
+            let expansion_order = [6usize];
+            let expansion_order_p = expansion_order.as_ptr();
+            let nexpansion_order = 1;
+
+            let helmholtz_blas_svd_f32 = unsafe {
+                helmholtz_blas_svd_f32_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    wavenumber,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    1e-10,
+                    2,
+                )
+            };
+
+            let helmholtz_fft_f32 = unsafe {
+                helmholtz_fft_f32_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    wavenumber,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    32,
+                )
+            };
+
+            unsafe { evaluate(helmholtz_blas_svd_f32, false) };
+            unsafe { evaluate(helmholtz_fft_f32, false) };
+            unsafe { free_fmm_evaluator(helmholtz_blas_svd_f32) };
+            unsafe { free_fmm_evaluator(helmholtz_fft_f32) };
+        }
+
+        // f64
+        {
+            let n_points = 1000;
+            let sources = points_fixture::<f64>(n_points, None, None, None);
+            let targets = points_fixture::<f64>(n_points, None, None, None);
+            let charges = vec![Complex::<f64>::one(); n_points];
+            let wavenumber = 10.;
+
+            let nsources = n_points * 3;
+            let sources_p = sources.data().as_ptr() as *const c_void;
+
+            let ntargets = n_points * 3;
+            let targets_p = targets.data().as_ptr() as *const c_void;
+
+            let ncharges = n_points;
+            let charges_p = charges.as_ptr() as *const c_void;
+
+            let expansion_order = [6usize];
+            let expansion_order_p = expansion_order.as_ptr();
+            let nexpansion_order = 1;
+
+            let helmholtz_blas_svd_f64 = unsafe {
+                helmholtz_blas_svd_f64_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    wavenumber,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    1e-10,
+                    2,
+                )
+            };
+
+            let helmholtz_fft_f64 = unsafe {
+                helmholtz_fft_f64_alloc(
+                    expansion_order_p,
+                    nexpansion_order,
+                    true,
+                    wavenumber,
+                    sources_p,
+                    nsources,
+                    targets_p,
+                    ntargets,
+                    charges_p,
+                    ncharges,
+                    true,
+                    150,
+                    0,
+                    32,
+                )
+            };
+
+            unsafe { evaluate(helmholtz_blas_svd_f64, false) };
+            unsafe { evaluate(helmholtz_fft_f64, false) };
+            unsafe { free_fmm_evaluator(helmholtz_blas_svd_f64) };
+            unsafe { free_fmm_evaluator(helmholtz_fft_f64) };
+        }
     }
 }
