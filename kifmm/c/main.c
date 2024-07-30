@@ -36,9 +36,9 @@ int main() {
 
   // Instantiate a Laplace evaluator
   struct FmmEvaluator *evaluator = laplace_fft_f64_alloc(
-      expansion_order, nexpansion_order, eval_type, (const void *)sources, NSOURCES * 3,
-      (const void *)targets, NTARGETS * 3, (const void *)charges, NSOURCES,
-      prune_empty, n_crit, depth, block_size);
+      expansion_order, nexpansion_order, eval_type, (const void *)sources,
+      NSOURCES * 3, (const void *)targets, NTARGETS * 3, (const void *)charges,
+      NSOURCES, prune_empty, n_crit, depth, block_size);
 
   bool timed = true;
   FmmOperatorTimes *times = evaluate(evaluator, timed);

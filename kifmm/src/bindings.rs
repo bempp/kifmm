@@ -1362,8 +1362,10 @@ pub mod api {
 
             FmmCType::Laplace64 => match ctranslation_type {
                 FmmTranslationCType::Fft => {
+                    // let fmm = pointer
+                    //     as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
                     let fmm = pointer
-                        as *mut Box<KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>>;
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
                     let _ = unsafe { (*fmm).evaluate(timed) };
                     let length = unsafe { (*fmm).times.len() };

@@ -98,7 +98,6 @@ class RandomSvdSettings:
             self.n_oversamples = n_oversamples
 
 
-
 class BlasFieldTranslation:
     def __init__(
         self,
@@ -144,7 +143,6 @@ class BlasFieldTranslation:
             assert surface_diff >= 0
         except:
             raise TypeError("surface_diff must be positive or 0")
-
 
 
 class FftFieldTranslation:
@@ -463,7 +461,7 @@ class KiFmm:
 
                     elif self._field_translation.kernel.dtype == np.float64:
 
-                        self._fmm =  lib.laplace_blas_rsvd_f64_alloc(
+                        self._fmm = lib.laplace_blas_rsvd_f64_alloc(
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
@@ -479,7 +477,7 @@ class KiFmm:
                             self._field_translation.svd_threshold,
                             self._field_translation.surface_diff,
                             self._field_translation.rsvd.n_components,
-                            self._field_translation.rsvd.n_oversamples
+                            self._field_translation.rsvd.n_oversamples,
                         )
 
                         self.potential_dtype = np.float64
@@ -597,16 +595,14 @@ class KiFmm:
         morton_keys_p = lib.leaves_target_tree(self._fmm)
         ptr = ffi.cast("uint64_t*", morton_keys_p.data)
         self.leaves_target_tree = np.frombuffer(
-            ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")),
-            dtype=np.uint64
+            ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")), dtype=np.uint64
         )
 
     def _leaves_source_tree(self):
         morton_keys_p = lib.leaves_source_tree(self._fmm)
         ptr = ffi.cast("uint64_t*", morton_keys_p.data)
         self.leaves_source_tree = np.frombuffer(
-            ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")),
-            dtype=np.uint64
+            ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")), dtype=np.uint64
         )
 
     def _all_potentials(self):
@@ -645,7 +641,8 @@ class KiFmm:
         elif dtype == np.float64:
             ctype_buffer = ffi.cast("double*", ptr)
             return np.frombuffer(
-                ffi.buffer(ctype_buffer, length * ffi.sizeof("double")), dtype=np.float64
+                ffi.buffer(ctype_buffer, length * ffi.sizeof("double")),
+                dtype=np.float64,
             )
         elif dtype == np.complex64:
             ctype_buffer = ffi.cast("float*", ptr)
@@ -655,7 +652,8 @@ class KiFmm:
         elif dtype == np.complex128:
             ctype_buffer = ffi.cast("double*", ptr)
             return np.frombuffer(
-                ffi.buffer(ctype_buffer, length * ffi.sizeof("double")), dtype=np.float64
+                ffi.buffer(ctype_buffer, length * ffi.sizeof("double")),
+                dtype=np.float64,
             ).view(np.complex128)
         else:
             raise ValueError(f"Unsupported dtype: {dtype}")
@@ -670,7 +668,7 @@ class KiFmm:
             np.array(self.potential_dtype): Potential data associated with this leaf
         """
         try:
-            assert (isinstance(leaf, int) or (isinstance(leaf, np.uint64)))
+            assert isinstance(leaf, int) or (isinstance(leaf, np.uint64))
         except:
             raise TypeError("leaf must be of type int")
 
@@ -768,29 +766,32 @@ class KiFmm:
             nresult,
         )
 
-
     def coordinates_source_tree(self, leaf):
         try:
-            assert (isinstance(leaf, int) or (isinstance(leaf, np.uint64)))
+            assert isinstance(leaf, int) or (isinstance(leaf, np.uint64))
         except:
             raise TypeError("leaf must be of type int")
 
         coords = None
         if self._evaluated:
             coords_p = lib.coordinates_source_tree(self._fmm, leaf)
-            coords = KiFmm._cast_to_numpy_array(coord_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi)
+            coords = KiFmm._cast_to_numpy_array(
+                coord_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
+            )
 
         return coords
 
     def coordinates_target_tree(self, leaf):
         try:
-            assert (isinstance(leaf, int) or (isinstance(leaf, np.uint64)))
+            assert isinstance(leaf, int) or (isinstance(leaf, np.uint64))
         except:
             raise TypeError("leaf must be of type int")
 
         coords = None
         if self._evaluated:
             coords_p = lib.coordinates_target_tree(self._fmm, leaf)
-            coords = KiFmm._cast_to_numpy_array(coords_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi)
+            coords = KiFmm._cast_to_numpy_array(
+                coords_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
+            )
 
         return coords
