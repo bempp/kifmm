@@ -3554,7 +3554,7 @@ mod test {
     use super::{evaluate, laplace_blas_rsvd_f64_alloc};
 
     #[test]
-    fn test_raw_constructor() {
+    fn test_raw_constructors() {
         let n_points = 1000;
         let sources = points_fixture::<f64>(n_points, None, None, None);
         let targets = points_fixture::<f64>(n_points, None, None, None);

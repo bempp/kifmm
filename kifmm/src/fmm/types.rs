@@ -904,7 +904,7 @@ pub enum Isa {
     Neon(pulp::aarch64::NeonFcma),
 
     /// AVX2 ISA
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     Avx(pulp::x86::V3),
 
     /// Default is no vectorisation

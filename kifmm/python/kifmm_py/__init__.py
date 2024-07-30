@@ -80,22 +80,35 @@ class EvalType(Enum):
 
 
 class RandomSvdSettings:
-    def __init__(self, n_components, n_oversamples):
-        """Set parameters for randomised SVD.
+    def __init__(self, n_components=0, n_oversamples=10):
+        """Set Randomised SVD parameters
 
         Args:
-            n_components (int): Approximate rank of matrix to be compressed
-            n_oversamples (int): Number of oversamples used to sample subspace
+            n_components (int, optional): Estimated rank of
+            orthogonal subspace used to approximate kernel.
+            Defaults to being determined from
+            associated Kernel if set to 0.
+            n_oversamples (int, optional): Number of oversamples
+            used to approximate orthogonal subspace used to approximate
+            kernel. Defaults to 10.
         """
-        if n_components is None:
-            raise TypeError("n_components must be specified")
-        else:
-            self.n_components = n_components
+        try:
+            assert isinstance(n_components, int)
+        except:
+            raise TypeError("Expected int n_components")
 
-        if n_oversamples is None:
-            self.n_oversamples = 10
-        else:
-            self.n_oversamples = n_oversamples
+        try:
+            assert isinstance(n_oversamples, int)
+        except:
+            raise TypeError("n_oversamples must be an integer")
+
+        try:
+            assert n_oversamples >= 0
+        except:
+            raise TypeError("n_oversamples must be >= 0")
+
+        self.n_components = n_components
+        self.n_oversamples = n_oversamples
 
 
 class BlasFieldTranslation:
@@ -103,22 +116,22 @@ class BlasFieldTranslation:
         self,
         kernel,
         svd_threshold,
+        n_components=0,
+        n_oversamples=10,
         surface_diff=0,
         random=False,
-        n_components=None,
-        n_oversamples=None,
     ):
         """Set parameters for SVD compressed BLAS accelerated M2L field translation.
 
         Args:
             kernel (Kernel): Associated kernel
             svd_threshold (float): Singular value cutoff used in compression
+            n_components (int, optional): Parameter in random SVD.
+            n_oversamples (int, optional): Parameter in random SVD.
             surface_diff (int, optional): Difference in expansion order used to construct
             check and equivalent surfaces, surface_diff = check_surface_order-equivalent_surface_order.
             Defaults to 0.
             random (bool, optional): Whether or not to use random SVD. Defaults to False.
-            n_components (_type_, optional): Parameter in random SVD. Defaults to None.
-            n_oversamples (_type_, optional): Parameter in random SVD. Defaults to None.
         """
         self.kernel = kernel
         self.svd_threshold = self.kernel.dtype(svd_threshold)
@@ -135,7 +148,6 @@ class BlasFieldTranslation:
                     n_components,
                     n_oversamples,
                 )
-
         else:
             raise TypeError("Unsupported Kernel")
 

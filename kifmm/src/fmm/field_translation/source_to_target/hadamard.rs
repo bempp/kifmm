@@ -62,7 +62,7 @@ impl Hadamard8x8 for c32 {
     }
 
     #[inline(always)]
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     fn hadamard8x8(
         isa: Isa,
         matrix: &[Self::Scalar; 64],
@@ -82,7 +82,7 @@ impl Hadamard8x8 for c32 {
     #[inline(always)]
     #[cfg(not(any(
         all(target_arch = "aarch64", target_feature = "neon"),
-        all(target_arch = "x86_64", target_feature = "avx")
+        all(target_arch = "x86_64", target_feature = "avx2")
     )))]
     fn hadamard8x8(
         _isa: Isa,
@@ -117,7 +117,7 @@ impl Hadamard8x8 for c64 {
     }
 
     #[inline(always)]
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     fn hadamard8x8(
         isa: Isa,
         matrix: &[Self::Scalar; 64],
@@ -137,7 +137,7 @@ impl Hadamard8x8 for c64 {
     #[inline(always)]
     #[cfg(not(any(
         all(target_arch = "aarch64", target_feature = "neon"),
-        all(target_arch = "x86_64", target_feature = "avx")
+        all(target_arch = "x86_64", target_feature = "avx2")
     )))]
     fn hadamard8x8(
         _isa: Isa,
@@ -399,7 +399,7 @@ pub mod aarch64 {
     }
 }
 
-#[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+#[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
 pub mod x86 {
     use super::{c32, c64, Hadamard8x8Data};
     use pulp::x86::V3;
