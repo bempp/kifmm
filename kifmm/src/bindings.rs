@@ -265,8 +265,7 @@ pub mod constructors {
 
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
 
-    use crate::{
-        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
+    use crate::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 
     use super::{
         c32, c64, FmmCType, FmmEvaluator, FmmTranslationCType, Laplace3dKernel, SingleNodeBuilder,
@@ -1624,7 +1623,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len()*2,
+                            len: (*fmm).potentials.len() * 2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C32,
                         }
@@ -1638,7 +1637,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len()*2,
+                            len: (*fmm).potentials.len() * 2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C32,
                         }
@@ -1655,7 +1654,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len()*2,
+                            len: (*fmm).potentials.len() * 2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C64,
                         }
@@ -1670,7 +1669,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len()*2,
+                            len: (*fmm).potentials.len() * 2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C64,
                         }
