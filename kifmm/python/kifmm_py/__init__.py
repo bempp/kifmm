@@ -219,7 +219,6 @@ class HelmholtzKernel(Kernel):
         self.dtype = dtype
 
         try:
-            # print("HERE", type(wavenumber))
             assert type(wavenumber) == self.dtype
         except:
             raise TypeError("Invalid wavenumber type")
