@@ -313,6 +313,8 @@ class KiFmm:
             field_translation (obj): Either 'FftFieldTranslation' or 'BlasFieldTranslation'.
             timed (bool): Optionally return operator runtimes.
         """
+
+        self._evaluated = False
         self._expansion_order = expansion_order
         self._tree = tree
         self._field_translation = field_translation
@@ -341,8 +343,8 @@ class KiFmm:
         self._expansion_order_c = ffi.cast(
             "uintptr_t*", self._expansion_order.ctypes.data
         )
-        self._evaluated = False
         self.all_potentials = []
+        self._morton_keys_refs = set()
 
         # Build FMM runtime object
         self._construct()
@@ -607,12 +609,16 @@ class KiFmm:
             ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")), dtype=np.uint64
         )
 
+        self._morton_keys_refs.add(morton_keys_p)
+
+
     def _leaves_source_tree(self):
         morton_keys_p = lib.leaves_source_tree(self._fmm)
         ptr = ffi.cast("uint64_t*", morton_keys_p.data)
         self.leaves_source_tree = np.frombuffer(
             ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")), dtype=np.uint64
         )
+        self._morton_keys_refs.add(morton_keys_p)
 
     def _all_potentials(self):
         dim = 3
@@ -630,14 +636,20 @@ class KiFmm:
 
             # if self.
             self.all_potentials = np.reshape(
-                all_potentials, (n_evals, self._tree.ntargets//dim, self._field_translation.kernel.eval_type_r.value)
+                all_potentials,
+                (
+                    n_evals,
+                    self._tree.ntargets // dim,
+                    self._field_translation.kernel.eval_type_r.value,
+                ),
             )
 
             self.all_potentials_u = np.zeros_like(self.all_potentials)
 
             for i in range(0, self.all_potentials.shape[0]):
-                self.all_potentials_u[i] = self.all_potentials[i][self.target_global_indices]
-
+                self.all_potentials_u[i] = self.all_potentials[i][
+                    self.target_global_indices
+                ]
 
     @staticmethod
     def _cast_to_numpy_array(ptr, length, dtype, ffi):
@@ -773,6 +785,14 @@ class KiFmm:
         )
 
     def coordinates_source_tree(self, leaf):
+        """Lookup coordinates associated with a leaf in the source tree
+
+        Args:
+            leaf (int): Leaf Morton key
+
+        Returns:
+            np.array: Coordinates in Fortran order [x_1, x_2, ..., x_N, y_1, y_2, .., y_N, z_1, z_2, z_N]
+        """
         try:
             assert isinstance(leaf, int) or (isinstance(leaf, np.uint64))
         except:
@@ -788,6 +808,14 @@ class KiFmm:
         return coords
 
     def coordinates_target_tree(self, leaf):
+        """Lookup coordinates associated with a leaf in the target tree
+
+        Args:
+            leaf (int): Leaf Morton key
+
+        Returns:
+            np.array: Coordinates in Fortran order [x_1, x_2, ..., x_N, y_1, y_2, .., y_N, z_1, z_2, z_N]
+        """
         try:
             assert isinstance(leaf, int) or (isinstance(leaf, np.uint64))
         except:
@@ -801,3 +829,9 @@ class KiFmm:
             )
 
         return coords
+
+    def __del__(self):
+        if self._evaluated:
+            lib.free_fmm_evaluator(self._fmm)
+            for ref in self._morton_keys_refs:
+                lib.free_morton_keys(ref)
