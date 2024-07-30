@@ -191,6 +191,8 @@ class LaplaceKernel(Kernel):
         else:
             raise TypeError("Unrecognised eval_type")
 
+        self.eval_type_r = eval_type
+
 
 class HelmholtzKernel(Kernel):
     def __init__(self, dtype, wavenumber, eval_type):
@@ -202,7 +204,10 @@ class HelmholtzKernel(Kernel):
             eval_type (EvalType): Value or ValueDeriv
         """
 
+        self.dtype = dtype
+
         try:
+            # print("HERE", type(wavenumber))
             assert type(wavenumber) == self.dtype
         except:
             raise TypeError("Invalid wavenumber type")
@@ -214,7 +219,7 @@ class HelmholtzKernel(Kernel):
         else:
             raise TypeError("Unrecognised eval_type")
 
-        self.dtype = dtype
+        self.eval_type_r = eval_type
         self.wavenumber = wavenumber
 
 
@@ -237,7 +242,7 @@ class SingleNodeTree:
         try:
             assert len(sources) % dim == 0
             assert len(targets) % dim == 0
-            assert len(sources) % len(charges) == 0
+            assert len(charges) % (len(sources) // dim) == 0
         except:
             raise TypeError("Incorrect dimension for sources, targets or charges")
 
@@ -394,7 +399,7 @@ class KiFmm:
                         self._expansion_order_c,
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
-                        self.kernel.wavenumber,
+                        self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
                         self._tree.nsources,
                         self._tree.targets_c,
@@ -413,7 +418,7 @@ class KiFmm:
                         self._expansion_order_c,
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
-                        self.kernel.wavenumber,
+                        self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
                         self._tree.nsources,
                         self._tree.targets_c,
@@ -539,7 +544,7 @@ class KiFmm:
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
-                            self.kernel.wavenumber,
+                            self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
                             self._tree.nsources,
                             self._tree.targets_c,
@@ -559,7 +564,7 @@ class KiFmm:
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
-                            self.kernel.wavenumber,
+                            self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
                             self._tree.nsources,
                             self._tree.targets_c,
@@ -586,10 +591,14 @@ class KiFmm:
     def _target_global_indices(self):
         global_indices_p = lib.global_indices_target_tree(self._fmm)
         ptr = ffi.cast("uintptr_t*", global_indices_p.data)
-        self.target_global_indices = np.frombuffer(
+        tmp = np.frombuffer(
             ffi.buffer(ptr, global_indices_p.len * ffi.sizeof("uintptr_t")),
             dtype=np.uint64,
         )
+
+        self.target_global_indices = np.zeros_like(tmp)
+        for i, j in enumerate(tmp):
+            self.target_global_indices[j] = i
 
     def _leaves_target_tree(self):
         morton_keys_p = lib.leaves_target_tree(self._fmm)
@@ -617,19 +626,18 @@ class KiFmm:
                 ffi,
             )
 
-            n_evals = len(all_potentials) // (self._tree.ntargets // dim)
+            n_evals = self._tree.ncharges // (self._tree.nsources // 3)
+
+            # if self.
             self.all_potentials = np.reshape(
-                all_potentials, (n_evals, (self._tree.ntargets // dim))
+                all_potentials, (n_evals, self._tree.ntargets//dim, self._field_translation.kernel.eval_type_r.value)
             )
 
-    def unsort_all_potentials(self):
-        """Un-permute the evaluated potentials from Morton order to the input order"""
-        if self._evaluated:
-            self.all_potentials_r = np.zeros_like(self.all_potentials)
+            self.all_potentials_u = np.zeros_like(self.all_potentials)
 
             for i in range(0, self.all_potentials.shape[0]):
-                for j, k in enumerate(self.target_global_indices):
-                    self.all_potentials_r[i][k] = self.all_potentials[i][j]
+                self.all_potentials_u[i] = self.all_potentials[i][self.target_global_indices]
+
 
     @staticmethod
     def _cast_to_numpy_array(ptr, length, dtype, ffi):
@@ -729,8 +737,6 @@ class KiFmm:
             raise TypeError("Number of charges must match number of sources")
 
         try:
-            assert result.dtype == sources.dtype
-            assert result.dtype == targets.dtype
             assert result.dtype == charges.dtype
         except:
             raise TypeError("dtype of result must match source/charge/target data")

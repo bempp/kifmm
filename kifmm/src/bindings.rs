@@ -1624,7 +1624,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len(),
+                            len: (*fmm).potentials.len()*2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C32,
                         }
@@ -1638,7 +1638,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len(),
+                            len: (*fmm).potentials.len()*2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C32,
                         }
@@ -1655,7 +1655,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len(),
+                            len: (*fmm).potentials.len()*2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C64,
                         }
@@ -1670,7 +1670,7 @@ pub mod api {
 
                     let potentials = unsafe {
                         Potential {
-                            len: (*fmm).potentials.len(),
+                            len: (*fmm).potentials.len()*2,
                             data: (*fmm).potentials.as_ptr() as *const c_void,
                             scalar: ScalarType::C64,
                         }
@@ -3571,7 +3571,7 @@ mod test {
         let charges_p = charges.as_ptr() as *const c_void;
 
         let expansion_order = [6usize];
-        let expansion_order_p = expansion_order.as_ptr() as *const usize;
+        let expansion_order_p = expansion_order.as_ptr();
         let nexpansion_order = 1;
 
         let evaluator = unsafe {
@@ -3596,7 +3596,5 @@ mod test {
         };
 
         unsafe { evaluate(evaluator, false) };
-
-        assert!(false);
     }
 }

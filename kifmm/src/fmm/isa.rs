@@ -10,7 +10,7 @@ impl Isa {
             return Isa::Neon(pulp::aarch64::NeonFcma::try_new().unwrap());
         }
 
-        #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+        #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
         {
             return Isa::Avx(pulp::x86::V3::try_new().unwrap());
         }
