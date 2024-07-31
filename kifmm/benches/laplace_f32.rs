@@ -37,7 +37,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let prune_empty = true;
         let block_size = Some(32);
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -78,7 +78,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(10), None);
         let svd_threshold = None;
 
-        let fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -120,7 +120,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let prune_empty = true;
         let block_size = Some(16);
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -161,7 +161,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(20), None);
         let svd_threshold = Some(0.001);
 
-        let fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(

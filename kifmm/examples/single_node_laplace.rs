@@ -24,7 +24,7 @@ fn main() {
         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -53,7 +53,7 @@ fn main() {
 
         let singular_value_threshold = Some(1e-5);
 
-        let fmm_vec = SingleNodeBuilder::new()
+        let mut fmm_vec = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -82,7 +82,7 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
-        let fmm_mat = SingleNodeBuilder::new()
+        let mut fmm_mat = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(

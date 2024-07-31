@@ -876,6 +876,10 @@ where
     type Nodes = MortonKeys<T>;
     type Domain = Domain<T>;
 
+    fn raw(&self) -> u64 {
+        self.morton
+    }
+
     fn children(&self) -> Self::Nodes {
         MortonKeys {
             keys: self.children(),
