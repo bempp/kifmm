@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use green_kernels::laplace_3d::Laplace3dKernel;
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 use rlst::{c32, c64};
 
 use crate::{
@@ -203,7 +203,7 @@ impl Drop for FmmEvaluator {
                             *data
                                 as *mut KiFmm<
                                     c32,
-                                    Laplace3dKernel<c32>,
+                                    Helmholtz3dKernel<c32>,
                                     BlasFieldTranslationIa<c32>,
                                 >,
                         )
@@ -214,7 +214,11 @@ impl Drop for FmmEvaluator {
                     drop(unsafe {
                         Box::from_raw(
                             *data
-                                as *mut KiFmm<c32, Laplace3dKernel<c32>, FftFieldTranslation<c32>>,
+                                as *mut KiFmm<
+                                    c32,
+                                    Helmholtz3dKernel<c32>,
+                                    FftFieldTranslation<c32>,
+                                >,
                         )
                     });
                 }
@@ -227,7 +231,7 @@ impl Drop for FmmEvaluator {
                             *data
                                 as *mut KiFmm<
                                     c64,
-                                    Laplace3dKernel<c64>,
+                                    Helmholtz3dKernel<c64>,
                                     BlasFieldTranslationIa<c64>,
                                 >,
                         )
@@ -238,7 +242,11 @@ impl Drop for FmmEvaluator {
                     drop(unsafe {
                         Box::from_raw(
                             *data
-                                as *mut KiFmm<c64, Laplace3dKernel<c64>, FftFieldTranslation<c64>>,
+                                as *mut KiFmm<
+                                    c64,
+                                    Helmholtz3dKernel<c64>,
+                                    FftFieldTranslation<c64>,
+                                >,
                         )
                     });
                 }
@@ -3817,7 +3825,7 @@ mod test {
             let ntargets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
-            let ncharges = n_points;
+            let ncharges = n_points * 2;
             let charges_p = charges.as_ptr() as *const c_void;
 
             let expansion_order = [6usize];
