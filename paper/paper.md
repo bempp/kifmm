@@ -18,7 +18,7 @@ bibliography: paper.bib
 
 # Summary
 
-We present `kifmm-rs` a Rust based implementation of the kernel independent Fast Multipole Method (kiFMM), with Python bindings, that serves as a implementation framework for kiFMMs [@Ying2004; @Greengard1987]. The FMM is a key algorithm for scientific computing, commonly cited as one of the top algorithmic advances of the twentieth century [@cipra2000best] due to its acceleration of the computation of $N$-body potential evaluation problems of the form,
+We present `kifmm-rs` a Rust based implementation of the kernel independent Fast Multipole Method (kiFMM), with C bindings, that serves as a implementation framework for kiFMMs [@Ying2004; @Greengard1987]. The FMM is a key algorithm for scientific computing, commonly cited as one of the top algorithmic advances of the twentieth century [@cipra2000best] due to its acceleration of the computation of $N$-body potential evaluation problems of the form,
 
 \begin{equation}
     \phi(x_i) = \sum_{j=1}^N K(x_i, y_j) q(y_j)
@@ -48,16 +48,16 @@ the near component evaluated directly using the kernel function $K(.,.)$, and th
 
 # Statement of need
 
-Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. However, both of these efforts are provided as templated C++ libraries with brittle optimisations specialised for x86 architectures, for the M2L and P2P operations that make it complex for users or new developers to exchange or experiment with new algorithmic or implementation ideas that improve runtime performance. Notably, neither softwares support building to Arm targets which are becoming more common as both commodity and HPC platforms. In both softwares, sub-components such as the octree data structures and kernel implementations are not readily re-usable for related algorithmic work by downstream users, and underlying software used in compute kernels such as libraries for BLAS, LAPACK, or the FFT are not readily exchangeable.
+Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. However, both of these efforts are provided as templated C++ libraries with optimisations specialised for x86 architectures, for the M2L and P2P operations that make it complex for users or new developers to exchange or experiment with new algorithmic or implementation ideas that improve runtime performance. Notably, neither softwares support building to Arm targets which are becoming more common as both commodity and HPC platforms. In both softwares, sub-components such as the octree data structures and kernel implementations are not readily re-usable for related algorithmic work by downstream users, and underlying software used in compute kernels such as libraries for BLAS, LAPACK, or the FFT are not readily exchangeable.
 
-Our principle contributions with `kifmm-rs` that extend beyond current state of the art implementations are:
+Our principle contributions with `kifmm-rs` are:
 
 - A _highly portable_ Rust-based data-oriented software design that allows us to easily test the impact of different algorithmic approaches and computational backends, such as BLAS libraries, for critical algorithmic sub-components such as the M2L and P2P operations as well as deploy to different CPU targets. We present the software for shared memory, with plans for distributed memory extension.
 - _Competitive_ single-node performance, especially in single precision, enabled by the optimisation of BLAS based M2L field translation, based entirely on level 3 operations with high arithmetic intensity that are well suited to current and future hardware architectures that prioritise minimal memory movement per flop.
 - The ability to _process multiple sets of source densities_ corresponding to the same particle distribution using (\ref{eq:sec:summary:potential}), a common application in BEM.
-- _A Simple API_, with full Python bindings for non-specialist users. For basic usage all users need to specify are source and target coordinates, and associated source densities, with no temporary files.
+- _A C API_, using Rust's C ABI compatibility allowing for the construction of bindings into other languages, with full Python bindings for non-specialist users. For basic usage all users need to specify are source and target coordinates, and associated source densities, with no temporary files.
 
-`kifmm-rs` is a core dependency for the BEM library `bempp-rs` [@bempp_rs], and we present a detailed exposition behind the algorithmic and implementation approach in [@Kailasa2024]. Currently limited to shared memory systems, distributed memory extensions are an area of active development.
+`kifmm-rs` is a core dependency for the BEM library `bempp-rs` [@bempp_rs], and we present a detailed exposition behind the algorithmic and implementation approach in [@Kailasa2024].
 
 # Software design
 
@@ -73,7 +73,7 @@ Traits are contracts between types, and types can implement multiple traits. The
 
 ## API
 
-Our Rust APIs are simple, with the requirement for no temporary metadata files [@wang2021exafmm], or setup of ancillary data structures such as hierarchical trees [@Malhotra2015], required by the user. FMMs are simply parameterised using the builder pattern, with operator chaining to modulate the type of the runtime object. At its simplest, a user only specifies buffers associated with source and target particle coordinates, and associated source densities. Trait interfaces implemented for FMM objects allows users to access the associated objects such as PDE kernels and data such as multipole expansions.
+Our Rust APIs are simple, with the requirement for no temporary metadata files [@wang2021exafmm], or setup of ancillary data structures such as hierarchical trees [@Malhotra2015], required by the user. FMMs are simply parameterised using the builder pattern, with operator chaining to modulate the type of the runtime object. At its simplest, a user only specifies buffers associated with source and target particle coordinates, and associated source densities. Trait interfaces implemented for FMM objects allows users to access the associated objects such as kernels and data such as multipole expansions.
 
 ```rust
 use rand::{thread_rng, Rng};
@@ -104,7 +104,7 @@ fn main() {
     let n_crit = Some(150);
     // Alternatively, users can specify the tree depth they require
     let depth = None;
-    // Choose to remove empty leaves
+    // Choose to branches associated with empty leaves from constructed tree
     let prune_empty = true;
 
     // Set FMM Parameters
@@ -142,16 +142,16 @@ fn main() {
 }
 ```
 
-Indeed, the full API is more extensive, including features that enable for variable expansion orders by tree level useful for high-frequency problems, accelerated pre-computations for the BLAS based field translations based on randomised SVDs, alternative field translation implementations, data visualisation with MayaVi and methods for file IO. Both [Python](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples) and [Rust](https://github.com/bempp/kifmm/tree/main/kifmm/examples) examples can be found in the repository.
+Indeed, the full API is more extensive, including features that enable for variable expansion orders by tree level useful for oscillatory problems, accelerated pre-computations for the BLAS based field translations based on randomised SVDs and alternative field translation implementations. Both [Python](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples) and [Rust](https://github.com/bempp/kifmm/tree/main/kifmm/examples) examples can be found in the repository.
 
 # Benchmarks
 
-We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for particles contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in Appendix A of [@Kailasa2024]. We illustrate our software's performance using our BLAS based field translation method, which can handle multiple sets of source densities for a given set of source and target particles. This is particularly effective in single precision, where the required data is smaller and therefore results in fewer cache invalidations. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support, we see that the BLAS based field translation approach is effective for handling multiple sets of source densities in single precision due to the large cache sizes available on this architecture.
+We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for particles contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in the Appendix of [@Kailasa2024]. We illustrate our software's performance using our BLAS based field translation method, which can handle multiple sets of source densities for a given set of source and target particles. This is particularly effective in single precision, where the required data is smaller and therefore results in fewer cache invalidations. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support, we see that the BLAS based field translation approach is effective for handling multiple sets of source densities in single precision due to the large cache sizes available on this architecture.
 
-![X86 benchmarks against leading kiFMM software for achieving relative error $\epsilon$, for kifmm-rs the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss.jpg)
+![X86 benchmarks against leading kiFMM software for achieving relative error $\epsilon$, for `kifmm-rs` the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss.jpg)
 
 
-![Arm benchmarks for achieving relative error $\epsilon$, for kifmm-rs the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss2.jpg)
+![Arm benchmarks for achieving relative error $\epsilon$, for `kifmm-rs` the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss2.jpg)
 
 Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we report only the specifications of its 'performance' CPU cores. We report per core cache sizes for L1/L2 and total cache size for L3. \label{tab:hardware_and_software}
 
@@ -169,7 +169,7 @@ Table: Hardware and software used in our benchmarks, for the Apple M1 Pro we rep
 | **LAPACK**    | Apple Accelerate   | Open BLAS  |
 | **FFT**    | FFTW   | FFTW  |
 | **Threading**    | Rayon   | Rayon |
-| **ISA** | Neon | AVX2|
+| **SIMD Extensions** | Neon | SSE, SSE2, AVX, AVX2|
 
 # Acknowledgements
 

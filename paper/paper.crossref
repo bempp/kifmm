@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20240713T103738-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
-    <timestamp>20240713103738</timestamp>
+    <doi_batch_id>20240802T153318-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
+    <timestamp>20240802153318</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -169,16 +169,17 @@ Computational Physics, 73(2), 325–348.
 https://doi.org/10.1016/0021-9991(87)90140-9</unstructured_citation>
           </citation>
           <citation key="Kailasa2024">
-            <article_title>Designing kernel independent fast multipole
-methods for modern architectures</article_title>
+            <article_title>M2L translation operators for kernel
+independent fast multipole methods on modern
+architectures</article_title>
             <author>Kailasa</author>
             <journal_title>Submitted To SIAM Journal on Scientific
 Computing</journal_title>
             <cYear>2024</cYear>
             <unstructured_citation>Kailasa, S., Betcke, T., &amp;
-El-Kazdadi, S. (2024). Designing kernel independent fast multipole
-methods for modern architectures. Submitted To SIAM Journal on
-Scientific Computing.</unstructured_citation>
+El-Kazdadi, S. (2024). M2L translation operators for kernel independent
+fast multipole methods on modern architectures. Submitted To SIAM
+Journal on Scientific Computing.</unstructured_citation>
           </citation>
           <citation key="engquist2010fast">
             <article_title>Fast directional algorithms for the helmholtz
