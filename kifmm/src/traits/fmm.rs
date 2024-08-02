@@ -3,10 +3,7 @@ use crate::traits::tree::FmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{
-    tree::Tree,
-    types::{FmmError, FmmTime},
-};
+use super::{tree::Tree, types::FmmError};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -110,6 +107,9 @@ where
         leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
 
+    /// Get all potential data at all particles, stored in order by global index
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>>;
+
     /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
     fn equivalent_surface_order(&self, level: u64) -> usize;
 
@@ -135,7 +135,7 @@ where
     fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError>;
+    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///

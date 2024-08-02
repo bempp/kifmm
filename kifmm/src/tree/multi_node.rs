@@ -653,9 +653,6 @@ where
     type Scalar = T;
     type Domain = Domain<T>;
     type Node = MortonKey<T>;
-    type NodeSlice<'a> = &'a [MortonKey<T>]
-        where T: 'a, C: 'a;
-    type Nodes = MortonKeys<T>;
 
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
         self.coordinates(leaf).map(|coords| coords.len() / 3)
@@ -693,7 +690,7 @@ where
         &self.domain
     }
 
-    fn keys(&self, level: u64) -> Option<Self::NodeSlice<'_>> {
+    fn keys(&self, level: u64) -> Option<&[Self::Node]> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
             Some(&self.keys[l..r])
         } else {
@@ -701,7 +698,7 @@ where
         }
     }
 
-    fn all_keys(&self) -> Option<Self::NodeSlice<'_>> {
+    fn all_keys(&self) -> Option<&[Self::Node]> {
         Some(&self.keys)
     }
 
@@ -713,7 +710,7 @@ where
         Some(&self.leaves_set)
     }
 
-    fn all_leaves(&self) -> Option<Self::NodeSlice<'_>> {
+    fn all_leaves(&self) -> Option<&[Self::Node]> {
         Some(&self.leaves)
     }
 

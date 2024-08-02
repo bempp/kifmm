@@ -14,7 +14,7 @@ use crate::{
             TargetTranslation,
         },
         tree::{FmmTree, Tree},
-        types::{FmmError, FmmTime},
+        types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
     Fmm, SingleNodeFmmTree,
 };
@@ -182,21 +182,26 @@ where
         }
     }
 
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError> {
-        // Upward pass
-        let mut times = FmmTime::new();
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>> {
+        Some(&self.potentials)
+    }
 
+    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
+        // Upward pass
         if timed {
             {
                 let s = Instant::now();
                 self.p2m()?;
-                times.insert("p2m".to_string(), s.elapsed());
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
 
                 for level in (1..=self.tree().source_tree().depth()).rev() {
                     let s = Instant::now();
                     self.m2m(level)?;
-                    let label = "m2m".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
+                    self.times.push(FmmOperatorTime::from_instant(
+                        FmmOperatorType::M2M(level),
+                        s,
+                    ));
                 }
             }
 
@@ -206,23 +211,30 @@ where
                     if level > 2 {
                         let s = Instant::now();
                         self.l2l(level)?;
-                        let label = "l2l".to_string() + &format!("_level_{}", level);
-                        times.insert(label, s.elapsed());
+                        self.times.push(FmmOperatorTime::from_instant(
+                            FmmOperatorType::L2L(level),
+                            s,
+                        ));
                     }
                     let s = Instant::now();
                     self.m2l(level)?;
-                    let label = "m2l".to_string() + &format!("_level_{}", level);
-                    times.insert(label, s.elapsed());
+                    self.times.push(FmmOperatorTime::from_instant(
+                        FmmOperatorType::M2L(level),
+                        s,
+                    ));
                 }
 
                 // Leaf level computation
                 let s = Instant::now();
                 self.p2p()?;
-                times.insert("p2p".to_string(), s.elapsed());
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
                 let s = Instant::now();
                 self.l2p()?;
-                times.insert("l2p".to_string(), s.elapsed());
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
             }
+            Ok(())
         } else {
             // Upward pass
             {
@@ -246,9 +258,8 @@ where
                 self.p2p()?;
                 self.l2p()?;
             }
+            Ok(())
         }
-
-        Ok(times)
     }
 
     fn clear(&mut self, charges: &[Self::Scalar]) {
@@ -678,7 +689,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -694,7 +705,7 @@ mod test {
         fmm_fft.evaluate(false).unwrap();
 
         let svd_threshold = Some(1e-5);
-        let fmm_svd = SingleNodeBuilder::new()
+        let mut fmm_svd = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -745,7 +756,7 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
-        let fmm_svd = SingleNodeBuilder::new()
+        let mut fmm_svd = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -856,7 +867,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let fmm_fft = SingleNodeBuilder::new()
+            let mut fmm_fft = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -881,7 +892,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm_fft = SingleNodeBuilder::new()
+            let mut fmm_fft = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -911,7 +922,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -940,7 +951,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1000,7 +1011,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1030,7 +1041,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1089,7 +1100,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1150,7 +1161,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1180,7 +1191,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1235,7 +1246,7 @@ mod test {
 
         let wavenumber = 2.5;
 
-        let fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new()
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -1281,7 +1292,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1303,7 +1314,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1331,7 +1342,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1353,7 +1364,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1406,7 +1417,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1428,7 +1439,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1456,7 +1467,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1478,7 +1489,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1532,7 +1543,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1555,7 +1566,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1608,7 +1619,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1666,7 +1677,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1692,7 +1703,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1756,7 +1767,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = EvalType::Value;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1778,7 +1789,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = EvalType::ValueDeriv;
-            let fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(

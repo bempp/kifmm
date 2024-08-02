@@ -16,14 +16,6 @@ pub trait Tree {
     /// A tree node.
     type Node: TreeNode<Scalar = Self::Scalar, Domain = Self::Domain> + Clone + Copy;
 
-    /// Slice of nodes.
-    type NodeSlice<'a>: IntoIterator<Item = &'a Self::Node>
-    where
-        Self: 'a;
-
-    /// Copy of nodes
-    type Nodes: IntoIterator<Item = Self::Node>;
-
     /// Number of leaves
     fn n_leaves(&self) -> Option<usize>;
 
@@ -37,13 +29,13 @@ pub trait Tree {
     fn depth(&self) -> u64;
 
     /// Get a reference to all leaves, gets local keys in multi-node setting.
-    fn all_leaves(&self) -> Option<Self::NodeSlice<'_>>;
+    fn all_leaves(&self) -> Option<&[Self::Node]>;
 
     /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
-    fn keys(&self, level: u64) -> Option<Self::NodeSlice<'_>>;
+    fn keys(&self, level: u64) -> Option<&[Self::Node]>;
 
     /// Get a reference to all keys, gets local keys in a multi-node setting.
-    fn all_keys(&self) -> Option<Self::NodeSlice<'_>>;
+    fn all_keys(&self) -> Option<&[Self::Node]>;
 
     /// Get a reference to all keys as a set, gets local keys in a multi-node setting.
     fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>>;
@@ -112,7 +104,7 @@ where
     Self::Tree: Tree,
 {
     /// Tree associated with this FMM tree
-    type Tree;
+    type Tree: Tree;
 
     /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
@@ -144,6 +136,9 @@ where
 
     /// Copy of nodes
     type Nodes: IntoIterator<Item = Self>;
+
+    /// Raw representation of a node
+    fn raw(&self) -> u64;
 
     /// The parent of this node
     fn parent(&self) -> Self;

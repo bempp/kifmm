@@ -10,7 +10,7 @@ impl Isa {
             return Isa::Neon(pulp::aarch64::NeonFcma::try_new().unwrap());
         }
 
-        #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+        #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
         {
             return Isa::Avx(pulp::x86::V3::try_new().unwrap());
         }
@@ -29,7 +29,7 @@ impl Isa {
     }
 
     /// Getter
-    #[cfg(all(target_arch = "x86_64", target_feature = "avx"))]
+    #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
     pub fn isa(&self) -> Option<&pulp::x86::V3> {
         if let Isa::Avx(ref avx) = self {
             Some(avx)
@@ -41,7 +41,7 @@ impl Isa {
     /// Getter
     #[cfg(not(any(
         all(target_arch = "aarch64", target_feature = "neon"),
-        all(target_arch = "x86_64", target_feature = "avx")
+        all(target_arch = "x86_64", target_feature = "avx2")
     )))]
     pub fn isa(&self) -> Option<()> {
         None
