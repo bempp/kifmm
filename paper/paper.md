@@ -115,7 +115,7 @@ fn main() {
     let check_surface_diff = Some(2);
 
     // Create an FMM
-    let fmm = SingleNodeBuilder::new()
+    let mut fmm = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, depth, prune_empty) // Create tree
         .unwrap()
         .parameters(
@@ -133,7 +133,7 @@ fn main() {
         .unwrap();
 
     // Run FMM
-    let times = fmm.evaluate(true); // Optionally time the operators
+    fmm.evaluate(true); // Optionally time the operators
 
     // Lookup potentials by leaf from target leaf boxes
     let leaf_idx = 0;
