@@ -44,7 +44,7 @@ The FMM splits (\ref{eq:sec:summary:potential}) for a given target cluster into 
     \label{eq:sec:summary:near_far_split}
 \end{equation}
 
-the near component evaluated directly using the kernel function $K(.,.)$, and the far-field compressed via a _field translation_, referred to as the multipole to local (M2L) translation. This split, in addition to a recursive loop through a hierarchical data structure, commonly an octree for three dimensional problems, gives rise to the linear/log-linear complexity of the FMM, as the number of far-field interactions which are admissable is limited by a constant depending on the problem dimension. The evaluation of the near field component commonly referred to as the particle to particle (P2P) operation. These two operations conspire to dominate runtimes in practical implementations. An approximate rule of thumb being that the P2P is compute bound, and the M2L is memory bound, acceleration attempts for FMM softwares often focus on reformulations that ensure the M2L has a high arithmetic intensity.
+the near component evaluated directly using the kernel function $K(.,.)$, and the far-field compressed via a _field translation_, referred to as the multipole to local (M2L) translation. This split, in addition to a recursive loop through a hierarchical data structure, commonly an octree for three dimensional problems, gives rise to the linear/log-linear complexity of the FMM, as the number of far-field interactions which are admissable is limited by a constant depending on the problem dimension. The evaluation of the near field component commonly referred to as the point to point (P2P) operation. These two operations conspire to dominate runtimes in practical implementations. An approximate rule of thumb being that the P2P is compute bound, and the M2L is memory bound, acceleration attempts for FMM softwares often focus on reformulations that ensure the M2L has a high arithmetic intensity.
 
 # Statement of need
 
@@ -54,7 +54,7 @@ Our principle contributions with `kifmm-rs` are:
 
 - A _highly portable_ Rust-based data-oriented software design that allows us to easily test the impact of different algorithmic approaches and computational backends, such as BLAS libraries, for critical algorithmic sub-components such as the M2L and P2P operations as well as deploy to different CPU targets. We present the software for shared memory, with plans for distributed memory extension.
 - _Competitive_ single-node performance, especially in single precision, enabled by the optimisation of BLAS based M2L field translation, based entirely on level 3 operations with high arithmetic intensity that are well suited to current and future hardware architectures that prioritise minimal memory movement per flop.
-- The ability to _process multiple sets of source densities_ corresponding to the same particle distribution using (\ref{eq:sec:summary:potential}), a common application in BEM.
+- The ability to _process multiple sets of source densities_ corresponding to the same point distribution using (\ref{eq:sec:summary:potential}), a common application in BEM.
 - _A C API_, using Rust's C ABI compatibility allowing for the construction of bindings into other languages, with full Python bindings for non-specialist users. For basic usage all users need to specify are source and target coordinates, and associated source densities, with no temporary files.
 
 `kifmm-rs` is a core dependency for the BEM library `bempp-rs` [@bempp_rs], and we present a detailed exposition behind the algorithmic and implementation approach in [@Kailasa2024].
@@ -73,14 +73,15 @@ Traits are contracts between types, and types can implement multiple traits. The
 
 ## API
 
-Our Rust APIs are simple, with the requirement for no temporary metadata files [@wang2021exafmm], or setup of ancillary data structures such as hierarchical trees [@Malhotra2015], required by the user. FMMs are simply parameterised using the builder pattern, with operator chaining to modulate the type of the runtime object. At its simplest, a user only specifies buffers associated with source and target particle coordinates, and associated source densities. Trait interfaces implemented for FMM objects allows users to access the associated objects such as kernels and data such as multipole expansions.
+Our Rust APIs are simple, with the requirement for no temporary metadata files [@wang2021exafmm], or setup of ancillary data structures such as hierarchical trees [@Malhotra2015], required by the user. FMMs are simply parameterised using the builder pattern, with operator chaining to modulate the type of the runtime object. At its simplest, a user only specifies buffers associated with source and target point coordinates, and associated source densities. Trait interfaces implemented for FMM objects allows users to access the associated objects such as kernels and data such as multipole expansions.
 
 ```rust
 use rand::{thread_rng, Rng};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder};
+use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder, FmmSvdMode};
 use kifmm::traits::tree::{FmmTree, Tree};
 use kifmm::traits::fmm::Fmm;
+
 
 fn main() {
     // Generate some random source/target/charge data
@@ -100,7 +101,7 @@ fn main() {
     charges.iter_mut().for_each(|c| *c = rng.gen());
 
     // Set tree parameters
-    // Library refines tree till fewer than 'n_crit' particles per leaf box
+    // Library refines tree till fewer than 'n_crit' points per leaf box
     let n_crit = Some(150);
     // Alternatively, users can specify the tree depth they require
     let depth = None;
@@ -115,6 +116,8 @@ fn main() {
     let check_surface_diff = Some(2);
 
     // Create an FMM
+    let svd_mode = FmmSvdMode::Deterministic; // Choose SVD compression mode, random or deterministic
+
     let mut fmm = SingleNodeBuilder::new()
         .tree(&sources, &targets, n_crit, depth, prune_empty) // Create tree
         .unwrap()
@@ -125,8 +128,8 @@ fn main() {
             EvalType::Value, // Choose potential or potential + deriv evaluation
             BlasFieldTranslationSaRcmp::new(
               singular_value_threshold,
-              check_surface_diff
-              ), // Choose field translation
+              check_surface_diff,
+              svd_mode), // Choose field translation
         )
         .unwrap()
         .build()
@@ -146,7 +149,7 @@ Indeed, the full API is more extensive, including features that enable for varia
 
 # Benchmarks
 
-We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for particles contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in the Appendix of [@Kailasa2024]. We illustrate our software's performance using our BLAS based field translation method, which can handle multiple sets of source densities for a given set of source and target particles. This is particularly effective in single precision, where the required data is smaller and therefore results in fewer cache invalidations. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support, we see that the BLAS based field translation approach is effective for handling multiple sets of source densities in single precision due to the large cache sizes available on this architecture.
+We benchmark our software against other leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for points contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Optimal parameters were calculated for this setting using a grid search, the results of which can be found in the Appendix of [@Kailasa2024]. We illustrate our software's performance using our BLAS based field translation method, which can handle multiple sets of source densities for a given set of source and target points. This is particularly effective in single precision, where the required data is smaller and therefore results in fewer cache invalidations. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support, we see that the BLAS based field translation approach is effective for handling multiple sets of source densities in single precision due to the large cache sizes available on this architecture.
 
 ![X86 benchmarks against leading kiFMM software for achieving relative error $\epsilon$, for `kifmm-rs` the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss.jpg)
 

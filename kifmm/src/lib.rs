@@ -95,6 +95,8 @@ pub use fmm::types::FftFieldTranslation;
 pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
+#[doc(inline)]
+pub use fmm::types::FmmSvdMode;
 
 #[cfg(feature = "mpi")]
 #[doc(inline)]
