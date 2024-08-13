@@ -44,7 +44,7 @@ The FMM splits (\ref{eq:sec:summary:potential}) for a given target cluster into 
     \label{eq:sec:summary:near_far_split}
 \end{equation}
 
-the near component evaluated directly using the kernel function $K(.,.)$, and the far-field compressed via a _field translation_, referred to as the multipole to local (M2L) translation. This split, in addition to a recursive loop through a hierarchical data structure, commonly an octree for three dimensional problems, gives rise to the linear/log-linear complexity of the FMM, as the number of far-field interactions which are admissable is limited by a constant depending on the problem dimension. The evaluation of the near field component commonly referred to as the point to point (P2P) operation. These two operations conspire to dominate runtimes in practical implementations. An approximate rule of thumb being that the P2P is compute bound, and the M2L is memory bound, acceleration attempts for FMM softwares often focus on reformulations that ensure the M2L has a high arithmetic intensity.
+the near component evaluated directly using the kernel function $K(.,.)$, and the far-field compressed via a _field translation_, referred to as the multipole to local (M2L) translation. This split, in addition to a recursive loop through a hierarchical data structure, commonly an octree for three dimensional problems, gives rise to the linear/log-linear complexity of the FMM, as the number of far-field interactions which are admissable is limited by a constant depending on the problem dimension. The evaluation of the near field component is commonly referred to as the point to point (P2P) operation. These two operations conspire to dominate runtimes in practical implementations. An approximate rule of thumb being that the P2P is compute bound, and the M2L is memory bound, acceleration attempts for FMM softwares often focus on reformulations that ensure the M2L has a high arithmetic intensity.
 
 # Statement of need
 
@@ -63,7 +63,7 @@ Our principle contributions with `kifmm-rs` are:
 
 ## Rust
 
-As a platform for scientific computing, Rust's principal benefits are its build system `Cargo` enabling builds with as little as one terminal command from a user's perspective with dependencies specified in a modern TOML style, and its single centrally supported LLVM based compiler `rustc` that ensures consistent cross-platform performance. Compiled Rust code is compatible with the C application binary interface (ABI), which enables linking the extensive existing scientific ecosystem. This also makes it easy to create language bindings for Rust projects from Python, C++ and other languages.
+As a platform for scientific computing, Rust's principal benefits are its build system Cargo enabling builds with as little as one terminal command from a user's perspective with dependencies specified in a modern TOML style, and its single centrally supported LLVM based compiler `rustc` that ensures consistent cross-platform performance. Compiled Rust code is compatible with the C application binary interface (ABI), which enables linking the extensive existing scientific ecosystem. This also makes it easy to create language bindings for Rust projects from Python, C++ and other languages.
 
 ## Data oriented design with traits
 
