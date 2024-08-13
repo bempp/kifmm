@@ -92,11 +92,11 @@ pub use fmm::types::BlasFieldTranslationSaRcmp;
 #[doc(inline)]
 pub use fmm::types::FftFieldTranslation;
 #[doc(inline)]
+pub use fmm::types::FmmSvdMode;
+#[doc(inline)]
 pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
-#[doc(inline)]
-pub use fmm::types::FmmSvdMode;
 
 #[cfg(feature = "mpi")]
 #[doc(inline)]
