@@ -45,7 +45,7 @@ The evaluation of the near field component is done directly and referred to as t
 
 # Statement of need
 
-Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. Both of these efforts are provided as templated C++ libraries with optimisations specialised for x86 architectures. Notably, neither softwares is well optimised for Arm targets which are becoming more common as both commodity and HPC platforms.
+Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. Both of these efforts are provided as templated C++ libraries with optimisations specialised for x86 architectures. Notably, neither softwares is well optimised for Arm targets which are becoming more common as both commodity and HPC platforms, additionally neither supports BLAS based M2L operations which we show in [@Kailasa2024] to be highly competitive with their FFT based approach, able to handle multiple sets of source densities, and are well suited to modern hardware with a simple specification.
 
 Our principle contributions with `kifmm-rs` are:
 
