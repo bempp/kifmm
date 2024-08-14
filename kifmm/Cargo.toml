@@ -5,7 +5,7 @@ mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
 
 [package]
 name = "kifmm"
-version = "0.1.0-dev"
+version = "1.0.0"
 edition = "2021"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 description = "Kernel-independent fast multipole method"
