@@ -3,9 +3,11 @@
 //! A Kernel Independent Fast Multipole method designed for portability, and flexible algorithmic construction based on \[1\].
 //!
 //! Notable features of this library are:
-//! * Highly optimised single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
-//! * Heterogenous acceleration for the the field translations (M2L) and direct summation (P2P) steps.
-//! * Flexible trait based interface for developing alternative operator implementations, or indeed related fast algorithms
+//! * Highly competitive single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
+//! * BLAS and FFT acceleration for the the field translations (M2L)
+//! * The ability to handle multiple right hand sides when using BLAS based M2L
+//! * Overdetermined check and equivalent surface construction when using BLAS based M2L
+//! * The ability to vary expansion orders by level, useful for oscillatory problems
 //!
 //! # Example Usage
 //!
