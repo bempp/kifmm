@@ -5,13 +5,13 @@ license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/kifmm"
 repository = "https://github.com/bempp/kifmm"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
-version = "0.1.0-dev"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-kifmm-fftw-src = { path = "../fftw-src" }
+kifmm-fftw-src = { version ="0.2.0" }
 libc = "0.2.153"
 num-complex = "0.4.5"
 
