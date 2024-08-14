@@ -1,4 +1,4 @@
-# KiFMM: Kernel-independent FMM
+# kifmm-rs: A Kernel-Independent Fast Multipole Framework in Rust
 
 ## Install
 
@@ -16,6 +16,10 @@ The current release version can be installed using the deployment on `crates.io`
 ```bash
 cargo add kifmm
 ```
+
+## Quickstart
+
+A quickstart example is available in the `kifmm/` directory's README, alongside instructions for building Python bindings or using the C bindings with CMake.
 
 ## Documentation
 The latest documentation of the main branch of this repo is available at [bempp.github.io/kifmm/kifmm/index.html](https://bempp.github.io/kifmm/kifmm/index.html).
