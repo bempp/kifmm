@@ -1,4 +1,4 @@
-## Quick Start
+# Quick Start
 
 Our Rust APIs are simple, with the requirement for no temporary metadata files, or setup of ancillary data structures such as hierarchical trees, required by the user. FMMs are simply parameterised using the builder pattern, with operator chaining to modulate the type of the runtime object. At its simplest, a user only specifies buffers associated with source and target point coordinates, and associated source densities. Trait interfaces implemented for FMM objects allows users to access the associated objects such as kernels and data such as multipole expansions.
 
