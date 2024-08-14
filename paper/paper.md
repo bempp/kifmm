@@ -24,7 +24,7 @@ We present `kifmm-rs` a Rust based implementation of the kernel independent Fast
     \label{eq:sec:summary:potential}
 \end{equation}
 
-from $O(N^2)$ to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluated at a set of target points, $\{x_i\}_{i=1}^M$, due to a set of densities, $\{ q_j \}_{j=1}^N$ and $K(.,.)$ is the interaction kernel. Compatible kernels commonly arise in science and engineering, such as the Laplace kernel which models the electrostatic or gravitational potentials corresponding to a set of source points on a set of target points,
+from $O(N^2)$ to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluated at a set of target points, $\{x_i\}_{i=1}^M$, due to a set of densities, $\{ q_j \}_{j=1}^N$ and $K(.,.)$ is the interaction kernel. Compatible kernels commonly arise in science and engineering, such as the Laplace kernel which models the electrostatic or gravitational potentials corresponding to a cluster of source points on a cluster of target points,
 
 \begin{equation}
     K(x, y) = \begin{cases}
@@ -34,7 +34,7 @@ from $O(N^2)$ to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluat
     \label{eq:sec:summary:laplace_kernel}
 \end{equation}
 
-FMMs split (\ref{eq:sec:summary:potential}) for a given target cluster into \textit{near} and \textit{far} components, the latter of which are taken to be amenable to approximation,
+FMMs split (\ref{eq:sec:summary:potential}) for a given cluster of target points into \textit{near} and \textit{far} components, the latter of which are taken to be amenable to approximation,
 
 \begin{equation}
     \phi(x_i) = \sum_{y_j \in \text{Near}(x_i)} K(x_i, y_j) q_j + \sum_{y_j \in \text{Far}(x_i)} K(x_i, y_j) q_j
@@ -45,7 +45,7 @@ The evaluation of the near field component is done directly and referred to as t
 
 # Statement of need
 
-Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. Both of these efforts are provided as templated C++ libraries with optimisations specialised for x86 architectures. Notably, neither softwares support building to Arm targets which are becoming more common as both commodity and HPC platforms.
+Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. Both of these efforts are provided as templated C++ libraries with optimisations specialised for x86 architectures. Notably, neither softwares is well optimised for Arm targets which are becoming more common as both commodity and HPC platforms.
 
 Our principle contributions with `kifmm-rs` are:
 
@@ -62,7 +62,7 @@ Rust traits are contracts between types, and types can implement multiple traits
 
 # Benchmarks
 
-We benchmark our software against leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the high performance x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for points contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Best parameter settings are described in the Appendix of [@Kailasa2024]. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support.
+We benchmark our software against leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for points contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Best parameter settings are described in the Appendix of [@Kailasa2024]. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support.
 
 ![X86 benchmarks against leading kiFMM software for achieving relative error $\epsilon$, for `kifmm-rs` the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss.png)
 
