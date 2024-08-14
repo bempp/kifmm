@@ -1,6 +1,5 @@
 //! # Multipole to local expansion field translation translations
 mod blas;
 mod fft;
-mod matvec;
-mod metadata;
+mod hadamard;
 pub mod transfer_vector;

@@ -1,3 +1,21 @@
 [build]
 rustflags = ["-C", "target-cpu=native"]
 
+[target.x86_64]
+rustflags = ["-C", "target-feature=+fma,+sse2,+avx,+avx2"]
+
+[target.aarch64]
+rustflags = ["-C", "target-feature=+neon"]
+
+[env]
+OPENBLAS_NUM_THREADS = "1"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = true
+
+[profile.bench]
+opt-level = 3
+codegen-units = 1
+lto = true

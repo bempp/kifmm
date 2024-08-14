@@ -1,12 +1,9 @@
 //! FMM traits
-use crate::{fmm::types::Charges, traits::tree::FmmTree};
+use crate::traits::tree::FmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{
-    tree::Tree,
-    types::{FmmError, FmmTime},
-};
+use super::{tree::Tree, types::FmmError};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -86,11 +83,21 @@ where
         key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<&[Self::Scalar]>;
 
+    /// Get the multipole expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
+
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
     fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node)
         -> Option<&[Self::Scalar]>;
+
+    /// Get the local expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn locals(&self, level: u64) -> Option<&[Self::Scalar]>;
 
     /// Get the potential data associated with the particles contained at a given node
     /// # Arguments
@@ -100,8 +107,23 @@ where
         leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
 
-    /// Get the expansion order associated with this FMM
-    fn expansion_order(&self) -> usize;
+    /// Get all potential data at all particles, stored in order by global index
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>>;
+
+    /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
+    fn equivalent_surface_order(&self, level: u64) -> usize;
+
+    /// Get the expansion order associated with this FMM, used to discretise the check surface.
+    fn check_surface_order(&self, level: u64) -> usize;
+
+    /// Check whether or not expansion order is set variably
+    fn variable_expansion_order(&self) -> bool;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn ncoeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;
@@ -113,13 +135,13 @@ where
     fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&self, timed: bool) -> Result<FmmTime, FmmError>;
+    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///
     /// # Arguments
     /// * `charges` - new charge data.
-    fn clear(&mut self, charges: &Charges<Self::Scalar>);
+    fn clear(&mut self, charges: &[Self::Scalar]);
 }
 
 /// Set all metadata required for FMMs
@@ -129,7 +151,7 @@ pub trait FmmMetadata {
 
     /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
-    fn metadata(&mut self, eval_type: EvalType, charges: &Charges<Self::Scalar>);
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]);
 }
 
 /// Defines how metadata associated with field translations is looked up at runtime.
@@ -138,6 +160,12 @@ pub trait FmmOperatorData
 where
     Self: FmmMetadata,
 {
+    /// Lookup convolution grid map for FFT based M2L operator
+    fn fft_map_index(&self, level: u64) -> usize;
+
+    /// Lookup expansion order
+    fn expansion_index(&self, level: u64) -> usize;
+
     /// Lookup c2e operator
     fn c2e_operator_index(&self, level: u64) -> usize;
 
@@ -149,6 +177,9 @@ where
 
     /// Lookup l2l operator
     fn l2l_operator_index(&self, level: u64) -> usize;
+
+    /// Displacement index
+    fn displacement_index(&self, level: u64) -> usize;
 }
 
 /// Marker trait for homogenous kernels

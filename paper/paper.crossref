@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<doi_batch xmlns="http://www.crossref.org/schema/5.3.1"
+           xmlns:ai="http://www.crossref.org/AccessIndicators.xsd"
+           xmlns:rel="http://www.crossref.org/relations.xsd"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           version="5.3.1"
+           xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
+  <head>
+    <doi_batch_id>20240814T121626-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
+    <timestamp>20240814121626</timestamp>
+    <depositor>
+      <depositor_name>JOSS Admin</depositor_name>
+      <email_address>admin@theoj.org</email_address>
+    </depositor>
+    <registrant>The Open Journal</registrant>
+  </head>
+  <body>
+    <journal>
+      <journal_metadata>
+        <full_title>Journal of Open Source Software</full_title>
+        <abbrev_title>JOSS</abbrev_title>
+        <issn media_type="electronic">2475-9066</issn>
+        <doi_data>
+          <doi>10.21105/joss</doi>
+          <resource>https://joss.theoj.org</resource>
+        </doi_data>
+      </journal_metadata>
+      <journal_issue>
+        <publication_date media_type="online">
+          <month>01</month>
+          <year>1970</year>
+        </publication_date>
+        <journal_volume>
+          <volume>¿VOL?</volume>
+        </journal_volume>
+        <issue>¿ISSUE?</issue>
+      </journal_issue>
+      <journal_article publication_type="full_text">
+        <titles>
+          <title>kifmm-rs: A Kernel-Independent Fast Multipole Framework
+in Rust</title>
+        </titles>
+        <contributors>
+          <person_name sequence="first" contributor_role="author">
+            <given_name>Srinath</given_name>
+            <surname>Kailasa</surname>
+            <ORCID>https://orcid.org/0000-0001-9734-8318</ORCID>
+          </person_name>
+        </contributors>
+        <publication_date>
+          <month>01</month>
+          <day>01</day>
+          <year>1970</year>
+        </publication_date>
+        <pages>
+          <first_page>¿PAGE?</first_page>
+        </pages>
+        <publisher_item>
+          <identifier id_type="doi">N/A</identifier>
+        </publisher_item>
+        <ai:program name="AccessIndicators">
+          <ai:license_ref applies_to="vor">http://creativecommons.org/licenses/by/4.0/</ai:license_ref>
+          <ai:license_ref applies_to="am">http://creativecommons.org/licenses/by/4.0/</ai:license_ref>
+          <ai:license_ref applies_to="tdm">http://creativecommons.org/licenses/by/4.0/</ai:license_ref>
+        </ai:program>
+        <rel:program>
+          <rel:related_item>
+            <rel:description>Software archive</rel:description>
+            <rel:inter_work_relation relationship-type="references" identifier-type="doi">10.5281</rel:inter_work_relation>
+          </rel:related_item>
+          <rel:related_item>
+            <rel:description>GitHub review issue</rel:description>
+            <rel:inter_work_relation relationship-type="hasReview" identifier-type="uri">https://github.com/openjournals</rel:inter_work_relation>
+          </rel:related_item>
+        </rel:program>
+        <doi_data>
+          <doi>N/A</doi>
+          <resource>https://joss.theoj.org/papers/N/A</resource>
+          <collection property="text-mining">
+            <item>
+              <resource mime_type="application/pdf">https://joss.theoj.org/papers/N/A.pdf</resource>
+            </item>
+          </collection>
+        </doi_data>
+        <citation_list>
+          <citation key="Ying2004">
+            <article_title>A kernel-independent adaptive fast multipole
+algorithm in two and three dimensions</article_title>
+            <author>Ying</author>
+            <journal_title>Journal of Computational
+Physics</journal_title>
+            <issue>2</issue>
+            <volume>196</volume>
+            <cYear>2004</cYear>
+            <unstructured_citation>Ying, L., Biros, G., &amp; Zorin, D.
+(2004). A kernel-independent adaptive fast multipole algorithm in two
+and three dimensions. Journal of Computational Physics, 196(2),
+591–626.</unstructured_citation>
+          </citation>
+          <citation key="Malhotra2015">
+            <article_title>PVFMM: A parallel kernel independent FMM for
+particle and volume potentials</article_title>
+            <author>Malhotra</author>
+            <journal_title>Communications in Computational
+Physics</journal_title>
+            <issue>3</issue>
+            <volume>18</volume>
+            <cYear>2015</cYear>
+            <unstructured_citation>Malhotra, D., &amp; Biros, G. (2015).
+PVFMM: A parallel kernel independent FMM for particle and volume
+potentials. Communications in Computational Physics, 18(3),
+808–830.</unstructured_citation>
+          </citation>
+          <citation key="wang2021exafmm">
+            <article_title>ExaFMM: A high-performance fast multipole
+method library with c++ and python interfaces</article_title>
+            <author>Wang</author>
+            <journal_title>Journal of Open Source
+Software</journal_title>
+            <issue>61</issue>
+            <volume>6</volume>
+            <cYear>2021</cYear>
+            <unstructured_citation>Wang, T., Yokota, R., &amp; Barba, L.
+A. (2021). ExaFMM: A high-performance fast multipole method library with
+c++ and python interfaces. Journal of Open Source Software, 6(61),
+3145.</unstructured_citation>
+          </citation>
+          <citation key="Greengard1987">
+            <article_title>A fast algorithm for particle
+simulations</article_title>
+            <author>Greengard</author>
+            <journal_title>Journal of computational
+physics</journal_title>
+            <issue>2</issue>
+            <volume>73</volume>
+            <cYear>1987</cYear>
+            <unstructured_citation>Greengard, L., &amp; Rokhlin, V.
+(1987). A fast algorithm for particle simulations. Journal of
+Computational Physics, 73(2), 325–348.</unstructured_citation>
+          </citation>
+          <citation key="Kailasa2024">
+            <article_title>M2L translation operators for kernel
+independent fast multipole methods on modern
+architectures</article_title>
+            <author>Kailasa</author>
+            <journal_title>Submitted To SIAM Journal on Scientific
+Computing</journal_title>
+            <cYear>2024</cYear>
+            <unstructured_citation>Kailasa, S., Betcke, T., &amp;
+El-Kazdadi, S. (2024). M2L translation operators for kernel independent
+fast multipole methods on modern architectures. Submitted To SIAM
+Journal on Scientific Computing.</unstructured_citation>
+          </citation>
+          <citation key="rlst">
+            <article_title>RLST: A linear algebra library in
+rust</article_title>
+            <author>Betcke</author>
+            <cYear>2024</cYear>
+            <unstructured_citation>Betcke, T. (2024). RLST: A linear
+algebra library in rust. https://github.com/linalg-rs/rlst;
+GitHub.</unstructured_citation>
+          </citation>
+          <citation key="pulp">
+            <article_title>Pulp: A safe abstraction over SIMD
+instructions</article_title>
+            <author>Kazdadi</author>
+            <cYear>2024</cYear>
+            <unstructured_citation>Kazdadi, S. E. (2024). Pulp: A safe
+abstraction over SIMD instructions. https://github.com/sarah-ek/pulp;
+GitHub.</unstructured_citation>
+          </citation>
+        </citation_list>
+      </journal_article>
+    </journal>
+  </body>
+</doi_batch>

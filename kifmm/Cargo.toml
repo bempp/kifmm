@@ -2,12 +2,10 @@
 # Treat warnings as a build error.
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
-python = ["dep:pyo3", "dep:numpy"]
-
 
 [package]
 name = "kifmm"
-version = "0.1.0"
+version = "0.1.0-dev"
 edition = "2021"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 description = "Kernel-independent fast multipole method"
@@ -23,18 +21,24 @@ name = "kifmm"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-itertools = "0.12.*"
+itertools = "0.13.*"
 num = "0.4"
 approx = "0.5"
 rayon = "1.9"
 rand = "0.8.5"
+<<<<<<< HEAD
 kifmm-fftw-sys = { version = "0.1" }
 green-kernels = { version = "0.1" }
+=======
+kifmm-fftw-sys = { path = "../fftw-sys" }
+green-kernels = { version = "0.2.0"}
+>>>>>>> main
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
 memoffset = {version = "0.9.1", optional = true}
 superslice = {version = "1.0.0", optional = true}
+<<<<<<< HEAD
 pyo3 = { version =  "0.21.2", features = ["extension-module", "multiple-pymethods"] , optional = true }
 numpy = { version = "0.21", optional = true }
 
@@ -43,17 +47,33 @@ rlst = { version = "0.1", features=["metal"]}
 
 [target.x86_64-unknown-linux-gnu.dependencies]
 rlst = { version = "0.1", features=["blis"]}
+=======
+pulp = "0.18.12"
+bytemuck = "1.16.0"
+rand_distr = "0.4.3"
+bitflags = "2.6.0"
+rlst = {version = "0.2.0"}
+coe-rs = "0.1.2"
+>>>>>>> main
 
 [dev-dependencies]
 criterion = { version = "0.5.*", features = ["html_reports"]}
+csv = "1.3.0"
+num_cpus = "1.16.0"
 
+[build-dependencies]
+cbindgen = "0.26.0"
 
 [[bench]]
-name = "laplace_f32"
+name = "direct_f32"
 harness = false
 
 [[bench]]
-name = "helmholtz_f32"
+name = "direct_f64"
+harness = false
+
+[[bench]]
+name = "laplace_mat_f64"
 harness = false
 
 [[bench]]
@@ -61,20 +81,16 @@ name = "laplace_mat_f32"
 harness = false
 
 [[bench]]
-name = "helmholtz_mat_f32"
+name = "laplace_f32"
+harness = false
+
+[[bench]]
+name = "laplace_f64"
 harness = false
 
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
-
-[target.aarch64-apple-darwin.dev-dependencies]
-blas-src = { version = "0.10", features = ["accelerate"]}
-lapack-src = { version = "0.10", features = ["accelerate"]}
-
-[target.x86_64-unknown-linux-gnu.dev-dependencies]
-blas-src = { version = "0.10", features = ["blis"]}
-lapack-src = { version = "0.10", features = ["netlib"]}
 
 [lints.clippy]
 wildcard_imports = "forbid"

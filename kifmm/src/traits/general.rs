@@ -3,6 +3,8 @@ use num::Complex;
 use rlst::RlstScalar;
 use rlst::{c32, c64};
 
+use crate::fmm::types::Isa;
+
 /// Returns the maximum machine precision corresponding to a type
 pub trait Epsilon
 where
@@ -54,3 +56,18 @@ impl_as_complex!(f32, Complex<f32>);
 impl_as_complex!(f64, Complex<f64>);
 impl_as_complex!(c32, c32);
 impl_as_complex!(c64, c64);
+
+/// Implement vectorised 8x8 Hadamard operation,
+pub trait Hadamard8x8 {
+    /// Associated scalar type
+    type Scalar: RlstScalar;
+
+    /// 8x8 Hadamard product
+    fn hadamard8x8(
+        isa: Isa,
+        matrix: &[Self::Scalar; 64],
+        vector: &[Self::Scalar; 8],
+        result: &mut [Self::Scalar; 8],
+        scale: Self::Scalar,
+    );
+}

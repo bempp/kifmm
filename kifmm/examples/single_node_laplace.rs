@@ -2,10 +2,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
-use rlst::{rlst_dynamic_array2, RawAccessMut};
-
-extern crate blas_src;
-extern crate lapack_src;
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 fn main() {
     // Setup random sources and targets
@@ -16,8 +13,9 @@ fn main() {
 
     // FMM parameters
     let n_crit = Some(150);
-    let expansion_order = 5;
-    let sparse = true;
+    let depth = None;
+    let expansion_order = [5];
+    let prune_empty = true;
 
     // FFT based M2L for a vector of charges
     {
@@ -26,15 +24,15 @@ fn main() {
         let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let fmm_fft = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+        let mut fmm_fft = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
-                expansion_order,
+                charges.data(),
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                FftFieldTranslation::new(),
+                FftFieldTranslation::new(None),
             )
             .unwrap()
             .build()
@@ -55,15 +53,19 @@ fn main() {
 
         let singular_value_threshold = Some(1e-5);
 
-        let fmm_vec = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+        let mut fmm_vec = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
-                expansion_order,
+                charges.data(),
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmp::new(
+                    singular_value_threshold,
+                    None,
+                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -80,15 +82,19 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
-        let fmm_mat = SingleNodeBuilder::new()
-            .tree(&sources, &targets, n_crit, sparse)
+        let mut fmm_mat = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
-                &charges,
-                expansion_order,
+                charges.data(),
+                &expansion_order,
                 Laplace3dKernel::new(),
                 EvalType::Value,
-                BlasFieldTranslationSaRcmp::new(singular_value_threshold),
+                BlasFieldTranslationSaRcmp::new(
+                    singular_value_threshold,
+                    None,
+                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()

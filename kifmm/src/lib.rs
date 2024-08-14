@@ -3,9 +3,11 @@
 //! A Kernel Independent Fast Multipole method designed for portability, and flexible algorithmic construction based on \[1\].
 //!
 //! Notable features of this library are:
-//! * Highly optimised single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
-//! * Heterogenous acceleration for the the field translations (M2L) and direct summation (P2P) steps.
-//! * Flexible trait based interface for developing alternative operator implementations, or indeed related fast algorithms
+//! * Highly competitive single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
+//! * BLAS and FFT acceleration for the the field translations (M2L)
+//! * The ability to handle multiple right hand sides when using BLAS based M2L
+//! * Overdetermined check and equivalent surface construction when using BLAS based M2L
+//! * The ability to vary expansion orders by level, useful for oscillatory problems
 //!
 //! # Example Usage
 //!
@@ -15,13 +17,10 @@
 //! Basic usage for evaluating an FMM between a set of source and target points
 //!
 //! ```rust
-//! # extern crate blas_src;
-//! # extern crate lapack_src;
-//!
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 //! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
-//! use rlst::{rlst_dynamic_array2, RawAccessMut};
+//! use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 //!
 //! // Setup random sources and targets
 //! let nsources = 1000;
@@ -31,8 +30,9 @@
 //!
 //! // FMM parameters
 //! let n_crit = Some(150); // Threshold for number of particles in a leaf box
-//! let expansion_order = 5; // Expansion order of multipole/local expansions
-//! let sparse = true; // Whether to exclude empty boxes in octrees
+//! let depth = None; //
+//! let expansion_order = [5]; // Expansion order of multipole/local expansions
+//! let prune_empty = true; // Whether to exclude empty boxes in octrees
 //!
 //! // FFT based Field Translation
 //! {
@@ -43,14 +43,14 @@
 //!
 //!     // Build FMM object, with a given kernel and field translation
 //!     let mut fmm_fft = SingleNodeBuilder::new()
-//!         .tree(&sources, &targets, n_crit, sparse)
+//!         .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 //!         .unwrap()
 //!         .parameters(
-//!             &charges,
-//!             expansion_order,
+//!             charges.data(),
+//!             &expansion_order,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             EvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
-//!             FftFieldTranslation::new(), // Choose a field translation method, could replace with BLAS field translation
+//!             FftFieldTranslation::new(None), // Choose a field translation method, could replace with BLAS field translation
 //!         )
 //!         .unwrap()
 //!         .build()
@@ -64,7 +64,7 @@
 //!     let tmp = vec![1.0; nsources * nvecs];
 //!     let mut new_charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
 //!     new_charges.data_mut().copy_from_slice(&tmp);
-//!     fmm_fft.clear(&new_charges);
+//!     fmm_fft.clear(charges.data());
 //! }
 //!
 //! ````
@@ -76,13 +76,13 @@
 //! \[1\] Ying, L., Biros, G., & Zorin, D. (2004). A kernel-independent adaptive fast multipole algorithm in two and three dimensions. Journal of Computational Physics, 196(2), 591-626.
 #![cfg_attr(feature = "strict", deny(warnings))]
 #![warn(missing_docs)]
-
+#![allow(clippy::doc_lazy_continuation)]
+#![allow(clippy::macro_metavars_in_unsafe)]
 pub mod fftw;
 pub mod fmm;
 #[cfg(feature = "mpi")]
 pub mod hyksort;
-#[cfg(feature = "python")]
-pub mod python;
+pub mod linalg;
 pub mod traits;
 pub mod tree;
 
@@ -94,6 +94,8 @@ pub use fmm::types::BlasFieldTranslationSaRcmp;
 #[doc(inline)]
 pub use fmm::types::FftFieldTranslation;
 #[doc(inline)]
+pub use fmm::types::FmmSvdMode;
+#[doc(inline)]
 pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
@@ -104,3 +106,6 @@ pub use fmm::types::MultiNodeFmmTree;
 
 #[doc(inline)]
 pub use traits::fmm::Fmm;
+#[cfg_attr(feature = "strict", deny(warnings))]
+#[warn(missing_docs)]
+pub mod bindings;

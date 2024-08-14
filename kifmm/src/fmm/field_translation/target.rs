@@ -4,15 +4,12 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use rayon::prelude::*;
-use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAccessMut, RlstScalar};
 
 use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
-    fmm::{constants::L2L_MAX_CHUNK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
+    fmm::{constants::L2L_MAX_BLOCK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{FmmOperatorData, HomogenousKernel, TargetTranslation},
@@ -20,6 +17,7 @@ use crate::{
         types::FmmError,
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
+    Fmm,
 };
 
 impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
@@ -29,7 +27,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData,
+    Self: FmmOperatorData + Fmm<Scalar = Scalar>,
 {
     fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
@@ -45,6 +43,8 @@ where
         parent_sources.sort();
         let nparents = parent_sources.len();
         let operator_index = self.l2l_operator_index(level);
+        let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
+        let ncoeffs_equivalent_surface_parent = self.ncoeffs_equivalent_surface(level - 1);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -60,8 +60,8 @@ where
                 }
 
                 let mut max_chunk_size = nparents;
-                if max_chunk_size > L2L_MAX_CHUNK_SIZE {
-                    max_chunk_size = L2L_MAX_CHUNK_SIZE
+                if max_chunk_size > L2L_MAX_BLOCK_SIZE {
+                    max_chunk_size = L2L_MAX_BLOCK_SIZE
                 }
                 let chunk_size = chunk_size(nparents, max_chunk_size);
 
@@ -71,19 +71,21 @@ where
                     .par_chunks_exact(chunk_size)
                     .zip(child_locals.par_chunks_exact(NSIBLINGS * chunk_size))
                     .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-                        let mut parent_locals =
-                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, chunk_size]);
+                        let mut parent_locals = rlst_dynamic_array2!(
+                            Scalar,
+                            [ncoeffs_equivalent_surface_parent, chunk_size]
+                        );
                         for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
                             .iter()
                             .enumerate()
                             .take(chunk_size)
                         {
-                            parent_locals.data_mut()
-                                [chunk_idx * self.ncoeffs..(chunk_idx + 1) * self.ncoeffs]
+                            parent_locals.data_mut()[chunk_idx * ncoeffs_equivalent_surface_parent
+                                ..(chunk_idx + 1) * ncoeffs_equivalent_surface_parent]
                                 .copy_from_slice(unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_local_pointer.raw,
-                                        self.ncoeffs,
+                                        ncoeffs_equivalent_surface_parent,
                                     )
                                 });
                         }
@@ -100,12 +102,15 @@ where
                                 let child_local = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         child_local_pointers_chunk[child_displacement][0].raw,
-                                        self.ncoeffs,
+                                        ncoeffs_equivalent_surface,
                                     )
                                 };
                                 child_local
                                     .iter_mut()
-                                    .zip(&tmp.data()[j * self.ncoeffs..(j + 1) * self.ncoeffs])
+                                    .zip(
+                                        &tmp.data()[j * ncoeffs_equivalent_surface
+                                            ..(j + 1) * ncoeffs_equivalent_surface],
+                                    )
                                     .for_each(|(l, t)| *l += *t);
                             }
                         }
@@ -132,17 +137,23 @@ where
                     .into_par_iter()
                     .zip(child_locals.par_chunks_exact(NSIBLINGS))
                     .for_each(|(parent_local_pointers, child_locals_pointers)| {
-                        let mut parent_locals =
-                            rlst_dynamic_array2!(Scalar, [self.ncoeffs, nmatvecs]);
+                        let mut parent_locals = rlst_dynamic_array2!(
+                            Scalar,
+                            [ncoeffs_equivalent_surface_parent, nmatvecs]
+                        );
 
                         for (charge_vec_idx, parent_local_pointer) in
                             parent_local_pointers.iter().enumerate().take(nmatvecs)
                         {
                             let tmp = unsafe {
-                                std::slice::from_raw_parts(parent_local_pointer.raw, self.ncoeffs)
+                                std::slice::from_raw_parts(
+                                    parent_local_pointer.raw,
+                                    ncoeffs_equivalent_surface_parent,
+                                )
                             };
-                            parent_locals.data_mut()[charge_vec_idx * self.ncoeffs
-                                ..(charge_vec_idx + 1) * self.ncoeffs]
+                            parent_locals.data_mut()[charge_vec_idx
+                                * ncoeffs_equivalent_surface_parent
+                                ..(charge_vec_idx + 1) * ncoeffs_equivalent_surface_parent]
                                 .copy_from_slice(tmp);
                         }
 
@@ -160,11 +171,11 @@ where
                                 let child_locals_ij = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         child_locals_ij.raw,
-                                        self.ncoeffs,
+                                        ncoeffs_equivalent_surface,
                                     )
                                 };
-                                let result_ij =
-                                    &result_i.data()[j * self.ncoeffs..(j + 1) * self.ncoeffs];
+                                let result_ij = &result_i.data()[j * ncoeffs_equivalent_surface
+                                    ..(j + 1) * ncoeffs_equivalent_surface];
                                 child_locals_ij
                                     .iter_mut()
                                     .zip(result_ij.iter())
@@ -186,12 +197,14 @@ where
         };
 
         let coordinates = self.tree.target_tree().all_coordinates().unwrap();
-        let surface_size = self.ncoeffs * self.dim;
+        let depth = self.tree.target_tree().depth();
+        let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(depth);
+        let equivalent_surface_size = ncoeffs_equivalent_surface * self.dim;
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                self.leaf_upward_surfaces_targets
-                    .par_chunks_exact(surface_size)
+                self.leaf_downward_equivalent_surfaces_targets
+                    .par_chunks_exact(equivalent_surface_size)
                     .zip(self.leaf_locals.par_iter())
                     .zip(&self.charge_index_pointer_targets)
                     .zip(&self.potentials_send_pointers)
@@ -207,16 +220,6 @@ where
 
                             // Compute direct
                             if ntargets > 0 {
-                                let target_coordinates_row_major = rlst_array_from_slice2!(
-                                    target_coordinates_row_major,
-                                    [ntargets, self.dim],
-                                    [self.dim, 1]
-                                );
-                                let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                                target_coordinates_col_major
-                                    .fill_from(target_coordinates_row_major.view());
-
                                 let result = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         potential_send_ptr.raw,
@@ -227,11 +230,11 @@ where
                                 self.kernel.evaluate_st(
                                     self.kernel_eval_type,
                                     leaf_downward_equivalent_surface,
-                                    target_coordinates_col_major.data(),
+                                    target_coordinates_row_major,
                                     unsafe {
                                         std::slice::from_raw_parts_mut(
                                             leaf_locals[0].raw,
-                                            self.ncoeffs,
+                                            ncoeffs_equivalent_surface,
                                         )
                                     },
                                     result,
@@ -246,8 +249,8 @@ where
             FmmEvalType::Matrix(nmatvec) => {
                 let n_leaves = self.tree.target_tree().n_leaves().unwrap();
                 for i in 0..nmatvec {
-                    self.leaf_upward_surfaces_targets
-                        .par_chunks_exact(surface_size)
+                    self.leaf_downward_equivalent_surfaces_targets
+                        .par_chunks_exact(equivalent_surface_size)
                         .zip(&self.leaf_locals)
                         .zip(&self.charge_index_pointer_targets)
                         .zip(&self.potentials_send_pointers[i * n_leaves..(i + 1) * n_leaves])
@@ -265,23 +268,14 @@ where
                                 let ntargets = target_coordinates_row_major.len() / self.dim;
 
                                 if ntargets > 0 {
-                                    let target_coordinates_row_major = rlst_array_from_slice2!(
-                                        target_coordinates_row_major,
-                                        [ntargets, self.dim],
-                                        [self.dim, 1]
-                                    );
-                                    let mut target_coordinates_col_major =
-                                        rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                                    target_coordinates_col_major
-                                        .fill_from(target_coordinates_row_major.view());
-
                                     let local_expansion_ptr = leaf_locals[i].raw;
                                     let local_expansion = unsafe {
                                         std::slice::from_raw_parts(
                                             local_expansion_ptr,
-                                            self.ncoeffs,
+                                            ncoeffs_equivalent_surface,
                                         )
                                     };
+
                                     let result = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             potential_send_ptr.raw,
@@ -292,7 +286,7 @@ where
                                     self.kernel.evaluate_st(
                                         self.kernel_eval_type,
                                         leaf_downward_equivalent_surface,
-                                        target_coordinates_col_major.data(),
+                                        target_coordinates_row_major,
                                         local_expansion,
                                         result,
                                     );
@@ -319,87 +313,68 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 leaves
-                .par_iter()
-                .zip(&self.charge_index_pointer_targets)
-                .zip(&self.potentials_send_pointers)
-                .for_each(
-                    |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
-                        let target_coordinates_row_major = &all_target_coordinates
-                            [charge_index_pointer_targets.0 * self.dim
-                                ..charge_index_pointer_targets.1 * self.dim];
-                        let ntargets = target_coordinates_row_major.len() / self.dim;
+                    .par_iter()
+                    .zip(&self.charge_index_pointer_targets)
+                    .zip(&self.potentials_send_pointers)
+                    .for_each(
+                        |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+                            let target_coordinates_row_major = &all_target_coordinates
+                                [charge_index_pointer_targets.0 * self.dim
+                                    ..charge_index_pointer_targets.1 * self.dim];
+                            let ntargets = target_coordinates_row_major.len() / self.dim;
 
-                        if ntargets > 0 {
-                            let target_coordinates_row_major = rlst_array_from_slice2!(
-                                target_coordinates_row_major,
-                                [ntargets, self.dim],
-                                [self.dim, 1]
-                            );
-                            let mut target_coordinates_col_major =
-                                rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                            target_coordinates_col_major
-                                .fill_from(target_coordinates_row_major.view());
+                            if ntargets > 0 {
+                                if let Some(u_list) = self.tree.near_field(leaf) {
+                                    let u_list_indices = u_list
+                                        .iter()
+                                        .filter_map(|k| self.tree.source_tree().leaf_index(k));
 
-                            if let Some(u_list) = self.tree.near_field(leaf) {
-                                let u_list_indices = u_list
-                                    .iter()
-                                    .filter_map(|k| self.tree.source_tree().leaf_index(k));
+                                    let charges = u_list_indices
+                                        .clone()
+                                        .map(|&idx| {
+                                            let index_pointer =
+                                                &self.charge_index_pointer_sources[idx];
+                                            &self.charges[index_pointer.0..index_pointer.1]
+                                        })
+                                        .collect_vec();
 
-                                let charges = u_list_indices
-                                    .clone()
-                                    .map(|&idx| {
-                                        let index_pointer = &self.charge_index_pointer_sources[idx];
-                                        &self.charges[index_pointer.0..index_pointer.1]
-                                    })
-                                    .collect_vec();
+                                    let sources_coordinates = u_list_indices
+                                        .into_iter()
+                                        .map(|&idx| {
+                                            let index_pointer =
+                                                &self.charge_index_pointer_sources[idx];
+                                            &all_source_coordinates[index_pointer.0 * self.dim
+                                                ..index_pointer.1 * self.dim]
+                                        })
+                                        .collect_vec();
 
-                                let sources_coordinates = u_list_indices
-                                    .into_iter()
-                                    .map(|&idx| {
-                                        let index_pointer = &self.charge_index_pointer_sources[idx];
-                                        &all_source_coordinates
-                                            [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
-                                    })
-                                    .collect_vec();
+                                    for (&charges, source_coordinates_row_major) in
+                                        charges.iter().zip(sources_coordinates)
+                                    {
+                                        let nsources =
+                                            source_coordinates_row_major.len() / self.dim;
 
-                                for (&charges, source_coordinates_row_major) in
-                                    charges.iter().zip(sources_coordinates)
-                                {
-                                    let nsources = source_coordinates_row_major.len() / self.dim;
+                                        if nsources > 0 {
+                                            let result = unsafe {
+                                                std::slice::from_raw_parts_mut(
+                                                    potential_send_pointer.raw,
+                                                    ntargets * self.kernel_eval_size,
+                                                )
+                                            };
 
-                                    if nsources > 0 {
-                                        let source_coordinates_row_major = rlst_array_from_slice2!(
-                                            source_coordinates_row_major,
-                                            [nsources, self.dim],
-                                            [self.dim, 1]
-                                        );
-                                        let mut source_coordinates_col_major = rlst_dynamic_array2!(
-                                            Scalar::Real,
-                                            [nsources, self.dim]
-                                        );
-                                        source_coordinates_col_major
-                                            .fill_from(source_coordinates_row_major.view());
-
-                                        let result = unsafe {
-                                            std::slice::from_raw_parts_mut(
-                                                potential_send_pointer.raw,
-                                                ntargets * self.kernel_eval_size,
+                                            self.kernel.evaluate_st(
+                                                self.kernel_eval_type,
+                                                source_coordinates_row_major,
+                                                target_coordinates_row_major,
+                                                charges,
+                                                result,
                                             )
-                                        };
-
-                                        self.kernel.evaluate_st(
-                                            self.kernel_eval_type,
-                                            source_coordinates_col_major.data(),
-                                            target_coordinates_col_major.data(),
-                                            charges,
-                                            result,
-                                        )
+                                        }
                                     }
                                 }
                             }
-                        }
-                    },
-                );
+                        },
+                    );
                 Ok(())
             }
 
@@ -418,16 +393,6 @@ where
                             let ntargets = target_coordinates_row_major.len() / self.dim;
 
                             if ntargets > 0 {
-                                let target_coordinates_row_major = rlst_array_from_slice2!(
-                                    target_coordinates_row_major,
-                                    [ntargets, self.dim],
-                                    [self.dim, 1]
-                                );
-                                let mut target_coordinates_col_major =
-                                    rlst_dynamic_array2!(Scalar::Real, [ntargets, self.dim]);
-                                target_coordinates_col_major
-                                    .fill_from(target_coordinates_row_major.view());
-
                                 if let Some(u_list) = self.tree.near_field(leaf) {
                                     let u_list_indices = u_list
                                         .iter()
@@ -459,17 +424,6 @@ where
                                     {
                                         let nsources =
                                             source_coordinates_row_major.len() / self.dim;
-                                        let source_coordinates_row_major = rlst_array_from_slice2!(
-                                            source_coordinates_row_major,
-                                            [nsources, self.dim],
-                                            [self.dim, 1]
-                                        );
-                                        let mut source_coordinates_col_major = rlst_dynamic_array2!(
-                                            Scalar::Real,
-                                            [nsources, self.dim]
-                                        );
-                                        source_coordinates_col_major
-                                            .fill_from(source_coordinates_row_major.view());
 
                                         if nsources > 0 {
                                             let result = unsafe {
@@ -481,8 +435,8 @@ where
 
                                             self.kernel.evaluate_st(
                                                 self.kernel_eval_type,
-                                                source_coordinates_col_major.data(),
-                                                target_coordinates_col_major.data(),
+                                                source_coordinates_row_major,
+                                                target_coordinates_row_major,
                                                 charges,
                                                 result,
                                             );

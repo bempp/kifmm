@@ -2,147 +2,215 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, SingleNodeBuilder};
-use kifmm::traits::fmm::Fmm;
+use kifmm::traits::fmm::{Fmm, SourceToTargetTranslation, TargetTranslation};
+use kifmm::traits::tree::{FmmTree, Tree};
 use kifmm::tree::helpers::points_fixture;
-use rlst::{rlst_dynamic_array2, RawAccessMut};
-
-extern crate blas_src;
-extern crate lapack_src;
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 fn laplace_potentials_f32(c: &mut Criterion) {
-    // Setup random sources and targets
+    let mut group = c.benchmark_group("F32 Potentials");
+
+    group
+        .sample_size(10)
+        .measurement_time(Duration::from_secs(15));
+
     let nsources = 1000000;
     let ntargets = 1000000;
     let sources = points_fixture::<f32>(nsources, None, None, Some(0));
     let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
-    // FMM parameters
-    let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
-    let svd_threshold = Some(2e-1);
+    // 3 Digits
+    {
+        let nvecs = 5;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
 
-    // FFT based M2L for a vector of charges
-    let nvecs = 5;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
+        // BLAS based M2L for a vector of charges
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let e = 3;
+        let expansion_order = vec![e; depth.unwrap() as usize + 1];
+        let prune_empty = true;
+        let surface_diff = None;
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(10), None);
+        let svd_threshold = None;
 
-    let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
-        .unwrap()
-        .parameters(
-            &charges,
-            expansion_order,
-            Laplace3dKernel::new(),
-            EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        let mut fmm_blas = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    let nvecs = 10;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
+        group.bench_function(format!("M2L=BLAS digits=3 vecs=5"), |b| {
+            b.iter(|| fmm_blas.evaluate(false))
+        });
 
-    let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
-        .unwrap()
-        .parameters(
-            &charges,
-            expansion_order,
-            Laplace3dKernel::new(),
-            EvalType::Value,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        group.bench_function(format!("M2L=BLAS digits=3, M2L vecs=5"), |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        });
 
-    let mut group = c.benchmark_group("Laplace Potentials mat f32");
-    group
-        .sample_size(10)
-        .measurement_time(Duration::from_secs(100));
+        group.bench_function(format!("M2L=BLAS digits=3, P2P vecs=5"), |b| {
+            b.iter(|| fmm_blas.p2p().unwrap())
+        });
 
-    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs=5"), |b| {
-        b.iter(|| fmm_blas_5.evaluate(false).unwrap())
-    });
+        let nvecs = 10;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
 
-    group.bench_function(format!("M2L=BLAS, N={nsources} NVecs=10"), |b| {
-        b.iter(|| fmm_blas_10.evaluate(false).unwrap())
-    });
-}
+        // BLAS based M2L for a vector of charges
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let e = 3;
+        let expansion_order = vec![e; depth.unwrap() as usize + 1];
+        let prune_empty = true;
+        let surface_diff = None;
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(10), None);
+        let svd_threshold = None;
 
-fn laplace_potentials_gradients_f32(c: &mut Criterion) {
-    // Setup random sources and targets
-    let nsources = 1000000;
-    let ntargets = 1000000;
-    let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-    let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+        let mut fmm_blas = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    // FMM parameters
-    let n_crit = Some(400);
-    let expansion_order = 5;
-    let sparse = true;
-    let svd_threshold = Some(2e-1);
+        group.bench_function(format!("M2L=BLAS digits=3 vecs=10"), |b| {
+            b.iter(|| fmm_blas.evaluate(false))
+        });
 
-    // FFT based M2L for a vector of charges
-    let nvecs = 5;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
+        group.bench_function(format!("M2L=BLAS digits=3, M2L vecs=10"), |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        });
 
-    let fmm_blas_5 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
-        .unwrap()
-        .parameters(
-            &charges,
-            expansion_order,
-            Laplace3dKernel::new(),
-            EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        group.bench_function(format!("M2L=BLAS digits=3, P2P vecs=10"), |b| {
+            b.iter(|| fmm_blas.p2p().unwrap())
+        });
+    }
 
-    let nvecs = 10;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
+    // 4 Digits
+    {
+        let nvecs = 5;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
 
-    let fmm_blas_10 = SingleNodeBuilder::new()
-        .tree(&sources, &targets, n_crit, sparse)
-        .unwrap()
-        .parameters(
-            &charges,
-            expansion_order,
-            Laplace3dKernel::new(),
-            EvalType::ValueDeriv,
-            BlasFieldTranslationSaRcmp::new(svd_threshold),
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+        // BLAS based M2L for a vector of charges
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let e = 4;
+        let expansion_order = vec![e; depth.unwrap() as usize + 1];
+        let prune_empty = true;
+        let surface_diff = Some(1);
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(20), None);
+        let svd_threshold = Some(0.001);
 
-    let mut group = c.benchmark_group("Laplace Gradients mat f32");
-    group
-        .sample_size(10)
-        .measurement_time(Duration::from_secs(150));
+        let mut fmm_blas = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    group.bench_function(format!("M2L=BLAS, N={nsources}, NVecs=5"), |b| {
-        b.iter(|| fmm_blas_5.evaluate(false).unwrap())
-    });
+        group.bench_function(format!("M2L=BLAS digits=4 vecs=5"), |b| {
+            b.iter(|| fmm_blas.evaluate(false))
+        });
 
-    group.bench_function(format!("M2L=BLAS, N={nsources}, NVecs=10"), |b| {
-        b.iter(|| fmm_blas_10.evaluate(false).unwrap())
-    });
+        group.bench_function(format!("M2L=BLAS digits=4, M2L vecs=5"), |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=4, P2P vecs=5"), |b| {
+            b.iter(|| fmm_blas.p2p().unwrap())
+        });
+
+        let nvecs = 10;
+        let tmp = vec![1.0; nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+
+        // BLAS based M2L for a vector of charges
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let e = 4;
+        let expansion_order = vec![e; depth.unwrap() as usize + 1];
+        let prune_empty = true;
+        let surface_diff = Some(1);
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(20), None);
+        let svd_threshold = Some(0.001);
+
+        let mut fmm_blas = SingleNodeBuilder::new()
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                EvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        group.bench_function(format!("M2L=BLAS digits=4 vecs=10"), |b| {
+            b.iter(|| fmm_blas.evaluate(false))
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=4, M2L vecs=10"), |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=4, P2P vecs=10"), |b| {
+            b.iter(|| fmm_blas.p2p().unwrap())
+        });
+    }
 }
 
 criterion_group!(laplace_p_f32, laplace_potentials_f32);
-criterion_group!(laplace_g_f32, laplace_potentials_gradients_f32);
-
-criterion_main!(laplace_p_f32, laplace_g_f32,);
+criterion_main!(laplace_p_f32);
