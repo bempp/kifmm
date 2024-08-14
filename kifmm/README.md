@@ -75,7 +75,6 @@ fn main() {
 }
 ```
 
-
 # Python Bindings
 
 We use Maturin for Python bindings, and provide an example of installation using the `uv` package manager for Python below.
