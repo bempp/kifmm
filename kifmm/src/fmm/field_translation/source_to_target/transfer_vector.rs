@@ -1,11 +1,11 @@
 //! Functions for handling transfer vectors
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use num::traits::Float;
 use rlst::RlstScalar;
 
-use crate::{fmm::types::TransferVector, tree::types::MortonKey};
+use crate::{fmm::{field_translation::target, types::TransferVector}, tree::types::MortonKey};
 
 /// Compute all unique transfer vectors at a given level.
 pub fn compute_transfer_vectors_at_level<T: RlstScalar + Float>(
@@ -55,11 +55,43 @@ pub fn compute_transfer_vectors_at_level<T: RlstScalar + Float>(
     Ok(result)
 }
 
+
+pub fn map_to_reduced<T: RlstScalar + Float>(level: u64) {
+
+    let transfer_vectors = compute_transfer_vectors_at_level::<T>(level).unwrap();
+
+    let sources_parents = transfer_vectors.iter().map(|t| t.source.parent()).collect_vec();
+    let targets_parents = transfer_vectors.iter().map(|t| t.target.parent()).collect_vec();
+
+    let tvs_parents = sources_parents.iter().zip(targets_parents.iter()).map(|(source, target)| {
+        source.find_transfer_vector(target).unwrap()
+    }).collect_vec();
+
+
+    println!("{:?} HERE {:?} ", tvs_parents.len(), targets_parents[0].level());
+
+    let components_parents = sources_parents.iter().zip(targets_parents.iter()).map(|(source, target)| {
+        source.find_transfer_vector_components(target).unwrap()
+    }).collect_vec();
+
+    let tvs_parent_set : HashSet<_> = tvs_parents.into_iter().collect();
+
+    println!("{:?} {:?}", tvs_parent_set, tvs_parent_set.len());
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
 
-    use super::compute_transfer_vectors_at_level;
+    use super::{compute_transfer_vectors_at_level, map_to_reduced};
+
+    #[test]
+    fn test_map_to_reduced() {
+
+        map_to_reduced::<f64>(3);
+        assert!(false);
+
+    }
 
     #[test]
     fn test_compute_transfer_vectors_at_level() {

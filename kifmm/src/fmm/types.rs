@@ -731,6 +731,49 @@ where
     pub surface_diff: usize,
 }
 
+
+/// Stores data and metadata for BLAS based acceleration scheme for field translation.
+///
+/// Our compressions scheme is related to that of the IA approximation scheme in [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)].
+/// However instead of taking the SVD over each interaction matrix at each level, which can be onerous due to the need for up to 316 SVDs
+/// per level we place a single box in the center of each neighbour of a given box's parent (which is used as a reference box during compression)
+/// This reduces the number of SVDs required to just 8 per level, and is postulated to provide similar performance with a compromise for accuracy
+/// by introducing some directional element to the compressed operators, with a lower pre-computation cost.
+///
+/// # Fields
+///
+/// - `threshold`- A value used to filter singular vectors during compression.
+///
+/// - `metadata`- Stores precomputed metadata required to apply this method. Indexed by tree level.
+///
+/// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions. Indexed by tree level.
+///
+/// - `cutoff_ranks`- Determined from the `threshold` parameter as the largest rank over the global SVD over all interaction
+///    matrices corresponding to unique transfer vectors. Indexed by level and then by transfer vector.
+#[derive(Default)]
+pub struct BlasFieldTranslationHalo<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Threshold
+    pub threshold: Scalar::Real,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataHalo<Scalar>>,
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
+
+    /// Cutoff ranks
+    pub cutoff_ranks: Vec<Vec<usize>>,
+
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
+    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
+}
+
 /// Represents the vector between a source and target boxes encoded by Morton keys.
 ///
 /// Encapsulates the directional vector from a source to a target, identified by their Morton keys,
@@ -877,6 +920,28 @@ where
     /// Right singular vectors of compressed M2L matrix, truncated to a maximum cutoff rank
     pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
+
+
+/// Stores metadata for BLAS based acceleration scheme for field translation.
+///
+/// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
+///  a matrix $K_t$, where $T$ is the set of unique transfer vectors.
+///
+/// Instead of individually compressing each $K_t \sim U V^T$, with an SVD. We compress a single representative
+/// interaction for a box placed in the middle of this halo position. Storing a map between each unique $t$ and this
+/// representative from the halo.
+#[derive(Default)]
+pub struct BlasMetadataHalo<T>
+where
+    T: RlstScalar,
+{
+    /// Left singular vectors from SVD of compressed M2L matrix, truncated to a maximum cutoff rank
+    pub u: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+
+    /// Right singular vectors of compressed M2L matrix, truncated to a maximum cutoff rank
+    pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+}
+
 
 impl<T> Default for BlasMetadataSaRcmp<T>
 where

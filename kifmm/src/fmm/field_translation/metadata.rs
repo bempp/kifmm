@@ -27,7 +27,7 @@ use crate::{
             ncoeffs_kifmm, potential_pointers,
         },
         types::{
-            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
+            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasFieldTranslationHalo, BlasMetadataIa, BlasMetadataSaRcmp,
             FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
         KiFmm,
