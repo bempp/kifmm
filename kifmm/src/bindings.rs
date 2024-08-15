@@ -2220,7 +2220,7 @@ pub mod api {
                         if let Some(tmp) = (*fmm).potential(&leaf) {
                             for &p in tmp.iter() {
                                 potentials.push(Potential {
-                                    len: p.len(),
+                                    len: p.len() * 2,
                                     data: p.as_ptr() as *const c_void,
                                     scalar: ScalarType::C32,
                                 })
@@ -2259,7 +2259,7 @@ pub mod api {
                         if let Some(tmp) = (*fmm).potential(&leaf) {
                             for &p in tmp.iter() {
                                 potentials.push(Potential {
-                                    len: p.len(),
+                                    len: p.len() * 2,
                                     data: p.as_ptr() as *const c_void,
                                     scalar: ScalarType::C32,
                                 })
@@ -2300,7 +2300,7 @@ pub mod api {
                         if let Some(tmp) = (*fmm).potential(&leaf) {
                             for &p in tmp.iter() {
                                 potentials.push(Potential {
-                                    len: p.len(),
+                                    len: p.len() * 2,
                                     data: p.as_ptr() as *const c_void,
                                     scalar: ScalarType::C64,
                                 })
@@ -2339,7 +2339,7 @@ pub mod api {
                         if let Some(tmp) = (*fmm).potential(&leaf) {
                             for &p in tmp.iter() {
                                 potentials.push(Potential {
-                                    len: p.len(),
+                                    len: p.len() * 2,
                                     data: p.as_ptr() as *const c_void,
                                     scalar: ScalarType::C64,
                                 })
