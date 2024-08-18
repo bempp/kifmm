@@ -73,29 +73,35 @@ mod mpi_point {
                     UncommittedUserDatatype::contiguous(3, &T::equivalent_datatype()).as_ref(),
                     UncommittedUserDatatype::contiguous(1, &usize::equivalent_datatype()).as_ref(),
                     UncommittedUserDatatype::structured(
-                        &[1, 1],
+                        &[1, 1, 1],
                         &[
                             offset_of!(MortonKey<T>, anchor) as Address,
                             offset_of!(MortonKey<T>, morton) as Address,
+                            offset_of!(MortonKey<T>, rank) as Address,
                         ],
                         &[
                             UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
                                 .as_ref(),
                             UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
+                                .as_ref(),
+                            UncommittedUserDatatype::contiguous(1, &i32::equivalent_datatype())
                                 .as_ref(),
                         ],
                     )
                     .as_ref(),
                     UncommittedUserDatatype::structured(
-                        &[1, 1],
+                        &[1, 1, 1],
                         &[
                             offset_of!(MortonKey<T>, anchor) as Address,
                             offset_of!(MortonKey<T>, morton) as Address,
+                            offset_of!(MortonKey<T>, rank) as Address,
                         ],
                         &[
                             UncommittedUserDatatype::contiguous(3, &u64::equivalent_datatype())
                                 .as_ref(),
                             UncommittedUserDatatype::contiguous(1, &u64::equivalent_datatype())
+                                .as_ref(),
+                            UncommittedUserDatatype::contiguous(1, &i32::equivalent_datatype())
                                 .as_ref(),
                         ],
                     )

@@ -5,7 +5,7 @@ use rlst::RlstScalar;
 
 use num::traits::Float;
 
-/// Interface for single and multi-node trees
+/// Interface for single node trees
 pub trait Tree {
     /// Scalar type
     type Scalar: RlstScalar + Float;

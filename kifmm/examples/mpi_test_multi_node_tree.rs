@@ -46,7 +46,6 @@ fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
 
     // Test that the partner's minimum node is greater than the process's maximum node
     if rank < size - 1 {
-        println!("max {:?} {:?}", max, partner_min);
         assert!(max < &partner_min)
     }
 }

@@ -78,7 +78,6 @@ where
 
     /// index for implementing the Iterator trait.
     pub index: usize,
-
 }
 
 /// Represents an MPI distributed tree structure equipped with spatial indexing capabilities for 3D
@@ -176,6 +175,30 @@ where
 
     /// All keys, returned as a set.
     pub keys_set: HashSet<MortonKey<T>>,
+}
+
+#[cfg(feature = "mpi")]
+pub struct MultiNodeTreeNew<T, C: Communicator>
+where
+    T: RlstScalar + Float + Equivalence,
+{
+    /// Global communicator for this Tree
+    pub world: C,
+
+    /// MPI Rank
+    pub rank: i32,
+
+    /// Range of leaf keys at this processor, and their current rank [rank, min, max]
+    pub range: [u64; 3],
+
+    /// Depth of the global tree
+    pub global_depth: u64,
+
+    /// Depth of each local tree
+    pub local_depth: u64,
+
+    /// Single node trees at this rank
+    pub trees: Vec<SingleNodeTree<T>>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.

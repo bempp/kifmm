@@ -57,7 +57,7 @@ where
                 keys.iter().filter(|&&k| k.level() == level).collect();
 
             for work_item in work_set.iter() {
-                let mut ancestors = work_item.ancestors();
+                let mut ancestors = work_item.ancestors(None);
                 ancestors.remove(work_item);
                 for ancestor in ancestors.iter() {
                     if key_set.contains(ancestor) {
@@ -124,8 +124,8 @@ where
     /// - `start` - The Morton Key defining the beginning of the region to complete.
     /// - `end` - The Morton Key marking the end of the region.
     pub fn complete_region(start: &MortonKey<T>, end: &MortonKey<T>) -> Vec<MortonKey<T>> {
-        let mut start_ancestors: HashSet<MortonKey<_>> = start.ancestors();
-        let mut end_ancestors: HashSet<MortonKey<_>> = end.ancestors();
+        let mut start_ancestors: HashSet<MortonKey<_>> = start.ancestors(None);
+        let mut end_ancestors: HashSet<MortonKey<_>> = end.ancestors(None);
 
         // Remove endpoints from ancestors
         start_ancestors.remove(start);
@@ -403,7 +403,7 @@ where
             anchor: *anchor,
             morton,
             scalar: PhantomData::<T>,
-            rank: rank.unwrap_or_default()
+            rank: rank.unwrap_or_default(),
         }
     }
 
@@ -577,7 +577,11 @@ where
 
     /// Return the first child of a Morton Key on the deepest level.
     pub fn finest_first_child(&self) -> Self {
-        Self::new(&self.anchor, DEEPEST_LEVEL - self.level() + self.morton, Some(self.rank))
+        Self::new(
+            &self.anchor,
+            DEEPEST_LEVEL - self.level() + self.morton,
+            Some(self.rank),
+        )
     }
 
     /// Return the last child of a Morton Key on the deepest level.
@@ -615,7 +619,7 @@ where
         }
 
         for &child_morton in children_morton.iter() {
-            children.push(MortonKey::from_morton(child_morton, None))
+            children.push(MortonKey::from_morton(child_morton, Some(self.rank)))
         }
 
         children.sort();
@@ -629,7 +633,7 @@ where
 
     /// Check if the key is ancestor of `other`.
     pub fn is_ancestor(&self, other: &MortonKey<T>) -> bool {
-        let ancestors = other.ancestors();
+        let ancestors = other.ancestors(None);
         ancestors.contains(self)
     }
 
@@ -639,14 +643,15 @@ where
     }
 
     /// Return set of all ancestors of this Morton Key.
-    pub fn ancestors(&self) -> HashSet<MortonKey<T>> {
+    pub fn ancestors(&self, level: Option<u64>) -> HashSet<MortonKey<T>> {
         let mut ancestors = HashSet::<MortonKey<_>>::new();
+        let level = level.unwrap_or(0);
 
         let mut current = *self;
 
         ancestors.insert(current);
 
-        while current.level() > 0 {
+        while current.level() > level {
             current = current.parent();
             ancestors.insert(current);
         }
@@ -688,7 +693,7 @@ where
         if self == other {
             *other
         } else {
-            let my_ancestors = self.ancestors();
+            let my_ancestors = self.ancestors(None);
             let mut current = *other;
             while !my_ancestors.contains(&current) {
                 current = current.parent()
@@ -856,8 +861,8 @@ where
 
     /// Check if two keys are adjacent with respect to each other
     pub fn is_adjacent(&self, other: &MortonKey<T>) -> bool {
-        let ancestors = self.ancestors();
-        let other_ancestors = other.ancestors();
+        let ancestors = self.ancestors(None);
+        let other_ancestors = other.ancestors(None);
 
         // If either key overlaps they cannot be adjacent.
         if ancestors.contains(other) || other_ancestors.contains(self) {
@@ -1317,37 +1322,37 @@ mod test {
             MortonKey::new(
                 &[displacement, 0, 0],
                 0b100000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
             MortonKey::new(
                 &[0, displacement, 0],
                 0b10000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
             MortonKey::new(
                 &[0, 0, displacement],
                 0b1000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
             MortonKey::new(
                 &[displacement, displacement, 0],
                 0b110000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
             MortonKey::new(
                 &[displacement, 0, displacement],
                 0b101000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
             MortonKey::new(
                 &[0, displacement, displacement],
                 0b11000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
             MortonKey::new(
                 &[displacement, displacement, displacement],
                 0b111000000000000000000000000000000000000000000000000000000000001,
-                None
+                None,
             ),
         ];
 
@@ -1365,7 +1370,7 @@ mod test {
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL, None);
 
-        let mut ancestors: Vec<MortonKey<_>> = key.ancestors().into_iter().collect();
+        let mut ancestors: Vec<MortonKey<_>> = key.ancestors(None).into_iter().collect();
         ancestors.sort();
 
         // Test that all ancestors found
@@ -1392,7 +1397,7 @@ mod test {
         let b = MortonKey::new(
             &[displacement, displacement, displacement],
             0b111000000000000000000000000000000000000000000000000000000000001,
-            None
+            None,
         );
         let result = a.finest_ancestor(&b);
         let expected = MortonKey::new(&[0, 0, 0], 0, None);
@@ -1567,7 +1572,7 @@ mod test {
     #[test]
     fn test_linearize_keys() {
         let key = MortonKey::<f64>::new(&[0, 0, 0], 15, None);
-        let ancestors = key.ancestors().into_iter().collect_vec();
+        let ancestors = key.ancestors(None).into_iter().collect_vec();
         let linearized = MortonKeys::linearize_keys(&ancestors);
 
         assert_eq!(linearized.len(), 1);
@@ -1660,7 +1665,7 @@ mod test {
         let b = MortonKey::<f64>::new(
             &[LEVEL_SIZE - 1, LEVEL_SIZE - 1, LEVEL_SIZE - 1],
             0b111111111111111111111111111111111111111111111111000000000010000,
-            None
+            None,
         );
 
         let region = MortonKeys::complete_region(&a, &b);
@@ -1676,7 +1681,7 @@ mod test {
 
         // Test that FCA is an ancestor of all nodes in the result
         for node in region.iter() {
-            let ancestors = node.ancestors();
+            let ancestors = node.ancestors(None);
             assert!(ancestors.contains(&fa));
         }
 
@@ -1686,7 +1691,7 @@ mod test {
 
         // Test that the compeleted region doesn't contain any overlaps
         for node in region.iter() {
-            let mut ancestors = node.ancestors();
+            let mut ancestors = node.ancestors(None);
             ancestors.remove(node);
             for ancestor in ancestors.iter() {
                 assert!(!region.contains(ancestor))
@@ -1727,7 +1732,7 @@ mod test {
         // Test for overlaps in balanced tree
         for key in tree.iter() {
             if !tree.iter().contains(key) {
-                let mut ancestors = key.ancestors();
+                let mut ancestors = key.ancestors(None);
                 ancestors.remove(key);
 
                 for ancestor in ancestors.iter() {
@@ -1758,7 +1763,7 @@ mod test {
 
         let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL, None);
 
-        let mut ancestors = key.ancestors();
+        let mut ancestors = key.ancestors(None);
         ancestors.remove(&key);
 
         // Test that overlapping nodes are not adjacent

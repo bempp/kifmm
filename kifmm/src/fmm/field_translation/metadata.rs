@@ -934,7 +934,9 @@ where
             let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
 
             // Need to find valid source/target pairs at this level with matching transfer vectors;
-            let all_keys = MortonKey::<Scalar::Real>::root(None).descendants(2).unwrap();
+            let all_keys = MortonKey::<Scalar::Real>::root(None)
+                .descendants(2)
+                .unwrap();
 
             // The child boxes in the halo of the sibling set
             let mut sources = vec![];
