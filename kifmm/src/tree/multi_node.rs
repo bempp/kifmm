@@ -57,8 +57,8 @@ where
             let coord: &[T; 3] = &coordinates_row_major[i * dim..(i + 1) * dim]
                 .try_into()
                 .unwrap();
-            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(coord, &domain, depth);
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL, None);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth, None);
 
             points.push(Point {
                 coordinate: *coord,
@@ -255,8 +255,8 @@ where
             let coord: &[T; 3] = &coordinates_row_major[i * dim..(i + 1) * dim]
                 .try_into()
                 .unwrap();
-            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(coord, &domain, depth);
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL, None);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth, None);
 
             points.push(Point {
                 coordinate: *coord,
@@ -507,7 +507,7 @@ where
         size: i32,
         world: &C,
     ) -> MortonKeys<T> {
-        let root = MortonKey::root();
+        let root = MortonKey::root(None);
         // Define the tree's global domain with the finest first/last descendants
         if rank == 0 {
             let ffc_root = root.finest_first_child();

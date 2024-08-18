@@ -561,7 +561,7 @@ mod test {
     ) where
         T::Real: Default,
     {
-        let root = MortonKey::root();
+        let root = MortonKey::root(None);
 
         let multipoles = fmm.multipole(&root).unwrap();
         let upward_equivalent_surface = root.surface_grid(
@@ -626,7 +626,7 @@ mod test {
     ) where
         T::Real: Default,
     {
-        let root = MortonKey::<T::Real>::root();
+        let root = MortonKey::<T::Real>::root(None);
         let multipole = fmm.multipole(&root).unwrap();
 
         let upward_equivalent_surface = root.surface_grid(

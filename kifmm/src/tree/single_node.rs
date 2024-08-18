@@ -44,8 +44,8 @@ where
                 .try_into()
                 .unwrap();
 
-            let base_key = MortonKey::<T>::from_point(coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::<T>::from_point(coord, &domain, depth);
+            let base_key = MortonKey::<T>::from_point(coord, &domain, DEEPEST_LEVEL, None);
+            let encoded_key = MortonKey::<T>::from_point(coord, &domain, depth, None);
             points.push(Point {
                 coordinate: *coord,
                 base_key,
@@ -67,7 +67,7 @@ where
                 .flat_map(|(i, j)| (0..LEVEL_SIZE).step_by(diameter).map(move |k| [i, j, k]))
                 .map(|anchor| {
                     let morton = encode_anchor(&anchor, depth);
-                    MortonKey::<T>::new(&anchor, morton)
+                    MortonKey::<T>::new(&anchor, morton, None)
                 }),
         );
 
@@ -209,8 +209,8 @@ where
                 .try_into()
                 .unwrap();
 
-            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(coord, &domain, depth);
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL, None);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth, None);
             points.push(Point {
                 coordinate: *coord,
                 base_key,
@@ -507,7 +507,7 @@ where
     ///
     /// - `seeds` - Mutable reference to a collection of seed octants.
     pub fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
-        let root = MortonKey::root();
+        let root = MortonKey::root(None);
 
         let ffc_root = root.finest_first_child();
         let min = seeds.iter().min().unwrap();
@@ -833,7 +833,7 @@ mod test {
 
     #[test]
     pub fn test_assign_nodes_to_points() {
-        let root = MortonKey::<f64>::root();
+        let root = MortonKey::<f64>::root(None);
 
         // Generate points in a single octant of the domain
         let n_points = 10;
@@ -843,7 +843,7 @@ mod test {
         let mut tmp = Points::default();
         for i in 0..n_points {
             let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
-            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL, None);
             tmp.push(Point {
                 coordinate: point,
                 base_key: key,
@@ -883,7 +883,7 @@ mod test {
 
     #[test]
     pub fn test_split_blocks() {
-        let root = MortonKey::root();
+        let root = MortonKey::root(None);
         let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let n_points = 10000;
         let points = points_fixture(n_points, None, None, None);
@@ -892,7 +892,7 @@ mod test {
 
         for i in 0..n_points {
             let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
-            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL, None);
             tmp.push(Point {
                 coordinate: point,
                 base_key: key,
@@ -930,7 +930,7 @@ mod test {
 
     #[test]
     fn test_complete_blocktree() {
-        let root = MortonKey::root();
+        let root = MortonKey::root(None);
 
         let a = root.first_child();
         let b = *root.children().last().unwrap();

@@ -56,8 +56,13 @@ where
 {
     /// The anchor is the index coordinate of the key, with respect to the origin of the Domain.
     pub anchor: [u64; 3],
+
     /// The Morton encoded anchor.
     pub morton: u64,
+
+    /// Associated MPI rank in distributed setting, defaults to 0
+    pub rank: i32,
+
     /// Scalar type of coordinate data associated with the key
     pub scalar: PhantomData<T>,
 }
@@ -73,6 +78,7 @@ where
 
     /// index for implementing the Iterator trait.
     pub index: usize,
+
 }
 
 /// Represents an MPI distributed tree structure equipped with spatial indexing capabilities for 3D

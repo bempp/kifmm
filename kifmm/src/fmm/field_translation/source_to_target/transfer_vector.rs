@@ -13,7 +13,7 @@ pub fn compute_transfer_vectors_at_level<T: RlstScalar + Float>(
 ) -> Result<Vec<TransferVector<T>>, std::io::Error> {
     let mut result = Vec::new();
 
-    let mut parent_key = MortonKey::<T>::root();
+    let mut parent_key = MortonKey::<T>::root(None);
 
     for _ in 0..(level - 1) {
         parent_key = parent_key.first_child()

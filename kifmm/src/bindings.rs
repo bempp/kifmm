@@ -2051,7 +2051,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2091,7 +2091,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2132,7 +2132,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2171,7 +2171,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2212,7 +2212,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2251,7 +2251,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2292,7 +2292,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2331,7 +2331,7 @@ pub mod api {
                         }
                     };
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let mut potentials = Vec::new();
 
@@ -2389,7 +2389,7 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2418,7 +2418,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2449,7 +2449,7 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2478,7 +2478,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2509,7 +2509,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2538,7 +2538,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2569,7 +2569,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2598,7 +2598,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2653,7 +2653,7 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2682,7 +2682,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2713,7 +2713,7 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2742,7 +2742,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2773,7 +2773,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2802,7 +2802,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2833,7 +2833,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
@@ -2862,7 +2862,7 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let leaf = MortonKey::from_morton(leaf);
+                    let leaf = MortonKey::from_morton(leaf, None);
 
                     let len;
                     let ptr;
