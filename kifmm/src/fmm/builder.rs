@@ -17,7 +17,7 @@ use crate::{
         },
         fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
-        tree::{FmmTree, Tree},
+        tree::{FmmTree, SingleNodeTree},
     },
     tree::{types::Domain, SingleNodeTree},
 };
@@ -116,8 +116,8 @@ where
 
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree = SingleNodeTree::new(sources, depth, prune_empty, self.domain)?;
-            let target_tree = SingleNodeTree::new(targets, depth, prune_empty, self.domain)?;
+            let source_tree = SingleNodeTree::new(None, sources, depth, prune_empty, self.domain, None, 0)?;
+            let target_tree = SingleNodeTree::new(None, targets, depth, prune_empty, self.domain, None, 0)?;
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,

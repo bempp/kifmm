@@ -19,7 +19,7 @@ use crate::{
     },
     traits::{
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
-        tree::{FmmTree, Tree},
+        tree::{FmmTree, SingleNodeTree},
         types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,

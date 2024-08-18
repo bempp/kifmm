@@ -58,6 +58,8 @@ where
     pub anchor: [u64; 3],
     /// The Morton encoded anchor.
     pub morton: u64,
+    /// Owning process
+    pub rank: i32,
     /// Scalar type of coordinate data associated with the key
     pub scalar: PhantomData<T>,
 }
@@ -132,44 +134,47 @@ where
     /// Range of leaf keys at this processor, and their current rank [rank, min, max]
     pub range: [u64; 3],
 
-    /// Depth of the tree
-    pub depth: u64,
+    /// Single node trees at this process
+    pub trees: Vec<SingleNodeTree<T>>,
 
-    /// Domain spanned by the points.
-    pub domain: Domain<T>,
+    // /// Depth of the tree
+    // pub depth: u64,
 
-    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T>,
+    // /// Domain spanned by the points.
+    // pub domain: Domain<T>,
 
-    /// All global indices
-    pub global_indices: Vec<usize>,
+    // /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
+    // pub coordinates: Vec<T>,
 
-    /// The leaves that span the tree.
-    pub leaves: MortonKeys<T>,
+    // /// All global indices
+    // pub global_indices: Vec<usize>,
 
-    /// All nodes in tree.
-    pub keys: MortonKeys<T>,
+    // /// The leaves that span the tree.
+    // pub leaves: MortonKeys<T>,
 
-    /// Associate leaves with point indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+    // /// All nodes in tree.
+    // pub keys: MortonKeys<T>,
 
-    /// Associate levels with key indices.
-    pub levels_to_keys: HashMap<u64, (usize, usize)>,
+    // /// Associate leaves with point indices.
+    // pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
 
-    /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T>, usize>,
+    // /// Associate levels with key indices.
+    // pub levels_to_keys: HashMap<u64, (usize, usize)>,
 
-    /// Map between a key and its index at a level
-    pub key_to_level_index: HashMap<MortonKey<T>, usize>,
+    // /// Map between a key and its index
+    // pub key_to_index: HashMap<MortonKey<T>, usize>,
 
-    /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+    // /// Map between a key and its index at a level
+    // pub key_to_level_index: HashMap<MortonKey<T>, usize>,
 
-    /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T>>,
+    // /// Map between a leaf and its index
+    // pub leaf_to_index: HashMap<MortonKey<T>, usize>,
 
-    /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T>>,
+    // /// All leaves, returned as a set.
+    // pub leaves_set: HashSet<MortonKey<T>>,
+
+    // /// All keys, returned as a set.
+    // pub keys_set: HashSet<MortonKey<T>>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.

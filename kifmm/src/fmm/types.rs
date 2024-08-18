@@ -496,6 +496,59 @@ where
     pub depth_set: Option<bool>,
 }
 
+
+#[derive(Default)]
+pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData, C>
+where
+    Scalar: RlstScalar + Default + Equivalence,
+    Kernel: KernelTrait<T = Scalar> + Clone,
+    SourceToTargetData: SourceToTargetDataTrait,
+    <Scalar as RlstScalar>::Real: Default + Equivalence,
+    C: Communicator
+{
+    /// Instruction set architecture
+    pub isa: Option<Isa>,
+
+    /// Tree
+    pub tree: Option<MultiNodeFmmTree<Scalar::Real, C>>,
+
+    /// Kernel
+    pub kernel: Option<Kernel>,
+
+    /// Charges
+    pub charges: Option<Vec<Scalar>>,
+
+    /// Data and metadata for field translations
+    pub source_to_target: Option<SourceToTargetData>,
+
+    /// Domain
+    pub domain: Option<Domain<Scalar::Real>>,
+
+    /// Variable expansion order by level
+    pub variable_expansion_order: Option<bool>,
+
+    /// Expansion order used to discretise equivalent surface
+    pub equivalent_surface_order: Option<Vec<usize>>,
+
+    /// Expansion order used to discretise check surface
+    pub check_surface_order: Option<Vec<usize>>,
+
+    /// Number of coefficients
+    pub ncoeffs_equivalent_surface: Option<Vec<usize>>,
+
+    /// Number of coefficients
+    pub ncoeffs_check_surface: Option<Vec<usize>>,
+
+    /// Kernel eval type
+    pub kernel_eval_type: Option<EvalType>,
+
+    /// FMM eval type
+    pub fmm_eval_type: Option<FmmEvalType>,
+
+    /// Has depth or ncrit been set
+    pub depth_set: Option<bool>,
+}
+
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
 ///
 /// This struct encapsulates octrees for two distributions of points, sources, and targets,
@@ -521,6 +574,7 @@ pub struct SingleNodeFmmTree<T: RlstScalar + Float + Default> {
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T>,
 }
+
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on distributed nodes.
 ///

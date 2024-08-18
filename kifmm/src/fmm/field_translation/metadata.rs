@@ -41,7 +41,7 @@ use crate::{
         },
         fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
-        tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
+        tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, SingleNodeTree},
     },
     tree::{
         constants::{
@@ -79,7 +79,7 @@ where
     Self: SourceToTargetTranslation,
 {
     fn source(&mut self) {
-        let root = MortonKey::<Scalar::Real>::root();
+        let root = MortonKey::<Scalar::Real>::root(0);
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -193,7 +193,7 @@ where
     }
 
     fn target(&mut self) {
-        let root = MortonKey::<Scalar::Real>::root();
+        let root = MortonKey::<Scalar::Real>::root(0);
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -309,7 +309,7 @@ where
     Self: SourceToTargetTranslation,
 {
     fn source(&mut self) {
-        let root = MortonKey::<Scalar::Real>::root();
+        let root = MortonKey::<Scalar::Real>::root(0);
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -460,7 +460,7 @@ where
     }
 
     fn target(&mut self) {
-        let root = MortonKey::<Scalar::Real>::root();
+        let root = MortonKey::<Scalar::Real>::root(0);
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -900,7 +900,7 @@ where
 
         if depth >= 2 {
             // Find unique transfer vectors in correct order at level 3
-            let key = MortonKey::from_point(&point, domain, 3);
+            let key = MortonKey::from_point(&point, domain, 3, 0);
             let siblings = key.siblings();
             let parent = key.parent();
 
@@ -934,7 +934,7 @@ where
             let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
 
             // Need to find valid source/target pairs at this level with matching transfer vectors;
-            let all_keys = MortonKey::<Scalar::Real>::root().descendants(2).unwrap();
+            let all_keys = MortonKey::<Scalar::Real>::root(0).descendants(2).unwrap();
 
             // The child boxes in the halo of the sibling set
             let mut sources = vec![];
@@ -1137,7 +1137,7 @@ where
                 let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
 
                 // Encode point in centre of domain and compute halo of parent, and their resp. children
-                let key = MortonKey::from_point(&point, domain, level);
+                let key = MortonKey::from_point(&point, domain, level, 0);
                 let siblings = key.siblings();
                 let parent = key.parent();
 
@@ -1949,7 +1949,7 @@ where
         let point = [point[0], point[1], point[2]];
 
         // Encode point in centre of domain and compute halo of parent, and their resp. children
-        let key = MortonKey::from_point(&point, self.tree.source_tree().domain(), 3);
+        let key = MortonKey::from_point(&point, self.tree.source_tree().domain(), 3, 0);
         let siblings = key.siblings();
         let parent = key.parent();
         let halo = parent.neighbors();

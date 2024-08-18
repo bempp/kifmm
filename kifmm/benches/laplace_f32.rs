@@ -5,7 +5,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fmm::{Fmm, SourceToTargetTranslation, TargetTranslation};
-use kifmm::traits::tree::{FmmTree, Tree};
+use kifmm::traits::tree::{FmmTree, SingleNodeTree};
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 

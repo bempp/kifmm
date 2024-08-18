@@ -13,7 +13,7 @@ use crate::{
             FmmOperatorData, HomogenousKernel, SourceToTargetTranslation, SourceTranslation,
             TargetTranslation,
         },
-        tree::{FmmTree, Tree},
+        tree::{FmmTree, SingleNodeTree},
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
     Fmm, SingleNodeFmmTree,
@@ -69,7 +69,7 @@ where
 
     fn multipole(
         &self,
-        key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
+        key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::SingleNodeTree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(&key_idx) = self.tree().source_tree().level_index(key) {
             let multipole_ptr = &self.level_multipoles[key.level() as usize][key_idx][0];
@@ -110,7 +110,7 @@ where
 
     fn local(
         &self,
-        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        key: &<<Self::Tree as FmmTree>::Tree as SingleNodeTree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(&key_idx) = self.tree().target_tree().level_index(key) {
             let local_ptr = &self.level_locals[key.level() as usize][key_idx][0];
@@ -151,7 +151,7 @@ where
 
     fn potential(
         &self,
-        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        leaf: &<<Self::Tree as FmmTree>::Tree as SingleNodeTree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>> {
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
@@ -348,7 +348,7 @@ mod test {
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::tree::{FmmTree, FmmTreeNode, Tree},
+        traits::tree::{FmmTree, FmmTreeNode, SingleNodeTree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };
@@ -561,7 +561,7 @@ mod test {
     ) where
         T::Real: Default,
     {
-        let root = MortonKey::root();
+        let root = MortonKey::root(0);
 
         let multipoles = fmm.multipole(&root).unwrap();
         let upward_equivalent_surface = root.surface_grid(
@@ -626,7 +626,7 @@ mod test {
     ) where
         T::Real: Default,
     {
-        let root = MortonKey::<T::Real>::root();
+        let root = MortonKey::<T::Real>::root(0);
         let multipole = fmm.multipole(&root).unwrap();
 
         let upward_equivalent_surface = root.surface_grid(

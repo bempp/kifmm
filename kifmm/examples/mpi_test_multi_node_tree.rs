@@ -5,7 +5,7 @@ use rand::distributions::uniform::SampleUniform;
 
 use rlst::{RawAccess, RlstScalar};
 
-use kifmm::{traits::tree::Tree, tree::helpers::points_fixture};
+use kifmm::{traits::tree::SingleNodeTree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};

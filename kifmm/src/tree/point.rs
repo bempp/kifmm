@@ -133,8 +133,8 @@ mod test {
             ];
             points.push(Point {
                 coordinate: p,
-                base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
-                encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL),
+                base_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL, 0),
+                encoded_key: MortonKey::from_point(&p, &domain, DEEPEST_LEVEL, 0),
                 global_index: i,
             })
         }

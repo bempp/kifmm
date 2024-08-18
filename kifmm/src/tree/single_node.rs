@@ -5,10 +5,11 @@ use std::collections::{HashMap, HashSet};
 use num::traits::Float;
 
 use itertools::Itertools;
+use rand::seq::index;
 use rlst::RlstScalar;
 
 use crate::{
-    traits::tree::Tree,
+    traits::tree::SingleNodeTree,
     tree::{
         constants::{DEEPEST_LEVEL, LEVEL_SIZE},
         morton::encode_anchor,
@@ -33,6 +34,7 @@ where
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
+        rank: i32
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
@@ -44,8 +46,8 @@ where
                 .try_into()
                 .unwrap();
 
-            let base_key = MortonKey::<T>::from_point(coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::<T>::from_point(coord, &domain, depth);
+            let base_key = MortonKey::<T>::from_point(coord, &domain, DEEPEST_LEVEL, rank);
+            let encoded_key = MortonKey::<T>::from_point(coord, &domain, depth, rank);
             points.push(Point {
                 coordinate: *coord,
                 base_key,
@@ -194,10 +196,12 @@ where
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
     fn uniform_tree_pruned(
+        root: Option<MortonKey<T>>,
         coordinates_row_major: &[T],
         &domain: &Domain<T>,
         depth: u64,
         global_indices: &[usize],
+        rank: i32,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
@@ -209,8 +213,8 @@ where
                 .try_into()
                 .unwrap();
 
-            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
-            let encoded_key = MortonKey::from_point(coord, &domain, depth);
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL, rank);
+            let encoded_key = MortonKey::from_point(coord, &domain, depth, rank);
             points.push(Point {
                 coordinate: *coord,
                 base_key,
@@ -246,17 +250,24 @@ where
         let mut leaves = MortonKeys::from(leaves);
         leaves.sort();
 
-        // Find all keys in tree
+        // Find all keys in tree up to root (if specified) or up to level 0
+        let root_level;
+        if let Some(root) = root {
+            root_level = root.level()
+        } else {
+            root_level = 0
+        };
+
         let tmp: HashSet<MortonKey<_>> = leaves
             .iter()
-            .flat_map(|leaf| leaf.ancestors().into_iter())
+            .flat_map(|leaf| leaf.ancestors_to_level(root_level).into_iter())
             .collect();
 
         // Ensure all siblings of ancestors are included
         let tmp: HashSet<MortonKey<_>> = tmp
             .iter()
             .flat_map(|key| {
-                if key.level() != 0 {
+                if key.level() != root_level {
                     key.siblings()
                 } else {
                     vec![*key]
@@ -342,6 +353,44 @@ where
         })
     }
 
+    /// From a set of specified roots, create a number of single node trees of matching
+    // length
+    pub fn from_roots(roots: &MortonKeys<T>, points:  &mut Points<T>, global_depth: u64, local_depth: u64, prune_empty: bool, rank: i32) -> Vec<SingleNodeTree<T>> {
+
+        let mut result = Vec::new();
+
+        let (_unmapped, index_map) = SingleNodeTree::<T>::assign_nodes_to_points_new(&roots, points);
+        let depth = local_depth + global_depth;
+
+        for root in roots.iter() {
+
+            // Assign points to each single node tree
+            let mut local_points = index_map.get(root).unwrap().iter().map(|&i| points[i]).collect_vec();
+            local_points.sort();
+
+            // Create new buffer containing local coordinates on this local tree
+            let local_coordinates = local_points.iter().flat_map(|p| {
+                p.coordinate
+            })
+            .collect_vec();
+
+            let local_indices= Some(local_points.iter().map(|p| {
+                p.global_index
+            })
+            .collect_vec());
+
+            let local_domain = Some(Domain::from_local_points(&local_coordinates));
+
+            let tree =  SingleNodeTree::new(Some(*root), &local_coordinates, depth, prune_empty, local_domain, local_indices, rank).unwrap();
+
+            result.push(tree)
+
+        }
+
+
+        result
+    }
+
     /// Calculates the minimum depth of a tree required to ensure that each leaf box contains at most `n_crit` points,
     /// assuming a uniform distribution of points.
     ///
@@ -392,10 +441,13 @@ where
     ///   all points.
     ///
     pub fn new(
+        root: Option<MortonKey<T>>,
         coordinates_row_major: &[T],
         depth: u64,
         prune_empty: bool,
         domain: Option<Domain<T>>,
+        global_indices: Option<Vec<usize>>,
+        rank: i32
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
         let dim = 3;
 
@@ -408,21 +460,24 @@ where
             (true, true, true, true) => {
                 let n_coords = coords_len / dim;
                 let domain = domain.unwrap_or(Domain::from_local_points(coordinates_row_major));
-                let global_indices = (0..n_coords).collect_vec();
+                let global_indices = global_indices.unwrap_or((0..n_coords).collect_vec());
 
                 SingleNodeTree::uniform_tree_pruned(
+                    root,
                     coordinates_row_major,
                     &domain,
                     depth,
                     &global_indices,
+                    rank
                 )
             }
             (true, true, true, false) => {
                 let n_coords = coords_len / dim;
                 let domain = domain.unwrap_or(Domain::from_local_points(coordinates_row_major));
-                let global_indices = (0..n_coords).collect_vec();
+                // let global_indices = (0..n_coords).collect_vec();
+                let global_indices = global_indices.unwrap_or((0..n_coords).collect_vec());
 
-                SingleNodeTree::uniform_tree(coordinates_row_major, &domain, depth, &global_indices)
+                SingleNodeTree::uniform_tree(coordinates_row_major, &domain, depth, &global_indices, rank)
             }
 
             (false, _, _, _) => {
@@ -488,6 +543,48 @@ where
         unmapped
     }
 
+    pub fn assign_nodes_to_points_new(nodes: &MortonKeys<T>, points: &mut Points<T>) -> (MortonKeys<T>, HashMap<MortonKey<T>, Vec<usize>>) {
+        let mut map: HashMap<MortonKey<_>, bool> = HashMap::new();
+
+        let mut index_map = HashMap::new();
+
+        for node in nodes.iter() {
+            map.insert(*node, false);
+        }
+
+        for node in nodes.iter() {
+            index_map.insert(*node, Vec::new());
+        }
+
+        for (point_index, point) in points.iter_mut().enumerate() {
+            // Ancestor could be the key itself
+            if let Some(ancestor) = point
+                .base_key
+                .ancestors()
+                .into_iter()
+                .sorted()
+                .rev()
+                .find(|a| map.contains_key(a))
+            {
+                point.encoded_key = ancestor;
+                map.insert(ancestor, true);
+                index_map.get_mut(&ancestor).unwrap().push(point_index)
+            }
+        }
+
+        index_map.retain(|_, v| !v.is_empty());
+
+        let mut unmapped = MortonKeys::new();
+
+        for (node, is_mapped) in map.iter() {
+            if !is_mapped {
+                unmapped.push(*node)
+            }
+        }
+
+        (unmapped, index_map)
+    }
+
     /// Completes a minimal tree structure by filling gaps between a given set of `seed` octants.
     ///
     /// Seeds are a set of octants that serve as the starting points for building the complete tree,
@@ -495,7 +592,7 @@ where
     /// in the gaps.
     ///
     /// Operates in-place to ensure that the tree structure represents a continuous space, without gaps,
-    /// encompassing all the provided seed octants. This process involves adding any necessary intermediate
+    /// encompassing all the provided seed octants. This rankess involves adding any necessary intermediate
     /// nodes to bridge the gaps between the initially disjoint seed octants, resulting in a coherent,
     /// minimal 'block' tree that spans the seeds' collective domain, by a set of 'blocks' which are the
     /// largest possible nodes, specified by Morton key, that span the domain specified by the seeds.
@@ -507,7 +604,7 @@ where
     ///
     /// - `seeds` - Mutable reference to a collection of seed octants.
     pub fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
-        let root = MortonKey::root();
+        let root = MortonKey::root(seeds[0].rank);
 
         let ffc_root = root.finest_first_child();
         let min = seeds.iter().min().unwrap();
@@ -653,7 +750,7 @@ where
     }
 }
 
-impl<T> Tree for SingleNodeTree<T>
+impl<T> SingleNodeTree for SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {
@@ -772,7 +869,7 @@ mod test {
 
         // Test uniformly distributed data
         let points = points_fixture(n_points, Some(-1.0), Some(1.0), None);
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None);
+        let tree = SingleNodeTree::<f64>::new(None, points.data(), depth, false, None, None, 0);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -790,7 +887,7 @@ mod test {
 
         // Test a column distribution of data
         let points = points_fixture_col::<f64>(n_points);
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None).unwrap();
+        let tree = SingleNodeTree::<f64>::new(None, points.data(), depth, false, None, None, 0).unwrap();
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -833,7 +930,7 @@ mod test {
 
     #[test]
     pub fn test_assign_nodes_to_points() {
-        let root = MortonKey::<f64>::root();
+        let root = MortonKey::<f64>::root(0);
 
         // Generate points in a single octant of the domain
         let n_points = 10;
@@ -843,7 +940,7 @@ mod test {
         let mut tmp = Points::default();
         for i in 0..n_points {
             let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
-            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL, 0);
             tmp.push(Point {
                 coordinate: point,
                 base_key: key,
@@ -883,7 +980,7 @@ mod test {
 
     #[test]
     pub fn test_split_blocks() {
-        let root = MortonKey::root();
+        let root = MortonKey::root(0);
         let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);
         let n_points = 10000;
         let points = points_fixture(n_points, None, None, None);
@@ -892,7 +989,7 @@ mod test {
 
         for i in 0..n_points {
             let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
-            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL, 0);
             tmp.push(Point {
                 coordinate: point,
                 base_key: key,
@@ -930,7 +1027,7 @@ mod test {
 
     #[test]
     fn test_complete_blocktree() {
-        let root = MortonKey::root();
+        let root = MortonKey::root(0);
 
         let a = root.first_child();
         let b = *root.children().last().unwrap();
@@ -957,7 +1054,7 @@ mod test {
         let n_points = 10000;
         let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None).unwrap();
+        let tree = SingleNodeTree::<f64>::new(None, points.data(), depth, false, None, None, 0).unwrap();
 
         let keys = tree.all_keys().unwrap();
 
@@ -993,7 +1090,7 @@ mod test {
         let n_points = 10000;
         let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None).unwrap();
+        let tree = SingleNodeTree::<f64>::new(None, points.data(), depth, false, None, None, 0).unwrap();
 
         let keys = tree.keys(3).unwrap();
 

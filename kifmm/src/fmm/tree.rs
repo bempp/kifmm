@@ -4,7 +4,7 @@ use rlst::RlstScalar;
 
 use crate::{
     fmm::types::SingleNodeFmmTree,
-    traits::tree::{FmmTree, Tree},
+    traits::tree::{FmmTree, SingleNodeTree},
     tree::types::SingleNodeTree,
 };
 
@@ -22,14 +22,14 @@ where
         &self.target_tree
     }
 
-    fn domain(&self) -> &<Self::Tree as Tree>::Domain {
+    fn domain(&self) -> &<Self::Tree as SingleNodeTree>::Domain {
         &self.domain
     }
 
     fn near_field(
         &self,
-        leaf: &<Self::Tree as Tree>::Node,
-    ) -> Option<Vec<<Self::Tree as Tree>::Node>> {
+        leaf: &<Self::Tree as SingleNodeTree>::Node,
+    ) -> Option<Vec<<Self::Tree as SingleNodeTree>::Node>> {
         // Get the all_keys_set if it exists
         self.source_tree().all_keys_set().map(|all_keys_set| {
             // Collect neighbors that exist in the all_keys_set and push the leaf into the vector
