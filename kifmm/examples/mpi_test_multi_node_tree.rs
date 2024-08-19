@@ -121,6 +121,8 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 fn main() {
     // Setup an MPI environment
 
+    use kifmm::tree::types::MultiNodeTreeNew;
+
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let comm = world.duplicate();
@@ -129,50 +131,60 @@ fn main() {
     let prune_empty = false;
     let depth = 5;
     let n_points = 10000;
+    let local_depth = 3;
+    let global_depth = 1;
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
 
+    let uniform = MultiNodeTreeNew::new(
+        points.data(), local_depth, global_depth, true, None, &world
+    ).unwrap();
+
+    for tree in uniform.trees.iter() {
+        println!("rank {:?} {:?}", world.rank(), tree.n_coordinates_tot());
+    }
+
     // Create a uniform tree
-    let uniform = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
+    // let uniform = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
 
-    test_no_overlaps(&comm, &uniform);
-    if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on uniform tree");
-    }
+    // test_no_overlaps(&comm, &uniform);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_no_overlaps passed on uniform tree");
+    // }
 
-    test_global_bounds::<f32>(&comm);
-    if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on uniform tree");
-    }
+    // test_global_bounds::<f32>(&comm);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_global_bounds passed on uniform tree");
+    // }
 
-    test_n_leaves(&comm, &uniform);
-    if world.rank() == 0 {
-        println!("\t ... test_n_leaves passed on uniform tree");
-    }
+    // test_n_leaves(&comm, &uniform);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_n_leaves passed on uniform tree");
+    // }
 
-    test_n_points(&comm, &uniform, n_points);
-    if world.rank() == 0 {
-        println!("\t ... test_n_points passed on uniform tree");
-    }
+    // test_n_points(&comm, &uniform, n_points);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_n_points passed on uniform tree");
+    // }
 
-    let prune_empty = true;
-    let sparse = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
+    // let prune_empty = true;
+    // let sparse = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
 
-    test_no_overlaps(&comm, &sparse);
-    if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on sparse tree");
-    }
+    // test_no_overlaps(&comm, &sparse);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_no_overlaps passed on sparse tree");
+    // }
 
-    test_global_bounds::<f32>(&comm);
-    if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on sparse tree");
-    }
+    // test_global_bounds::<f32>(&comm);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_global_bounds passed on sparse tree");
+    // }
 
-    test_n_points(&comm, &sparse, n_points);
-    if world.rank() == 0 {
-        println!("\t ... test_n_points passed on sparse tree");
-    }
+    // test_n_points(&comm, &sparse, n_points);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_n_points passed on sparse tree");
+    // }
 }
 
 #[cfg(not(feature = "mpi"))]

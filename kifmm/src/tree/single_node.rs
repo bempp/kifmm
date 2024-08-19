@@ -295,7 +295,7 @@ where
         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
         // Return tree in sorted order, by level and then by Morton key
-        for l in 0..=depth {
+        for l in root_level..=depth {
             let &(l, r) = levels_to_keys.get(&l).unwrap();
             let subset = &mut keys[l..r];
             subset.sort();
@@ -303,7 +303,7 @@ where
 
         let mut key_to_level_index = HashMap::new();
         // Compute key to level index
-        for l in 0..=depth {
+        for l in root_level..=depth {
             let &(l, r) = levels_to_keys.get(&l).unwrap();
             let keys = &keys[l..r];
             for (i, key) in keys.iter().enumerate() {
@@ -356,6 +356,7 @@ where
     pub fn from_roots(
         roots: &MortonKeys<T>,
         points: &mut Points<T>,
+        global_domain: &Domain<T>,
         global_depth: u64,
         local_depth: u64,
         prune_empty: bool,
@@ -368,34 +369,30 @@ where
         let depth = local_depth + global_depth;
 
         for root in roots.iter() {
-            // Assign points to each single node tree
-            let mut local_points = index_map
-                .get(root)
-                .unwrap()
-                .iter()
-                .map(|&i| points[i])
-                .collect_vec();
-            local_points.sort();
 
-            // Create new buffer containing local coordinates on this local tree
-            let local_coordinates = local_points.iter().flat_map(|p| p.coordinate).collect_vec();
+            if let Some(indices) = index_map.get(root) {
+                let mut local_points = indices.into_iter().map(|&i| points[i]).collect_vec();
+                local_points.sort();
 
-            let local_indices = Some(local_points.iter().map(|p| p.global_index).collect_vec());
+                // Create new buffer containing local coordinates on this local tree
+                let local_coordinates = local_points.iter().flat_map(|p| p.coordinate).collect_vec();
+                let local_indices = Some(local_points.iter().map(|p| p.global_index).collect_vec());
 
-            let local_domain = Some(Domain::from_local_points(&local_coordinates));
+                let tree = SingleNodeTree::new(
+                    &local_coordinates,
+                    depth,
+                    true,
+                    Some(*global_domain),
+                    Some(*root),
+                    local_indices,
+                    Some(rank),
+                )
+                .unwrap();
 
-            let tree = SingleNodeTree::new(
-                &local_coordinates,
-                depth,
-                true,
-                local_domain,
-                Some(*root),
-                local_indices,
-                Some(rank),
-            )
-            .unwrap();
+                result.push(tree)
 
-            result.push(tree)
+            }
+
         }
 
         result

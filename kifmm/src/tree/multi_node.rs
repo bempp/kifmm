@@ -24,7 +24,7 @@ impl<T, C: Communicator> MultiNodeTreeNew<T, C>
 where
     T: RlstScalar + Float + Equivalence + Default,
 {
-    fn uniform_tree(
+    pub fn uniform_tree(
         coordinates_row_major: &[T],
         &domain: &Domain<T>,
         local_depth: u64,
@@ -64,43 +64,59 @@ where
         let mut leaves = MortonKeys::from(leaves);
         leaves.complete();
 
-        // Find the seeds (coarsest leaves) on each processor
-        let mut seeds = SingleNodeTree::<T>::find_seeds(&leaves);
-
-        // Compute the minimum spanning block tree
-        let block_tree = Self::complete_block_tree(&mut seeds, rank, size, world);
-
-        // Transfer points below minimum seed to previous processor
-        Self::transfer_points_to_blocktree(world, &points, &seeds, &rank, &size);
-
-        // Morton sort over local points after transfer
-        points.sort();
-
-        // Split blocks to required depth, defines roots of all local single node trees
-        let mut roots_parents = MortonKeys::new();
-        for block in block_tree.iter() {
-            let level_diff = global_depth - block.level();
-            roots_parents.append(&mut block.descendants(level_diff).unwrap())
-        }
-
         // These define all the single node trees to be constructed
-        let roots = MortonKeys::from(
-            roots_parents
-                .into_iter()
-                .flat_map(|parent| parent.children())
-                .collect_vec(),
-        );
         let trees =
-            SingleNodeTree::from_roots(&roots, &mut points, global_depth, local_depth, true, rank);
+            SingleNodeTree::from_roots(&leaves, &mut points, &domain, global_depth, local_depth, true, rank);
+
+        let ffc = leaves[0].finest_first_child();
+        let flc = leaves.last().unwrap().finest_last_child();
 
         Ok(MultiNodeTreeNew {
             world: world.duplicate(),
             rank,
-            range: [0, 0, 0],
+            range: [ffc.morton, flc.morton],
             global_depth,
             local_depth,
             trees,
         })
+    }
+
+    pub fn new(
+        coordinates_row_major: &[T],
+        local_depth: u64,
+        global_depth: u64,
+        prune_empty: bool,
+        domain: Option<Domain<T>>,
+        world: &C,
+    ) -> Result<MultiNodeTreeNew<T, SimpleCommunicator>, std::io::Error> {
+        let dim = 3;
+        let coords_len = coordinates_row_major.len();
+
+        if !coordinates_row_major.is_empty() && coords_len & dim == 0 {
+            let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, world));
+            let n_coords = coords_len / dim;
+
+            // Calculate subcommunicator size for hyksort
+            let hyksort_subcomm_size = 2;
+
+            // Assign global indices
+            let global_indices = global_indices(n_coords, world);
+
+            return MultiNodeTreeNew::uniform_tree(
+                coordinates_row_major,
+                &domain,
+                local_depth,
+                global_depth,
+                &global_indices,
+                world,
+                hyksort_subcomm_size,
+            );
+        }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "Invalid points format",
+        ))
     }
 
     fn complete_block_tree(
