@@ -11,11 +11,8 @@ use crate::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex, types::FmmOperatorTime,
     },
-    tree::types::{Domain, MortonKey, SingleNodeTree},
+    tree::types::{Domain, MortonKey, MultiNodeTreeNew, SingleNodeTree},
 };
-
-#[cfg(feature = "mpi")]
-use crate::tree::types::MultiNodeTree;
 
 #[cfg(feature = "mpi")]
 use mpi::traits::{Communicator, Equivalence};
@@ -290,6 +287,27 @@ where
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
 }
+
+#[cfg(feature = "mpi")]
+#[allow(clippy::type_complexity)]
+#[derive(Default)]
+pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, C>
+where
+    Scalar: RlstScalar + Equivalence + Float,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
+    SourceToTargetData: SourceToTargetDataTrait,
+    <Scalar as RlstScalar>::Real: Default + Equivalence,
+    C: Communicator + Default,
+    MultiNodeFmmTree<Scalar, C>: Default,
+{
+    pub isa: Isa,
+    pub communicator: C,
+    pub rank: i32,
+    pub kernel: Kernel,
+    pub tree: MultiNodeFmmTree<Scalar, C>,
+    pub fmms: Vec<KiFmm<Scalar, Kernel, SourceToTargetData>>,
+}
+
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
@@ -541,9 +559,9 @@ pub struct SingleNodeFmmTree<T: RlstScalar + Float + Default> {
 #[cfg(feature = "mpi")]
 pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator> {
     /// An octree structure containing the source points for the FMM calculation.
-    pub source_tree: MultiNodeTree<T, C>,
+    pub source_tree: MultiNodeTreeNew<T, C>,
     /// An octree structure containing the target points for the FMM calculation.
-    pub target_tree: MultiNodeTree<T, C>,
+    pub target_tree: MultiNodeTreeNew<T, C>,
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T>,
 }

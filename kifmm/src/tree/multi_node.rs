@@ -1,6 +1,6 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
 use crate::{
-    traits::tree::Tree,
+    traits::tree::{MultiNodeTreeTrait, SingleNodeTreeTrait},
     tree::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
@@ -65,8 +65,15 @@ where
         leaves.complete();
 
         // These define all the single node trees to be constructed
-        let trees =
-            SingleNodeTree::from_roots(&leaves, &mut points, &domain, global_depth, local_depth, true, rank);
+        let trees = SingleNodeTree::from_roots(
+            &leaves,
+            &mut points,
+            &domain,
+            global_depth,
+            local_depth,
+            true,
+            rank,
+        );
 
         let ffc = leaves[0].finest_first_child();
         let flc = leaves.last().unwrap().finest_last_child();
@@ -238,6 +245,21 @@ where
     }
 }
 
+impl<T, C> MultiNodeTreeTrait for MultiNodeTreeNew<T, C>
+where
+    T: RlstScalar + Default + Float + Equivalence,
+    C: Communicator + Default,
+{
+    type Tree = SingleNodeTree<T>;
+
+    fn rank(&self) -> i32 {
+        self.rank
+    }
+
+    fn trees<'a>(&'a self) -> &'a [Self::Tree] {
+        self.trees.as_ref()
+    }
+}
 // impl<T, C: Communicator> MultiNodeTree<T, C>
 // where
 //     T: RlstScalar + Float + Equivalence + Default,
@@ -866,7 +888,7 @@ fn global_indices(n_points: usize, comm: &impl Communicator) -> Vec<usize> {
     global_indices
 }
 
-impl<T, C: Communicator> Tree for MultiNodeTree<T, C>
+impl<T, C: Communicator> SingleNodeTreeTrait for MultiNodeTree<T, C>
 where
     T: RlstScalar + Float + Equivalence,
 {

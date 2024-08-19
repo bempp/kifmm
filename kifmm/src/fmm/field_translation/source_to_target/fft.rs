@@ -22,7 +22,7 @@ use crate::{
         fftw::Dft,
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Hadamard8x8},
-        tree::{FmmTree, Tree},
+        tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
         types::FmmError,
     },
     tree::{

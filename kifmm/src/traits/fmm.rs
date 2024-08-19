@@ -1,9 +1,12 @@
 //! FMM traits
-use crate::traits::tree::FmmTree;
+use crate::traits::tree::SingleNodeFmmTreeTrait;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{tree::Tree, types::FmmError};
+use super::{
+    tree::{MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeTreeTrait},
+    types::FmmError,
+};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -70,7 +73,7 @@ where
     type Scalar;
 
     /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
-    type Tree: FmmTree;
+    type Tree: SingleNodeFmmTreeTrait;
 
     /// Kernel associated with this FMMl
     type Kernel: Kernel<T = Self::Scalar>;
@@ -80,7 +83,7 @@ where
     /// * `key` - The source node.
     fn multipole(
         &self,
-        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        key: &<<Self::Tree as SingleNodeFmmTreeTrait>::Tree as SingleNodeTreeTrait>::Node,
     ) -> Option<&[Self::Scalar]>;
 
     /// Get the multipole expansion data associated with a tree level as a slice
@@ -91,8 +94,10 @@ where
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
-    fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node)
-        -> Option<&[Self::Scalar]>;
+    fn local(
+        &self,
+        key: &<<Self::Tree as SingleNodeFmmTreeTrait>::Tree as SingleNodeTreeTrait>::Node,
+    ) -> Option<&[Self::Scalar]>;
 
     /// Get the local expansion data associated with a tree level as a slice
     /// # Arguments
@@ -104,7 +109,7 @@ where
     /// * `key` - The target leaf node.
     fn potential(
         &self,
-        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        leaf: &<<Self::Tree as SingleNodeFmmTreeTrait>::Tree as SingleNodeTreeTrait>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get all potential data at all particles, stored in order by global index
@@ -142,6 +147,29 @@ where
     /// # Arguments
     /// * `charges` - new charge data.
     fn clear(&mut self, charges: &[Self::Scalar]);
+}
+
+pub trait MultiNodeFmm
+where
+    Self::Scalar: RlstScalar,
+{
+    /// Data associated with FMM, must implement RlstScalar.
+    type Scalar;
+
+    /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
+    type Tree: MultiNodeFmmTreeTrait;
+
+    /// Kernel associated with this FMMl
+    type Kernel: Kernel<T = Self::Scalar>;
+
+    /// Get the kernel associated with this FMM
+    fn kernel(&self) -> &Self::Kernel;
+
+    /// Get the dimension of the data in this FMM
+    fn dim(&self) -> usize;
+
+    /// Evaluate the potentials, or potential gradients, for this FMM
+    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 }
 
 /// Set all metadata required for FMMs

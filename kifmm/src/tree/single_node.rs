@@ -8,7 +8,7 @@ use itertools::Itertools;
 use rlst::RlstScalar;
 
 use crate::{
-    traits::tree::Tree,
+    traits::tree::SingleNodeTreeTrait,
     tree::{
         constants::{DEEPEST_LEVEL, LEVEL_SIZE},
         morton::encode_anchor,
@@ -369,13 +369,13 @@ where
         let depth = local_depth + global_depth;
 
         for root in roots.iter() {
-
             if let Some(indices) = index_map.get(root) {
                 let mut local_points = indices.into_iter().map(|&i| points[i]).collect_vec();
                 local_points.sort();
 
                 // Create new buffer containing local coordinates on this local tree
-                let local_coordinates = local_points.iter().flat_map(|p| p.coordinate).collect_vec();
+                let local_coordinates =
+                    local_points.iter().flat_map(|p| p.coordinate).collect_vec();
                 let local_indices = Some(local_points.iter().map(|p| p.global_index).collect_vec());
 
                 let tree = SingleNodeTree::new(
@@ -390,9 +390,7 @@ where
                 .unwrap();
 
                 result.push(tree)
-
             }
-
         }
 
         result
@@ -758,7 +756,7 @@ where
     }
 }
 
-impl<T> Tree for SingleNodeTree<T>
+impl<T> SingleNodeTreeTrait for SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {

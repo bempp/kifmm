@@ -6,7 +6,7 @@ use rlst::RlstScalar;
 use num::traits::Float;
 
 /// Interface for single node trees
-pub trait Tree {
+pub trait SingleNodeTreeTrait {
     /// Scalar type
     type Scalar: RlstScalar + Float;
 
@@ -98,13 +98,21 @@ pub trait Tree {
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 }
 
+pub trait MultiNodeTreeTrait {
+    type Tree: SingleNodeTreeTrait;
+
+    fn rank(&self) -> i32;
+
+    fn trees<'a>(&'a self) -> &'a [Self::Tree];
+}
+
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
-pub trait FmmTree
+pub trait SingleNodeFmmTreeTrait
 where
-    Self::Tree: Tree,
+    Self::Tree: SingleNodeTreeTrait,
 {
     /// Tree associated with this FMM tree
-    type Tree: Tree;
+    type Tree: SingleNodeTreeTrait;
 
     /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
@@ -113,13 +121,26 @@ where
     fn target_tree(&self) -> &Self::Tree;
 
     /// Get the domain
-    fn domain(&self) -> &<Self::Tree as Tree>::Domain;
+    fn domain(&self) -> &<Self::Tree as SingleNodeTreeTrait>::Domain;
 
     /// Get the near field of a leaf node
     fn near_field(
         &self,
-        leaf: &<Self::Tree as Tree>::Node,
-    ) -> Option<Vec<<Self::Tree as Tree>::Node>>;
+        leaf: &<Self::Tree as SingleNodeTreeTrait>::Node,
+    ) -> Option<Vec<<Self::Tree as SingleNodeTreeTrait>::Node>>;
+}
+
+pub trait MultiNodeFmmTreeTrait
+where
+    Self::Tree: MultiNodeTreeTrait,
+{
+    type Tree: MultiNodeTreeTrait;
+
+    fn rank(&self) -> i32;
+
+    fn source_tree(&self) -> &Self::Tree;
+
+    fn target_tree(&self) -> &Self::Tree;
 }
 
 /// Interface for tree nodes

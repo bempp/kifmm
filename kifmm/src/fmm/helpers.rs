@@ -10,7 +10,7 @@ use rlst::{
 
 use crate::{
     fmm::types::SendPtrMut,
-    traits::tree::{FmmTreeNode, Tree},
+    traits::tree::{FmmTreeNode, SingleNodeTreeTrait},
     tree::types::{MortonKey, SingleNodeTree},
 };
 

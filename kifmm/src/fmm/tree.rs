@@ -1,14 +1,39 @@
 //! Implementation of FMM compatible trees
+use mpi::traits::{Communicator, Equivalence};
 use num::traits::Float;
 use rlst::RlstScalar;
 
 use crate::{
     fmm::types::SingleNodeFmmTree,
-    traits::tree::{FmmTree, Tree},
+    traits::tree::{
+        MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait,
+    },
+    tree::types::MultiNodeTreeNew,
     tree::types::SingleNodeTree,
+    MultiNodeFmmTree,
 };
 
-impl<T> FmmTree for SingleNodeFmmTree<T>
+impl<T, C> MultiNodeFmmTreeTrait for MultiNodeFmmTree<T, C>
+where
+    T: RlstScalar + Float + Default + Equivalence,
+    C: Communicator + Default,
+{
+    type Tree = MultiNodeTreeNew<T, C>;
+
+    fn rank(&self) -> i32 {
+        self.source_tree.rank
+    }
+
+    fn target_tree(&self) -> &Self::Tree {
+        &self.target_tree
+    }
+
+    fn source_tree(&self) -> &Self::Tree {
+        &self.source_tree
+    }
+}
+
+impl<T> SingleNodeFmmTreeTrait for SingleNodeFmmTree<T>
 where
     T: RlstScalar + Float + Default,
 {
@@ -22,14 +47,14 @@ where
         &self.target_tree
     }
 
-    fn domain(&self) -> &<Self::Tree as Tree>::Domain {
+    fn domain(&self) -> &<Self::Tree as SingleNodeTreeTrait>::Domain {
         &self.domain
     }
 
     fn near_field(
         &self,
-        leaf: &<Self::Tree as Tree>::Node,
-    ) -> Option<Vec<<Self::Tree as Tree>::Node>> {
+        leaf: &<Self::Tree as SingleNodeTreeTrait>::Node,
+    ) -> Option<Vec<<Self::Tree as SingleNodeTreeTrait>::Node>> {
         // Get the all_keys_set if it exists
         self.source_tree().all_keys_set().map(|all_keys_set| {
             // Collect neighbors that exist in the all_keys_set and push the leaf into the vector

@@ -17,7 +17,7 @@ use crate::{
         },
         fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
-        tree::{FmmTree, Tree},
+        tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
     },
     tree::{types::Domain, SingleNodeTree},
 };
