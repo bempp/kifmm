@@ -74,7 +74,7 @@
 //!
 //! ## References
 //! \[1\] Ying, L., Biros, G., & Zorin, D. (2004). A kernel-independent adaptive fast multipole algorithm in two and three dimensions. Journal of Computational Physics, 196(2), 591-626.
-#![cfg_attr(feature = "strict", deny(warnings))]
+#![cfg_attr(feature = "strict", deny(warnings), deny(unused_crate_dependencies))]
 #![warn(missing_docs)]
 #![allow(clippy::doc_lazy_continuation)]
 #![allow(clippy::macro_metavars_in_unsafe)]
@@ -109,3 +109,8 @@ pub use traits::fmm::Fmm;
 #[cfg_attr(feature = "strict", deny(warnings))]
 #[warn(missing_docs)]
 pub mod bindings;
+
+#[cfg(test)]
+mod test {
+    use criterion as _; // Hack to show that criterion is used, as cargo test does not see benches
+}
