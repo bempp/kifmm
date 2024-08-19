@@ -50,29 +50,59 @@ where
 
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
         // Run upward pass on local trees
-        for fmm in self.fmms.iter() {
-            fmm.p2m()?;
-        }
-
-        for level in (self.tree.source_tree.global_depth
-            ..(self.tree.source_tree.global_depth + self.tree.source_tree.local_depth))
-            .rev()
         {
             for fmm in self.fmms.iter() {
-                fmm.m2m(level)?;
+                fmm.p2m()?;
+            }
+
+            for level in (self.tree.source_tree.global_depth
+                ..(self.tree.source_tree.global_depth + self.tree.source_tree.local_depth))
+                .rev()
+            {
+                for fmm in self.fmms.iter() {
+                    fmm.m2m(level)?;
+                }
             }
         }
 
         // At this point the exchange needs to happen of multipole data
-        {}
+        {
+            // 1. Gather ranges on other processes
 
-        // Now can proceed with remainder of the upward pass on chosen node
-        {}
+            // 2. Form packets
 
-        // Now send multipole data to all local trees
-        {}
+            // 3. Exchange packets (point to point)
 
-        // Now remainder of downward pass can happen in parallel
+            // 4. Pass all root multipole data to root node so that final part of upward pass can occur on root node
+        }
+
+        // Now can proceed with remainder of the upward pass on chosen node, and some of the downward pass
+        {
+            if self.communicator.rank() == 0 {
+                // Global upward pass
+                for level in (1..self.tree.source_tree.global_depth).rev() {
+                    for fmm in self.fmms.iter() {
+                        fmm.m2m(level)?;
+                    }
+                }
+
+                // Global downward pass
+                for level in 2..=self.tree.target_tree.global_depth {
+                    if level > 2 {
+                        for fmm in self.fmms.iter() {
+                            fmm.l2l(level)?;
+                        }
+                    }
+                    for fmm in self.fmms.iter() {
+                        fmm.m2l(level)?;
+                    }
+                }
+            }
+
+            // Exchange root multipole data back to required MPI processes
+        }
+
+        // Now remainder of downward pass can happen in parallel on each process
         {}
 
         Ok(())
