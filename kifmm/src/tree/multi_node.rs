@@ -1,10 +1,9 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
 use crate::{
-    traits::tree::{MultiNodeTreeTrait, SingleNodeTreeTrait},
-    tree::{
+    samplesort::samplesort, traits::tree::{MultiNodeTreeTrait, SingleNodeTreeTrait}, tree::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
-    },
+    }
 };
 
 use crate::hyksort::hyksort;
@@ -57,12 +56,13 @@ where
 
         // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
-        hyksort(&mut points, hyksort_subcomm_size, comm)?;
+        // hyksort(&mut points, hyksort_subcomm_size, comm)?;
+        samplesort(&mut points, &comm, 500).unwrap();
 
         // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
-        let mut leaves = MortonKeys::from(leaves);
-        leaves.complete();
+        let leaves = MortonKeys::from(leaves);
+        // leaves.complete();
 
         // These define all the single node trees to be constructed
         let trees = SingleNodeTree::from_roots(

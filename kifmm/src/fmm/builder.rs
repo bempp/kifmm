@@ -357,6 +357,7 @@ where
                 Some(domain),
                 world,
             )?;
+
             let target_tree = MultiNodeTreeNew::new(
                 targets,
                 local_depth,
