@@ -75,13 +75,9 @@ where
             rank,
         );
 
-        let ffc = leaves[0].finest_first_child();
-        let flc = leaves.last().unwrap().finest_last_child();
-
         Ok(MultiNodeTreeNew {
             world: world.duplicate(),
             rank,
-            range: [ffc.morton, flc.morton],
             global_depth,
             local_depth,
             trees,
@@ -248,7 +244,7 @@ where
 impl<T, C> MultiNodeTreeTrait for MultiNodeTreeNew<T, C>
 where
     T: RlstScalar + Default + Float + Equivalence,
-    C: Communicator + Default,
+    C: Communicator,
 {
     type Tree = SingleNodeTree<T>;
 
@@ -258,6 +254,10 @@ where
 
     fn trees<'a>(&'a self) -> &'a [Self::Tree] {
         self.trees.as_ref()
+    }
+
+    fn n_roots(&self) -> usize {
+        self.trees.len()
     }
 }
 // impl<T, C: Communicator> MultiNodeTree<T, C>

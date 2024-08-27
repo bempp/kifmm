@@ -170,6 +170,16 @@ where
 
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    fn exchange_multipoles(&mut self);
+
+    fn equivalent_surface_order(&self, level: u64) -> usize;
+
+    fn check_surface_order(&self, level: u64) -> usize;
+
+    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
+
+    fn ncoeffs_check_surface(&self, level: u64) -> usize;
 }
 
 /// Set all metadata required for FMMs

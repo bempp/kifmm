@@ -188,9 +188,6 @@ where
     /// MPI Rank
     pub rank: i32,
 
-    /// Range of leaf keys at this processor, and their current rank [rank, min, max]
-    pub range: [u64; 2],
-
     /// Depth of the global tree
     pub global_depth: u64,
 

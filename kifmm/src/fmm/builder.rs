@@ -1,8 +1,13 @@
 //! Builder objects to construct FMMs
-use std::collections::HashSet;
+use std::{collections::HashSet, marker::PhantomData};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
+use mpi::{
+    topology::SimpleCommunicator,
+    traits::{Communicator, Equivalence},
+};
+use num::Float;
 use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
@@ -17,10 +22,18 @@ use crate::{
         },
         fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
-        tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
+        tree::{
+            MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait,
+        },
     },
-    tree::{types::Domain, SingleNodeTree},
+    tree::{
+        types::{Domain, MultiNodeTreeNew},
+        MultiNodeTree, SingleNodeTree,
+    },
+    MultiNodeFmmTree,
 };
+
+use super::types::{KiFmmMultiNode, MultiNodeBuilder};
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
@@ -267,6 +280,193 @@ where
             result.target();
             result.source_to_target();
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
+            result.displacements();
+
+            Ok(result)
+        }
+    }
+}
+
+impl<Scalar, Kernel, SourceToTargetData> MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default + Equivalence + Float,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    Kernel: KernelTrait<T = Scalar> + Clone + HomogenousKernel + Clone + Default,
+    SourceToTargetData: SourceToTargetDataTrait,
+    KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>:
+        SourceAndTargetTranslationMetadata + SourceToTargetTranslationMetadata, //     + FmmMetadata<Scalar = Scalar>,
+{
+    pub fn new() -> Self {
+        Self {
+            domain: None,
+            tree: None,
+            communicator: None,
+            equivalent_surface_order: None,
+            isa: None,
+            source_to_target: None,
+            check_surface_order: None,
+            ncoeffs_check_surface: None,
+            ncoeffs_equivalent_surface: None,
+            kernel_eval_type: None,
+            fmm_eval_type: None,
+            charges: None,
+            kernel: None,
+            nfmms: None,
+        }
+    }
+
+    pub fn tree(
+        mut self,
+        sources: &[Scalar::Real],
+        targets: &[Scalar::Real],
+        local_depth: u64,
+        global_depth: u64,
+        prune_empty: bool,
+        world: &SimpleCommunicator,
+    ) -> Result<Self, std::io::Error> {
+        let dim = 3;
+        let nsources = sources.len() / dim;
+        let ntargets = targets.len() / dim;
+
+        let dims = sources.len() % dim;
+        let dimt = targets.len() % dim;
+
+        if dims != 0 || dimt != 0 {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Only 3D FMM supported",
+            ))
+        } else if nsources == 0 || ntargets == 0 {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Must have a positive number of source or target particles",
+            ))
+        } else {
+            // Source and target trees calcualted over the same domain
+            let source_domain = Domain::from_global_points(sources, world);
+            let target_domain = Domain::from_global_points(targets, world);
+
+            // Calculate union of domains for source and target points, needed to define operators
+            let domain = source_domain.union(&target_domain);
+
+            let source_tree = MultiNodeTreeNew::new(
+                sources,
+                local_depth,
+                global_depth,
+                prune_empty,
+                Some(domain),
+                world,
+            )?;
+            let target_tree = MultiNodeTreeNew::new(
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                Some(domain),
+                world,
+            )?;
+
+            let fmm_tree = MultiNodeFmmTree {
+                source_tree,
+                target_tree,
+                domain,
+            };
+
+            self.communicator = Some(world.duplicate());
+            self.nfmms = Some(fmm_tree.n_source_trees());
+            self.tree = Some(fmm_tree);
+            Ok(self)
+        }
+    }
+
+    pub fn parameters(
+        mut self,
+        expansion_order: usize,
+        kernel: Kernel,
+        source_to_target: SourceToTargetData,
+    ) -> Result<Self, std::io::Error> {
+        if self.tree.is_none() {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must build tree before specifying FMM parameters",
+            ))
+        } else {
+            // TODO: Mapping of global indices needs to happen here eventually.
+            self.ncoeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
+            self.ncoeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
+
+            self.kernel = Some(kernel);
+            self.fmm_eval_type = Some(FmmEvalType::Vector);
+            self.kernel_eval_type = Some(EvalType::Value);
+            self.isa = Some(Isa::new());
+            self.source_to_target = Some(source_to_target);
+            self.equivalent_surface_order = Some(expansion_order);
+            self.check_surface_order = Some(expansion_order);
+            Ok(self)
+        }
+    }
+
+    pub fn build(
+        self,
+    ) -> Result<
+        KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>,
+        std::io::Error,
+    > {
+        if self.tree.is_none() {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must create a tree, and FMM metadata before building",
+            ))
+        } else {
+            let kernel = self.kernel.unwrap();
+            let communicator = self.communicator.unwrap();
+            let rank = communicator.rank();
+
+            let mut result = KiFmmMultiNode {
+                isa: self.isa.unwrap(),
+                communicator,
+                nfmms: self.nfmms.unwrap(),
+                rank,
+                kernel,
+                tree: self.tree.unwrap(),
+                equivalent_surface_order: self.equivalent_surface_order.unwrap(),
+                check_surface_order: self.check_surface_order.unwrap(),
+                ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
+                ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
+                source_to_target: self.source_to_target.unwrap(),
+                fmm_eval_type: self.fmm_eval_type.unwrap(),
+                kernel_eval_type: self.kernel_eval_type.unwrap(),
+                charges: Vec::default(),
+                kernel_eval_size: 1,
+                charge_index_pointers_sources: Vec::default(),
+                charge_index_pointers_targets: Vec::default(),
+                leaf_upward_check_surfaces_sources: Vec::default(),
+                leaf_downward_equivalent_surfaces_targets: Vec::default(),
+                leaf_upward_equivalent_surfaces_sources: Vec::default(),
+                leaf_scales_sources: Vec::default(),
+                uc2e_inv_1: Vec::default(),
+                uc2e_inv_2: Vec::default(),
+                dc2e_inv_1: Vec::default(),
+                dc2e_inv_2: Vec::default(),
+                source: Vec::default(),
+                source_vec: Vec::default(),
+                target_vec: Vec::default(),
+                multipoles: Vec::default(),
+                locals: Vec::default(),
+                potentials: Vec::default(),
+                leaf_multipoles: Vec::default(),
+                level_multipoles: Vec::default(),
+                leaf_locals: Vec::default(),
+                level_locals: Vec::default(),
+                level_index_pointer_locals: Vec::default(),
+                level_index_pointer_multipoles: Vec::default(),
+                potentials_send_pointers: Vec::default(),
+            };
+
+            result.source();
+            result.target();
+            result.source_to_target();
+            // result.metadata();
             result.displacements();
 
             Ok(result)

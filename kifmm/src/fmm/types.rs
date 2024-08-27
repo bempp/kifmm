@@ -1,7 +1,8 @@
 //! Data structures for kernel independent FMM
-use std::{collections::HashMap, sync::RwLock};
+use std::{collections::HashMap, marker::PhantomData, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use mpi::topology::SimpleCommunicator;
 use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
@@ -290,22 +291,71 @@ where
 
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
-#[derive(Default)]
 pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, C>
 where
     Scalar: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
-    C: Communicator + Default,
-    MultiNodeFmmTree<Scalar, C>: Default,
+    C: Communicator,
 {
+    pub nfmms: usize,
     pub isa: Isa,
     pub communicator: C,
     pub rank: i32,
     pub kernel: Kernel,
-    pub tree: MultiNodeFmmTree<Scalar, C>,
-    pub fmms: Vec<KiFmm<Scalar, Kernel, SourceToTargetData>>,
+    pub tree: MultiNodeFmmTree<<Scalar as RlstScalar>::Real, C>,
+    pub charges: Vec<Vec<Scalar>>,
+    pub check_surface_order: usize,
+    pub equivalent_surface_order: usize,
+    pub ncoeffs_equivalent_surface: usize,
+    pub ncoeffs_check_surface: usize,
+    pub kernel_eval_type: EvalType,
+    pub fmm_eval_type: FmmEvalType,
+    pub kernel_eval_size: usize,
+    pub charge_index_pointers_sources: Vec<Vec<(usize, usize)>>, // One for each of nfmm
+    pub charge_index_pointers_targets: Vec<Vec<(usize, usize)>>,
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Vec<Scalar::Real>>,
+    pub leaf_upward_check_surfaces_sources: Vec<Vec<Scalar::Real>>,
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Vec<Scalar::Real>>,
+    pub leaf_scales_sources: Vec<Vec<Scalar>>,
+    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub source_to_target: SourceToTargetData,
+
+    pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+    pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+
+    // This will have to be re-allocated upon receiving ghost data, all of the stuff below, after point + multipoles have been
+    // exchanged.
+    // Multipole exchange should be done at trait level, over the kiFMM.
+    pub multipoles: Vec<Vec<Scalar>>, // outer FMM, inner each buffer
+    pub locals: Vec<Vec<Scalar>>,
+    pub potentials: Vec<Vec<Scalar>>,
+
+    /// Multipole expansions at leaf level
+    pub leaf_multipoles: Vec<Vec<SendPtrMut<Scalar>>>, // Outer: fmms, inner pointers
+
+    /// Multipole expansions at each level
+    pub level_multipoles: Vec<Vec<Vec<SendPtrMut<Scalar>>>>, // outer fmms, middle level, inner pointers
+
+    /// Local expansions at the leaf level
+    pub leaf_locals: Vec<Vec<SendPtrMut<Scalar>>>, // Same as leaf multipoles
+
+    /// The local expansion data at each level.
+    pub level_locals: Vec<Vec<Vec<SendPtrMut<Scalar>>>>, // same as level multipoles
+
+    /// Index pointers to each key at a given level, indexed by level.
+    pub level_index_pointer_locals: Vec<Vec<HashMap<MortonKey<Scalar::Real>, usize>>>, // outer fmm
+
+    /// Index pointers to each key at a given level, indexed by level.
+    pub level_index_pointer_multipoles: Vec<Vec<HashMap<MortonKey<Scalar::Real>, usize>>>, // outer fmm
+
+    /// The evaluated potentials at each target leaf box.
+    pub potentials_send_pointers: Vec<Vec<SendPtrMut<Scalar>>>, // outer fmm
 }
 
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -512,6 +562,51 @@ where
 
     /// Has depth or ncrit been set
     pub depth_set: Option<bool>,
+}
+
+#[derive(Default)]
+pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default + Equivalence,
+    Kernel: KernelTrait<T = Scalar> + Clone,
+    SourceToTargetData: SourceToTargetDataTrait,
+    <Scalar as RlstScalar>::Real: Default + Equivalence,
+{
+    /// Kernel
+    pub kernel: Option<Kernel>,
+
+    /// Tree
+    pub tree: Option<MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>>,
+
+    pub communicator: Option<SimpleCommunicator>,
+
+    pub domain: Option<Domain<Scalar::Real>>,
+
+    pub isa: Option<Isa>,
+
+    /// Data and metadata for field translations
+    pub source_to_target: Option<SourceToTargetData>,
+
+    pub equivalent_surface_order: Option<usize>,
+
+    pub check_surface_order: Option<usize>,
+
+    /// Number of coefficients
+    pub ncoeffs_equivalent_surface: Option<usize>,
+
+    /// Number of coefficients
+    pub ncoeffs_check_surface: Option<usize>,
+
+    /// Kernel eval type
+    pub kernel_eval_type: Option<EvalType>,
+
+    /// FMM eval type
+    pub fmm_eval_type: Option<FmmEvalType>,
+
+    /// Charges associated with each local FMM
+    pub charges: Option<Vec<Vec<Scalar>>>,
+
+    pub nfmms: Option<usize>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.

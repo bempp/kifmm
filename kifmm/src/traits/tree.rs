@@ -104,6 +104,8 @@ pub trait MultiNodeTreeTrait {
     fn rank(&self) -> i32;
 
     fn trees<'a>(&'a self) -> &'a [Self::Tree];
+
+    fn n_roots(&self) -> usize;
 }
 
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
@@ -141,6 +143,10 @@ where
     fn source_tree(&self) -> &Self::Tree;
 
     fn target_tree(&self) -> &Self::Tree;
+
+    fn n_source_trees(&self) -> usize;
+
+    fn n_target_trees(&self) -> usize;
 }
 
 /// Interface for tree nodes

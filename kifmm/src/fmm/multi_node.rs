@@ -1,12 +1,19 @@
 //! Multi Node FMM
 //! Single Node FMM
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-use mpi::traits::{Communicator, Equivalence};
+use itertools::Itertools;
+use mpi::{
+    datatype::PartitionMut,
+    topology::SimpleCommunicator,
+    traits::{Communicator, Equivalence},
+};
 use num::Float;
 use rlst::RlstScalar;
+
+use mpi::collective::CommunicatorCollectives;
 
 use crate::{
     fmm::types::{FmmEvalType, KiFmm},
@@ -21,6 +28,7 @@ use crate::{
         },
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
+    tree::types::MortonKey,
     Fmm, MultiNodeFmmTree,
 };
 
@@ -29,20 +37,18 @@ use super::{
     types::KiFmmMultiNode,
 };
 
-impl<Scalar, Kernel, SourceToTargetData, C> MultiNodeFmm
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, C>
+impl<Scalar, Kernel, SourceToTargetData> MultiNodeFmm
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslation + FmmOperatorData,
-    C: Communicator + Default,
-    MultiNodeFmmTree<Scalar, C>: Default,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
-    type Tree = MultiNodeFmmTree<Scalar, C>;
+    type Tree = MultiNodeFmmTree<Scalar, SimpleCommunicator>;
 
     fn dim(&self) -> usize {
         3
@@ -50,28 +56,12 @@ where
 
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
         // Run upward pass on local trees
-        {
-            for fmm in self.fmms.iter() {
-                fmm.p2m()?;
-            }
-
-            for level in (self.tree.source_tree.global_depth
-                ..(self.tree.source_tree.global_depth + self.tree.source_tree.local_depth))
-                .rev()
-            {
-                for fmm in self.fmms.iter() {
-                    fmm.m2m(level)?;
-                }
-            }
-        }
+        {}
 
         // At this point the exchange needs to happen of multipole data
         {
-            // 1. Gather ranges on other processes
-
-            // 2. Form packets
-
             // 3. Exchange packets (point to point)
+            // self.exchange_multipoles();
 
             // 4. Pass all root multipole data to root node so that final part of upward pass can occur on root node
         }
@@ -80,22 +70,11 @@ where
         {
             if self.communicator.rank() == 0 {
                 // Global upward pass
-                for level in (1..self.tree.source_tree.global_depth).rev() {
-                    for fmm in self.fmms.iter() {
-                        fmm.m2m(level)?;
-                    }
-                }
+                for level in (1..self.tree.source_tree.global_depth).rev() {}
 
                 // Global downward pass
                 for level in 2..=self.tree.target_tree.global_depth {
-                    if level > 2 {
-                        for fmm in self.fmms.iter() {
-                            fmm.l2l(level)?;
-                        }
-                    }
-                    for fmm in self.fmms.iter() {
-                        fmm.m2l(level)?;
-                    }
+                    if level > 2 {}
                 }
             }
 
@@ -103,12 +82,124 @@ where
         }
 
         // Now remainder of downward pass can happen in parallel on each process
-        {}
+        {
+            // local leaf level operations
+            // fmm.p2p()?;
+            // fmm.l2p()?;
+        }
 
         Ok(())
     }
 
     fn kernel(&self) -> &Self::Kernel {
         &self.kernel
+    }
+
+    fn exchange_multipoles(&mut self) {
+        // let rank = self.rank;
+        // let size = self.communicator.size();
+
+        // // 1. Gather ranges on all processes (should be defined also by interaction lists)
+        // let mut all_ranges = vec![0u64; (size as usize) * 2];
+
+        // {
+        //     // let ranges = self.ranges.iter().flat_map(|&(a, b)| vec![a, b]).collect_vec();
+        //     let range = vec![self.ranges.first().unwrap().0, self.ranges.last().unwrap().1];
+
+        //     let counts = vec![2 as i32 ; size as usize];
+        //     let displs = counts
+        //         .iter()
+        //         .scan(0, |acc, &x| {
+        //             let tmp = *acc;
+        //             *acc += x;
+        //             Some(tmp)
+        //         })
+        //         .collect_vec();
+
+        //     let mut partition = PartitionMut::new(&mut all_ranges, counts, &displs[..]);
+        //     self.communicator
+        //         .all_gather_varcount_into(&range[..], &mut partition);
+        // }
+
+        // let all_domains = all_ranges
+        //     .chunks_exact(2)
+        //     .enumerate()
+        //     .map(|(rank, domain)| {
+        //         (
+        //             MortonKey::<Scalar::Real>::from_morton(domain[0], Some(rank as i32)),
+        //             MortonKey::<Scalar::Real>::from_morton(domain[1], Some(rank as i32)),
+        //         )
+        //     })
+        //     .collect_vec();
+
+        // // 2. Receive packets from contributors
+        // // Need to have a second range for each multi node FMM (excluding the interaction list)
+        // // This defines the owned octants,
+
+        // // 3. Form packets for users
+        // {
+        //     // Need to check all keys for which ranges they fall into
+        //     let mut users = HashMap::new();
+
+        //     for n in 0..size {
+        //         if n != rank {
+        //             users.insert(n, Vec::new());
+        //         }
+        //     }
+
+        //     for (fmm_index, fmm) in self.fmms.iter().enumerate() {
+        //         for &key in fmm.tree.source_tree.all_keys().unwrap() {
+        //             for &(l, r) in all_domains.iter() {
+        //                 if key >= l && key <= r {
+        //                     users.get_mut(&l.rank).unwrap().push((fmm_index, key))
+        //                 }
+        //             }
+        //         }
+        //     }
+
+        //     // Can form packets with user data
+        //     for (user, required_keys) in users.iter() {
+
+        //         // Need to have a better way of doing this, accounting for the potential variation by level
+        //         let ncoeffs_equivalent_surface = self.fmms[0].ncoeffs_equivalent_surface[0];
+
+        //         let mut packet = vec![Scalar::zero(); required_keys.len() * ncoeffs_equivalent_surface];
+        //         let mut count = 0;
+
+        //         for (fmm_index, key) in required_keys.iter() {
+        //             // Shouldn't need double index, should be looking up multipole data by fmm_index in the first place.
+        //             if let Some(multipole) = self.fmms[*fmm_index].multipole(key) {
+
+        //                 packet[count * ncoeffs_equivalent_surface .. (count + 1) * ncoeffs_equivalent_surface].copy_from_slice(multipole);
+        //                 count += 1;
+        //             }
+        //         }
+
+        //         // Send packet to user process
+
+        //         // 1 . Communicate packet size
+
+        //         // 2. Communicate packet
+
+        //         // 4. Communicate index pointers
+
+        //     }
+        // }
+    }
+
+    fn check_surface_order(&self, level: u64) -> usize {
+        self.check_surface_order
+    }
+
+    fn equivalent_surface_order(&self, level: u64) -> usize {
+        self.equivalent_surface_order
+    }
+
+    fn ncoeffs_check_surface(&self, level: u64) -> usize {
+        self.ncoeffs_check_surface
+    }
+
+    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize {
+        self.ncoeffs_equivalent_surface
     }
 }

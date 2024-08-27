@@ -16,7 +16,7 @@ use crate::{
 impl<T, C> MultiNodeFmmTreeTrait for MultiNodeFmmTree<T, C>
 where
     T: RlstScalar + Float + Default + Equivalence,
-    C: Communicator + Default,
+    C: Communicator,
 {
     type Tree = MultiNodeTreeNew<T, C>;
 
@@ -30,6 +30,14 @@ where
 
     fn source_tree(&self) -> &Self::Tree {
         &self.source_tree
+    }
+
+    fn n_source_trees(&self) -> usize {
+        self.source_tree.trees.len()
+    }
+
+    fn n_target_trees(&self) -> usize {
+        self.target_tree.trees.len()
     }
 }
 

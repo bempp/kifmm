@@ -29,3 +29,7 @@ pub trait SourceToTargetTranslationMetadata {
     /// Map between source/target nodes, indexed by level.
     fn displacements(&mut self);
 }
+
+pub trait SourceToTargetTranslationMultiNode {
+    fn ranges(&mut self);
+}
