@@ -2,7 +2,8 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use num::{One, Zero};
+use mpi::{topology::SimpleCommunicator, traits::Equivalence};
+use num::{Float, One, Zero};
 
 use rayon::prelude::*;
 use rlst::{
@@ -15,7 +16,7 @@ use crate::{
     fftw::array::{AlignedAllocable, AlignedVec},
     fmm::{
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
-        types::{FmmEvalType, SendPtrMut},
+        types::{FftFieldTranslationMultiNode, FmmEvalType, KiFmmMultiNode, SendPtrMut},
         KiFmm,
     },
     traits::{
@@ -378,5 +379,31 @@ where
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
         Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
+    }
+}
+
+impl<Scalar, Kernel> SourceToTargetTranslation
+    for KiFmmMultiNode<Scalar, Kernel, FftFieldTranslationMultiNode<Scalar>, SimpleCommunicator>
+where
+    Scalar: RlstScalar
+        + AsComplex
+        + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
+        + Default
+        + AlignedAllocable
+        + Equivalence
+        + Float,
+    <Scalar as AsComplex>::ComplexType: Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType>
+        + AlignedAllocable,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    Self: FmmOperatorData,
+    <Scalar as Dft>::Plan: Sync,
+{
+    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+        Ok(())
+    }
+
+    fn p2l(&self, level: u64) -> Result<(), FmmError> {
+        Ok(())
     }
 }

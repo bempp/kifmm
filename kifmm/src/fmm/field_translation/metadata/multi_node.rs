@@ -8,7 +8,7 @@ use mpi::{
 };
 use num::{Float, Zero};
 use pulp::Scalar;
-use rayon::iter::IntoParallelIterator;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer,
@@ -17,13 +17,13 @@ use rlst::{
 use crate::{
     fmm::{
         helpers::{flip3, homogenous_kernel_scale},
-        types::FftMetadata,
+        types::{FftFieldTranslationMultiNode, FftMetadata},
     },
     linalg::pinv::pinv,
     traits::{
         fftw::{Dft, DftType},
         field::SourceToTargetTranslationMetadata,
-        fmm::MultiNodeFmm,
+        fmm::{FmmMetadata, MultiNodeFmm},
         general::AsComplex,
     },
     tree::{
@@ -297,7 +297,7 @@ impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmmMultiNode<
         Scalar,
         Laplace3dKernel<Scalar>,
-        FftFieldTranslation<Scalar>,
+        FftFieldTranslationMultiNode<Scalar>,
         SimpleCommunicator,
     >
 where
@@ -309,59 +309,65 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
+    // Must be run AFTER multipole exchange.
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
         let depth = self.tree.source_tree.local_depth + self.tree.target_tree.global_depth;
 
-        // for level in 2..=depth {
-        //     let targets = self.tree.target_tree.keys(level).unwrap();
-        //     let targets_parents: HashSet<MortonKey<_>> =
-        //         targets.iter().map(|target| target.parent()).collect();
-        //     let mut targets_parents = targets_parents.into_iter().collect_vec();
-        //     targets_parents.sort();
-        //     let ntargets_parents = targets_parents.len();
+        for fmm_index in 0..self.nfmms {
+            let mut tmp = Vec::new();
 
-        //     let sources = self.tree.source_tree().keys(level).unwrap();
+            for level in 2..=depth {
+                let targets = self.tree.target_tree.trees[fmm_index].keys(level).unwrap();
+                let targets_parents: HashSet<MortonKey<_>> =
+                    targets.iter().map(|target| target.parent()).collect();
+                let mut targets_parents = targets_parents.into_iter().collect_vec();
+                targets_parents.sort();
+                let ntargets_parents = targets_parents.len();
 
-        //     let sources_parents: HashSet<MortonKey<_>> =
-        //         sources.iter().map(|source| source.parent()).collect();
-        //     let mut sources_parents = sources_parents.into_iter().collect_vec();
-        //     sources_parents.sort();
-        //     let nsources_parents = sources_parents.len();
+                let sources = self.tree.source_tree.trees[fmm_index].keys(level).unwrap();
 
-        //     let result = vec![Vec::new(); NHALO];
-        //     let result = result.into_iter().map(RwLock::new).collect_vec();
+                let sources_parents: HashSet<MortonKey<_>> =
+                    sources.iter().map(|source| source.parent()).collect();
+                let mut sources_parents = sources_parents.into_iter().collect_vec();
+                sources_parents.sort();
+                let nsources_parents = sources_parents.len();
 
-        //     let targets_parents_neighbors = targets_parents
-        //         .iter()
-        //         .map(|parent| parent.all_neighbors())
-        //         .collect_vec();
+                let result = vec![Vec::new(); NHALO];
+                let result = result.into_iter().map(RwLock::new).collect_vec();
 
-        //     let zero_displacement = nsources_parents * NSIBLINGS;
+                let targets_parents_neighbors = targets_parents
+                    .iter()
+                    .map(|parent| parent.all_neighbors())
+                    .collect_vec();
 
-        //     (0..NHALO).into_par_iter().for_each(|i| {
-        //         let mut result_i = result[i].write().unwrap();
-        //         for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-        //             // Check if neighbor exists in a valid tree
-        //             if let Some(neighbor) = all_neighbors[i] {
-        //                 // If it does, check if first child exists in the source tree
-        //                 let first_child = neighbor.first_child();
-        //                 if let Some(neighbor_displacement) =
-        //                     self.level_index_pointer_multipoles[level as usize].get(&first_child)
-        //                 {
-        //                     result_i.push(*neighbor_displacement)
-        //                 } else {
-        //                     result_i.push(zero_displacement)
-        //                 }
-        //             } else {
-        //                 result_i.push(zero_displacement)
-        //             }
-        //         }
-        //     });
+                let zero_displacement = nsources_parents * NSIBLINGS;
 
-        //     displacements.push(result);
-        // }
+                (0..NHALO).into_par_iter().for_each(|i| {
+                    let mut result_i = result[i].write().unwrap();
+                    for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
+                        // Check if neighbor exists in a valid tree
+                        if let Some(neighbor) = all_neighbors[i] {
+                            // If it does, check if first child exists in the source tree
+                            let first_child = neighbor.first_child();
+                            if let Some(neighbor_displacement) = self.level_index_pointer_multipoles
+                                [fmm_index][level as usize]
+                                .get(&first_child)
+                            {
+                                result_i.push(*neighbor_displacement)
+                            } else {
+                                result_i.push(zero_displacement)
+                            }
+                        } else {
+                            result_i.push(zero_displacement)
+                        }
+                    }
+                });
 
+                tmp.push(result);
+            }
+            displacements.push(tmp);
+        }
         self.source_to_target.displacements = displacements;
     }
 
@@ -429,7 +435,6 @@ where
         }
 
         let equivalent_surface_order = self.equivalent_surface_order;
-        let check_surface_order = self.check_surface_order;
         let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
         let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
         let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
@@ -581,7 +586,12 @@ where
 }
 
 impl<Scalar>
-    KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslation<Scalar>, SimpleCommunicator>
+    KiFmmMultiNode<
+        Scalar,
+        Laplace3dKernel<Scalar>,
+        FftFieldTranslationMultiNode<Scalar>,
+        SimpleCommunicator,
+    >
 where
     Scalar: RlstScalar + AsComplex + Default + Dft + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
@@ -702,4 +712,53 @@ where
 
         (surf_to_conv, conv_to_surf)
     }
+}
+
+impl<Scalar, SourceToTargetData> FmmOperatorData
+    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData, SimpleCommunicator>
+where
+    Scalar: RlstScalar + Default + Equivalence + Float,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
+{
+    fn fft_map_index(&self, level: u64) -> usize {
+        0
+    }
+
+    fn expansion_index(&self, level: u64) -> usize {
+        0
+    }
+
+    fn c2e_operator_index(&self, level: u64) -> usize {
+        0
+    }
+
+    fn m2m_operator_index(&self, level: u64) -> usize {
+        0
+    }
+
+    fn l2l_operator_index(&self, level: u64) -> usize {
+        0
+    }
+
+    fn m2l_operator_index(&self, level: u64) -> usize {
+        0
+    }
+
+    fn displacement_index(&self, level: u64) -> usize {
+        0
+    }
+}
+
+impl<Scalar, Kernel, SourceToTargetData> FmmMetadata
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>
+where
+    Scalar: RlstScalar + Default + Float + Equivalence,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
+{
+    type Scalar = Scalar;
+
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {}
 }

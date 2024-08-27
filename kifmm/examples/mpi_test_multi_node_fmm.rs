@@ -6,7 +6,7 @@ fn main() {
 
     use green_kernels::laplace_3d::Laplace3dKernel;
     use kifmm::{
-        fmm::types::MultiNodeBuilder,
+        fmm::types::{FftFieldTranslationMultiNode, MultiNodeBuilder},
         tree::{helpers::points_fixture, types::MultiNodeTreeNew},
         FftFieldTranslation,
     };
@@ -45,7 +45,7 @@ fn main() {
         .parameters(
             expansion_order,
             Laplace3dKernel::<f32>::new(),
-            FftFieldTranslation::<f32>::new(None),
+            FftFieldTranslationMultiNode::<f32>::new(None),
         )
         .unwrap()
         .build()

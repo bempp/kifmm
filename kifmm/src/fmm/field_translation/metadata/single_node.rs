@@ -28,7 +28,7 @@ use crate::{
         },
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
-            FftFieldTranslation, FftMetadata, FmmSvdMode,
+            FftFieldTranslation, FftFieldTranslationMultiNode, FftMetadata, FmmSvdMode,
         },
         KiFmm,
     },
@@ -2451,7 +2451,38 @@ where
     }
 }
 
+impl<Scalar> FftFieldTranslationMultiNode<Scalar>
+where
+    Scalar: RlstScalar + AsComplex + Dft + Default,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
+{
+    /// Constructor for FFT based field translations
+    pub fn new(block_size: Option<usize>) -> Self {
+        Self {
+            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
+            block_size: block_size.unwrap_or(DEFAULT_M2L_FFT_BLOCK_SIZE),
+            ..Default::default()
+        }
+    }
+}
+
 impl<Scalar> SourceToTargetDataTrait for FftFieldTranslation<Scalar>
+where
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
+{
+    type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
+
+    fn overdetermined(&self) -> bool {
+        false
+    }
+
+    fn surface_diff(&self) -> usize {
+        0
+    }
+}
+
+impl<Scalar> SourceToTargetDataTrait for FftFieldTranslationMultiNode<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,

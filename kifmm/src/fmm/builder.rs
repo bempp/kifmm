@@ -466,8 +466,8 @@ where
             result.source();
             result.target();
             result.source_to_target();
-            // result.metadata();
-            result.displacements();
+            // result.metadata();  // Must be run after ghost exchange.
+            // result.displacements(); // Must be run after ghost exchange.
 
             Ok(result)
         }

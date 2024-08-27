@@ -44,7 +44,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslation + FmmOperatorData,
+    // KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslation + FmmOperatorData,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;

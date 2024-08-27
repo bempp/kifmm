@@ -698,6 +698,31 @@ where
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
+/// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
+#[derive(Default)]
+pub struct FftFieldTranslationMultiNode<Scalar>
+where
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+{
+    /// Map between indices of surface convolution grid points.
+    pub surf_to_conv_map: Vec<Vec<usize>>, // Indexed by level
+
+    /// Map between indices of convolution and surface grid points.
+    pub conv_to_surf_map: Vec<Vec<usize>>, // Indexed by level
+
+    /// Maximum block size when grouping interactions
+    pub block_size: usize,
+
+    /// Precomputed data required for FFT compressed M2L interaction.
+    pub metadata: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>>, // index corresponds to level
+
+    /// Unique transfer vectors to lookup m2l unique kernel interactions
+    pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
+    pub displacements: Vec<Vec<Vec<RwLock<Vec<usize>>>>>,
+}
+
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
