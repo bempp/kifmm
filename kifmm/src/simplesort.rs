@@ -5,7 +5,10 @@ use std::fmt::Debug;
 
 use itertools::Itertools;
 use mpi::{
-    datatype::{Partition, PartitionMut}, topology::SimpleCommunicator, traits::{Communicator, CommunicatorCollectives, Equivalence}, Count, Rank
+    datatype::{Partition, PartitionMut},
+    topology::SimpleCommunicator,
+    traits::{Communicator, CommunicatorCollectives, Equivalence},
+    Count, Rank,
 };
 
 pub fn simplesort<T>(
@@ -63,8 +66,6 @@ where
         .map(|(l, r)| if r - l > 0 { r - l + 1 } else { 0 })
         .collect_vec();
 
-
-
     let displs_snd = counts_snd
         .iter()
         .scan(0, |acc, &x| {
@@ -74,12 +75,9 @@ where
         })
         .collect_vec();
 
-
     let mut counts_recv = vec![0 as Count; size as usize];
 
-
     comm.all_to_all_into(&counts_snd, &mut counts_recv);
-
 
     let displs_recv = counts_recv
         .iter()
@@ -91,7 +89,6 @@ where
         .collect_vec();
 
     let total = counts_recv.iter().sum::<Count>();
-
 
     let mut received = vec![T::default(); total as usize];
     let mut partition_received: PartitionMut<[T], Vec<i32>, &[i32]> =

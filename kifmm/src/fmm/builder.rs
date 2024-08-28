@@ -43,7 +43,7 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Default,
     KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>,
+        + FmmMetadata<Scalar = Scalar, Charges = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
@@ -294,7 +294,9 @@ where
     Kernel: KernelTrait<T = Scalar> + Clone + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait,
     KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>:
-        SourceAndTargetTranslationMetadata + SourceToTargetTranslationMetadata, //     + FmmMetadata<Scalar = Scalar>,
+        SourceAndTargetTranslationMetadata
+            + SourceToTargetTranslationMetadata
+            + FmmMetadata<Scalar = Scalar, Charges = Vec<Scalar>>,
 {
     pub fn new() -> Self {
         Self {
@@ -467,7 +469,7 @@ where
             result.source();
             result.target();
             result.source_to_target();
-            // result.metadata(); // Everything required for the local upward passes
+            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap()); // Everything required for the local upward passes
 
             // metadata computation needs to be split into two, one for before upward pass
             // one for after upward pass

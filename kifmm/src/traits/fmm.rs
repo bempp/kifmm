@@ -187,13 +187,14 @@ pub trait FmmMetadata {
     /// Associated scalar
     type Scalar: RlstScalar;
 
+    type Charges;
+
     /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]);
+    fn metadata<'a>(&mut self, eval_type: EvalType, charges: &'a [Self::Charges]);
 }
 
 pub trait FmmMetadataMultiNode {
-
     type Scalar;
 
     // After ghost exchange, insert new charges and associated leaf data into local trees

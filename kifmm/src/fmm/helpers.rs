@@ -1,5 +1,5 @@
 //! Helper Functions
-use std::collections::HashMap;
+use std::{collections::HashMap, default};
 
 use itertools::Itertools;
 use num::traits::Float;
@@ -9,7 +9,7 @@ use rlst::{
 };
 
 use crate::{
-    fmm::types::SendPtrMut,
+    fmm::{tree, types::SendPtrMut},
     traits::tree::{FmmTreeNode, SingleNodeTreeTrait},
     tree::types::{MortonKey, SingleNodeTree},
 };
@@ -153,6 +153,39 @@ where
     result
 }
 
+/// Create an index pointer for the coordinates in a source and a target tree
+/// between the local indices for each leaf and their associated charges
+pub fn coordinate_index_pointer_multinode<T>(
+    trees: &[SingleNodeTree<T>],
+) -> Vec<Vec<(usize, usize)>>
+where
+    T: RlstScalar + Float,
+{
+    let mut global_result = Vec::new();
+
+    let nfmms = trees.len();
+
+    for fmm_idx in 0..nfmms {
+        let tree = &trees[fmm_idx];
+
+        let mut index_pointer = 0;
+
+        let mut result = vec![(0usize, 0usize); tree.n_leaves().unwrap()];
+
+        for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+            let n_points = tree.n_coordinates(leaf).unwrap_or_default();
+
+            // Update charge index pointer
+            result[i] = (index_pointer, index_pointer + n_points);
+            index_pointer += n_points;
+        }
+
+        global_result.push(result);
+    }
+
+    global_result
+}
+
 /// Create index pointers for each key at each level of an octree
 pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey<T>, usize>>
 where
@@ -216,6 +249,50 @@ where
     result
 }
 
+pub fn level_expansion_pointers_multinode<T>(
+    trees: &[SingleNodeTree<T::Real>],
+    ncoeffs: usize,
+    expansions: &[Vec<T>],
+    local_depth: u64,
+    global_depth: u64,
+) -> Vec<Vec<Vec<SendPtrMut<T>>>>
+where
+    T: RlstScalar,
+{
+    let nfmms = trees.len();
+
+    let depth = local_depth + global_depth;
+    let mut global_result = Vec::new();
+
+    for fmm_idx in 0..nfmms {
+        let tree = &trees[fmm_idx];
+        let nkeys = tree.n_keys_tot().unwrap();
+        let expansions_i = &expansions[fmm_idx];
+
+        let mut result = vec![Vec::new(); (depth + 1).try_into().unwrap()];
+        let mut level_displacement = 0;
+
+        for level in 0..depth {
+            let mut tmp_multipoles = Vec::new();
+            let keys = tree.keys(level).unwrap();
+            let nkeys_level = keys.len();
+
+            for (key_idx, _) in keys.iter().enumerate() {
+                let key_displacement = level_displacement + ncoeffs * key_idx;
+                let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
+                tmp_multipoles.push(SendPtrMut { raw });
+            }
+
+            result[level as usize] = tmp_multipoles;
+            level_displacement += nkeys_level * ncoeffs;
+        }
+
+        global_result.push(result)
+    }
+
+    global_result
+}
+
 /// Create mutable pointers for leaf expansions in a tree
 pub fn leaf_expansion_pointers<T>(
     tree: &SingleNodeTree<T::Real>,
@@ -259,6 +336,47 @@ where
     }
 
     result
+}
+
+/// Create mutable pointers for leaf expansions in a tree
+pub fn leaf_expansion_pointers_multinode<T>(
+    trees: &[SingleNodeTree<T::Real>],
+    ncoeffs: usize,
+    expansions: &[Vec<T>],
+    local_depth: u64,
+    global_depth: u64,
+) -> Vec<Vec<SendPtrMut<T>>>
+where
+    T: RlstScalar,
+{
+    let nfmms = trees.len();
+
+    let mut global_result = Vec::new();
+
+    let depth = local_depth + global_depth;
+
+    for fmm_idx in 0..nfmms {
+        let tree = &trees[fmm_idx];
+        let n_leaves = tree.n_leaves().unwrap();
+        let iterator = (0..depth).zip(vec![ncoeffs; depth as usize]).collect_vec();
+        let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
+            acc + tree.n_keys(level).unwrap() * ncoeffs
+        });
+
+        let expansion_i = &expansions[fmm_idx];
+
+        let mut result = vec![SendPtrMut::<T>::default(); n_leaves];
+
+        for (leaf_idx, _) in tree.all_leaves().unwrap().iter().enumerate() {
+            let key_displacement = level_displacement + leaf_idx * ncoeffs;
+            let raw = unsafe { expansion_i.as_ptr().add(key_displacement) as *mut T };
+            result[leaf_idx] = SendPtrMut { raw };
+        }
+
+        global_result[fmm_idx] = result;
+    }
+
+    global_result
 }
 
 /// Create mutable pointers for potentials in a tree
@@ -310,6 +428,52 @@ where
     }
 
     result
+}
+
+/// Create mutable pointers for potentials in a tree
+pub fn potential_pointers_multinode<T>(
+    trees: &[SingleNodeTree<T::Real>],
+    kernel_eval_size: usize,
+    potentials: &[Vec<T>],
+) -> Vec<Vec<SendPtrMut<T>>>
+where
+    T: RlstScalar,
+{
+    let mut global_result = Vec::new();
+    let nfmms = trees.len();
+    let dim = 3;
+
+    for fmm_idx in 0..nfmms {
+        let tree = &trees[fmm_idx];
+        let n_leaves = tree.n_leaves().unwrap();
+
+        let mut result = vec![SendPtrMut::default(); n_leaves];
+
+        let potentials_i = &potentials[fmm_idx];
+        let mut raw_pointer = potentials_i.as_ptr() as *mut T;
+
+        for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+            let n_points;
+            let n_evals;
+
+            if let Some(coordinates) = tree.coordinates(leaf) {
+                n_points = coordinates.len() / dim;
+                n_evals = n_points * kernel_eval_size
+            } else {
+                n_evals = 0;
+            }
+
+            result[i] = SendPtrMut { raw: raw_pointer };
+
+            unsafe {
+                raw_pointer = raw_pointer.add(n_evals);
+            }
+        }
+
+        global_result.push(result)
+    }
+
+    global_result
 }
 
 /// Map charges to map global indices

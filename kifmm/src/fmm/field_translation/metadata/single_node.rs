@@ -2290,8 +2290,9 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     type Scalar = Scalar;
+    type Charges = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
+    fn metadata<'a>(&mut self, eval_type: EvalType, charges: &'a [Self::Charges]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
         let alpha_inner = Scalar::real(ALPHA_INNER);
 
@@ -2377,7 +2378,7 @@ where
         );
 
         let level_locals = level_expansion_pointers(
-            &self.tree.source_tree,
+            &self.tree.target_tree,
             &self.ncoeffs_equivalent_surface,
             nmatvecs,
             &locals,
