@@ -2375,7 +2375,7 @@ where
         );
 
         let level_locals = level_expansion_pointers(
-            &self.tree.source_tree,
+            &self.tree.target_tree,
             &self.ncoeffs_equivalent_surface,
             nmatvecs,
             &locals,
