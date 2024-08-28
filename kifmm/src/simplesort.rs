@@ -1,31 +1,25 @@
+//! Even simpler than sample sort, statically define key distribution without sampling, allows simple pinning of MPI processes to CPUs
+//!
+
 use std::fmt::Debug;
 
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 use mpi::{
-    datatype::{Partition, PartitionMut},
-    topology::SimpleCommunicator,
-    traits::{Communicator, CommunicatorCollectives, Equivalence},
-    Count,
+    datatype::{Partition, PartitionMut}, topology::SimpleCommunicator, traits::{Communicator, CommunicatorCollectives, Equivalence}, Count, Rank
 };
-use rand::{thread_rng, Rng};
 
-pub fn samplesort<T>(
+pub fn simplesort<T>(
     arr: &mut Vec<T>,
     comm: &SimpleCommunicator,
-    k: usize,
+    splitters: &[T],
 ) -> Result<(), std::io::Error>
 where
     T: Equivalence + Ord + Default + Clone + Debug,
 {
-    if k > arr.len() {
+    if splitters.len() != (comm.size() - 1).try_into().unwrap() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "k must be less than length of array",
-        ));
-    } else if k == 0 {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidInput,
-            "k must be greater than 0",
+            "The number of splitters must be size-1, i.e. need to explicitly define split for all MPI processes",
         ));
     }
 
@@ -34,28 +28,8 @@ where
     // Perform local sort
     arr.sort();
 
-    // 1. Collect k samples from each process onto all other processes
-    let mut received_samples = vec![T::default(); k * (size as usize)];
-    let mut rng = thread_rng();
-    let sample_idxs: Vec<usize> = (0..k).map(|_| rng.gen_range(0..arr.len())).collect();
-
-    let local_samples = sample_idxs
-        .into_iter()
-        .map(|i| arr[i].clone())
-        .collect_vec();
-
-    comm.all_gather_into(&local_samples[..], &mut received_samples[..]);
-
-    // Ignore first k samples to ensure size-1 splitters
-    received_samples.sort();
-    received_samples = received_samples[k..].to_vec();
-
-    // Every k'th sample defines a bucket
-    let splitters = received_samples.into_iter().step_by(k).collect_vec();
+    // Sort local data into buckets
     let nsplitters = size - 1;
-    // let mut counts_snd = Vec::new();
-
-    // 2. Sort local data into buckets
     let mut splitter_index: i32 = 0;
     let mut l = 0;
     let mut count = 0;
@@ -89,6 +63,8 @@ where
         .map(|(l, r)| if r - l > 0 { r - l + 1 } else { 0 })
         .collect_vec();
 
+
+
     let displs_snd = counts_snd
         .iter()
         .scan(0, |acc, &x| {
@@ -98,11 +74,12 @@ where
         })
         .collect_vec();
 
-    // println!("rank {:?} {:?} {:?} {:?} {:?}",comm.rank(), counts_snd, counts_snd.iter().sum::<Count>(), 1, splitter_indices);
 
     let mut counts_recv = vec![0 as Count; size as usize];
 
+
     comm.all_to_all_into(&counts_snd, &mut counts_recv);
+
 
     let displs_recv = counts_recv
         .iter()
@@ -115,13 +92,16 @@ where
 
     let total = counts_recv.iter().sum::<Count>();
 
+
     let mut received = vec![T::default(); total as usize];
-    let mut partition_received =
+    let mut partition_received: PartitionMut<[T], Vec<i32>, &[i32]> =
         PartitionMut::new(&mut received[..], counts_recv, &displs_recv[..]);
     let partition_snd = Partition::new(&arr[..], counts_snd, &displs_snd[..]);
 
     comm.all_to_all_varcount_into(&partition_snd, &mut partition_received);
     received.sort();
+
+    // println!("FOO RANK {:?} counts send {:?} displs snd {:?}", comm.rank(), counts_snd, total);
     *arr = received;
 
     Ok(())

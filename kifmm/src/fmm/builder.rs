@@ -467,7 +467,14 @@ where
             result.source();
             result.target();
             result.source_to_target();
-            // result.metadata();  // Must be run after ghost exchange.
+            // result.metadata(); // Everything required for the local upward passes
+
+            // metadata computation needs to be split into two, one for before upward pass
+            // one for after upward pass
+            // second one must be done in application code in order to attach charges, which depends on
+            // the final point distribution, actually both need to be done in application code to attach charges,
+            // new multipoles and metadata re-alloc.
+            // Charges must be exchanged to near field octants too, which must be done as a part of the ghost exchange.
             // result.displacements(); // Must be run after ghost exchange.
 
             Ok(result)

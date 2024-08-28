@@ -84,6 +84,9 @@ pub mod fmm;
 pub mod hyksort;
 #[cfg(feature = "mpi")]
 pub mod samplesort;
+#[cfg(feature = "mpi")]
+pub mod simplesort;
+
 pub mod linalg;
 pub mod traits;
 pub mod tree;

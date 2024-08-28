@@ -1,5 +1,5 @@
 //! FMM traits
-use crate::traits::tree::SingleNodeFmmTreeTrait;
+use crate::{traits::tree::SingleNodeFmmTreeTrait, tree::types::MortonKey};
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
@@ -190,6 +190,26 @@ pub trait FmmMetadata {
     /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
     fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]);
+}
+
+pub trait FmmMetadataMultiNode {
+
+    type Scalar;
+
+    // After ghost exchange, insert new charges and associated leaf data into local trees
+    fn update_charges(&mut self, new_charges: &[Self::Scalar]);
+
+    // After ghost exchange and local upward passses, insert new multipole data, and associated keys into local trees
+    fn update_multipoles(
+        &mut self,
+        new_multipoles: &[Self::Scalar],
+        keys: &[Self::Scalar],
+        expansion_order: usize,
+    );
+
+    /// Called after multipoles updated, creates new displacement data structure for looking up appropriate M2L data, which in a multi-node setting must be done at
+    /// runtime due to ghost exchange.
+    fn displacements(&mut self);
 }
 
 /// Defines how metadata associated with field translations is looked up at runtime.

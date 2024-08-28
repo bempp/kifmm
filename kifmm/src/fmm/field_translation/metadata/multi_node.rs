@@ -760,5 +760,7 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {}
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
+
+    }
 }

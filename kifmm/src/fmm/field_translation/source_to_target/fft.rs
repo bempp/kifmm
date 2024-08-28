@@ -392,8 +392,8 @@ where
         + AlignedAllocable
         + Equivalence
         + Float,
-    <Scalar as AsComplex>::ComplexType: Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType>
-        + AlignedAllocable,
+    <Scalar as AsComplex>::ComplexType:
+        Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: FmmOperatorData,

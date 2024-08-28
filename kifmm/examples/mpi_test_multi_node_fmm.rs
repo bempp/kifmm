@@ -20,8 +20,8 @@ fn main() {
     // Setup tree parameters
     let prune_empty = false;
     let n_points = 10000;
-    let local_depth = 3;
-    let global_depth = 1;
+    let local_depth = 1;
+    let global_depth = 4;
 
     let expansion_order = 6;
 
@@ -50,11 +50,15 @@ fn main() {
         .build()
         .unwrap();
 
-    println!("RANK {:?} {:?}", fmm.communicator.rank(), fmm.tree.source_tree.trees.len());
+    // println!(
+    //     "RANK {:?} {:?}",
+    //     fmm.communicator.rank(),
+    //     fmm.tree.source_tree.trees.len()
+    // );
     // if fmm.communicator.rank() == 0 {
-        // for source_tree in fmm.tree.source_tree.trees.iter() {
-        //     println!("RANK {:?} {:?} {:?} {:?}", fmm.communicator.rank(), source_tree.leaves.iter().min().unwrap(), source_tree.leaves.iter().max().unwrap(), source_tree.leaves.len());
-        // }
+    // for source_tree in fmm.tree.source_tree.trees.iter() {
+    //     println!("RANK {:?} {:?} {:?} {:?}", fmm.communicator.rank(), source_tree.leaves.iter().min().unwrap(), source_tree.leaves.iter().max().unwrap(), source_tree.leaves.len());
+    // }
     // }
 
     // Charge setting has to be after construction in multi-node

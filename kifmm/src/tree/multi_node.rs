@@ -1,23 +1,33 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
 use crate::{
-    samplesort::samplesort, traits::tree::{MultiNodeTreeTrait, SingleNodeTreeTrait}, tree::{
+    samplesort::samplesort, simplesort, traits::tree::{MultiNodeTreeTrait, SingleNodeTreeTrait}, tree::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points, SingleNodeTree},
     }
 };
 
 use crate::hyksort::hyksort;
+use crate::simplesort::simplesort;
+
 use itertools::Itertools;
 use mpi::topology::SimpleCommunicator;
 use mpi::{
     traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
     Rank,
 };
-use num::Float;
+use num::{zero, Float, Zero};
+use pulp::Scalar;
 use rlst::RlstScalar;
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, fmt::Debug};
 
 use super::types::MultiNodeTreeNew;
+
+pub enum SortKind <T: Equivalence + Ord  + Default + Clone + Debug>{
+    Hyksort{k: usize},
+    Samplesort{k: usize},
+    Simplesort{splitters: Vec<T>}
+}
+
 
 impl<T, C: Communicator> MultiNodeTreeNew<T, C>
 where
@@ -44,7 +54,7 @@ where
                 .try_into()
                 .unwrap();
             let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL, Some(rank));
-            let encoded_key = MortonKey::from_point(coord, &domain, global_depth, Some(rank));
+            let encoded_key = MortonKey::from_point(coord, &domain, local_depth, Some(rank));
 
             points.push(Point {
                 coordinate: *coord,
@@ -57,12 +67,22 @@ where
         // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
         // hyksort(&mut points, hyksort_subcomm_size, comm)?;
-        samplesort(&mut points, &comm, 500).unwrap();
+        // samplesort(&mut points, &comm, 500).unwrap();
+
+        let splitters = MortonKey::root(None).descendants(local_depth)?;
+        let mut splitters = splitters.into_iter().map(|m|
+            Point {coordinate: [T::zero(); 3], global_index: 0, encoded_key: m, base_key: m}).collect_vec();
+        splitters.sort();
+        let splitters = &splitters[1..];
+        simplesort(&mut points, &comm, splitters)?;
+
 
         // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
-        let leaves = MortonKeys::from(leaves);
+        let mut leaves = MortonKeys::from(leaves);
+        leaves.sort();
         // leaves.complete();
+
 
         // These define all the single node trees to be constructed
         let trees = SingleNodeTree::from_roots(
@@ -74,6 +94,11 @@ where
             true,
             rank,
         );
+
+        for tree in trees.iter() {
+            println!("HERE RANK {:?} ROOTS {:?}", comm.rank(), tree.n_coordinates_tot());
+        }
+
 
         Ok(MultiNodeTreeNew {
             world: world.duplicate(),
