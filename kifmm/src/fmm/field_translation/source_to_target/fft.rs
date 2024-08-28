@@ -383,7 +383,7 @@ where
 }
 
 impl<Scalar, Kernel> SourceToTargetTranslation
-    for KiFmmMultiNode<Scalar, Kernel, FftFieldTranslationMultiNode<Scalar>, SimpleCommunicator>
+    for KiFmmMultiNode<Scalar, Kernel, FftFieldTranslationMultiNode<Scalar>>
 where
     Scalar: RlstScalar
         + AsComplex

@@ -105,14 +105,6 @@ where
             rank,
         );
 
-        for tree in trees.iter() {
-            println!(
-                "HERE RANK {:?} ROOTS {:?}",
-                comm.rank(),
-                tree.n_coordinates_tot()
-            );
-        }
-
         Ok(MultiNodeTreeNew {
             world: world.duplicate(),
             rank,

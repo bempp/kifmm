@@ -293,10 +293,9 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + Clone + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait,
-    KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>:
-        SourceAndTargetTranslationMetadata
-            + SourceToTargetTranslationMetadata
-            + FmmMetadata<Scalar = Scalar, Charges = Vec<Scalar>>,
+    KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>: SourceAndTargetTranslationMetadata
+        + SourceToTargetTranslationMetadata
+        + FmmMetadata<Scalar = Scalar, Charges = Vec<Scalar>>,
 {
     pub fn new() -> Self {
         Self {
@@ -411,10 +410,7 @@ where
 
     pub fn build(
         self,
-    ) -> Result<
-        KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>,
-        std::io::Error,
-    > {
+    ) -> Result<KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -426,6 +422,7 @@ where
             let rank = communicator.rank();
 
             let mut result = KiFmmMultiNode {
+                times: Vec::default(),
                 isa: self.isa.unwrap(),
                 communicator,
                 nfmms: self.nfmms.unwrap(),
@@ -469,7 +466,8 @@ where
             result.source();
             result.target();
             result.source_to_target();
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap()); // Everything required for the local upward passes
+            // pass dummy charges for now.
+            result.metadata(self.kernel_eval_type.unwrap(), &[vec![Scalar::zero(); 1]]); // Everything required for the local upward passes
 
             // metadata computation needs to be split into two, one for before upward pass
             // one for after upward pass

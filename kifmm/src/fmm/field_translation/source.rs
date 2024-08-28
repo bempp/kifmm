@@ -3,6 +3,11 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
+use mpi::{
+    topology::SimpleCommunicator,
+    traits::{Communicator, Equivalence},
+};
+use num::Float;
 use rayon::prelude::*;
 
 use rlst::{
@@ -13,8 +18,8 @@ use rlst::{
 use crate::{
     fmm::{
         constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
-        helpers::chunk_size,
-        types::{FmmEvalType, KiFmm},
+        helpers::{chunk_size, homogenous_kernel_scale},
+        types::{FmmEvalType, KiFmm, KiFmmMultiNode},
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
@@ -391,5 +396,145 @@ where
                 Ok(())
             }
         }
+    }
+}
+
+impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar + Equivalence + Float,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default + Equivalence,
+    Self: FmmOperatorData,
+{
+    fn p2m(&self) -> Result<(), FmmError> {
+        let dim = 3;
+
+        println!(
+            "Rank {:?} running P2M nfmm: {:?}",
+            self.communicator.rank(),
+            self.tree.source_tree.trees.len()
+        );
+        // Run P2M for each local root at this processor
+        for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
+            // let &ncoeffs
+            let Some(_leaves) = tree.all_leaves() else {
+                return Err(FmmError::Failed(
+                    "P2M failed, no leaves found in source tree".to_string(),
+                ));
+            };
+
+            let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface;
+            let ncoeffs_check_surface = self.ncoeffs_check_surface;
+            let n_leaves = tree.n_leaves().unwrap();
+            let check_surface_size = ncoeffs_check_surface * dim;
+
+            let coordinates = tree.all_coordinates().unwrap();
+            let ncoordinates = coordinates.len() / dim;
+            let operator_index = 0;
+            let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
+
+            let mut check_potentials =
+                rlst_dynamic_array2!(Scalar, [n_leaves * ncoeffs_check_surface, 1]);
+
+            let charges = &self.charges[fmm_idx];
+            let kernel = &self.kernel;
+
+            check_potentials
+                .data_mut()
+                .par_chunks_exact_mut(ncoeffs_check_surface)
+                .zip(
+                    self.leaf_upward_check_surfaces_sources[fmm_idx]
+                        .par_chunks_exact(check_surface_size),
+                )
+                .zip(&self.charge_index_pointers_sources[fmm_idx])
+                .for_each(
+                    |((check_potential, upward_check_surface), charge_index_pointer)| {
+                        let charges = &charges[charge_index_pointer.0..charge_index_pointer.1];
+
+                        let coordinates_row_major = &coordinates
+                            [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
+                        let nsources = coordinates_row_major.len() / dim;
+
+                        if nsources > 0 {
+                            kernel.evaluate_st(
+                                EvalType::Value,
+                                coordinates_row_major,
+                                upward_check_surface,
+                                charges,
+                                check_potential,
+                            );
+                        }
+                    },
+                );
+
+            let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
+            let scale = if self.kernel.is_homogenous() {
+                homogenous_kernel_scale(depth)
+            } else {
+                Scalar::one()
+            };
+            let uc2e_inv_1 = &self.uc2e_inv_1;
+            let uc2e_inv_2 = &self.uc2e_inv_2;
+
+            check_potentials
+                .data()
+                .par_chunks_exact(ncoeffs_check_surface * chunk_size)
+                .zip(self.leaf_multipoles[fmm_idx].par_chunks_exact(chunk_size))
+                .for_each(|(check_potential, multipole_ptrs)| {
+                    let check_potential = rlst_array_from_slice2!(
+                        check_potential,
+                        [ncoeffs_check_surface, chunk_size]
+                    );
+
+                    let tmp = if kernel.is_homogenous() {
+                        let mut scaled_check_potential =
+                            rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, chunk_size]);
+                        scaled_check_potential.fill_from(check_potential);
+                        scaled_check_potential.scale_inplace(scale);
+
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            uc2e_inv_1[operator_index].view(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                uc2e_inv_2[operator_index].view(),
+                                scaled_check_potential,
+                            ),
+                        )
+                    } else {
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            uc2e_inv_1[operator_index].view(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                uc2e_inv_2[operator_index].view(),
+                                check_potential.view(),
+                            ),
+                        )
+                    };
+
+                    for (i, multipole_ptr) in multipole_ptrs.iter().enumerate().take(chunk_size) {
+                        let multipole = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                multipole_ptr.raw,
+                                ncoeffs_equivalent_surface,
+                            )
+                        };
+
+                        multipole
+                            .iter_mut()
+                            .zip(
+                                &tmp.data()[i * ncoeffs_equivalent_surface
+                                    ..(i + 1) * ncoeffs_equivalent_surface],
+                            )
+                            .for_each(|(m, t)| *m += *t);
+                    }
+                });
+        }
+        Ok(())
+    }
+
+    fn m2m(&self, level: u64) -> Result<(), FmmError> {
+        // println!("Rank {:?} running M2M", self.communicator.rank());
+
+        Ok(())
     }
 }

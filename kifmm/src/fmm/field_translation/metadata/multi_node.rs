@@ -58,16 +58,15 @@ use crate::{
     MultiNodeFmmTree,
 };
 
-impl<Scalar, Kernel, SourceToTargetData, C> SourceToTargetTranslationMultiNode
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, C>
+impl<Scalar, Kernel, SourceToTargetData> SourceToTargetTranslationMultiNode
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: SourceToTargetTranslation,
-    C: Communicator,
-    MultiNodeFmmTree<Scalar, C>: Default,
+    MultiNodeFmmTree<Scalar, SimpleCommunicator>: Default,
 {
     fn ranges(&mut self) {
         // All ranges for FMMs at this processor
@@ -120,7 +119,7 @@ where
 }
 
 impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData, SimpleCommunicator>
+    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
@@ -299,12 +298,7 @@ where
 }
 
 impl<Scalar> SourceToTargetTranslationMetadata
-    for KiFmmMultiNode<
-        Scalar,
-        Laplace3dKernel<Scalar>,
-        FftFieldTranslationMultiNode<Scalar>,
-        SimpleCommunicator,
-    >
+    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslationMultiNode<Scalar>>
 where
     Scalar: RlstScalar
         + Equivalence
@@ -590,13 +584,7 @@ where
     }
 }
 
-impl<Scalar>
-    KiFmmMultiNode<
-        Scalar,
-        Laplace3dKernel<Scalar>,
-        FftFieldTranslationMultiNode<Scalar>,
-        SimpleCommunicator,
-    >
+impl<Scalar> KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslationMultiNode<Scalar>>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
@@ -720,7 +708,7 @@ where
 }
 
 impl<Scalar, SourceToTargetData> FmmOperatorData
-    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData, SimpleCommunicator>
+    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
@@ -756,7 +744,7 @@ where
 }
 
 impl<Scalar, Kernel, SourceToTargetData> FmmMetadata
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,

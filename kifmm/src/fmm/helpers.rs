@@ -194,11 +194,13 @@ where
     let mut result = vec![HashMap::new(); (tree.depth() + 1).try_into().unwrap()];
 
     for level in 0..=tree.depth() {
-        let keys = tree.keys(level).unwrap();
-        for (level_idx, key) in keys.iter().enumerate() {
-            result[level as usize].insert(*key, level_idx);
+        if let Some(keys) = tree.keys(level) {
+            for (level_idx, key) in keys.iter().enumerate() {
+                result[level as usize].insert(*key, level_idx);
+            }
         }
     }
+
     result
 }
 
@@ -274,17 +276,19 @@ where
 
         for level in 0..depth {
             let mut tmp_multipoles = Vec::new();
-            let keys = tree.keys(level).unwrap();
-            let nkeys_level = keys.len();
 
-            for (key_idx, _) in keys.iter().enumerate() {
-                let key_displacement = level_displacement + ncoeffs * key_idx;
-                let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
-                tmp_multipoles.push(SendPtrMut { raw });
+            if let Some(keys) = tree.keys(level) {
+                let nkeys_level = keys.len();
+
+                for (key_idx, _) in keys.iter().enumerate() {
+                    let key_displacement = level_displacement + ncoeffs * key_idx;
+                    let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
+                    tmp_multipoles.push(SendPtrMut { raw });
+                }
+
+                result[level as usize] = tmp_multipoles;
+                level_displacement += nkeys_level * ncoeffs;
             }
-
-            result[level as usize] = tmp_multipoles;
-            level_displacement += nkeys_level * ncoeffs;
         }
 
         global_result.push(result)
@@ -360,7 +364,11 @@ where
         let n_leaves = tree.n_leaves().unwrap();
         let iterator = (0..depth).zip(vec![ncoeffs; depth as usize]).collect_vec();
         let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
-            acc + tree.n_keys(level).unwrap() * ncoeffs
+            if let Some(n_keys) = tree.n_keys(level) {
+                acc + n_keys * ncoeffs
+            } else {
+                acc + 0
+            }
         });
 
         let expansion_i = &expansions[fmm_idx];
@@ -373,7 +381,7 @@ where
             result[leaf_idx] = SendPtrMut { raw };
         }
 
-        global_result[fmm_idx] = result;
+        global_result.push(result);
     }
 
     global_result

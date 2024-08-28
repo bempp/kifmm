@@ -291,20 +291,20 @@ where
 
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
-pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, C>
+pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
-    C: Communicator,
 {
+    pub times: Vec<FmmOperatorTime>,
     pub nfmms: usize,
     pub isa: Isa,
-    pub communicator: C,
+    pub communicator: SimpleCommunicator,
     pub rank: i32,
     pub kernel: Kernel,
-    pub tree: MultiNodeFmmTree<<Scalar as RlstScalar>::Real, C>,
+    pub tree: MultiNodeFmmTree<<Scalar as RlstScalar>::Real, SimpleCommunicator>,
     pub charges: Vec<Vec<Scalar>>,
     pub check_surface_order: usize,
     pub equivalent_surface_order: usize,

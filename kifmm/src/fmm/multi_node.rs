@@ -4,9 +4,7 @@ use std::{collections::HashMap, time::Instant};
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-use itertools::Itertools;
 use mpi::{
-    datatype::PartitionMut,
     topology::SimpleCommunicator,
     traits::{Communicator, Equivalence},
 };
@@ -23,28 +21,21 @@ use crate::{
             FmmOperatorData, HomogenousKernel, MultiNodeFmm, SourceToTargetTranslation,
             SourceTranslation, TargetTranslation,
         },
-        tree::{
-            MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait,
-        },
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    tree::types::MortonKey,
     Fmm, MultiNodeFmmTree,
 };
 
-use super::{
-    helpers::{leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers},
-    types::KiFmmMultiNode,
-};
+use super::types::KiFmmMultiNode;
 
 impl<Scalar, Kernel, SourceToTargetData> MultiNodeFmm
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SimpleCommunicator>
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    // KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslation + FmmOperatorData,
+    Self: SourceTranslation,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -55,8 +46,24 @@ where
     }
 
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
-        // Run upward pass on local trees
-        {}
+        // Run upward pass on local trees, up to local depth
+        {
+            let s = Instant::now();
+            self.p2m()?;
+            self.times
+                .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
+
+            let local_depth = self.tree.source_tree.local_depth;
+            let global_depth = self.tree.source_tree.global_depth;
+            for level in local_depth..(local_depth + global_depth) {
+                let s = Instant::now();
+                self.m2m(level)?;
+                self.times.push(FmmOperatorTime::from_instant(
+                    FmmOperatorType::M2M(level),
+                    s,
+                ));
+            }
+        }
 
         // At this point the exchange needs to happen of multipole data
         {

@@ -7,6 +7,7 @@ fn main() {
     use green_kernels::laplace_3d::Laplace3dKernel;
     use kifmm::{
         fmm::types::{FftFieldTranslationMultiNode, MultiNodeBuilder},
+        traits::fmm::MultiNodeFmm,
         tree::{helpers::points_fixture, types::MultiNodeTreeNew},
         FftFieldTranslation,
     };
@@ -31,7 +32,7 @@ fn main() {
     let charges = vec![1f32; n_points];
 
     // Create a uniform tree
-    let fmm = MultiNodeBuilder::new()
+    let mut fmm = MultiNodeBuilder::new()
         .tree(
             points.data(),
             points.data(),
@@ -49,6 +50,8 @@ fn main() {
         .unwrap()
         .build()
         .unwrap();
+
+    fmm.evaluate(true);
 
     // println!(
     //     "RANK {:?} {:?}",
