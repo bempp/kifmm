@@ -1,5 +1,9 @@
 //! Data structures for kernel independent FMM
-use std::{collections::HashMap, marker::PhantomData, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+    sync::RwLock,
+};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use mpi::topology::SimpleCommunicator;
@@ -299,7 +303,8 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
     pub times: Vec<FmmOperatorTime>,
-    pub nfmms: usize,
+    pub nsource_trees: usize,
+    pub ntarget_trees: usize,
     pub isa: Isa,
     pub communicator: SimpleCommunicator,
     pub rank: i32,
@@ -356,6 +361,10 @@ where
 
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<Vec<SendPtrMut<Scalar>>>, // outer fmm
+
+    /// Can form query packet during pre-computation, but don't in principle know about existence
+    /// of these multipoles, or where they are physically located, which must be checked at runtime
+    pub query_packet: Vec<MortonKey<Scalar::Real>>,
 }
 
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -606,7 +615,9 @@ where
     /// Charges associated with each local FMM
     pub charges: Option<Vec<Vec<Scalar>>>,
 
-    pub nfmms: Option<usize>,
+    pub nsource_trees: Option<usize>,
+
+    pub ntarget_trees: Option<usize>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.

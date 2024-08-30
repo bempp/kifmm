@@ -27,6 +27,7 @@ use crate::{
         },
     },
     tree::{
+        multi_node::SortKind,
         types::{Domain, MultiNodeTreeNew},
         MultiNodeTree, SingleNodeTree,
     },
@@ -312,7 +313,8 @@ where
             fmm_eval_type: None,
             charges: None,
             kernel: None,
-            nfmms: None,
+            nsource_trees: None,
+            ntarget_trees: None,
         }
     }
 
@@ -324,6 +326,7 @@ where
         global_depth: u64,
         prune_empty: bool,
         world: &SimpleCommunicator,
+        sort_kind: SortKind,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
         let nsources = sources.len() / dim;
@@ -357,6 +360,7 @@ where
                 prune_empty,
                 Some(domain),
                 world,
+                sort_kind.clone(),
             )?;
 
             let target_tree = MultiNodeTreeNew::new(
@@ -366,6 +370,7 @@ where
                 prune_empty,
                 Some(domain),
                 world,
+                sort_kind.clone(),
             )?;
 
             let fmm_tree = MultiNodeFmmTree {
@@ -375,7 +380,8 @@ where
             };
 
             self.communicator = Some(world.duplicate());
-            self.nfmms = Some(fmm_tree.n_source_trees());
+            self.nsource_trees = Some(fmm_tree.n_source_trees());
+            self.ntarget_trees = Some(fmm_tree.n_target_trees());
             self.tree = Some(fmm_tree);
             Ok(self)
         }
@@ -425,7 +431,8 @@ where
                 times: Vec::default(),
                 isa: self.isa.unwrap(),
                 communicator,
-                nfmms: self.nfmms.unwrap(),
+                nsource_trees: self.nsource_trees.unwrap(),
+                ntarget_trees: self.ntarget_trees.unwrap(),
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),
@@ -461,6 +468,7 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
+                query_packet: Vec::default(),
             };
 
             result.source();

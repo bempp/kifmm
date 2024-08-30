@@ -21,8 +21,8 @@ fn main() {
     // Setup tree parameters
     let prune_empty = false;
     let n_points = 10000;
-    let local_depth = 1;
-    let global_depth = 4;
+    let local_depth = 3;
+    let global_depth = 1;
 
     let expansion_order = 6;
 
@@ -40,6 +40,7 @@ fn main() {
             global_depth,
             prune_empty,
             &world,
+            kifmm::tree::multi_node::SortKind::Simplesort,
         )
         .unwrap()
         .parameters(

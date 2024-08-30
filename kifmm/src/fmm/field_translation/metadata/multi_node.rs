@@ -4,7 +4,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, 
 use itertools::Itertools;
 use mpi::{
     topology::SimpleCommunicator,
-    traits::{Communicator, Equivalence},
+    traits::{Collection, Communicator, Equivalence},
 };
 use num::{Float, Zero};
 use pulp::Scalar;
@@ -311,64 +311,64 @@ where
 {
     // Must be run AFTER multipole exchange.
     fn displacements(&mut self) {
-        let mut displacements = Vec::new();
-        let depth = self.tree.source_tree.local_depth + self.tree.target_tree.global_depth;
+        // let mut displacements = Vec::new();
+        // let depth = self.tree.source_tree.local_depth + self.tree.target_tree.global_depth;
 
-        for fmm_index in 0..self.nfmms {
-            let mut tmp = Vec::new();
+        // for fmm_index in 0..self.nfmms {
+        //     let mut tmp = Vec::new();
 
-            for level in 2..=depth {
-                let targets = self.tree.target_tree.trees[fmm_index].keys(level).unwrap();
-                let targets_parents: HashSet<MortonKey<_>> =
-                    targets.iter().map(|target| target.parent()).collect();
-                let mut targets_parents = targets_parents.into_iter().collect_vec();
-                targets_parents.sort();
-                let ntargets_parents = targets_parents.len();
+        //     for level in 2..=depth {
+        //         let targets = self.tree.target_tree.trees[fmm_index].keys(level).unwrap();
+        //         let targets_parents: HashSet<MortonKey<_>> =
+        //             targets.iter().map(|target| target.parent()).collect();
+        //         let mut targets_parents = targets_parents.into_iter().collect_vec();
+        //         targets_parents.sort();
+        //         let ntargets_parents = targets_parents.len();
 
-                let sources = self.tree.source_tree.trees[fmm_index].keys(level).unwrap();
+        //         let sources = self.tree.source_tree.trees[fmm_index].keys(level).unwrap();
 
-                let sources_parents: HashSet<MortonKey<_>> =
-                    sources.iter().map(|source| source.parent()).collect();
-                let mut sources_parents = sources_parents.into_iter().collect_vec();
-                sources_parents.sort();
-                let nsources_parents = sources_parents.len();
+        //         let sources_parents: HashSet<MortonKey<_>> =
+        //             sources.iter().map(|source| source.parent()).collect();
+        //         let mut sources_parents = sources_parents.into_iter().collect_vec();
+        //         sources_parents.sort();
+        //         let nsources_parents = sources_parents.len();
 
-                let result = vec![Vec::new(); NHALO];
-                let result = result.into_iter().map(RwLock::new).collect_vec();
+        //         let result = vec![Vec::new(); NHALO];
+        //         let result = result.into_iter().map(RwLock::new).collect_vec();
 
-                let targets_parents_neighbors = targets_parents
-                    .iter()
-                    .map(|parent| parent.all_neighbors())
-                    .collect_vec();
+        //         let targets_parents_neighbors = targets_parents
+        //             .iter()
+        //             .map(|parent| parent.all_neighbors())
+        //             .collect_vec();
 
-                let zero_displacement = nsources_parents * NSIBLINGS;
+        //         let zero_displacement = nsources_parents * NSIBLINGS;
 
-                (0..NHALO).into_par_iter().for_each(|i| {
-                    let mut result_i = result[i].write().unwrap();
-                    for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-                        // Check if neighbor exists in a valid tree
-                        if let Some(neighbor) = all_neighbors[i] {
-                            // If it does, check if first child exists in the source tree
-                            let first_child = neighbor.first_child();
-                            if let Some(neighbor_displacement) = self.level_index_pointer_multipoles
-                                [fmm_index][level as usize]
-                                .get(&first_child)
-                            {
-                                result_i.push(*neighbor_displacement)
-                            } else {
-                                result_i.push(zero_displacement)
-                            }
-                        } else {
-                            result_i.push(zero_displacement)
-                        }
-                    }
-                });
+        //         (0..NHALO).into_par_iter().for_each(|i| {
+        //             let mut result_i = result[i].write().unwrap();
+        //             for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
+        //                 // Check if neighbor exists in a valid tree
+        //                 if let Some(neighbor) = all_neighbors[i] {
+        //                     // If it does, check if first child exists in the source tree
+        //                     let first_child = neighbor.first_child();
+        //                     if let Some(neighbor_displacement) = self.level_index_pointer_multipoles
+        //                         [fmm_index][level as usize]
+        //                         .get(&first_child)
+        //                     {
+        //                         result_i.push(*neighbor_displacement)
+        //                     } else {
+        //                         result_i.push(zero_displacement)
+        //                     }
+        //                 } else {
+        //                     result_i.push(zero_displacement)
+        //                 }
+        //             }
+        //         });
 
-                tmp.push(result);
-            }
-            displacements.push(tmp);
-        }
-        self.source_to_target.displacements = displacements;
+        //         tmp.push(result);
+        //     }
+        //     displacements.push(tmp);
+        // }
+        // self.source_to_target.displacements = displacements;
     }
 
     fn source_to_target(&mut self) {
@@ -773,7 +773,8 @@ where
             EvalType::ValueDeriv => 4,
         };
 
-        let nfmms = self.nfmms;
+        let nsource_trees = self.nsource_trees;
+        let ntarget_trees = self.ntarget_trees;
         let mut ntarget_points = 0;
         let mut nsource_points = 0;
         let mut nsource_keys = 0;
@@ -788,21 +789,20 @@ where
         // Allocate buffer to store potential data at target points
         let mut potentials = Vec::new();
 
-        for fmm_idx in 0..nfmms {
-            let ntarget_points = self.tree.target_tree.trees[fmm_idx]
-                .n_coordinates_tot()
-                .unwrap();
-            potentials.push(vec![Scalar::default(); ntarget_points * eval_size]);
-
-            // let ntarget_leaves = self.tree.target_tree.trees[fmm_idx].n_leaves().unwrap();
-            // let nsource_leaves = self.tree.source_tree.trees[fmm_idx].n_leaves().unwrap();
-
-            let ntarget_keys = self.tree.target_tree.trees[fmm_idx].n_keys_tot().unwrap();
+        for fmm_idx in 0..nsource_trees {
             let nsource_keys = self.tree.source_tree.trees[fmm_idx].n_keys_tot().unwrap();
             multipoles.push(vec![
                 Scalar::default();
                 nsource_keys * self.ncoeffs_equivalent_surface
             ]);
+        }
+
+        for fmm_idx in 0..ntarget_trees {
+            let ntarget_keys = self.tree.target_tree.trees[fmm_idx].n_keys_tot().unwrap();
+            let ntarget_points = self.tree.target_tree.trees[fmm_idx]
+                .n_coordinates_tot()
+                .unwrap();
+            potentials.push(vec![Scalar::default(); ntarget_points * eval_size]);
             locals.push(vec![
                 Scalar::default();
                 ntarget_keys * self.ncoeffs_equivalent_surface
@@ -826,9 +826,8 @@ where
         let mut leaf_downward_equivalent_surfaces_targets = Vec::new();
 
         // Precompute surfaces
-        for fmm_idx in 0..nfmms {
+        for fmm_idx in 0..nsource_trees {
             let source_tree = &self.tree.source_tree.trees[fmm_idx];
-            let target_tree = &self.tree.target_tree.trees[fmm_idx];
 
             let leaf_upward_equivalent_surfaces_sources_i = leaf_surfaces(
                 source_tree,
@@ -844,6 +843,12 @@ where
                 self.check_surface_order,
             );
 
+            leaf_upward_equivalent_surfaces_sources.push(leaf_upward_equivalent_surfaces_sources_i);
+            leaf_upward_check_surfaces_sources.push(leaf_upward_check_surfaces_sources_i);
+        }
+
+        for fmm_idx in 0..ntarget_trees {
+            let target_tree = &self.tree.target_tree.trees[fmm_idx];
             let leaf_downward_equivalent_surfaces_targets_i = leaf_surfaces(
                 target_tree,
                 self.ncoeffs_equivalent_surface,
@@ -851,8 +856,6 @@ where
                 self.equivalent_surface_order,
             );
 
-            leaf_upward_equivalent_surfaces_sources.push(leaf_upward_equivalent_surfaces_sources_i);
-            leaf_upward_check_surfaces_sources.push(leaf_upward_check_surfaces_sources_i);
             leaf_downward_equivalent_surfaces_targets
                 .push(leaf_downward_equivalent_surfaces_targets_i);
         }
@@ -901,7 +904,7 @@ where
         // TODO: Replace with real charge distribution
         let mut charges = Vec::new();
 
-        for fmm_idx in 0..nfmms {
+        for fmm_idx in 0..nsource_trees {
             let nsource_points = self.tree.source_tree.trees[fmm_idx]
                 .n_coordinates_tot()
                 .unwrap();
@@ -913,6 +916,45 @@ where
             coordinate_index_pointer_multinode(&self.tree.target_tree.trees);
         let charge_index_pointer_sources =
             coordinate_index_pointer_multinode(&self.tree.source_tree.trees);
+
+        // New: Need to figure out which multipole data needs to be queried for and isn't contained in source
+        // trees locally, local trees ideally need a tree ID, which associates them with a local and global rank.
+
+        let mut locally_owned_domains = HashSet::new();
+        for tree in self.tree.source_tree.trees.iter() {
+            locally_owned_domains.insert(tree.root);
+        }
+
+        // Defines all non-locally contained multipoles I need to find at this rank, does not know about existence or indeed where
+        // these multipoles are located physically
+        let mut query_packet = HashSet::new();
+
+        for target_tree in self.tree.target_tree.trees.iter() {
+            for level in
+                2..=(self.tree.target_tree.local_depth + self.tree.target_tree.global_depth)
+            {
+                if let Some(keys) = target_tree.keys(level) {
+                    for key in keys.iter() {
+                        let interaction_list = key
+                            .parent()
+                            .neighbors()
+                            .iter()
+                            .flat_map(|pn| pn.children())
+                            .filter(|pnc| {
+                                !key.is_adjacent(pnc)
+                                    && pnc
+                                        .ancestors(None)
+                                        .intersection(&locally_owned_domains)
+                                        .count()
+                                        == 0
+                            })
+                            .collect_vec();
+
+                        query_packet.extend(interaction_list.iter().cloned())
+                    }
+                }
+            }
+        }
 
         self.multipoles = multipoles;
         self.locals = locals;
@@ -931,5 +973,6 @@ where
         self.charge_index_pointers_sources = charge_index_pointer_targets;
         self.charge_index_pointers_sources = charge_index_pointer_sources;
         self.kernel_eval_size = eval_size;
+        self.query_packet = query_packet.into_iter().collect()
     }
 }

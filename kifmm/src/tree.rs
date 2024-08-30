@@ -39,7 +39,7 @@ mod point;
 mod single_node;
 
 #[cfg(feature = "mpi")]
-mod multi_node;
+pub mod multi_node;
 
 // Public API
 #[doc(inline)]

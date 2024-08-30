@@ -256,6 +256,27 @@ where
     }
 }
 
+impl<T> MortonKeys<T>
+where
+    T: RlstScalar + Float,
+{
+    pub fn from_hashset(keys: HashSet<MortonKey<T>>, rank: i32) -> Self {
+        let keys = MortonKeys {
+            keys: keys
+                .iter()
+                .map(|k| MortonKey {
+                    anchor: k.anchor,
+                    morton: k.morton,
+                    rank: rank,
+                    scalar: PhantomData,
+                })
+                .collect_vec(),
+            index: 0,
+        };
+        keys
+    }
+}
+
 impl<T> PartialEq for MortonKey<T>
 where
     T: RlstScalar + Float,
@@ -809,7 +830,7 @@ where
         {
             let new_anchor: [u64; 3] = [x as u64, y as u64, z as u64];
             let new_morton = encode_anchor(&new_anchor, level);
-            Some(Self::new(&new_anchor, new_morton, None))
+            Some(Self::new(&new_anchor, new_morton, Some(self.rank)))
         } else {
             None
         }

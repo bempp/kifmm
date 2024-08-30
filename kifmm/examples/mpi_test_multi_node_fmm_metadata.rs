@@ -4,6 +4,7 @@ use green_kernels::traits::Kernel;
 use kifmm::{
     fmm::types::KiFmmMultiNode,
     traits::{field::SourceToTargetData, tree::SingleNodeTreeTrait},
+    tree::multi_node::splitters,
 };
 use pulp::Scalar;
 
@@ -20,7 +21,6 @@ fn main() {
 
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
-    let comm = world.duplicate();
 
     // Setup tree parameters
     let prune_empty = false;
@@ -34,10 +34,12 @@ fn main() {
     let points = points_fixture::<f32>(n_points, None, None, None);
 
     // Attach some charges
-    let charges = vec![1f32; n_points];
+    // let charges = vec![1f32; n_points];
+
+    let sort_kind = kifmm::tree::multi_node::SortKind::Simplesort;
 
     // Create a distributed FMM object
-    let mut fmm = MultiNodeBuilder::new()
+    let fmm = MultiNodeBuilder::new()
         .tree(
             points.data(),
             points.data(),
@@ -45,6 +47,7 @@ fn main() {
             global_depth,
             prune_empty,
             &world,
+            sort_kind,
         )
         .unwrap()
         .parameters(
@@ -56,21 +59,20 @@ fn main() {
         .build()
         .unwrap();
 
-    /// Test that the level index pointers are created correctly
+    // Test that the level index pointers are created correctly
     {
-        /// 1. Test that the outer loop is over all local roots
-        let nfmms = fmm.nfmms;
-        assert_eq!(fmm.level_index_pointer_multipoles.len(), nfmms);
-        assert_eq!(fmm.level_index_pointer_locals.len(), nfmms);
+        // 1. Test that the outer loop is over all local roots
+        assert_eq!(fmm.level_index_pointer_multipoles.len(), fmm.nsource_trees);
+        assert_eq!(fmm.level_index_pointer_locals.len(), fmm.ntarget_trees);
 
-        /// 2. Test that each item is of size equal to to the number of global levels
+        // 2. Test that each item is of size equal to to the number of global levels
         let depth = local_depth + global_depth;
         assert_eq!(
             fmm.level_index_pointer_multipoles[0].len(),
             (depth + 1) as usize
         );
 
-        /// 3. Test that only levels associated with the local tree are populated
+        // 3. Test that only levels associated with the local tree are populated
         for level in 0..global_depth {
             assert!(fmm.level_index_pointer_multipoles[0][level as usize].is_empty());
             assert!(fmm.level_index_pointer_locals[0][level as usize].is_empty());
@@ -86,14 +88,13 @@ fn main() {
         }
     }
 
-    /// Test that level expansion pointers are created correctly
+    // Test that level expansion pointers are created correctly
     {
         // 1. Test that the outer loop is over all local roots
-        let nfmms = fmm.nfmms;
-        assert_eq!(fmm.level_locals.len(), nfmms);
-        assert_eq!(fmm.level_multipoles.len(), nfmms);
+        assert_eq!(fmm.level_locals.len(), fmm.ntarget_trees);
+        assert_eq!(fmm.level_multipoles.len(), fmm.nsource_trees);
 
-        /// 2. Test that each item is of size equal to to the number of global levels
+        // 2. Test that each item is of size equal to to the number of global levels
         let depth = local_depth + global_depth;
         assert_eq!(fmm.level_locals[0].len(), (depth + 1) as usize);
         assert_eq!(fmm.level_multipoles[0].len(), (depth + 1) as usize);
@@ -114,14 +115,11 @@ fn main() {
         }
     }
 
-    /// Test that leaf expansions have leaf expansion pointers have been properly set
+    // Test that leaf expansions have leaf expansion pointers have been properly set
     {
-        let nfmms = fmm.nfmms;
-
         // 1. Test that the outer loop is over all local roots
-        let nfmms = fmm.nfmms;
-        assert_eq!(fmm.leaf_locals.len(), nfmms);
-        assert_eq!(fmm.leaf_multipoles.len(), nfmms);
+        assert_eq!(fmm.leaf_locals.len(), fmm.ntarget_trees);
+        assert_eq!(fmm.leaf_multipoles.len(), fmm.nsource_trees);
 
         // 2. Test that the number of pointers is equal to the number of leaves
         let nleaves = fmm.tree.source_tree.trees[0].n_leaves().unwrap();

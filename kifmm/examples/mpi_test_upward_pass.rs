@@ -30,7 +30,7 @@ fn main() {
     // Setup tree parameters
     let prune_empty = false;
     let n_points = 10000;
-    let local_depth = 4;
+    let local_depth = 3;
     let global_depth = 1;
 
     let expansion_order = 6;
@@ -50,6 +50,7 @@ fn main() {
             global_depth,
             prune_empty,
             &world,
+            kifmm::tree::multi_node::SortKind::Simplesort,
         )
         .unwrap()
         .parameters(
@@ -73,8 +74,7 @@ fn main() {
         }
 
         // Test at local roots
-        for fmm_idx in 0..fmm.nfmms {
-
+        for fmm_idx in 0..fmm.nsource_trees {
             // Test root multipole
             {
                 let root = fmm.tree.source_tree.trees[fmm_idx].root;
@@ -85,7 +85,9 @@ fn main() {
                 );
                 let root_multipole = fmm.multipole(fmm_idx, &root).unwrap();
 
-                let all_coordinates = fmm.tree.source_tree.trees[fmm_idx].all_coordinates().unwrap();
+                let all_coordinates = fmm.tree.source_tree.trees[fmm_idx]
+                    .all_coordinates()
+                    .unwrap();
 
                 let test_point = vec![1000f32, 0f32, 0f32];
 
@@ -94,10 +96,22 @@ fn main() {
 
                 let charges = vec![1f32; all_coordinates.len() / 3];
 
-                fmm.kernel.evaluate_st(green_kernels::types::EvalType::Value, all_coordinates, &test_point, &charges, &mut expected);
-                fmm.kernel.evaluate_st(green_kernels::types::EvalType::Value, &upward_equivalent_surface, &test_point, &root_multipole, &mut found);
+                fmm.kernel.evaluate_st(
+                    green_kernels::types::EvalType::Value,
+                    all_coordinates,
+                    &test_point,
+                    &charges,
+                    &mut expected,
+                );
+                fmm.kernel.evaluate_st(
+                    green_kernels::types::EvalType::Value,
+                    &upward_equivalent_surface,
+                    &test_point,
+                    &root_multipole,
+                    &mut found,
+                );
 
-                let abs_err  = (expected[0] - found[0]).abs();
+                let abs_err = (expected[0] - found[0]).abs();
                 let rel_err = abs_err / expected[0];
                 assert!(rel_err <= 1e-5);
             }
@@ -119,7 +133,9 @@ fn main() {
                 }
 
                 let leaf = fmm.tree.source_tree.trees[fmm_idx].leaves[leaf_idx];
-                let leaf_coords = fmm.tree.source_tree.trees[fmm_idx].coordinates(&leaf).unwrap();
+                let leaf_coords = fmm.tree.source_tree.trees[fmm_idx]
+                    .coordinates(&leaf)
+                    .unwrap();
 
                 let leaf_multipole = fmm.multipole(fmm_idx, &leaf).unwrap();
 
@@ -136,10 +152,22 @@ fn main() {
 
                 let charges = vec![1f32; leaf_coords.len() / 3];
 
-                fmm.kernel.evaluate_st(green_kernels::types::EvalType::Value, leaf_coords, &test_point, &charges, &mut expected);
-                fmm.kernel.evaluate_st(green_kernels::types::EvalType::Value, &upward_equivalent_surface, &test_point, &leaf_multipole, &mut found);
+                fmm.kernel.evaluate_st(
+                    green_kernels::types::EvalType::Value,
+                    leaf_coords,
+                    &test_point,
+                    &charges,
+                    &mut expected,
+                );
+                fmm.kernel.evaluate_st(
+                    green_kernels::types::EvalType::Value,
+                    &upward_equivalent_surface,
+                    &test_point,
+                    &leaf_multipole,
+                    &mut found,
+                );
 
-                let abs_err  = (expected[0] - found[0]).abs();
+                let abs_err = (expected[0] - found[0]).abs();
                 let rel_err = abs_err / expected[0];
                 assert!(rel_err <= 1e-5);
             }

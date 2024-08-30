@@ -1,4 +1,3 @@
-- check the depths on local/global tree creation regarding metadata as well as meshing of morton keys.
 - multipole data exchange implementation
 - remainder of upward pass on elected node.
 - local data exchange to each local root

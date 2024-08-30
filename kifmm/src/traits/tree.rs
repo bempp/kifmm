@@ -1,7 +1,7 @@
 //! Tree Traits
 use std::{collections::HashSet, hash::Hash};
 
-use rlst::RlstScalar;
+use rlst::{dense::linalg::qr, RlstScalar};
 
 use num::traits::Float;
 
@@ -96,6 +96,12 @@ pub trait SingleNodeTreeTrait {
     /// # Arguments
     /// - `idx` - Index being query.
     fn node(&self, idx: usize) -> Option<&Self::Node>;
+
+    // Defines owned octants by each local root, defined as all descendents of each local root
+    fn owned_range(&self) -> Self::Node;
+
+    // Defines larger region which contributes to each local root's tree via the union of their interaction lists
+    fn contributing_range(&self) -> [Self::Node; 2];
 }
 
 pub trait MultiNodeTreeTrait {

@@ -28,10 +28,27 @@ use std::{
 
 use super::types::MultiNodeTreeNew;
 
-pub enum SortKind<T: Equivalence + Ord + Default + Clone + Debug> {
-    Hyksort { k: usize },
+#[derive(Clone)]
+pub enum SortKind {
+    Hyksort { k: i32 },
     Samplesort { k: usize },
-    Simplesort { splitters: Vec<T> },
+    Simplesort,
+}
+
+pub fn splitters<T: RlstScalar + Float>(root: MortonKey<T>, global_depth: u64) -> Vec<Point<T>> {
+    let splitters = MortonKey::root(None).descendants(global_depth).unwrap();
+    let mut splitters = splitters
+        .into_iter()
+        .map(|m| Point {
+            coordinate: [T::zero(); 3],
+            global_index: 0,
+            encoded_key: m,
+            base_key: m,
+        })
+        .collect_vec();
+    splitters.sort();
+    let splitters = &splitters[1..];
+    splitters.to_vec()
 }
 
 impl<T, C: Communicator> MultiNodeTreeNew<T, C>
@@ -46,6 +63,7 @@ where
         global_indices: &[usize],
         world: &C,
         hyksort_subcomm_size: i32,
+        sort_kind: SortKind,
     ) -> Result<MultiNodeTreeNew<T, SimpleCommunicator>, std::io::Error> {
         let size = world.size();
         let rank = world.rank();
@@ -71,7 +89,18 @@ where
 
         // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
-        hyksort(&mut points, hyksort_subcomm_size, comm)?;
+
+        match sort_kind {
+            SortKind::Hyksort { k } => hyksort(&mut points, k, comm)?,
+            SortKind::Samplesort { k } => samplesort(&mut points, &comm, k)?,
+            SortKind::Simplesort => {
+                let root = MortonKey::root(Some(rank));
+                let splitters = splitters(root, global_depth);
+                simplesort(&mut points, &comm, &splitters)?;
+            }
+        }
+
+        // hyksort(&mut points, hyksort_subcomm_size, comm)?;
         // samplesort(&mut points, &comm, 500).unwrap();
 
         // let splitters = MortonKey::root(None).descendants(global_depth)?;
@@ -90,20 +119,26 @@ where
 
         // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
-        let mut leaves = MortonKeys::from(leaves);
+        let mut leaves = MortonKeys::from_hashset(leaves, rank);
         leaves.sort();
         // leaves.complete();
 
         // These define all the single node trees to be constructed
         let trees = SingleNodeTree::from_roots(
+            rank,
             &leaves,
             &mut points,
             &domain,
             global_depth,
             local_depth,
             true,
-            rank,
         );
+
+        let mut keys_set = HashSet::new();
+
+        for tree in trees.iter() {
+            keys_set.extend(&mut tree.keys.clone());
+        }
 
         Ok(MultiNodeTreeNew {
             world: world.duplicate(),
@@ -111,6 +146,7 @@ where
             global_depth,
             local_depth,
             trees,
+            keys_set,
         })
     }
 
@@ -121,6 +157,7 @@ where
         prune_empty: bool,
         domain: Option<Domain<T>>,
         world: &C,
+        sort_kind: SortKind,
     ) -> Result<MultiNodeTreeNew<T, SimpleCommunicator>, std::io::Error> {
         let dim = 3;
         let coords_len = coordinates_row_major.len();
@@ -143,6 +180,7 @@ where
                 &global_indices,
                 world,
                 hyksort_subcomm_size,
+                sort_kind,
             );
         }
 
@@ -916,109 +954,4 @@ fn global_indices(n_points: usize, comm: &impl Communicator) -> Vec<usize> {
     }
 
     global_indices
-}
-
-impl<T, C: Communicator> SingleNodeTreeTrait for MultiNodeTree<T, C>
-where
-    T: RlstScalar + Float + Equivalence,
-{
-    type Scalar = T;
-    type Domain = Domain<T>;
-    type Node = MortonKey<T>;
-
-    fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
-        self.coordinates(leaf).map(|coords| coords.len() / 3)
-    }
-
-    fn n_coordinates_tot(&self) -> Option<usize> {
-        self.all_coordinates().map(|coords| coords.len() / 3)
-    }
-
-    fn node(&self, idx: usize) -> Option<&Self::Node> {
-        Some(&self.keys[idx])
-    }
-
-    fn n_keys_tot(&self) -> Option<usize> {
-        Some(self.keys.len())
-    }
-
-    fn n_keys(&self, level: u64) -> Option<usize> {
-        if let Some((l, r)) = self.levels_to_keys.get(&level) {
-            Some(r - l)
-        } else {
-            None
-        }
-    }
-
-    fn n_leaves(&self) -> Option<usize> {
-        Some(self.leaves.len())
-    }
-
-    fn depth(&self) -> u64 {
-        self.depth
-    }
-
-    fn domain(&self) -> &'_ Self::Domain {
-        &self.domain
-    }
-
-    fn keys(&self, level: u64) -> Option<&[Self::Node]> {
-        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
-            Some(&self.keys[l..r])
-        } else {
-            None
-        }
-    }
-
-    fn all_keys(&self) -> Option<&[Self::Node]> {
-        Some(&self.keys)
-    }
-
-    fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>> {
-        Some(&self.keys_set)
-    }
-
-    fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>> {
-        Some(&self.leaves_set)
-    }
-
-    fn all_leaves(&self) -> Option<&[Self::Node]> {
-        Some(&self.leaves)
-    }
-
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
-        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.coordinates[l * 3..r * 3])
-        } else {
-            None
-        }
-    }
-
-    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
-        Some(&self.coordinates)
-    }
-
-    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
-        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.global_indices[l..r])
-        } else {
-            None
-        }
-    }
-
-    fn all_global_indices(&self) -> Option<&[usize]> {
-        Some(&self.global_indices)
-    }
-
-    fn index(&self, key: &Self::Node) -> Option<&usize> {
-        self.key_to_index.get(key)
-    }
-
-    fn level_index(&self, key: &Self::Node) -> Option<&usize> {
-        self.key_to_level_index.get(key)
-    }
-
-    fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize> {
-        self.leaf_to_index.get(leaf)
-    }
 }

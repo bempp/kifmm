@@ -196,6 +196,8 @@ where
 
     /// Single node trees at this rank
     pub trees: Vec<SingleNodeTree<T>>,
+
+    pub keys_set: HashSet<MortonKey<T>>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -286,6 +288,10 @@ pub struct SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {
+    pub global_rank: i32,
+
+    pub local_rank: i32,
+
     /// Associated root node
     pub root: MortonKey<T>,
 

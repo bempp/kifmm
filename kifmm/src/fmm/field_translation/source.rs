@@ -23,7 +23,7 @@ use crate::{
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation, MultiNodeFmm},
+        fmm::{FmmOperatorData, HomogenousKernel, MultiNodeFmm, SourceTranslation},
         tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
         types::FmmError,
     },
@@ -528,7 +528,6 @@ where
     }
 
     fn m2m(&self, level: u64) -> Result<(), FmmError> {
-
         for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
             let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface;
 
