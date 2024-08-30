@@ -21,6 +21,7 @@ use crate::{
             FmmOperatorData, HomogenousKernel, MultiNodeFmm, SourceToTargetTranslation,
             SourceTranslation, TargetTranslation,
         },
+        tree::SingleNodeTreeTrait,
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
     Fmm, MultiNodeFmmTree,
@@ -39,7 +40,7 @@ where
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
-    type Tree = MultiNodeFmmTree<Scalar, SimpleCommunicator>;
+    type Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>;
 
     fn dim(&self) -> usize {
         3
@@ -55,7 +56,7 @@ where
 
             let local_depth = self.tree.source_tree.local_depth;
             let global_depth = self.tree.source_tree.global_depth;
-            for level in local_depth..(local_depth + global_depth) {
+            for level in (global_depth..=(local_depth + global_depth)).rev() {
                 let s = Instant::now();
                 self.m2m(level)?;
                 self.times.push(FmmOperatorTime::from_instant(
@@ -208,5 +209,39 @@ where
 
     fn ncoeffs_equivalent_surface(&self, level: u64) -> usize {
         self.ncoeffs_equivalent_surface
+    }
+
+    fn multipole(
+        &self,
+        fmm_idx: usize,
+        key: &<<<Self::Tree as crate::traits::tree::MultiNodeFmmTreeTrait>::Tree as crate::traits::tree::MultiNodeTreeTrait>::Tree as crate::traits::tree::SingleNodeTreeTrait>::Node,
+    ) -> Option<&[Self::Scalar]> {
+        if fmm_idx < self.nfmms {
+            if let Some(&key_idx) = self.tree.source_tree.trees[fmm_idx].level_index(key) {
+                let multipole_ptr = self.level_multipoles[fmm_idx][key.level() as usize][key_idx];
+                unsafe {
+                    Some(std::slice::from_raw_parts(
+                        multipole_ptr.raw,
+                        self.ncoeffs_equivalent_surface,
+                    ))
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn multipoles(&self, fmm_idx: usize, level: u64) -> Option<&[Self::Scalar]> {
+        if fmm_idx < self.nfmms {
+
+            let multipole_ptr = &self.level_multipoles[fmm_idx][level as usize][0];
+            let nsources = self.tree.source_tree.trees[fmm_idx].n_keys(level).unwrap();
+            unsafe {Some(std::slice::from_raw_parts(multipole_ptr.raw, self.ncoeffs_equivalent_surface * nsources))}
+
+        } else {
+            None
+        }
     }
 }

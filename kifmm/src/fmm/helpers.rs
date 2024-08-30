@@ -204,6 +204,34 @@ where
     result
 }
 
+pub fn level_index_pointer_multinode<T>(
+    trees: &[SingleNodeTree<T>],
+    local_depth: u64,
+    global_depth: u64,
+) -> Vec<Vec<HashMap<MortonKey<T>, usize>>>
+where
+    T: RlstScalar + Float,
+{
+    let depth = local_depth + global_depth;
+
+    let mut global_result = Vec::new();
+    for tree in trees.iter() {
+        let mut result = vec![HashMap::new(); (depth + 1).try_into().unwrap()];
+
+        for level in global_depth..=depth {
+            if let Some(keys) = tree.keys(level) {
+                for (level_idx, key) in keys.iter().enumerate() {
+                    result[level as usize].insert(*key, level_idx);
+                }
+            }
+        }
+
+        global_result.push(result)
+    }
+
+    global_result
+}
+
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
 pub fn level_expansion_pointers<T>(
     tree: &SingleNodeTree<T::Real>,
@@ -268,14 +296,13 @@ where
 
     for fmm_idx in 0..nfmms {
         let tree = &trees[fmm_idx];
-        let nkeys = tree.n_keys_tot().unwrap();
         let expansions_i = &expansions[fmm_idx];
 
         let mut result = vec![Vec::new(); (depth + 1).try_into().unwrap()];
         let mut level_displacement = 0;
 
-        for level in 0..depth {
-            let mut tmp_multipoles = Vec::new();
+        for level in global_depth..=depth {
+            let mut tmp_expansions = Vec::new();
 
             if let Some(keys) = tree.keys(level) {
                 let nkeys_level = keys.len();
@@ -283,10 +310,10 @@ where
                 for (key_idx, _) in keys.iter().enumerate() {
                     let key_displacement = level_displacement + ncoeffs * key_idx;
                     let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
-                    tmp_multipoles.push(SendPtrMut { raw });
+                    tmp_expansions.push(SendPtrMut { raw });
                 }
 
-                result[level as usize] = tmp_multipoles;
+                result[level as usize] = tmp_expansions;
                 level_displacement += nkeys_level * ncoeffs;
             }
         }

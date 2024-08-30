@@ -180,6 +180,14 @@ where
     fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
 
     fn ncoeffs_check_surface(&self, level: u64) -> usize;
+
+    fn multipole(
+        &self,
+        fmm_idx: usize,
+        key: &<<<Self::Tree as MultiNodeFmmTreeTrait>::Tree as MultiNodeTreeTrait>::Tree as SingleNodeTreeTrait>::Node,
+    ) -> Option<&[Self::Scalar]>;
+
+    fn multipoles(&self, fmm_idx: usize, level: u64) -> Option<&[Self::Scalar]>;
 }
 
 /// Set all metadata required for FMMs

@@ -23,7 +23,7 @@ use crate::{
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation},
+        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation, MultiNodeFmm},
         tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
         types::FmmError,
     },
@@ -271,8 +271,8 @@ where
             child_sources.iter().map(|source| source.parent()).collect();
 
         let mut parent_targets = parent_targets.into_iter().collect_vec();
-
         parent_targets.sort();
+
         let nparents = parent_targets.len();
         let child_multipoles = self.multipoles(level).unwrap();
 
@@ -403,7 +403,7 @@ impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Equivalence + Float,
-    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
     Self: FmmOperatorData,
@@ -411,11 +411,6 @@ where
     fn p2m(&self) -> Result<(), FmmError> {
         let dim = 3;
 
-        println!(
-            "Rank {:?} running P2M nfmm: {:?}",
-            self.communicator.rank(),
-            self.tree.source_tree.trees.len()
-        );
         // Run P2M for each local root at this processor
         for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
             // let &ncoeffs
@@ -533,7 +528,90 @@ where
     }
 
     fn m2m(&self, level: u64) -> Result<(), FmmError> {
-        // println!("Rank {:?} running M2M", self.communicator.rank());
+
+        for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
+            let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface;
+
+            let Some(child_sources) = tree.keys(level) else {
+                return Err(FmmError::Failed(format!(
+                    "M2M failed at level {:?}, no sources found",
+                    level
+                )));
+            };
+
+            let parent_targets: HashSet<_> =
+                child_sources.iter().map(|source| source.parent()).collect();
+
+            let mut parent_targets = parent_targets.into_iter().collect_vec();
+            parent_targets.sort();
+
+            let nparents = parent_targets.len();
+
+            // let multipole_ptr = &self.level_multipoles[fmm_idx][level as usize][0];
+            // let nsources = tree.n_keys(level).unwrap();
+            // let child_multipoles = unsafe {
+            //     std::slice::from_raw_parts(multipole_ptr.raw, nsources * ncoeffs_equivalent_surface)
+            // };
+            let child_multipoles = self.multipoles(fmm_idx, level).unwrap();
+
+            let mut parent_multipoles = Vec::new();
+            for parent in parent_targets.iter() {
+                let &parent_index_pointer = self.level_index_pointer_multipoles[fmm_idx]
+                    [(level - 1) as usize]
+                    .get(parent)
+                    .unwrap();
+
+                let parent_multipole =
+                    &self.level_multipoles[fmm_idx][(level - 1) as usize][parent_index_pointer];
+                parent_multipoles.push(parent_multipole);
+            }
+
+            let mut max_chunk_size = nparents;
+            if max_chunk_size > M2M_MAX_BLOCK_SIZE {
+                max_chunk_size = M2M_MAX_BLOCK_SIZE
+            }
+
+            let chunk_size = chunk_size(nparents, max_chunk_size);
+
+            let source = &self.source[0];
+
+            child_multipoles
+                .par_chunks_exact(NSIBLINGS * ncoeffs_equivalent_surface * chunk_size)
+                .zip(parent_multipoles.par_chunks_exact(chunk_size))
+                .for_each(
+                    |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
+                        let child_multipoles_chunk_mat = rlst_array_from_slice2!(
+                            child_multipoles_chunk,
+                            [ncoeffs_equivalent_surface * NSIBLINGS, chunk_size]
+                        );
+
+                        let parent_multipoles_chunk = empty_array::<Scalar, 2>()
+                            .simple_mult_into_resize(source.view(), child_multipoles_chunk_mat);
+
+                        for (chunk_idx, parent_multipole_pointer) in parent_multipole_pointers_chunk
+                            .iter()
+                            .enumerate()
+                            .take(chunk_size)
+                        {
+                            let parent_multipole = unsafe {
+                                std::slice::from_raw_parts_mut(
+                                    parent_multipole_pointer.raw,
+                                    ncoeffs_equivalent_surface,
+                                )
+                            };
+
+                            parent_multipole
+                                .iter_mut()
+                                .zip(
+                                    &parent_multipoles_chunk.data()[chunk_idx
+                                        * ncoeffs_equivalent_surface
+                                        ..(chunk_idx + 1) * ncoeffs_equivalent_surface],
+                                )
+                                .for_each(|(p, t)| *p += *t);
+                        }
+                    },
+                )
+        }
 
         Ok(())
     }

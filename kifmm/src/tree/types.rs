@@ -286,6 +286,9 @@ pub struct SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {
+    /// Associated root node
+    pub root: MortonKey<T>,
+
     /// Depth of a tree.
     pub depth: u64,
 

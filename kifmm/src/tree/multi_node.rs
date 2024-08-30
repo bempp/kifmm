@@ -59,7 +59,7 @@ where
                 .try_into()
                 .unwrap();
             let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL, Some(rank));
-            let encoded_key = MortonKey::from_point(coord, &domain, local_depth, Some(rank));
+            let encoded_key = MortonKey::from_point(coord, &domain, global_depth, Some(rank));
 
             points.push(Point {
                 coordinate: *coord,
@@ -71,22 +71,22 @@ where
 
         // Perform parallel Morton sort over encoded points
         let comm = world.duplicate();
-        // hyksort(&mut points, hyksort_subcomm_size, comm)?;
+        hyksort(&mut points, hyksort_subcomm_size, comm)?;
         // samplesort(&mut points, &comm, 500).unwrap();
 
-        let splitters = MortonKey::root(None).descendants(local_depth)?;
-        let mut splitters = splitters
-            .into_iter()
-            .map(|m| Point {
-                coordinate: [T::zero(); 3],
-                global_index: 0,
-                encoded_key: m,
-                base_key: m,
-            })
-            .collect_vec();
-        splitters.sort();
-        let splitters = &splitters[1..];
-        simplesort(&mut points, &comm, splitters)?;
+        // let splitters = MortonKey::root(None).descendants(global_depth)?;
+        // let mut splitters = splitters
+        //     .into_iter()
+        //     .map(|m| Point {
+        //         coordinate: [T::zero(); 3],
+        //         global_index: 0,
+        //         encoded_key: m,
+        //         base_key: m,
+        //     })
+        //     .collect_vec();
+        // splitters.sort();
+        // let splitters = &splitters[1..];
+        // simplesort(&mut points, &comm, splitters)?;
 
         // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();

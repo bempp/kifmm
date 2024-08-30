@@ -19,7 +19,8 @@ use crate::{
         helpers::{
             coordinate_index_pointer_multinode, flip3, homogenous_kernel_scale,
             leaf_expansion_pointers_multinode, leaf_surfaces, level_expansion_pointers,
-            level_expansion_pointers_multinode, level_index_pointer, potential_pointers_multinode,
+            level_expansion_pointers_multinode, level_index_pointer, level_index_pointer_multinode,
+            potential_pointers_multinode,
         },
         types::{FftFieldTranslationMultiNode, FftMetadata},
     },
@@ -809,18 +810,16 @@ where
         }
 
         // Index pointer of multipole and local data, indexed by fmm index, then by level
-        let mut level_index_pointer_multipoles = Vec::new();
-        let mut level_index_pointer_locals = Vec::new();
-
-        for fmm_idx in 0..nfmms {
-            let level_index_pointer_multipoles_i =
-                level_index_pointer(&self.tree.source_tree().trees[fmm_idx]);
-            let level_index_pointer_locals_i =
-                level_index_pointer(&self.tree.target_tree().trees[fmm_idx]);
-
-            level_index_pointer_multipoles.push(level_index_pointer_multipoles_i);
-            level_index_pointer_locals.push(level_index_pointer_locals_i);
-        }
+        let mut level_index_pointer_multipoles = level_index_pointer_multinode(
+            &self.tree.source_tree.trees,
+            self.tree.source_tree.local_depth,
+            self.tree.source_tree.global_depth,
+        );
+        let mut level_index_pointer_locals = level_index_pointer_multinode(
+            &self.tree.target_tree.trees,
+            self.tree.target_tree.local_depth,
+            self.tree.source_tree.global_depth,
+        );
 
         let mut leaf_upward_equivalent_surfaces_sources = Vec::new();
         let mut leaf_upward_check_surfaces_sources = Vec::new();
@@ -893,7 +892,6 @@ where
         );
 
         // Mutable pointers to potential data at each target leaf
-
         let potentials_send_pointers = potential_pointers_multinode(
             &self.tree.target_tree.trees,
             self.kernel_eval_size,

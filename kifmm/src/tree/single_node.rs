@@ -34,6 +34,8 @@ where
         depth: u64,
         global_indices: &[usize],
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
+        let root = MortonKey::from_anchor(&[0, 0, 0], 0, Some(0));
+
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
 
@@ -168,6 +170,7 @@ where
         }
 
         Ok(SingleNodeTree {
+            root,
             depth,
             coordinates,
             global_indices,
@@ -255,6 +258,12 @@ where
             0
         };
 
+        let root = if let Some(root) = root {
+            root
+        } else {
+            MortonKey::from_anchor(&[0, 0, 0], 0, rank)
+        };
+
         // Find all keys in tree
         let tmp: HashSet<MortonKey<_>> = leaves
             .iter()
@@ -335,6 +344,7 @@ where
         }
 
         Ok(SingleNodeTree {
+            root,
             depth,
             coordinates,
             global_indices,
