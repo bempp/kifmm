@@ -1,12 +1,12 @@
 //! Multi Node FMM
 //! Single Node FMM
-use std::{collections::HashMap, time::Instant};
+use std::{collections::{HashMap, HashSet}, hash::Hash, time::Instant};
 
 use green_kernels::traits::Kernel as KernelTrait;
 
 use itertools::Itertools;
 use mpi::{
-    collective::SystemOperation, ffi::RSMPI_SUM, request::WaitGuard, topology::SimpleCommunicator, traits::{Communicator, Destination, Equivalence, Source}
+    collective::SystemOperation, ffi::RSMPI_SUM, raw::AsRaw, request::WaitGuard, topology::{Color, SimpleCommunicator}, traits::{Communicator, Destination, Equivalence, Group, Root, Source}
 };
 use num::Float;
 use rlst::RlstScalar;
@@ -105,7 +105,7 @@ where
     }
 
     fn exchange_multipoles(&mut self) {
-        let rank = self.rank;
+        let world_rank = self.rank;
         let size = self.communicator.size();
 
         // 1. Gather ranges_min on all processes (should be defined also by interaction lists)
@@ -155,6 +155,8 @@ where
 
         // Using query packet figure out where to send each query physically, using the computed ranges_min.
         {
+
+            // This can be multithreaded
             let mut packets = vec![Vec::new(); size as usize];
 
             for &query in self.query_packet.iter() {
@@ -165,7 +167,8 @@ where
                     }
                 }
             }
-            let messages = packets.iter().map(|p| if !p.is_empty() { 1} else { 0}).collect_vec();
+
+            let messages = packets.iter().map(|p| if !p.is_empty() { 1 } else { 0 }).collect_vec();
 
             let packet_destinations = packets
                 .iter()
@@ -192,10 +195,12 @@ where
             let packet_sizes = packets.iter().map(|p| p.len() as i32 ).collect_vec();
 
             let mut total_messages = vec![0i32; size as usize];
+
             // All to all to figure out with whom to communicate
             self.communicator.all_reduce_into(&messages, &mut total_messages, SystemOperation::sum());
 
-            let recv_count = total_messages[rank as usize];
+            // Break into subcommunicators so multipoles can be broadcast
+            let recv_count = total_messages[world_rank as usize];
             let send_count = packets.len() as i32;
             let nreqs = recv_count + send_count;
 
@@ -203,10 +208,12 @@ where
             let mut received_packet_sizes = vec![0 as i32; recv_count as usize];
             let mut received_packet_sources = vec![0 as i32; recv_count as usize];
 
+            let color = self.communicator.rank();
+            // println!("ABOUT TO START {:?} {:?} {:?}", rank, send_count, recv_count);
             mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                for (i, &rank) in packet_destinations.iter().enumerate() {
-                    let tag = rank;
-                    let sreq = self.communicator.process_at_rank(rank).immediate_send_with_tag(
+                for (i, &destination_rank) in packet_destinations.iter().enumerate() {
+                    let tag = destination_rank;
+                    let sreq = self.communicator.process_at_rank(destination_rank).immediate_send_with_tag(
                         scope,
                         &packet_sizes[i],
                         tag,
@@ -219,7 +226,7 @@ where
                         // Spin for message availability. There is no guarantee that
                         // immediate sends, even to the same process, will be immediately
                         // visible to an immediate probe.
-                        let preq = self.communicator.any_process().immediate_matched_probe_with_tag(rank);
+                        let preq = self.communicator.any_process().immediate_matched_probe_with_tag(world_rank);
                         if let Some(p) = preq {
                             break p;
                         }
@@ -235,14 +242,100 @@ where
                 coll.wait_all(&mut complete);
             });
 
+            let mut split_comms = HashMap::new();
 
-            if rank == 0 {
-                println!("message sizes at rank {:?} {:?} {:?}", rank, received_packet_sizes, received_packet_sources);
+            let all_colors = (0..size).collect_vec();
+            let mut relevant_colors: HashSet<i32> = received_packet_sources.iter().cloned().collect();
+            relevant_colors.insert(world_rank);
+            let mut all_colors_mapped = Vec::new();
+
+            for color in all_colors.iter() {
+                let c = if relevant_colors.contains(color) {
+                    Color::with_value(*color)
+                } else {
+                    Color::undefined()
+                };
+                all_colors_mapped.push(c);
+            };
+
+            for (color_raw, &color) in all_colors_mapped.iter().enumerate() {
+                if let Some(new_comm) = self.communicator.split_by_color(color) {
+                    split_comms.insert(color_raw as i32, new_comm);
+                }
             }
 
-            if rank == 7 {
-                println!("message sizes at rank {:?} {:?} {:?}", rank, received_packet_sizes, received_packet_sources);
+            // Broadcasting a message from global root rank, can loop over all root ranks and their respective subcommunicators
+            // scattering depends on original rank order, so packets have to be arranged in rank order at this point.
+            let broadcast_world_rank = 0;
+            if split_comms.keys().contains(&broadcast_world_rank) {
+                let comm = split_comms.get(&broadcast_world_rank).unwrap();
+
+                let world_group = self.communicator.group();
+                let split_group = comm.group();
+                let split_rank = world_group.translate_rank(broadcast_world_rank, &split_group).unwrap();
+
+                let root_process = comm.process_at_rank(split_rank);
+
+                let mut received = 0i32;
+                if comm.rank() == split_rank {
+                    let msg: Vec<i32> = (0..comm.size()).collect_vec();
+                    root_process.scatter_into_root(&msg, &mut received);
+                } else {
+                    root_process.scatter_into(&mut received);
+                }
+
+                println!("RECEIVING {:?} at rank {:?} {:?}", received, world_rank, comm.rank())
             }
+
+            // let recv_count = total_messages[rank as usize];
+            // let send_count = packets.len() as i32;
+            // let nreqs = recv_count + send_count;
+
+            // // Can now set up point to point, or break up into subcommunicators
+            // let mut received_packet_sizes = vec![0 as i32; recv_count as usize];
+            // let mut received_packet_sources = vec![0 as i32; recv_count as usize];
+
+            // println!("ABOUT TO START {:?} {:?} {:?}", rank, send_count, recv_count);
+            // mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+            //     for (i, &destination_rank) in packet_destinations.iter().enumerate() {
+            //         let tag = destination_rank;
+            //         let sreq = self.communicator.process_at_rank(destination_rank).immediate_send_with_tag(
+            //             scope,
+            //             &packet_sizes[i],
+            //             tag,
+            //         );
+            //         coll.add(sreq);
+            //     }
+
+            //     for (i, size) in received_packet_sizes.iter_mut().enumerate() {
+            //         let (msg, status) = loop {
+            //             // Spin for message availability. There is no guarantee that
+            //             // immediate sends, even to the same process, will be immediately
+            //             // visible to an immediate probe.
+            //             let preq = self.communicator.any_process().immediate_matched_probe_with_tag(rank);
+            //             if let Some(p) = preq {
+            //                 break p;
+            //             }
+            //         };
+
+            //         let rreq = msg.immediate_matched_receive_into(scope, size);
+            //         received_packet_sources[i] = status.source_rank();
+
+            //         coll.add(rreq);
+            //     }
+
+            //     let mut complete = vec![];
+            //     coll.wait_all(&mut complete);
+            // });
+
+
+            // if rank == 0 {
+            //     println!("message sizes at rank {:?} {:?} {:?}", rank, received_packet_sizes, received_packet_sources);
+            // }
+
+            // if rank == 7 {
+            //     println!("message sizes at rank {:?} {:?} {:?}", rank, received_packet_sizes, received_packet_sources);
+            // }
 
 
             // debugging code

@@ -1,4 +1,10 @@
 - multipole data exchange implementation
-- remainder of upward pass on elected node.
-- local data exchange to each local root
-- independent downward pass
+    - communicate buffers
+    - insertion into tree, and recreation of metadata
+
+- node election (easy)
+    - remainder of upward pass on elected node.
+
+
+- local data exchange to each local root (also easy)
+    - independent downward pass
