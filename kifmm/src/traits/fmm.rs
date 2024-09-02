@@ -1,5 +1,7 @@
 //! FMM traits
-use crate::{traits::tree::SingleNodeFmmTreeTrait, tree::types::MortonKey};
+use crate::{
+    fmm::types::CommunicationMode, traits::tree::SingleNodeFmmTreeTrait, tree::types::MortonKey,
+};
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
@@ -171,9 +173,6 @@ where
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
-    // After multipoles have been exchanged, neeed to update associated metadata
-    fn reset_metadata(&mut self);
-
     fn equivalent_surface_order(&self, level: u64) -> usize;
 
     fn check_surface_order(&self, level: u64) -> usize;
@@ -264,14 +263,10 @@ pub trait GhostExchange {
     fn gather_ranges(&mut self);
 
     /// Exchange V list data
-    fn v_list_p2p(&mut self);
+    fn v_list_exchange(&mut self);
 
     /// Exchange U list data
-    fn u_list_p2p(&mut self);
-
-    fn v_list_subcomm(&mut self);
-
-    fn u_list_subcomm(&mut self);
+    fn u_list_exchange(&mut self);
 
     /// Gather root multipoles from local trees at nominated node
     fn gather_root_multipoles(&mut self);

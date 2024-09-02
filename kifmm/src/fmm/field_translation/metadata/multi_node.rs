@@ -1000,9 +1000,6 @@ where
         self.gather_ranges();
 
         // At this point I can exchange charge data for particle query packet
-        match self.communication_mode {
-            CommunicationMode::P2P => self.u_list_p2p(),
-            CommunicationMode::Subcomm => self.u_list_subcomm(),
-        }
+        self.u_list_exchange();
     }
 }

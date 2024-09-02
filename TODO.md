@@ -1,5 +1,6 @@
 - multipole data exchange implementation
-    - communicate buffers
+    - Change buffer communication so that packets are implicit rather than explicit, at least for v list
+    - need to communicate index pointers for coordinate data, somehow accounting for displacement from different packets
     - Ghost tree creation
 
 - node election (easy)

@@ -392,7 +392,7 @@ where
 }
 
 /// Communication mode is P2P by default
-#[derive(Default)]
+#[derive(Default, Clone, Copy)]
 pub enum CommunicationMode {
     #[default]
     /// Point to point communication of U and V list ghost data
