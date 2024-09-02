@@ -2,7 +2,7 @@
 
 use green_kernels::traits::Kernel;
 use kifmm::{
-    fmm::types::KiFmmMultiNode,
+    fmm::types::{CommunicationMode, KiFmmMultiNode},
     traits::{field::SourceToTargetData, tree::SingleNodeTreeTrait},
     tree::multi_node::splitters,
 };
@@ -37,6 +37,7 @@ fn main() {
     // let charges = vec![1f32; n_points];
 
     let sort_kind = kifmm::tree::multi_node::SortKind::Simplesort;
+    let communication_mode = CommunicationMode::P2P;
 
     // Create a distributed FMM object
     let fmm = MultiNodeBuilder::new()
@@ -54,6 +55,7 @@ fn main() {
             expansion_order,
             Laplace3dKernel::<f32>::new(),
             FftFieldTranslationMultiNode::<f32>::new(None),
+            communication_mode,
         )
         .unwrap()
         .build()

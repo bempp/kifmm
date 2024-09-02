@@ -34,7 +34,7 @@ use crate::{
     MultiNodeFmmTree,
 };
 
-use super::types::{KiFmmMultiNode, MultiNodeBuilder};
+use super::types::{CommunicationMode, KiFmmMultiNode, MultiNodeBuilder};
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
@@ -315,6 +315,7 @@ where
             kernel: None,
             nsource_trees: None,
             ntarget_trees: None,
+            communication_mode: None,
         }
     }
 
@@ -392,6 +393,7 @@ where
         expansion_order: usize,
         kernel: Kernel,
         source_to_target: SourceToTargetData,
+        communication_mode: CommunicationMode,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -410,6 +412,7 @@ where
             self.source_to_target = Some(source_to_target);
             self.equivalent_surface_order = Some(expansion_order);
             self.check_surface_order = Some(expansion_order);
+            self.communication_mode = Some(communication_mode);
             Ok(self)
         }
     }
@@ -443,6 +446,7 @@ where
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
+                communication_mode: self.communication_mode.unwrap(),
                 charges: Vec::default(),
                 kernel_eval_size: 1,
                 charge_index_pointers_sources: Vec::default(),
@@ -471,6 +475,10 @@ where
                 multipole_query_packet: Vec::default(),
                 particle_query_packet: Vec::default(),
                 all_ranges: Vec::default(),
+                ghost_u_list_octants: Vec::default(),
+                ghost_v_list_octants: Vec::default(),
+                ghost_u_list_data: Vec::default(),
+                ghost_v_list_data: Vec::default(),
             };
 
             result.source();

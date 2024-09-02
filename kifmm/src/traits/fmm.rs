@@ -264,8 +264,24 @@ pub trait ExchangeGhostData {
     fn gather_ranges(&mut self);
 
     /// Exchange V list data
-    fn v_list(&mut self);
+    fn v_list_p2p(&mut self);
 
     /// Exchange U list data
-    fn u_list(&mut self);
+    fn u_list_p2p(&mut self);
+
+    fn v_list_subcomm(&mut self);
+
+    fn u_list_subcomm(&mut self);
+
+    /// Update metadata with multipole
+    fn update_v_list_metadata(&mut self);
+
+    /// Update metadata with particles
+    fn update_u_list_metadata(&mut self);
+
+    /// Gather root multipoles from local trees at nominated node
+    fn gather_root_multipoles(&mut self);
+
+    /// Scatter root locals back to local trees
+    fn scatter_root_locals(&mut self);
 }

@@ -1,6 +1,7 @@
 //! Data structures for kernel independent FMM
 use std::{
     collections::{HashMap, HashSet},
+    default,
     marker::PhantomData,
     sync::RwLock,
 };
@@ -371,6 +372,29 @@ where
 
     /// All ranges owned by the local trees of all processors
     pub all_ranges: Vec<MortonKey<Scalar::Real>>,
+
+    /// Communication mode for ghost data
+    pub communication_mode: CommunicationMode,
+
+    /// ghost octants for v list
+    pub ghost_v_list_octants: Vec<Vec<MortonKey<Scalar::Real>>>,
+
+    pub ghost_v_list_data: Vec<Vec<Scalar>>,
+
+    /// ghost octants for u list
+    pub ghost_u_list_octants: Vec<Vec<MortonKey<Scalar::Real>>>,
+
+    pub ghost_u_list_data: Vec<Vec<Scalar::Real>>,
+}
+
+/// Communication mode is P2P by default
+#[derive(Default)]
+pub enum CommunicationMode {
+    #[default]
+    /// Point to point communication of U and V list ghost data
+    P2P,
+    /// Use subcommunicator splitting and collectives for U and V list data
+    Subcomm,
 }
 
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -624,6 +648,8 @@ where
     pub nsource_trees: Option<usize>,
 
     pub ntarget_trees: Option<usize>,
+
+    pub communication_mode: Option<CommunicationMode>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.

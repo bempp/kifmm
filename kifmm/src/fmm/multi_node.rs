@@ -39,7 +39,7 @@ use crate::{
     Fmm, MultiNodeFmmTree,
 };
 
-use super::types::KiFmmMultiNode;
+use super::types::{CommunicationMode, KiFmmMultiNode};
 
 impl<Scalar, Kernel, SourceToTargetData> MultiNodeFmm
     for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
@@ -80,33 +80,31 @@ where
 
         // At this point the exchange needs to happen of multipole data
         {
-            //     // 3. Exchange packets (point to point)
-            self.v_list();
+            // 3. Exchange packets (point to point)
+
+            match self.communication_mode {
+                CommunicationMode::P2P => self.v_list_p2p(),
+                CommunicationMode::Subcomm => self.v_list_subcomm(),
+            }
+
+            // Update metadata
+            self.update_v_list_metadata();
 
             //     // 4. Pass all root multipole data to root node so that final part of upward pass can occur on root node
         }
 
+        // Gather root multipoles at nominated node
+        self.gather_root_multipoles();
+
         // Now can proceed with remainder of the upward pass on chosen node, and some of the downward pass
-        // {
-        //     if self.communicator.rank() == 0 {
-        //         // Global upward pass
-        //         for level in (1..self.tree.source_tree.global_depth).rev() {}
+        {
 
-        //         // Global downward pass
-        //         for level in 2..=self.tree.target_tree.global_depth {
-        //             if level > 2 {}
-        //         }
-        //     }
+        }
 
-        //     // Exchange root multipole data back to required MPI processes
-        // }
+        // Scatter root locals back to local trees
+        self.scatter_root_locals();
 
         // Now remainder of downward pass can happen in parallel on each process
-        // {
-        //     // local leaf level operations
-        //     // fmm.p2p()?;
-        //     // fmm.l2p()?;
-        // }
 
         Ok(())
     }
@@ -182,6 +180,14 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: SourceTranslation,
 {
+    fn gather_root_multipoles(&mut self) {
+
+    }
+
+    fn scatter_root_locals(&mut self) {
+
+    }
+
     fn gather_ranges(&mut self) {
         let size = self.communicator.size();
 
@@ -212,7 +218,7 @@ where
         self.all_ranges = all_ranges;
     }
 
-    fn u_list(&mut self) {
+    fn u_list_p2p(&mut self) {
         let world_rank = self.rank;
         let size = self.communicator.size();
 
@@ -343,7 +349,6 @@ where
             let mut tmp = Vec::new();
 
             for key in recv_buffer.iter() {
-
                 let mut index = 0;
                 for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
                     if tree.keys_set.contains(key) {
@@ -352,10 +357,9 @@ where
                     }
                 }
 
-                if let Some(_coords) = self.tree.source_tree.trees[index].coordinates(key)  {
+                if let Some(_coords) = self.tree.source_tree.trees[index].coordinates(key) {
                     tmp.push(*key)
                 }
-
             }
 
             available_received_packets_sizes.push(tmp.len() as i32);
@@ -367,7 +371,6 @@ where
         let mut send_buffers_index_pointers = Vec::new();
 
         for packet in available_received_packets.iter() {
-
             let mut tmp = Vec::new(); // index pointer
 
             let mut packet_size = 0;
@@ -382,11 +385,12 @@ where
                     }
                 }
 
-                let ncoords = if let Some(coords) = self.tree.source_tree.trees[index].coordinates(key) {
-                    coords.len()
-                } else {
-                    0
-                };
+                let ncoords =
+                    if let Some(coords) = self.tree.source_tree.trees[index].coordinates(key) {
+                        coords.len()
+                    } else {
+                        0
+                    };
 
                 tmp.push((index_pointer, index_pointer + ncoords));
                 packet_size += ncoords;
@@ -399,8 +403,10 @@ where
 
         // Allocate send buffers
         let mut send_buffers = Vec::new();
-        for (packet, &packet_size) in available_received_packets.iter().zip(send_buffers_len.iter()) {
-
+        for (packet, &packet_size) in available_received_packets
+            .iter()
+            .zip(send_buffers_len.iter())
+        {
             let mut tmp = vec![Scalar::Real::default(); packet_size as usize];
 
             let mut index_pointer = 0;
@@ -416,12 +422,11 @@ where
 
                 if let Some(coords) = self.tree.source_tree.trees[index].coordinates(key) {
                     let ncoords = coords.len();
-                    tmp[index_pointer..index_pointer+ncoords].copy_from_slice(coords);
+                    tmp[index_pointer..index_pointer + ncoords].copy_from_slice(coords);
                     index_pointer += ncoords
                 } else {
                     index_pointer += 0
                 }
-
             }
 
             send_buffers.push(tmp);
@@ -500,7 +505,10 @@ where
                 coll.add(sreq);
             }
 
-            for (i, size) in available_requested_packet_sizes_particle.iter_mut().enumerate() {
+            for (i, size) in available_requested_packet_sizes_particle
+                .iter_mut()
+                .enumerate()
+            {
                 let source_rank = packet_destinations[i];
                 let rreq = self
                     .communicator
@@ -512,7 +520,6 @@ where
             let mut complete = vec![];
             coll.wait_all(&mut complete);
         });
-
 
         // Allocate receive buffers for particle data
         let mut recv_buffers = Vec::new();
@@ -549,9 +556,12 @@ where
             coll.wait_all(&mut complete);
         });
 
+        // Insert ghost particle data into local tree
+        self.ghost_u_list_octants = available_requested_packets;
+        self.ghost_u_list_data = recv_buffers;
     }
 
-    fn v_list(&mut self) {
+    fn v_list_p2p(&mut self) {
         let world_rank = self.rank;
         let size = self.communicator.size();
 
@@ -608,104 +618,6 @@ where
             let send_count = packets.len() as i32;
             let nreqs = recv_count + send_count;
 
-            // Can now set up point to point, or break up into subcommunicators
-
-            // Attempt at subcomm coloring
-            // {
-            // let mut received_packet_sizes = vec![0 as i32; recv_count as usize];
-            //    let mut received_packet_sources = vec![0 as i32; recv_count as usize];
-            // let color = self.communicator.rank();
-            // // println!("ABOUT TO START {:?} {:?} {:?}", rank, send_count, recv_count);
-            // mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-            //     for (i, &destination_rank) in packet_destinations.iter().enumerate() {
-            //         let tag = destination_rank;
-            //         let sreq = self.communicator.process_at_rank(destination_rank).immediate_send_with_tag(
-            //             scope,
-            //             &packet_sizes[i],
-            //             tag,
-            //         );
-            //         coll.add(sreq);
-            //     }
-
-            //     for (i, size) in received_packet_sizes.iter_mut().enumerate() {
-            //         let (msg, status) = loop {
-            //             // Spin for message availability. There is no guarantee that
-            //             // immediate sends, even to the same process, will be immediately
-            //             // visible to an immediate probe.
-            //             let preq = self.communicator.any_process().immediate_matched_probe_with_tag(world_rank);
-            //             if let Some(p) = preq {
-            //                 break p;
-            //             }
-            //         };
-
-            //         let rreq = msg.immediate_matched_receive_into(scope, size);
-            //         received_packet_sources[i] = status.source_rank();
-
-            //         coll.add(rreq);
-            //     }
-
-            //     let mut complete = vec![];
-            //     coll.wait_all(&mut complete);
-            // });
-
-            // let mut split_comms = HashMap::new();
-
-            // let all_colors = (0..size).collect_vec();
-            // let mut relevant_colors: HashSet<i32> = received_packet_sources.iter().cloned().collect();
-            // relevant_colors.insert(world_rank);
-            // let mut all_colors_mapped = Vec::new();
-
-            // for color in all_colors.iter() {
-            //     let c = if relevant_colors.contains(color) {
-            //         Color::with_value(*color)
-            //     } else {
-            //         Color::undefined()
-            //     };
-            //     all_colors_mapped.push(c);
-            // };
-
-            // for (color_raw, &color) in all_colors_mapped.iter().enumerate() {
-            //     if let Some(new_comm) = self.communicator.split_by_color(color) {
-            //         split_comms.insert(color_raw as i32, new_comm);
-            //     }
-            // }
-
-            // // Broadcasting a message from global root rank, can loop over all root ranks and their respective subcommunicators
-            // // scattering depends on original rank order, so packets have to be arranged in rank order at this point.
-            // let broadcast_world_rank = 0;
-
-            // // This serialises over each overlapping set of subcommunicators
-            // (0..size).into_iter().for_each(|broadcast_world_rank: i32|{
-            //     if split_comms.keys().contains(&broadcast_world_rank) {
-            //         let comm = split_comms.get(&broadcast_world_rank).unwrap();
-
-            //         let world_group = self.communicator.group();
-            //         let split_group = comm.group();
-            //         let split_rank = world_group.translate_rank(broadcast_world_rank, &split_group).unwrap();
-
-            //         let root_process = comm.process_at_rank(split_rank);
-
-            //         let mut received = 0i32;
-            //         if comm.rank() == split_rank {
-            //             let msg: Vec<i32> = vec![broadcast_world_rank; size as usize];
-            //             mpi::request::scope(|scope| {
-            //                 let req = root_process.immediate_scatter_into_root(scope, &msg[..], &mut received);
-            //                 req.wait();
-            //             });
-            //         } else {
-            //             mpi::request::scope(|scope| {
-            //                 let req = root_process.immediate_scatter_into(scope, &mut received);
-            //                 req.wait();
-            //             });
-            //         }
-
-            //         println!("RECEIVING {:?} at rank {:?} from {:?}", received, world_rank, broadcast_world_rank)
-            //     }
-            // });
-            // println!("");
-            // }
-
-            // Try returning to point to point, as this overlapping communication won't be an issue.
             let mut received_packet_sizes = vec![0 as i32; recv_count as usize];
             let mut received_packet_sources = vec![0 as i32; recv_count as usize];
 
@@ -920,18 +832,172 @@ where
                 coll.wait_all(&mut complete);
             });
 
-            if world_rank == 0 {
-                println!("RECEIVED ");
-                println!(
-                    "requested {:?} available {:?} received {:?}",
-                    &recv_buffers[0][0..10],
-                    available_received_packets[0].len(),
-                    available_received_packets_sizes[0]
-                );
-            }
+            self.ghost_v_list_octants = available_received_packets;
+            self.ghost_v_list_data = recv_buffers;
         }
+    }
 
+    fn u_list_subcomm(&mut self) {}
+
+    fn v_list_subcomm(&mut self) {
+        // // This can be multithreaded
+        // let mut packets = vec![Vec::new(); size as usize];
+
+        // for &query in self.multipole_query_packet.iter() {
+        //     for (destination_rank, range) in self.all_ranges.chunks(2).enumerate() {
+        //         if range[0] <= query.finest_first_child()
+        //             && query.finest_first_child() <= range[1]
+        //         {
+        //             packets[destination_rank].push(query)
+        //         }
+        //     }
+        // }
+
+        // let messages = packets
+        //     .iter()
+        //     .map(|p| if !p.is_empty() { 1 } else { 0 })
+        //     .collect_vec();
+
+        // let packet_destinations = packets
+        //     .iter()
+        //     .enumerate()
+        //     .filter_map(|(rank, packet)| {
+        //         if packet.len() > 0 {
+        //             Some(rank as i32)
+        //         } else {
+        //             None
+        //         }
+        //     })
+        //     .collect_vec();
+
+        // let packets = packets
+        //     .into_iter()
+        //     .filter_map(|p| if p.len() > 0 { Some(p) } else { None })
+        //     .collect_vec();
+
+        // let packet_sizes = packets.iter().map(|p| p.len() as i32).collect_vec();
+
+        // let mut total_messages = vec![0i32; size as usize];
+
+        // // All to all to figure out with whom to communicate
+        // self.communicator.all_reduce_into(
+        //     &messages,
+        //     &mut total_messages,
+        //     SystemOperation::sum(),
+        // );
+
+        // // Break into subcommunicators so multipoles can be broadcast
+        // let recv_count = total_messages[world_rank as usize];
+        // let send_count = packets.len() as i32;
+        // let nreqs = recv_count + send_count;
+
+        // Can now set up point to point, or break up into subcommunicators
+
+        // Attempt at subcomm coloring
+        // {
+        // let mut received_packet_sizes = vec![0 as i32; recv_count as usize];
+        //    let mut received_packet_sources = vec![0 as i32; recv_count as usize];
+        // let color = self.communicator.rank();
+        // // println!("ABOUT TO START {:?} {:?} {:?}", rank, send_count, recv_count);
+        // mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+        //     for (i, &destination_rank) in packet_destinations.iter().enumerate() {
+        //         let tag = destination_rank;
+        //         let sreq = self.communicator.process_at_rank(destination_rank).immediate_send_with_tag(
+        //             scope,
+        //             &packet_sizes[i],
+        //             tag,
+        //         );
+        //         coll.add(sreq);
+        //     }
+
+        //     for (i, size) in received_packet_sizes.iter_mut().enumerate() {
+        //         let (msg, status) = loop {
+        //             // Spin for message availability. There is no guarantee that
+        //             // immediate sends, even to the same process, will be immediately
+        //             // visible to an immediate probe.
+        //             let preq = self.communicator.any_process().immediate_matched_probe_with_tag(world_rank);
+        //             if let Some(p) = preq {
+        //                 break p;
+        //             }
+        //         };
+
+        //         let rreq = msg.immediate_matched_receive_into(scope, size);
+        //         received_packet_sources[i] = status.source_rank();
+
+        //         coll.add(rreq);
+        //     }
+
+        //     let mut complete = vec![];
+        //     coll.wait_all(&mut complete);
+        // });
+
+        // let mut split_comms = HashMap::new();
+
+        // let all_colors = (0..size).collect_vec();
+        // let mut relevant_colors: HashSet<i32> = received_packet_sources.iter().cloned().collect();
+        // relevant_colors.insert(world_rank);
+        // let mut all_colors_mapped = Vec::new();
+
+        // for color in all_colors.iter() {
+        //     let c = if relevant_colors.contains(color) {
+        //         Color::with_value(*color)
+        //     } else {
+        //         Color::undefined()
+        //     };
+        //     all_colors_mapped.push(c);
+        // };
+
+        // for (color_raw, &color) in all_colors_mapped.iter().enumerate() {
+        //     if let Some(new_comm) = self.communicator.split_by_color(color) {
+        //         split_comms.insert(color_raw as i32, new_comm);
+        //     }
+        // }
+
+        // // Broadcasting a message from global root rank, can loop over all root ranks and their respective subcommunicators
+        // // scattering depends on original rank order, so packets have to be arranged in rank order at this point.
+        // let broadcast_world_rank = 0;
+
+        // // This serialises over each overlapping set of subcommunicators
+        // (0..size).into_iter().for_each(|broadcast_world_rank: i32|{
+        //     if split_comms.keys().contains(&broadcast_world_rank) {
+        //         let comm = split_comms.get(&broadcast_world_rank).unwrap();
+
+        //         let world_group = self.communicator.group();
+        //         let split_group = comm.group();
+        //         let split_rank = world_group.translate_rank(broadcast_world_rank, &split_group).unwrap();
+
+        //         let root_process = comm.process_at_rank(split_rank);
+
+        //         let mut received = 0i32;
+        //         if comm.rank() == split_rank {
+        //             let msg: Vec<i32> = vec![broadcast_world_rank; size as usize];
+        //             mpi::request::scope(|scope| {
+        //                 let req = root_process.immediate_scatter_into_root(scope, &msg[..], &mut received);
+        //                 req.wait();
+        //             });
+        //         } else {
+        //             mpi::request::scope(|scope| {
+        //                 let req = root_process.immediate_scatter_into(scope, &mut received);
+        //                 req.wait();
+        //             });
+        //         }
+
+        //         println!("RECEIVING {:?} at rank {:?} from {:?}", received, world_rank, broadcast_world_rank)
+        //     }
+        // });
+        // println!("");
+        // }
+    }
+
+    fn update_u_list_metadata(&mut self) {
+        // potential index pointers need to be updated, and local trees need to be updated
+        // corresponding tree index should be available in the request data to avoid a double loop
+
+    }
+
+    fn update_v_list_metadata(&mut self) {
         // Next step, generate metadata, will require a re-allocation for optimal performance of kernels for M2L in local trees
+        // Need to be careful to insert siblings, even if they don't have any multipole data from ghosts so that kernels work.
 
         // Recreate tree index lookups
         // Copy local multipole data to new tree, with addition of ghost multipoles

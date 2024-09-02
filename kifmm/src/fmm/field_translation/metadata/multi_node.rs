@@ -22,7 +22,7 @@ use crate::{
             level_expansion_pointers_multinode, level_index_pointer, level_index_pointer_multinode,
             potential_pointers_multinode,
         },
-        types::{FftFieldTranslationMultiNode, FftMetadata},
+        types::{CommunicationMode, FftFieldTranslationMultiNode, FftMetadata},
     },
     linalg::pinv::pinv,
     traits::{
@@ -1000,6 +1000,11 @@ where
         self.gather_ranges();
 
         // At this point I can exchange charge data for particle query packet
-        self.u_list();
+        match self.communication_mode {
+            CommunicationMode::P2P => self.u_list_p2p(),
+            CommunicationMode::Subcomm => self.u_list_subcomm(),
+        }
+
+        self.update_u_list_metadata();
     }
 }
