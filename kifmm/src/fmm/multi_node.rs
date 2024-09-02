@@ -29,13 +29,16 @@ use crate::{
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{
-            ExchangeGhostData, FmmOperatorData, HomogenousKernel, MultiNodeFmm,
+            FmmOperatorData, GhostExchange, HomogenousKernel, MultiNodeFmm,
             SourceToTargetTranslation, SourceTranslation, TargetTranslation,
         },
         tree::SingleNodeTreeTrait,
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    tree::{helpers::all_to_allv_sparse, types::MortonKey},
+    tree::{
+        helpers::all_to_allv_sparse,
+        types::{GhostTreeU, GhostTreeV, MortonKey},
+    },
     Fmm, MultiNodeFmmTree,
 };
 
@@ -48,7 +51,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    Self: SourceTranslation + ExchangeGhostData,
+    Self: SourceTranslation + GhostExchange,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -80,31 +83,25 @@ where
 
         // At this point the exchange needs to happen of multipole data
         {
-            // 3. Exchange packets (point to point)
-
             match self.communication_mode {
                 CommunicationMode::P2P => self.v_list_p2p(),
                 CommunicationMode::Subcomm => self.v_list_subcomm(),
             }
-
-            // Update metadata
-            self.update_v_list_metadata();
-
-            //     // 4. Pass all root multipole data to root node so that final part of upward pass can occur on root node
         }
+
+        // Build up local data structures containing ghost data
 
         // Gather root multipoles at nominated node
         self.gather_root_multipoles();
 
         // Now can proceed with remainder of the upward pass on chosen node, and some of the downward pass
-        {
-
-        }
+        {}
 
         // Scatter root locals back to local trees
         self.scatter_root_locals();
 
-        // Now remainder of downward pass can happen in parallel on each process
+        // Now remainder of downward pass can happen in parallel on each process, similar to how I've written the local upward passes
+        // new kernels have to reflect ghost data, and potentially multiple local source trees
 
         Ok(())
     }
@@ -171,7 +168,7 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> ExchangeGhostData
+impl<Scalar, Kernel, SourceToTargetData> GhostExchange
     for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
@@ -180,13 +177,9 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: SourceTranslation,
 {
-    fn gather_root_multipoles(&mut self) {
+    fn gather_root_multipoles(&mut self) {}
 
-    }
-
-    fn scatter_root_locals(&mut self) {
-
-    }
+    fn scatter_root_locals(&mut self) {}
 
     fn gather_ranges(&mut self) {
         let size = self.communicator.size();
@@ -556,9 +549,14 @@ where
             coll.wait_all(&mut complete);
         });
 
-        // Insert ghost particle data into local tree
-        self.ghost_u_list_octants = available_requested_packets;
-        self.ghost_u_list_data = recv_buffers;
+        // Insert ghost particle data into special ghost tree
+        let tmp_index_pointers = vec![vec![1, 1]];
+        self.ghost_tree_u = GhostTreeU::from_ghost_data(
+            &available_received_packets,
+            &tmp_index_pointers,
+            &recv_buffers,
+        )
+        .unwrap_or_default();
     }
 
     fn v_list_p2p(&mut self) {
@@ -832,8 +830,12 @@ where
                 coll.wait_all(&mut complete);
             });
 
-            self.ghost_v_list_octants = available_received_packets;
-            self.ghost_v_list_data = recv_buffers;
+            // self.ghost_v_list_octants = available_received_packets;
+            // self.ghost_v_list_data = recv_buffers;
+
+            self.ghost_tree_v =
+                GhostTreeV::from_ghost_data(&available_received_packets, &recv_buffers)
+                    .unwrap_or_default();
         }
     }
 
@@ -987,22 +989,5 @@ where
         // });
         // println!("");
         // }
-    }
-
-    fn update_u_list_metadata(&mut self) {
-        // potential index pointers need to be updated, and local trees need to be updated
-        // corresponding tree index should be available in the request data to avoid a double loop
-
-    }
-
-    fn update_v_list_metadata(&mut self) {
-        // Next step, generate metadata, will require a re-allocation for optimal performance of kernels for M2L in local trees
-        // Need to be careful to insert siblings, even if they don't have any multipole data from ghosts so that kernels work.
-
-        // Recreate tree index lookups
-        // Copy local multipole data to new tree, with addition of ghost multipoles
-
-        // Final step, setup new tree on nominated node for global FMM calculation, with all the leaf level
-        // multipole data it needs to do both upward and doward passes
     }
 }

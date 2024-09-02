@@ -41,6 +41,9 @@ mod single_node;
 #[cfg(feature = "mpi")]
 pub mod multi_node;
 
+#[cfg(feature = "mpi")]
+pub mod ghost_tree;
+
 // Public API
 #[doc(inline)]
 pub use crate::tree::types::SingleNodeTree;

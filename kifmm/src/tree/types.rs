@@ -61,6 +61,7 @@ where
     pub morton: u64,
 
     /// Associated MPI rank in distributed setting, defaults to 0
+    /// Going to use this to label association with local tree instead of MPI rank
     pub rank: i32,
 
     /// Scalar type of coordinate data associated with the key
@@ -301,6 +302,9 @@ where
     /// Domain spanned by the points.
     pub domain: Domain<T>,
 
+    /// All points associated with domain, with associated Morton Keys
+    pub points: Vec<Point<T>>,
+
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
     pub coordinates: Vec<T>,
 
@@ -333,4 +337,82 @@ where
 
     /// All keys, returned as a set.
     pub keys_set: HashSet<MortonKey<T>>,
+}
+
+/// Ghost tree for received U list data
+#[derive(Default)]
+pub struct GhostTreeU<T>
+where
+    T: RlstScalar + Float,
+{
+    pub global_rank: i32,
+
+    pub local_rank: i32,
+    /// Depth of a tree. taken from underlying tree
+    pub depth: u64,
+
+    /// Domain spanned by the points.
+    pub domain: Domain<T>,
+
+    /// All points associated with domain, with associated Morton Keys
+    pub points: Vec<Point<T>>,
+
+    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
+    pub coordinates: Vec<T>,
+
+    /// All global indices
+    pub global_indices: Vec<usize>,
+
+    /// The leaves that span the tree, and associated Point data.
+    pub leaves: MortonKeys<T>,
+
+    /// Associate leaves with coordinate indices.
+    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+
+    /// Map between a leaf and its index
+    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+
+    /// All leaves, returned as a set.
+    pub leaves_set: HashSet<MortonKey<T>>,
+}
+
+/// Ghost tree for received V list data
+#[derive(Default)]
+pub struct GhostTreeV<T>
+where
+    T: RlstScalar + Float,
+{
+    pub global_rank: i32,
+
+    pub local_rank: i32,
+
+    /// Associated root node
+    pub root: MortonKey<T>,
+
+    /// Depth of a tree.
+    pub depth: u64,
+
+    /// Domain spanned by the points.
+    pub domain: Domain<T>,
+
+    /// All global indices
+    pub global_indices: Vec<usize>,
+
+    /// The leaves that span the tree, and associated Point data.
+    pub leaves: MortonKeys<T::Real>,
+
+    /// All nodes in tree, and associated Node data.
+    pub keys: MortonKeys<T::Real>,
+
+    /// Associate levels with key indices.
+    pub levels_to_keys: HashMap<u64, (usize, usize)>,
+
+    /// Map between a key and its index
+    pub key_to_index: HashMap<MortonKey<T::Real>, usize>,
+
+    /// Map between a key and its index at a level
+    pub key_to_level_index: HashMap<MortonKey<T::Real>, usize>,
+
+    /// All keys, returned as a set.
+    pub keys_set: HashSet<MortonKey<T::Real>>,
 }

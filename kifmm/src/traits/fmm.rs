@@ -259,7 +259,7 @@ where
     fn is_homogenous(&self) -> bool;
 }
 
-pub trait ExchangeGhostData {
+pub trait GhostExchange {
     /// Gather ranges controlled by each local tree
     fn gather_ranges(&mut self);
 
@@ -272,12 +272,6 @@ pub trait ExchangeGhostData {
     fn v_list_subcomm(&mut self);
 
     fn u_list_subcomm(&mut self);
-
-    /// Update metadata with multipole
-    fn update_v_list_metadata(&mut self);
-
-    /// Update metadata with particles
-    fn update_u_list_metadata(&mut self);
 
     /// Gather root multipoles from local trees at nominated node
     fn gather_root_multipoles(&mut self);

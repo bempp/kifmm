@@ -28,7 +28,7 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::SourceToTargetTranslationMetadata,
-        fmm::{ExchangeGhostData, FmmMetadata, MultiNodeFmm},
+        fmm::{FmmMetadata, GhostExchange, MultiNodeFmm},
         general::AsComplex,
         tree::MultiNodeFmmTreeTrait,
     },
@@ -751,7 +751,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
-    Self: ExchangeGhostData,
+    Self: GhostExchange,
 {
     type Scalar = Scalar;
     type Charges = Vec<Self::Scalar>;
@@ -1004,7 +1004,5 @@ where
             CommunicationMode::P2P => self.u_list_p2p(),
             CommunicationMode::Subcomm => self.u_list_subcomm(),
         }
-
-        self.update_u_list_metadata();
     }
 }

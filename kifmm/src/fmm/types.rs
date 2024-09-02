@@ -17,7 +17,7 @@ use crate::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex, types::FmmOperatorTime,
     },
-    tree::types::{Domain, MortonKey, MultiNodeTreeNew, SingleNodeTree},
+    tree::types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MultiNodeTreeNew, SingleNodeTree},
 };
 
 #[cfg(feature = "mpi")]
@@ -385,6 +385,10 @@ where
     pub ghost_u_list_octants: Vec<Vec<MortonKey<Scalar::Real>>>,
 
     pub ghost_u_list_data: Vec<Vec<Scalar::Real>>,
+
+    pub ghost_tree_u: GhostTreeU<Scalar::Real>,
+
+    pub ghost_tree_v: GhostTreeV<Scalar>,
 }
 
 /// Communication mode is P2P by default

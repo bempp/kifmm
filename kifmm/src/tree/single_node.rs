@@ -17,6 +17,8 @@ use crate::{
     },
 };
 
+use super::point;
+
 impl<T> SingleNodeTree<T>
 where
     T: RlstScalar + Float,
@@ -187,6 +189,7 @@ where
             leaves_set,
             keys_set,
             levels_to_keys,
+            points,
         })
     }
 
@@ -363,6 +366,7 @@ where
             leaves_set,
             keys_set,
             levels_to_keys,
+            points,
         })
     }
 
@@ -394,6 +398,8 @@ where
                     local_points.iter().flat_map(|p| p.coordinate).collect_vec();
                 let local_indices = Some(local_points.iter().map(|p| p.global_index).collect_vec());
 
+                let root_label = i as i32;
+
                 let mut tree = SingleNodeTree::new(
                     &local_coordinates,
                     depth,
@@ -401,7 +407,7 @@ where
                     Some(*global_domain),
                     Some(*root),
                     local_indices,
-                    Some(rank),
+                    Some(root_label),
                 )
                 .unwrap();
 
@@ -892,6 +898,159 @@ where
         [neighbours[0], *neighbours.last().unwrap()]
     }
 }
+
+// impl<T: RlstScalar + Float> AttachGhosts for SingleNodeTree<T> {
+//     /// Must be called for each local rank SEPARATELY at this point
+//     fn attach_ghosts_u_list(
+//         &mut self,
+//         ghost_octants: &[<Self as SingleNodeTreeTrait>::Node],
+//         coordinate_data: &[<Self as SingleNodeTreeTrait>::Scalar],
+//         coordinate_index_pointers: &[(usize, usize)],
+//         local_rank: i32,
+//     ) {
+//         let dim = 3;
+//         let n_coords = coordinate_data.len() / dim;
+//         let root = self.root;
+//         let root_level = self.root.level();
+
+//         // TODO: Add global index information at some point
+//         let mut points = Points::default();
+//         for i in 0..n_coords {
+//             let coord: &[T; 3] = &coordinate_data[i * dim..(i + 1) * dim].try_into().unwrap();
+//             let base_key =
+//                 MortonKey::from_point(coord, &self.domain, DEEPEST_LEVEL, Some(local_rank));
+//             let encoded_key =
+//                 MortonKey::from_point(coord, &self.domain, self.depth, Some(local_rank));
+//             points.push(Point {
+//                 coordinate: *coord,
+//                 base_key,
+//                 encoded_key,
+//                 global_index: 0,
+//             })
+//         }
+
+//         // Add to local points
+//         self.points.extend(points.iter());
+//         self.points.sort();
+
+//         // Re-index index pointers
+//         let mut leaves_to_coordinates = HashMap::new();
+//         let mut curr = self.points[0];
+//         let mut curr_idx = 0;
+
+//         for (i, point) in self.points.iter().enumerate() {
+//             if point.encoded_key != curr.encoded_key {
+//                 leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
+//                 curr_idx = i;
+//                 curr = *point;
+//             }
+//         }
+//         leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
+
+//         // Ensure that final leaf set contains siblings of all encoded keys
+//         let leaves: HashSet<MortonKey<_>> = leaves_to_coordinates
+//             .keys()
+//             .flat_map(|k| k.siblings())
+//             .collect();
+
+//         // Sort leaves before returning
+//         let mut leaves = MortonKeys::from(leaves);
+//         leaves.sort();
+
+//         // Find all keys in tree
+//         let tmp: HashSet<MortonKey<_>> = leaves
+//             .iter()
+//             .flat_map(|leaf| leaf.ancestors(Some(root_level)).into_iter())
+//             .collect();
+
+//         // Ensure all siblings of ancestors are included
+//         let tmp: HashSet<MortonKey<_>> = tmp
+//             .iter()
+//             .flat_map(|key| {
+//                 if key.level() != root_level {
+//                     key.siblings()
+//                 } else {
+//                     vec![*key]
+//                 }
+//             })
+//             .collect();
+
+//         let mut keys = MortonKeys::from(tmp);
+
+//         // Create sets for inclusion testing
+//         let leaves_set: HashSet<MortonKey<_>> = leaves.iter().cloned().collect();
+//         let keys_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
+
+//         // Group by level to perform efficient lookup
+//         keys.sort_by_key(|a| a.level());
+
+//         let mut levels_to_keys = HashMap::new();
+//         let mut curr = keys[0];
+//         let mut curr_idx = 0;
+//         for (i, key) in keys.iter().enumerate() {
+//             if key.level() != curr.level() {
+//                 levels_to_keys.insert(curr.level(), (curr_idx, i));
+//                 curr_idx = i;
+//                 curr = *key;
+//             }
+//         }
+//         levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+//         // Return tree in sorted order, by level and then by Morton key
+//         for l in root_level..=self.depth {
+//             let &(l, r) = levels_to_keys.get(&l).unwrap();
+//             let subset = &mut keys[l..r];
+//             subset.sort();
+//         }
+
+//         let mut key_to_level_index = HashMap::new();
+//         // Compute key to level index
+//         for l in root_level..=self.depth {
+//             let &(l, r) = levels_to_keys.get(&l).unwrap();
+//             let keys = &keys[l..r];
+//             for (i, key) in keys.iter().enumerate() {
+//                 key_to_level_index.insert(*key, i);
+//             }
+//         }
+
+//         // Collect coordinates in row-major order, for ease of lookup
+//         let coordinates = points
+//             .iter()
+//             .map(|p| p.coordinate)
+//             .flat_map(|[x, y, z]| vec![x, y, z])
+//             .collect_vec();
+
+//         // Collect global indices, in Morton sorted order
+//         let global_indices = points.iter().map(|p| p.global_index).collect_vec();
+
+//         // Map between keys/leaves and their respective indices
+//         let mut key_to_index = HashMap::new();
+
+//         for (i, key) in keys.iter().enumerate() {
+//             key_to_index.insert(*key, i);
+//         }
+
+//         let mut leaf_to_index = HashMap::new();
+
+//         for (i, key) in leaves.iter().enumerate() {
+//             leaf_to_index.insert(*key, i);
+//         }
+
+//         self.coordinates = coordinates;
+//         self.leaves = leaves;
+//         self.keys = keys;
+//         self.leaves_to_coordinates = leaves_to_coordinates;
+//         self.key_to_index = key_to_index;
+//         self.key_to_level_index = key_to_level_index;
+//         self.leaf_to_index = leaf_to_index;
+//         self.leaves_set = leaves_set;
+//         self.keys_set = keys_set;
+//         self.levels_to_keys = levels_to_keys;
+
+//     }
+
+//     fn attach_ghosts_v_list(&mut self) {}
+// }
 
 #[cfg(test)]
 mod test {

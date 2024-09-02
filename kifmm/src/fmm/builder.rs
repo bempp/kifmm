@@ -28,7 +28,7 @@ use crate::{
     },
     tree::{
         multi_node::SortKind,
-        types::{Domain, MultiNodeTreeNew},
+        types::{Domain, GhostTreeU, GhostTreeV, MultiNodeTreeNew},
         MultiNodeTree, SingleNodeTree,
     },
     MultiNodeFmmTree,
@@ -479,6 +479,8 @@ where
                 ghost_v_list_octants: Vec::default(),
                 ghost_u_list_data: Vec::default(),
                 ghost_v_list_data: Vec::default(),
+                ghost_tree_u: GhostTreeU::default(),
+                ghost_tree_v: GhostTreeV::default(),
             };
 
             result.source();
