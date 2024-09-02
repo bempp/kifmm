@@ -364,7 +364,13 @@ where
 
     /// Can form query packet during pre-computation, but don't in principle know about existence
     /// of these multipoles, or where they are physically located, which must be checked at runtime
-    pub query_packet: Vec<MortonKey<Scalar::Real>>,
+    pub multipole_query_packet: Vec<MortonKey<Scalar::Real>>,
+
+    /// Form a similar query packet during pre-computation for particle data
+    pub particle_query_packet: Vec<MortonKey<Scalar::Real>>,
+
+    /// All ranges owned by the local trees of all processors
+    pub all_ranges: Vec<MortonKey<Scalar::Real>>,
 }
 
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>

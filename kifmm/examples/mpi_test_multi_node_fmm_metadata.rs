@@ -19,9 +19,9 @@ fn main() {
     use mpi::{environment::Universe, traits::Communicator};
     use rlst::RawAccess;
 
-    let universe: Universe = mpi::initialize().unwrap();
+    // let universe: Universe = mpi::initialize().unwrap();
+    let (universe, threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
-
     // Setup tree parameters
     let prune_empty = false;
     let n_points = 10000;

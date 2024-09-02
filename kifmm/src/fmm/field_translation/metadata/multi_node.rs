@@ -28,7 +28,7 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::SourceToTargetTranslationMetadata,
-        fmm::{FmmMetadata, MultiNodeFmm},
+        fmm::{ExchangeGhostData, FmmMetadata, MultiNodeFmm},
         general::AsComplex,
         tree::MultiNodeFmmTreeTrait,
     },
@@ -751,6 +751,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
+    Self: ExchangeGhostData,
 {
     type Scalar = Scalar;
     type Charges = Vec<Self::Scalar>;
@@ -927,7 +928,7 @@ where
 
         // Defines all non-locally contained multipoles I need to find at this rank, does not know about existence or indeed where
         // these multipoles are located physically
-        let mut query_packet = HashSet::new();
+        let mut multipole_query_packet = HashSet::new();
 
         for target_tree in self.tree.target_tree.trees.iter() {
             for level in
@@ -950,9 +951,28 @@ where
                             })
                             .collect_vec();
 
-                        query_packet.extend(interaction_list.iter().cloned())
+                        multipole_query_packet.extend(interaction_list.iter().cloned())
                     }
                 }
+            }
+        }
+
+        let mut particle_query_packet = HashSet::new();
+
+        for target_tree in self.tree.target_tree.trees.iter() {
+            for leaf in target_tree.leaves.iter() {
+                let interaction_list = leaf
+                    .neighbors()
+                    .into_iter()
+                    .filter(|n| {
+                        n.ancestors(None)
+                            .intersection(&locally_owned_domains)
+                            .count()
+                            == 0
+                    })
+                    .collect_vec();
+
+                particle_query_packet.extend(interaction_list.iter().cloned())
             }
         }
 
@@ -973,6 +993,13 @@ where
         self.charge_index_pointers_sources = charge_index_pointer_targets;
         self.charge_index_pointers_sources = charge_index_pointer_sources;
         self.kernel_eval_size = eval_size;
-        self.query_packet = query_packet.into_iter().collect()
+        self.multipole_query_packet = multipole_query_packet.into_iter().collect();
+        self.particle_query_packet = particle_query_packet.into_iter().collect();
+
+        // Compute ranges
+        self.gather_ranges();
+
+        // At this point I can exchange charge data for particle query packet
+        self.u_list();
     }
 }

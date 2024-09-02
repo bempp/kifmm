@@ -171,7 +171,8 @@ where
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
-    fn exchange_multipoles(&mut self);
+    // After multipoles have been exchanged, neeed to update associated metadata
+    fn reset_metadata(&mut self);
 
     fn equivalent_surface_order(&self, level: u64) -> usize;
 
@@ -256,4 +257,15 @@ where
 {
     /// Homogeneity check
     fn is_homogenous(&self) -> bool;
+}
+
+pub trait ExchangeGhostData {
+    /// Gather ranges controlled by each local tree
+    fn gather_ranges(&mut self);
+
+    /// Exchange V list data
+    fn v_list(&mut self);
+
+    /// Exchange U list data
+    fn u_list(&mut self);
 }

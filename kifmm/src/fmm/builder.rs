@@ -468,7 +468,9 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                query_packet: Vec::default(),
+                multipole_query_packet: Vec::default(),
+                particle_query_packet: Vec::default(),
+                all_ranges: Vec::default(),
             };
 
             result.source();
