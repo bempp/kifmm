@@ -1000,6 +1000,6 @@ where
         self.gather_ranges();
 
         // At this point I can exchange charge data for particle query packet
-        self.u_list_exchange();
+        // self.u_list_exchange();
     }
 }

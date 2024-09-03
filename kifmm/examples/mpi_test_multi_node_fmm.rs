@@ -14,9 +14,8 @@ fn main() {
     use mpi::{environment::Universe, traits::Communicator};
     use rlst::RawAccess;
 
-    let universe: Universe = mpi::initialize().unwrap();
+    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
-    let comm = world.duplicate();
 
     // Setup tree parameters
     let prune_empty = false;

@@ -2,6 +2,11 @@
 use std::{collections::HashMap, default};
 
 use itertools::Itertools;
+use mpi::{
+    collective::SystemOperation,
+    topology::SimpleCommunicator,
+    traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
+};
 use num::traits::Float;
 use rlst::{
     rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape,
@@ -691,4 +696,114 @@ mod test {
             }
         }
     }
+}
+
+/// Communicate point to point variable amounts of data specified by destination and source rank
+#[inline(always)]
+pub fn sparse_point_to_point_v<T: Equivalence + Default>(
+    comm: &SimpleCommunicator,
+    queries_to_send: &[Vec<T>],
+    queries_to_send_destination_ranks: &[i32],
+    queries_to_recv_buffers: &mut [Vec<T>],
+    queries_to_recv_source_ranks: &[i32],
+    nreqs: i32,
+) {
+    mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+        for (i, query) in queries_to_send.iter().enumerate() {
+            let sreq = comm
+                .process_at_rank(queries_to_send_destination_ranks[i])
+                .immediate_send(scope, &query[..]);
+            coll.add(sreq);
+        }
+
+        for (i, recv_buffer) in queries_to_recv_buffers.iter_mut().enumerate() {
+            let rreq = comm
+                .process_at_rank(queries_to_recv_source_ranks[i])
+                .immediate_receive_into(scope, &mut recv_buffer[..]);
+            coll.add(rreq);
+        }
+
+        let mut complete = vec![];
+        coll.wait_all(&mut complete);
+    });
+}
+
+/// Communicate point to point variable amounts of data specified by destination and source rank
+#[inline(always)]
+pub fn sparse_point_to_point<T: Equivalence + Default>(
+    comm: &SimpleCommunicator,
+    queries_to_send: &[T],
+    queries_to_send_destination_ranks: &[i32],
+    queries_to_recv_buffers: &mut [T],
+    queries_to_recv_source_ranks: &[i32],
+    nreqs: i32,
+) {
+    mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+        for (i, query) in queries_to_send.iter().enumerate() {
+            let sreq = comm
+                .process_at_rank(queries_to_send_destination_ranks[i])
+                .immediate_send(scope, query);
+            coll.add(sreq);
+        }
+
+        for (i, recv_buffer) in queries_to_recv_buffers.iter_mut().enumerate() {
+            let rreq = comm
+                .process_at_rank(queries_to_recv_source_ranks[i])
+                .immediate_receive_into(scope, recv_buffer);
+            coll.add(rreq);
+        }
+
+        let mut complete = vec![];
+        coll.wait_all(&mut complete);
+    });
+}
+
+/// Communicate packet sizes to all specified destinations in a given communicator
+#[inline(always)]
+pub fn expected_queries(
+    comm: &SimpleCommunicator,
+    queries_to_send_sizes: &[i32],
+    queries_to_send_destination_ranks: &[i32],
+    recv_count: i32,
+    nreqs: i32,
+) -> (Vec<i32>, Vec<i32>) {
+    let this_rank = comm.rank();
+
+    // Size of expected messages and their origin ranks in this communicator
+    let mut queries_to_receive_sizes = vec![0i32; recv_count as usize];
+    let mut queries_to_receive_source_ranks = vec![0i32; recv_count as usize];
+
+    mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
+        // Isend each query size to destination ranks
+        for (i, &destination_rank) in queries_to_send_destination_ranks.iter().enumerate() {
+            let tag = destination_rank;
+            let sreq = comm
+                .process_at_rank(destination_rank)
+                .immediate_send_with_tag(scope, &queries_to_send_sizes[i], tag);
+            coll.add(sreq);
+        }
+
+        for (i, size) in queries_to_receive_sizes.iter_mut().enumerate() {
+            // Spin for message availability, no guarantee that isend even to same process
+            // will be immediatiely visible to matching probe
+            let (msg, status) = loop {
+                let preq = comm
+                    .any_process()
+                    .immediate_matched_probe_with_tag(this_rank);
+
+                if let Some(p) = preq {
+                    break p;
+                }
+            };
+
+            let rreq = msg.immediate_matched_receive_into(scope, size);
+            queries_to_receive_source_ranks[i] = status.source_rank();
+            coll.add(rreq);
+        }
+
+        let mut complete = vec![];
+        coll.wait_all(&mut complete);
+    });
+
+    (queries_to_receive_sizes, queries_to_receive_source_ranks)
 }
