@@ -47,7 +47,7 @@ use crate::{
 
 use super::{
     helpers::{expected_queries, sparse_point_to_point_v},
-    types::{CommunicationMode, KiFmmMultiNode},
+    types::{CommunicationMode, IndexPointer, KiFmmMultiNode},
 };
 
 impl<Scalar, Kernel, SourceToTargetData> MultiNodeFmm
@@ -216,210 +216,153 @@ where
 
         match self.communication_mode {
             CommunicationMode::P2P => {
-                // 1. Use query packet to figure out where to send each query physically
-                let mut packets = vec![Vec::new(); size as usize];
+                // Use query packet to figure out where to send each query physically
+                let mut queries = vec![Vec::new(); size as usize];
 
                 for &query in self.particle_query_packet.iter() {
                     for (destination_rank, range) in self.all_ranges.chunks(2).enumerate() {
                         if range[0] <= query.finest_first_child()
                             && query.finest_first_child() <= range[1]
                         {
-                            packets[destination_rank].push(query)
+                            queries[destination_rank].push(query.morton)
                         }
                     }
                 }
 
-                let messages = packets
-                    .iter()
-                    .map(|p| if !p.is_empty() { 1 } else { 0 })
-                    .collect_vec();
+                let mut queries_to_send = Vec::new();
+                let mut nqueries_to_send = Vec::new();
+                let mut queries_to_send_sizes = Vec::new();
+                let mut queries_to_send_destination_ranks = Vec::new();
+                for (destination_rank, query) in queries.into_iter().enumerate() {
+                    if !query.is_empty() {
+                        queries_to_send_destination_ranks.push(destination_rank as i32);
+                        queries_to_send_sizes.push(query.len() as i32);
+                        queries_to_send.push(query);
+                        nqueries_to_send.push(1)
+                    } else {
+                        nqueries_to_send.push(0)
+                    }
+                }
 
-                let packet_destinations = packets
-                    .iter()
-                    .enumerate()
-                    .filter_map(|(rank, packet)| {
-                        if packet.len() > 0 {
-                            Some(rank as i32)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect_vec();
-
-                let packets = packets
-                    .into_iter()
-                    .filter_map(|p| if p.len() > 0 { Some(p) } else { None })
-                    .collect_vec();
-
-                let packet_sizes = packets.iter().map(|p| p.len() as i32).collect_vec();
-
-                let mut total_messages = vec![0i32; size as usize];
-
-                // 2. All to all to figure out with whom to communicate
-
+                // Mark ranks we expect to receive from with the number of expected messages
+                let mut nqueries_to_receive = vec![0i32; size as usize];
                 self.communicator.all_reduce_into(
-                    &messages,
-                    &mut total_messages,
+                    &nqueries_to_send,
+                    &mut nqueries_to_receive,
                     SystemOperation::sum(),
                 );
 
-                // 2. Need to now find packet sizes and sources for queries for particle data
-                let recv_count = total_messages[world_rank as usize];
-                let send_count = packets.len() as i32;
+                // Number of expected queries at this rank
+                let recv_count = nqueries_to_receive[world_rank as usize];
+
+                // Number of queries being send to other ranks
+                let send_count = queries_to_send.len() as i32;
+
+                // total number of requests being handled at this rank
                 let nreqs = recv_count + send_count;
 
-                let mut received_packet_sizes = vec![0 as i32; recv_count as usize];
-                let mut received_packet_sources = vec![0 as i32; recv_count as usize];
+                // Communicate query sizes, and with whom to communicate
+                // This is the size and origin of queries received from source ranks, and expected at this rank
+                let (queries_received_sizes, queries_received_source_ranks) = expected_queries(
+                    &self.communicator,
+                    &queries_to_send_sizes,
+                    &queries_to_send_destination_ranks,
+                    recv_count,
+                    nreqs,
+                );
 
-                mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                    for (i, &destination_rank) in packet_destinations.iter().enumerate() {
-                        let tag = destination_rank;
-                        let sreq = self
-                            .communicator
-                            .process_at_rank(destination_rank)
-                            .immediate_send_with_tag(scope, &packet_sizes[i], tag);
-                        coll.add(sreq);
-                    }
-
-                    for (i, size) in received_packet_sizes.iter_mut().enumerate() {
-                        let (msg, status) = loop {
-                            // Spin for message availability. There is no guarantee that
-                            // immediate sends, even to the same process, will be immediately
-                            // visible to an immediate probe.
-                            let preq = self
-                                .communicator
-                                .any_process()
-                                .immediate_matched_probe_with_tag(world_rank);
-                            if let Some(p) = preq {
-                                break p;
-                            }
-                        };
-
-                        let rreq = msg.immediate_matched_receive_into(scope, size);
-                        received_packet_sources[i] = status.source_rank();
-
-                        coll.add(rreq);
-                    }
-
-                    let mut complete = vec![];
-                    coll.wait_all(&mut complete);
-                });
-
-                // 3. Identify available U list data
-                let mut recv_buffers = Vec::new();
-                for packet_size in received_packet_sizes {
-                    recv_buffers.push(vec![
-                        MortonKey::<Scalar::Real>::default();
-                        packet_size as usize
-                    ])
+                // Allocate buffers to receive queries themselves
+                let mut queries_received = Vec::new();
+                for query_size in queries_received_sizes {
+                    queries_received.push(vec![0u64; query_size as usize])
                 }
 
-                // Barrier required to ensure that receive buffers are set up.
-                self.communicator.barrier();
+                sparse_point_to_point_v(
+                    &self.communicator,
+                    &queries_to_send,
+                    &queries_to_send_destination_ranks,
+                    &mut queries_received,
+                    &queries_received_source_ranks,
+                    nreqs,
+                );
 
-                mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                    for (i, packet) in packets.iter().enumerate() {
-                        let sreq = self
-                            .communicator
-                            .process_at_rank(packet_destinations[i])
-                            .immediate_send_with_tag(scope, &packet[..], packet_destinations[i]);
-                        coll.add(sreq);
-                    }
-
-                    for (i, buffer) in recv_buffers.iter_mut().enumerate() {
-                        let rreq = self
-                            .communicator
-                            .process_at_rank(received_packet_sources[i])
-                            .immediate_receive_into(scope, &mut buffer[..]);
-
-                        coll.add(rreq);
-                    }
-
-                    let mut complete = vec![];
-                    coll.wait_all(&mut complete);
-                });
-
-                let mut available_received_packets = Vec::new();
-                let mut available_received_packets_sizes = Vec::new();
+                // Lookup locally available particle data
+                let mut available_queries_received_reconstructed =
+                    vec![Vec::new(); queries_received.len()];
+                let mut available_queries_received = Vec::new();
+                let mut available_queries_received_sizes = Vec::new(); // number of U list octants
+                let mut available_queries_received_buffers_sizes = Vec::new(); // sizes of coordinate data
+                let mut available_queries_received_index_pointers = Vec::new(); // index pointers of coordinate data
 
                 // Check for inclusion in local tree
-                for recv_buffer in recv_buffers.iter() {
-                    let mut tmp = Vec::new();
+                for recv_buffer in queries_received.iter() {
+                    let mut raw_morton_i = Vec::new();
+                    let mut morton_i = Vec::new();
+                    let mut index_pointers_i = Vec::new();
 
-                    for key in recv_buffer.iter() {
-                        let mut index = 0;
-                        for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
-                            if tree.keys_set.contains(key) {
-                                index = fmm_idx;
-                                break;
-                            }
-                        }
-
-                        if let Some(_coords) = self.tree.source_tree.trees[index].coordinates(key) {
-                            tmp.push(*key)
-                        }
-                    }
-
-                    available_received_packets_sizes.push(tmp.len() as i32);
-                    available_received_packets.push(tmp);
-                }
-
-                // 3. Communicate ghost data
-                let mut send_buffers_len = Vec::new();
-                let mut send_buffers_index_pointers = Vec::new();
-
-                for packet in available_received_packets.iter() {
-                    let mut tmp = Vec::new(); // index pointer
-
-                    let mut packet_size = 0;
+                    let mut query_size_i = 0;
                     let mut index_pointer = 0;
 
-                    for key in packet.iter() {
-                        let mut index = 0;
-                        for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
-                            if tree.keys_set.contains(key) {
-                                index = fmm_idx;
-                                break;
+                    for &raw_morton in recv_buffer.iter() {
+                        let key = MortonKey::from_morton(raw_morton, None);
+
+                        // First check if this request is contained locally at all
+                        if self.tree.source_tree.keys_set.contains(&key) {
+                            // If it is, find associated source tree
+                            let mut tree_idx = 0;
+                            for (i, tree) in self.tree.source_tree.trees.iter().enumerate() {
+                                if tree.keys_set.contains(&key) {
+                                    tree_idx = i;
+                                    break;
+                                }
+                            }
+
+                            // Lookup associated coordinates for this key
+                            if let Some(coords) =
+                                self.tree.source_tree.trees[tree_idx].coordinates(&key)
+                            {
+                                raw_morton_i.push(raw_morton);
+                                morton_i.push(key);
+                                query_size_i += coords.len() as i32;
+
+                                index_pointers_i.push(IndexPointer::new(
+                                    index_pointer,
+                                    index_pointer + query_size_i,
+                                ));
+                                index_pointer += query_size_i;
                             }
                         }
-
-                        let ncoords = if let Some(coords) =
-                            self.tree.source_tree.trees[index].coordinates(key)
-                        {
-                            coords.len()
-                        } else {
-                            0
-                        };
-
-                        tmp.push((index_pointer, index_pointer + ncoords));
-                        packet_size += ncoords;
-                        index_pointer += ncoords
                     }
 
-                    send_buffers_len.push(packet_size as i32);
-                    send_buffers_index_pointers.push(tmp);
+                    available_queries_received_sizes.push(raw_morton_i.len() as i32);
+                    available_queries_received.push(raw_morton_i);
+                    available_queries_received_reconstructed.push(morton_i);
+                    available_queries_received_buffers_sizes.push(query_size_i);
+                    available_queries_received_index_pointers.push(index_pointers_i);
                 }
 
-                // Allocate send buffers
-                let mut send_buffers = Vec::new();
-                for (packet, &packet_size) in available_received_packets
+                // Allocate coordinate buffer to be sent that were requested and available
+                let mut available_queries_received_buffers = Vec::new();
+                for (query, &query_size) in available_queries_received_reconstructed
                     .iter()
-                    .zip(send_buffers_len.iter())
+                    .zip(available_queries_received_buffers_sizes.iter())
                 {
-                    let mut tmp = vec![Scalar::Real::default(); packet_size as usize];
+                    let mut tmp = vec![Scalar::Real::default(); query_size as usize];
 
                     let mut index_pointer = 0;
 
-                    for key in packet.iter() {
-                        let mut index = 0;
-                        for (fmm_idx, tree) in self.tree.source_tree.trees.iter().enumerate() {
-                            if tree.keys_set.contains(key) {
-                                index = fmm_idx;
+                    for &key in query.iter() {
+                        let mut tree_index = 0;
+                        for (i, tree) in self.tree.source_tree.trees.iter().enumerate() {
+                            if tree.keys_set.contains(&key) {
+                                tree_index = i;
                                 break;
                             }
                         }
 
-                        if let Some(coords) = self.tree.source_tree.trees[index].coordinates(key) {
+                        if let Some(coords) =
+                            self.tree.source_tree.trees[tree_index].coordinates(&key)
+                        {
                             let ncoords = coords.len();
                             tmp[index_pointer..index_pointer + ncoords].copy_from_slice(coords);
                             index_pointer += ncoords
@@ -428,140 +371,113 @@ where
                         }
                     }
 
-                    send_buffers.push(tmp);
+                    available_queries_received_buffers.push(tmp);
                 }
 
-                // Send back how many of requested U list are actually available, and what they are
-                let mut available_requested_packets_sizes = vec![0 as i32; send_count as usize];
-                mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                    for (i, packet_size) in available_received_packets_sizes.iter().enumerate() {
-                        let destination_rank = received_packet_sources[i];
-                        let sreq = self
-                            .communicator
-                            .process_at_rank(destination_rank)
-                            .immediate_send_with_tag(scope, packet_size, destination_rank);
+                // Send back how many of requested U list are actually available, and what they are and
+                // the associated index pointers
+                let mut available_queries_requested_sizes = vec![0i32; recv_count as usize];
 
-                        coll.add(sreq);
-                    }
+                sparse_point_to_point(
+                    &self.communicator,
+                    &available_queries_received_sizes,
+                    &queries_received_source_ranks,
+                    &mut available_queries_requested_sizes,
+                    &queries_to_send_destination_ranks,
+                    nreqs,
+                );
 
-                    for (i, size) in available_requested_packets_sizes.iter_mut().enumerate() {
-                        let source_rank = packet_destinations[i];
-                        let rreq = self
-                            .communicator
-                            .process_at_rank(source_rank)
-                            .immediate_receive_into(scope, size);
-                        coll.add(rreq);
-                    }
-
-                    let mut complete = vec![];
-                    coll.wait_all(&mut complete);
-                });
-
-                // Now send morton keys of query that actually exist
-                let mut available_requested_packets = Vec::new();
-                for (i, &size) in available_requested_packets_sizes.iter().enumerate() {
-                    available_requested_packets
-                        .push(vec![MortonKey::<Scalar::Real>::default(); size as usize])
+                // Now send back morton keys that were requested that actually exist
+                let mut available_queries_requested = Vec::new();
+                let mut available_queries_requested_index_pointers = Vec::new();
+                for (_i, &size) in available_queries_requested_sizes.iter().enumerate() {
+                    available_queries_requested.push(vec![0u64; size as usize]);
+                    available_queries_requested_index_pointers
+                        .push(vec![IndexPointer::default(); size as usize])
                 }
 
-                // Barrier required to ensure that receive buffers are set up.
-                self.communicator.barrier();
+                sparse_point_to_point_v(
+                    &self.communicator,
+                    &available_queries_received,
+                    &queries_received_source_ranks,
+                    &mut available_queries_requested,
+                    &queries_to_send_destination_ranks,
+                    nreqs,
+                );
 
-                mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                    for (i, packet) in available_received_packets.iter().enumerate() {
-                        let destination_rank = received_packet_sources[i];
-                        let sreq = self
-                            .communicator
-                            .process_at_rank(destination_rank)
-                            .immediate_send_with_tag(scope, &packet[..], destination_rank);
-                        coll.add(sreq);
-                    }
+                // Send back index pointers for coordinate data
+                sparse_point_to_point_v(
+                    &self.communicator,
+                    &available_queries_received_index_pointers,
+                    &queries_received_source_ranks,
+                    &mut available_queries_requested_index_pointers,
+                    &queries_to_send_destination_ranks,
+                    nreqs,
+                );
 
-                    for (i, buffer) in available_requested_packets.iter_mut().enumerate() {
-                        let source_rank = packet_destinations[i];
-                        let rreq = self
-                            .communicator
-                            .process_at_rank(source_rank)
-                            .immediate_receive_into(scope, &mut buffer[..]);
+                // Now send packet sizes for coordinate data that actually exists
+                let mut available_queries_requested_buffers_sizes = vec![0i32; recv_count as usize];
 
-                        coll.add(rreq);
-                    }
+                sparse_point_to_point(
+                    &self.communicator,
+                    &available_queries_received_buffers_sizes,
+                    &queries_received_source_ranks,
+                    &mut available_queries_requested_buffers_sizes,
+                    &queries_to_send_destination_ranks,
+                    nreqs,
+                );
 
-                    let mut complete = vec![];
-                    coll.wait_all(&mut complete);
-                });
-
-                // Now send packet sizes of queries that actually exist
-                let mut available_requested_packet_sizes_particle =
-                    vec![0 as i32; send_count as usize];
-                mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                    for (i, packet_size) in send_buffers_len.iter().enumerate() {
-                        let destination_rank = received_packet_sources[i];
-                        let sreq = self
-                            .communicator
-                            .process_at_rank(destination_rank)
-                            .immediate_send_with_tag(scope, packet_size, destination_rank);
-
-                        coll.add(sreq);
-                    }
-
-                    for (i, size) in available_requested_packet_sizes_particle
-                        .iter_mut()
-                        .enumerate()
-                    {
-                        let source_rank = packet_destinations[i];
-                        let rreq = self
-                            .communicator
-                            .process_at_rank(source_rank)
-                            .immediate_receive_into(scope, size);
-                        coll.add(rreq);
-                    }
-
-                    let mut complete = vec![];
-                    coll.wait_all(&mut complete);
-                });
-
-                // Allocate receive buffers for particle data
-                let mut recv_buffers = Vec::new();
-                for &packet_size in available_requested_packet_sizes_particle.iter() {
-                    let tmp = vec![Scalar::Real::default(); packet_size as usize];
-                    recv_buffers.push(tmp)
+                // Allocate receive buffers for coordinate data
+                let mut available_queries_requested_buffers = Vec::new();
+                for &query_size in available_queries_requested_buffers_sizes.iter() {
+                    let tmp = vec![Scalar::Real::default(); query_size as usize];
+                    available_queries_requested_buffers.push(tmp)
                 }
 
-                // Barrier required to ensure that receive buffers are set up.
-                self.communicator.barrier();
-
-                // Communicate ghost coordinate data
-                mpi::request::multiple_scope(nreqs as usize, |scope, coll| {
-                    for (i, packet) in send_buffers.iter().enumerate() {
-                        let destination_rank = received_packet_sources[i];
-                        let sreq = self
-                            .communicator
-                            .process_at_rank(destination_rank)
-                            .immediate_send_with_tag(scope, &packet[..], destination_rank);
-                        coll.add(sreq);
-                    }
-
-                    for (i, buffer) in recv_buffers.iter_mut().enumerate() {
-                        let source_rank = packet_destinations[i];
-                        let rreq = self
-                            .communicator
-                            .process_at_rank(source_rank)
-                            .immediate_receive_into(scope, &mut buffer[..]);
-
-                        coll.add(rreq);
-                    }
-
-                    let mut complete = vec![];
-                    coll.wait_all(&mut complete);
-                });
+                // Can now send actual coordinate data
+                sparse_point_to_point_v(
+                    &self.communicator,
+                    &available_queries_received_buffers,
+                    &queries_received_source_ranks,
+                    &mut available_queries_requested_buffers,
+                    &queries_to_send_destination_ranks,
+                    nreqs,
+                );
 
                 // Insert ghost particle data into special ghost tree
-                let tmp_index_pointers = vec![vec![1, 1]];
+                let mut ghost_leaves = Vec::new();
+                for query in available_queries_received.iter() {
+                    for &raw_morton in query.iter() {
+                        ghost_leaves.push(MortonKey::<Scalar::Real>::from_morton(raw_morton, None))
+                    }
+                }
+
+                let ghost_coordinates = available_queries_received_buffers
+                    .into_iter()
+                    .flatten()
+                    .collect_vec();
+
+                // Flattening index pointers from all received queries requires to use displacement from each query
+                // in received order
+                let mut displacement = 0;
+                for index_pointers in available_queries_received_index_pointers.iter_mut() {
+                    index_pointers.iter_mut().for_each(|i| {
+                        i.0 += displacement;
+                        i.1 += displacement;
+                    });
+
+                    displacement += index_pointers.last().unwrap().1;
+                }
+
+                let ghost_index_pointers = available_queries_received_index_pointers
+                    .into_iter()
+                    .flatten()
+                    .collect_vec();
+
                 self.ghost_tree_u = GhostTreeU::from_ghost_data(
-                    &available_received_packets,
-                    &tmp_index_pointers,
-                    &recv_buffers,
+                    ghost_leaves,
+                    ghost_index_pointers,
+                    ghost_coordinates,
                 )
                 .unwrap_or_default();
             }
@@ -623,8 +539,7 @@ where
                 // total number of requests being handled at this rank
                 let nreqs = recv_count + send_count;
 
-                // 1. Communicate query sizes
-
+                // Communicate query sizes, and with whom to communicate
                 // This is the size and origin of queries received from source ranks, and expected at this rank
                 let (queries_received_sizes, queries_received_source_ranks) = expected_queries(
                     &self.communicator,
@@ -651,6 +566,7 @@ where
                 );
 
                 // Lookup locally available multipole data requested in recv queries
+                // Also send back sibling data, as will be needed for M2L kernels
                 let mut available_queries_received = Vec::new();
                 let mut available_queries_received_sizes = Vec::new();
 
@@ -660,7 +576,6 @@ where
                     for &raw_morton in recv_buffer.iter() {
                         let key = MortonKey::from_morton(raw_morton, None);
                         if self.tree.source_tree.keys_set.contains(&key) {
-                            // Also send back sibling data, as will be needed for M2L kernels
                             let raw_siblings = key.siblings().into_iter().map(|s| s.morton);
                             for s in raw_siblings {
                                 tmp.push(s)
@@ -672,7 +587,7 @@ where
                     available_queries_received.push(tmp);
                 }
 
-                // Allocate multipole buffer to be sent that were requested
+                // Allocate multipole buffer to be sent that were requested and available
                 let mut available_queries_received_buffers = Vec::new();
                 for query in available_queries_received.iter() {
                     let mut multipole_idx = 0;
@@ -767,7 +682,6 @@ where
                     ghost_keys,
                     ghost_multipoles,
                     depth,
-                    &self.tree.domain,
                     self.ncoeffs_equivalent_surface,
                 )
                 .unwrap();

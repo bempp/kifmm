@@ -6,8 +6,14 @@ use std::{
     sync::RwLock,
 };
 
+use bytemuck::offset_of;
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
-use mpi::topology::SimpleCommunicator;
+use mpi::{
+    datatype::{UncommittedUserDatatype, UserDatatype},
+    topology::SimpleCommunicator,
+    traits::UncommittedDatatype,
+    Address,
+};
 use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
@@ -1095,4 +1101,32 @@ pub enum Isa {
     /// Default is no vectorisation
     #[default]
     Default,
+}
+
+#[repr(C)]
+#[derive(Default, Clone, Copy)]
+pub struct IndexPointer(pub i32, pub i32);
+
+impl IndexPointer {
+    pub fn new(l: i32, r: i32) -> Self {
+        Self(l, r)
+    }
+}
+
+unsafe impl Equivalence for IndexPointer {
+    type Out = UserDatatype;
+
+    fn equivalent_datatype() -> Self::Out {
+        UserDatatype::structured(
+            &[1, 1],
+            &[
+                offset_of!(IndexPointer, 0) as Address,
+                offset_of!(IndexPointer, 1) as Address,
+            ],
+            &[
+                UncommittedUserDatatype::contiguous(1, &i32::equivalent_datatype()).as_ref(),
+                UncommittedUserDatatype::contiguous(1, &i32::equivalent_datatype()).as_ref(),
+            ],
+        )
+    }
 }

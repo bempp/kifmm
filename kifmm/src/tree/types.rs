@@ -346,21 +346,11 @@ pub struct GhostTreeU<T>
 where
     T: RlstScalar + Float,
 {
-    pub global_rank: i32,
-
-    pub local_rank: i32,
-
     /// Depth of a tree. taken from underlying tree
     pub depth: u64,
 
-    /// Domain spanned by the points.
-    pub domain: Domain<T>,
-
-    /// All points associated with domain, with associated Morton Keys
-    pub points: Vec<Point<T>>,
-
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T>,
+    pub coordinates: Vec<T::Real>,
 
     /// All global indices
     pub global_indices: Vec<usize>,
@@ -384,15 +374,8 @@ pub struct GhostTreeV<T>
 where
     T: RlstScalar + Float,
 {
-    pub global_rank: i32,
-
-    pub local_rank: i32,
-
     /// Depth of a tree.
     pub depth: u64,
-
-    /// Domain spanned by the points.
-    pub domain: Domain<T::Real>,
 
     /// All global indices
     pub global_indices: Vec<usize>,

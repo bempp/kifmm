@@ -2,7 +2,10 @@ use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use num::Float;
+use pulp::Scalar;
 use rlst::RlstScalar;
+
+use crate::fmm::types::IndexPointer;
 
 use super::{
     domain,
@@ -13,17 +16,36 @@ impl<T> GhostTreeU<T>
 where
     T: RlstScalar + Float,
 {
+    /// Constructor
     pub fn from_ghost_data(
-        octants: &[Vec<MortonKey<T>>],
-        index_pointers: &[Vec<i32>],
-        coordinates: &[Vec<T>],
+        mut ghost_leaves: Vec<MortonKey<T>>,
+        ghost_index_pointers: Vec<IndexPointer>,
+        ghost_coordinates: Vec<T::Real>,
     ) -> Result<Self, std::io::Error> {
-        // let
+        let mut result = Self::default();
 
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "unimplemented",
-        ))
+        let leaves = MortonKeys::from(ghost_leaves);
+        let leaves_set: HashSet<_> = leaves.iter().cloned().collect();
+
+        let mut leaf_to_index = HashMap::new();
+
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
+
+        let mut leaves_to_coordinates = HashMap::new();
+
+        for (key, index_pointer) in leaves.iter().zip(ghost_index_pointers) {
+            leaves_to_coordinates
+                .insert(*key, (index_pointer.0 as usize, index_pointer.1 as usize));
+        }
+
+        result.leaves = leaves;
+        result.leaves_set = leaves_set;
+        result.coordinates = ghost_coordinates;
+        result.leaf_to_index = leaf_to_index;
+        result.leaves_to_coordinates = leaves_to_coordinates;
+        Ok(result)
     }
 }
 
@@ -36,7 +58,6 @@ where
         mut ghost_keys: Vec<MortonKey<T::Real>>,
         ghost_multipoles: Vec<T>,
         depth: u64,
-        domain: &Domain<T::Real>,
         ncoeffs_equivalent_surface: usize,
     ) -> Result<Self, std::io::Error> {
         let mut result = Self::default();
@@ -123,7 +144,6 @@ where
 
         // TODO: GLOBAL INDICES
         result.depth = depth;
-        result.domain = *domain;
         result.keys = keys;
         result.levels_to_keys = levels_to_keys;
         result.key_to_index = key_to_index;
