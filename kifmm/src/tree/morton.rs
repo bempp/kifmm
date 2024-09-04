@@ -1360,7 +1360,7 @@ mod test {
 
         // Test that all ancestors found
         for (current_level, &ancestor) in ancestors.iter().enumerate() {
-            assert!(ancestor.level() == current_level.try_into().unwrap());
+            assert!(ancestor.level() as usize == current_level);
         }
 
         // Test that the ancestors include the key at the leaf level
