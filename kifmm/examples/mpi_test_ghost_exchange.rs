@@ -6,7 +6,7 @@ fn main() {
 
     use green_kernels::laplace_3d::Laplace3dKernel;
     use kifmm::{
-        fmm::types::{CommunicationMode, FftFieldTranslationMultiNode, MultiNodeBuilder},
+        fmm::types::{FftFieldTranslationMultiNode, MultiNodeBuilder},
         traits::fmm::{GhostExchange, MultiNodeFmm},
         tree::{helpers::points_fixture, types::MultiNodeTreeNew},
         FftFieldTranslation,
@@ -31,8 +31,6 @@ fn main() {
 
     // let charges = vec![1f32; n_points];
 
-    let communication_mode = CommunicationMode::P2P;
-
     // Create a uniform tree
     let mut fmm = MultiNodeBuilder::new()
         .tree(
@@ -49,7 +47,6 @@ fn main() {
             expansion_order,
             Laplace3dKernel::<f32>::new(),
             FftFieldTranslationMultiNode::<f32>::new(None),
-            communication_mode,
         )
         .unwrap()
         .build()

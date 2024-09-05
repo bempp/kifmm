@@ -821,8 +821,8 @@ where
         self.depth
     }
 
-    fn domain(&self) -> &'_ Self::Domain {
-        &self.domain
+    fn domain(&self) -> Option<&Self::Domain> {
+        Some(&self.domain)
     }
 
     fn keys(&self, level: u64) -> Option<&[Self::Node]> {
@@ -885,17 +885,17 @@ where
         self.leaf_to_index.get(leaf)
     }
 
-    fn owned_range(&self) -> Self::Node {
-        self.root
+    fn owned_range(&self) -> Option<Self::Node> {
+        Some(self.root)
     }
 
     // Want the option to calculate this at runtime as interaction list calculation can be slow
     // Only run M2L locally for L_global + 1, so consider the union of interaction lists for everything below this.
-    fn contributing_range(&self) -> [Self::Node; 2] {
+    fn contributing_range(&self) -> Option<[Self::Node; 2]> {
         let mut neighbours = self.root.neighbors();
         neighbours.push(self.root);
         neighbours.sort();
-        [neighbours[0], *neighbours.last().unwrap()]
+        Some([neighbours[0], *neighbours.last().unwrap()])
     }
 }
 

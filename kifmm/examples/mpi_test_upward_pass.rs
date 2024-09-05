@@ -2,7 +2,7 @@
 
 use green_kernels::traits::Kernel;
 use kifmm::{
-    fmm::types::{CommunicationMode, KiFmmMultiNode},
+    fmm::types::KiFmmMultiNode,
     traits::{
         field::SourceToTargetData,
         fmm::SourceTranslation,
@@ -34,7 +34,6 @@ fn main() {
     let global_depth = 1;
 
     let expansion_order = 6;
-    let communication_mode = CommunicationMode::P2P;
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
@@ -58,7 +57,6 @@ fn main() {
             expansion_order,
             Laplace3dKernel::<f32>::new(),
             FftFieldTranslationMultiNode::<f32>::new(None),
-            communication_mode,
         )
         .unwrap()
         .build()

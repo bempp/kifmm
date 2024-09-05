@@ -71,7 +71,7 @@ pub trait SingleNodeTreeTrait {
     fn all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points, gets global domain in multi node setting.
-    fn domain(&self) -> &Self::Domain;
+    fn domain(&self) -> Option<&Self::Domain>;
 
     /// Map from the key to index position in sorted keys
     ///
@@ -98,10 +98,10 @@ pub trait SingleNodeTreeTrait {
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 
     // Defines owned octants by each local root, defined as all descendents of each local root
-    fn owned_range(&self) -> Self::Node;
+    fn owned_range(&self) -> Option<Self::Node>;
 
     // Defines larger region which contributes to each local root's tree via the union of their interaction lists
-    fn contributing_range(&self) -> [Self::Node; 2];
+    fn contributing_range(&self) -> Option<[Self::Node; 2]>;
 }
 
 pub trait MultiNodeTreeTrait {

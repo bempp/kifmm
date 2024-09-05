@@ -8,14 +8,19 @@ use std::{
 
 use bytemuck::offset_of;
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use itertools::Itertools;
 use mpi::{
     datatype::{UncommittedUserDatatype, UserDatatype},
+    raw::{AsRaw, FromRaw},
     topology::SimpleCommunicator,
-    traits::UncommittedDatatype,
+    traits::{Buffer, BufferMut, CommunicatorCollectives, PartitionedBuffer, PartitionedBufferMut, UncommittedDatatype},
     Address,
 };
 use num::traits::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
+use rlst::{
+    dense::layout, rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer,
+    VectorContainer,
+};
 
 use crate::{
     linalg::rsvd::Normaliser,
@@ -23,7 +28,9 @@ use crate::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex, types::FmmOperatorTime,
     },
-    tree::types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MultiNodeTreeNew, SingleNodeTree},
+    tree::types::{
+        Domain, GhostTreeU, GhostTreeV, MortonKey, MultiNodeTreeNew, Point, SingleNodeTree,
+    },
 };
 
 #[cfg(feature = "mpi")]
@@ -371,16 +378,20 @@ where
 
     /// Can form query packet during pre-computation, but don't in principle know about existence
     /// of these multipoles, or where they are physically located, which must be checked at runtime
-    pub multipole_query_packet: Vec<MortonKey<Scalar::Real>>,
+    pub v_list_queries: Vec<u64>,
+    pub v_list_ranks: Vec<i32>,
+    pub v_list_send_counts: Vec<i32>,
+    pub v_list_to_send: Vec<i32>,
 
     /// Form a similar query packet during pre-computation for particle data
-    pub particle_query_packet: Vec<MortonKey<Scalar::Real>>,
+    pub u_list_queries: Vec<u64>,
+    pub u_list_ranks: Vec<i32>,
+    pub u_list_send_counts: Vec<i32>,
+    pub u_list_to_send: Vec<i32>,
 
-    /// All ranges owned by the local trees of all processors
-    pub all_ranges: Vec<MortonKey<Scalar::Real>>,
-
-    /// Communication mode for ghost data
-    pub communication_mode: CommunicationMode,
+    pub layout: Layout<Scalar>,
+    pub neighbourhood_communicator_v: NeighbourhoodCommunicator,
+    pub neighbourhood_communicator_u: NeighbourhoodCommunicator,
 
     /// ghost octants for v list
     pub ghost_v_list_octants: Vec<Vec<MortonKey<Scalar::Real>>>,
@@ -395,16 +406,6 @@ where
     pub ghost_tree_u: GhostTreeU<Scalar::Real>,
 
     pub ghost_tree_v: GhostTreeV<Scalar>,
-}
-
-/// Communication mode is P2P by default
-#[derive(Default, Clone, Copy)]
-pub enum CommunicationMode {
-    #[default]
-    /// Point to point communication of U and V list ghost data
-    P2P,
-    /// Use subcommunicator splitting and collectives for U and V list data
-    Subcomm,
 }
 
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -658,8 +659,161 @@ where
     pub nsource_trees: Option<usize>,
 
     pub ntarget_trees: Option<usize>,
+}
 
-    pub communication_mode: Option<CommunicationMode>,
+/// Specified owned range (defined by roots) of each rank
+#[derive(Default)]
+pub struct Layout<T: RlstScalar + Float> {
+    pub raw: Vec<MortonKey<T::Real>>,
+    pub raw_set: HashSet<MortonKey<T::Real>>,
+    pub counts: Vec<i32>,
+    pub displacements: Vec<i32>,
+    pub ranks: Vec<i32>,
+    pub range_to_rank: HashMap<MortonKey<T::Real>, i32>,
+}
+
+impl<T: RlstScalar + Float> Layout<T> {
+    pub fn rank_from_key(&self, key: &MortonKey<T::Real>) -> Option<&i32> {
+        let ancestors = key.ancestors(None);
+        // assuming of length 1
+        let intersection = ancestors.intersection(&self.raw_set).collect_vec();
+        self.range_to_rank.get(intersection[0])
+    }
+}
+
+/// Each rank starts off knowing with whom it wants to communicate, but they don't have knowledge
+/// of this rank. The communicator is defined by the octants controlled by each rank
+pub struct NeighbourhoodCommunicator {
+    /// Neighbour ranks
+    pub neighbours: Vec<i32>,
+
+    /// Wrapper around a simple communicator type
+    pub raw: SimpleCommunicator,
+}
+
+impl NeighbourhoodCommunicator {
+
+    pub fn size(&self) -> i32 {
+        self.raw.size()
+    }
+
+    /// Forward send a buffer on the neighbourhood communicator
+    pub fn all_to_all_into<S: ?Sized, R: ?Sized>(&self, sendbuf: &S, recvbuf: &mut R)
+    where
+        S: Buffer,
+        R: BufferMut
+    {
+
+        let c_size = self.raw.size();
+
+        unsafe {
+            mpi_sys::MPI_Neighbor_alltoall(
+                sendbuf.pointer(),
+                sendbuf.count() / c_size,
+                sendbuf.as_datatype().as_raw(),
+                recvbuf.pointer_mut(),
+                recvbuf.count() / c_size,
+                recvbuf.as_datatype().as_raw(),
+                self.raw.as_raw()
+            );
+        }
+    }
+
+    /// Forward send a buffer on the neighbourhood communicator
+    pub fn all_to_all_varcount_into<S: ?Sized, R: ?Sized>(&self, sendbuf: &S, recvbuf: &mut R)
+    where
+        S: PartitionedBuffer,
+        R: PartitionedBufferMut
+    {
+
+        unsafe {
+            mpi_sys::MPI_Neighbor_alltoallv(
+                sendbuf.pointer(),
+                sendbuf.counts().as_ptr(),
+                sendbuf.displs().as_ptr(),
+                sendbuf.as_datatype().as_raw(),
+                recvbuf.pointer_mut(),
+                recvbuf.counts().as_ptr(),
+                recvbuf.displs().as_ptr(),
+                recvbuf.as_datatype().as_raw(),
+                self.raw.as_raw()
+            );
+        }
+    }
+
+
+
+    /// Map from local rank to the global rank
+    pub fn local_to_global_rank(&self, local_rank: i32) -> Option<i32> {
+
+        if local_rank < (self.neighbours.len() - 1) as i32 {
+            Some(self.neighbours[local_rank as usize])
+        } else {
+            None
+        }
+    }
+
+
+    /// Map from the global rank to the local rank
+    pub fn global_to_local_rank(&self, global_rank: i32) -> Option<i32> {
+
+        if let Some(idx) = self.neighbours.iter().position(|&g| global_rank == g ) {
+            Some(self.neighbours[idx])
+        } else {
+            None
+        }
+    }
+
+    /// Constructor from locations to send to
+    pub fn new(world_comm: &SimpleCommunicator, to_send: &[i32]) -> Self {
+        let size = world_comm.size();
+        let rank = world_comm.rank();
+
+        // Communicate whether to expect to be involved in send/receive with these ranks
+        let mut to_receive = vec![0i32; size as usize];
+        world_comm.all_to_all_into(to_send, &mut to_receive);
+
+        // Now create neighbours, with send and receive displacements
+        let mut neighbours = Vec::new();
+
+        for world_rank in 0..size as usize {
+            let world_rank_i32 = world_rank as i32;
+            if to_send[world_rank] != 0 || to_receive[world_rank] != 0 {
+                neighbours.push(world_rank_i32);
+            } else if (world_rank as i32) == rank {
+                neighbours.push(world_rank_i32)
+            }
+        }
+
+        // Can create neighbourhood communicators
+        let raw = unsafe {
+            let mut raw_comm = mpi_sys::RSMPI_COMM_NULL;
+            mpi_sys::MPI_Dist_graph_create_adjacent(
+                world_comm.as_raw(),
+                neighbours.len() as i32,
+                neighbours.as_ptr(),
+                mpi_sys::RSMPI_UNWEIGHTED(),
+                neighbours.len() as i32,
+                neighbours.as_ptr(),
+                mpi_sys::RSMPI_UNWEIGHTED(),
+                mpi_sys::RSMPI_INFO_NULL,
+                0,
+                &mut raw_comm,
+            );
+            mpi::topology::SimpleCommunicator::from_raw(raw_comm)
+        };
+
+        Self { neighbours, raw }
+    }
+
+    /// Simple constructor
+    pub fn from_comm(comm: &SimpleCommunicator) -> Self {
+        let neighbours = (0..comm.size()).collect_vec();
+        Self {
+            neighbours,
+            raw: comm.duplicate(),
+        }
+    }
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -1104,7 +1258,7 @@ pub enum Isa {
 }
 
 #[repr(C)]
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug)]
 pub struct IndexPointer(pub i32, pub i32);
 
 impl IndexPointer {

@@ -129,7 +129,7 @@ where
     for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
         let l = i * ncoeffs_leaf * dim;
         let r = l + ncoeffs_leaf * dim;
-        let surface = key.surface_grid(expansion_order_leaf, tree.domain(), alpha);
+        let surface = key.surface_grid(expansion_order_leaf, tree.domain().unwrap(), alpha);
 
         result[l..r].copy_from_slice(&surface);
     }

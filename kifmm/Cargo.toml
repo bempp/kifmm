@@ -1,7 +1,7 @@
 [features]
 # Treat warnings as a build error.
 strict = []
-mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
+mpi = ["dep:mpi", "dep:superslice", "dep:memoffset", "dep:mpi-sys"]
 
 [package]
 name = "kifmm"
@@ -31,6 +31,7 @@ green-kernels = { version = "0.2.0"}
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
+mpi-sys = { version="0.2.2", optional=true }
 memoffset = {version = "0.9.1", optional = true}
 superslice = {version = "1.0.0", optional = true}
 pulp = "0.18.12"
@@ -78,3 +79,4 @@ rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
 
 [lints.clippy]
 wildcard_imports = "forbid"
+

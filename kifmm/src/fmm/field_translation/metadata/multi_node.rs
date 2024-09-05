@@ -22,7 +22,7 @@ use crate::{
             level_expansion_pointers_multinode, level_index_pointer, level_index_pointer_multinode,
             potential_pointers_multinode,
         },
-        types::{CommunicationMode, FftFieldTranslationMultiNode, FftMetadata},
+        types::{FftFieldTranslationMultiNode, FftMetadata, NeighbourhoodCommunicator},
     },
     linalg::pinv::pinv,
     traits::{
@@ -926,56 +926,151 @@ where
             locally_owned_domains.insert(tree.root);
         }
 
-        // Defines all non-locally contained multipoles I need to find at this rank, does not know about existence or indeed where
-        // these multipoles are located physically
-        let mut multipole_query_packet = HashSet::new();
+        // Compute ranges on all processors
+        self.set_layout();
+
+        // Defines all non-locally contained multipole data, as well as established possibility of existence
+        //  as defined by local roots,
+        // Don't necessarily know if they contain data and therefore exist.
+        let mut v_list_queries = HashSet::new();
 
         for target_tree in self.tree.target_tree.trees.iter() {
-            for level in
-                2..=(self.tree.target_tree.local_depth + self.tree.target_tree.global_depth)
+            for level in self.tree.target_tree.global_depth
+                ..=(self.tree.target_tree.local_depth + self.tree.target_tree.global_depth)
             {
                 if let Some(keys) = target_tree.keys(level) {
                     for key in keys.iter() {
+                        // Compute interaction list
                         let interaction_list = key
                             .parent()
                             .neighbors()
                             .iter()
                             .flat_map(|pn| pn.children())
-                            .filter(|pnc| {
-                                !key.is_adjacent(pnc)
-                                    && pnc
-                                        .ancestors(None)
-                                        .intersection(&locally_owned_domains)
-                                        .count()
-                                        == 0
+                            .filter(|pnc| !key.is_adjacent(pnc))
+                            .collect_vec();
+
+                        // Filter for those contained on foreign ranks
+                        let interaction_list = interaction_list
+                            .iter()
+                            .filter_map(|key| {
+                                // Try to get the rank from the key
+                                if let Some(rank) = self.layout.rank_from_key(key) {
+                                    // Filter out if the rank is equal to my_rank
+                                    if rank != &self.rank {
+                                        return Some(key);
+                                    }
+                                }
+                                None
                             })
                             .collect_vec();
 
-                        multipole_query_packet.extend(interaction_list.iter().cloned())
+                        for key in interaction_list {
+                            v_list_queries.insert(*key);
+                        }
                     }
                 }
             }
         }
 
-        let mut particle_query_packet = HashSet::new();
+        let v_list_queries = v_list_queries.into_iter().collect_vec();
+        let mut v_list_ranks = Vec::new();
+        let mut v_list_send_counts = vec![0i32; self.communicator.size() as usize];
+        let mut v_list_to_send = vec![0i32; self.communicator.size() as usize];
 
-        for target_tree in self.tree.target_tree.trees.iter() {
-            for leaf in target_tree.leaves.iter() {
-                let interaction_list = leaf
-                    .neighbors()
-                    .into_iter()
-                    .filter(|n| {
-                        n.ancestors(None)
-                            .intersection(&locally_owned_domains)
-                            .count()
-                            == 0
-                    })
-                    .collect_vec();
+        for query in v_list_queries.iter() {
+            let rank = self.layout.rank_from_key(query).unwrap();
+            v_list_ranks.push(*rank);
+            v_list_send_counts[*rank as usize] += 1;
+        }
 
-                particle_query_packet.extend(interaction_list.iter().cloned())
+        for (i, &value) in v_list_send_counts.iter().enumerate() {
+            if value > 0 {
+                v_list_to_send[i] = 1;
             }
         }
 
+        // Sort queries by rank
+        let v_list_queries = {
+            let mut indices = (0..v_list_queries.len()).collect_vec();
+            indices.sort_by_key(|&i| v_list_ranks[i]);
+
+            let mut sorted_v_list_queries_t = Vec::with_capacity(v_list_queries.len());
+            for i in indices {
+                sorted_v_list_queries_t.push(v_list_queries[i].morton)
+            }
+
+            sorted_v_list_queries_t
+        };
+
+        self.neighbourhood_communicator_v =
+            NeighbourhoodCommunicator::new(&self.communicator, &v_list_to_send);
+
+        self.v_list_queries = v_list_queries;
+        self.v_list_ranks = v_list_ranks;
+        self.v_list_send_counts = v_list_send_counts;
+        self.v_list_to_send = v_list_to_send;
+
+        let mut u_list_queries = HashSet::new();
+        for target_tree in self.tree.target_tree.trees.iter() {
+            for leaf in target_tree.leaves.iter() {
+                // Compute interaction list
+                let interaction_list = leaf.neighbors();
+
+                // Filter for those contained on foreign ranks
+                let interaction_list = interaction_list
+                    .iter()
+                    .filter_map(|key| {
+                        // Try to get the rank from the key
+                        if let Some(rank) = self.layout.rank_from_key(key) {
+                            // Filter out if the rank is equal to my_rank
+                            if rank != &self.rank {
+                                return Some(key);
+                            }
+                        }
+                        None
+                    })
+                    .collect_vec();
+
+                for key in interaction_list {
+                    u_list_queries.insert(*key);
+                }
+            }
+        }
+
+        let u_list_queries = u_list_queries.into_iter().collect_vec();
+        let mut u_list_ranks = Vec::new();
+        let mut u_list_send_counts = vec![0i32; self.communicator.size() as usize];
+        let mut u_list_to_send = vec![0i32; self.communicator.size() as usize];
+
+        for query in u_list_queries.iter() {
+            let rank = self.layout.rank_from_key(query).unwrap();
+            u_list_ranks.push(*rank);
+            u_list_send_counts[*rank as usize] += 1;
+        }
+        for (i, &value) in u_list_send_counts.iter().enumerate() {
+            if value > 0 {
+                u_list_to_send[i] = 1;
+            }
+        }
+        // Sort queries by rank
+        let u_list_queries = {
+            let mut indices = (0..u_list_queries.len()).collect_vec();
+            indices.sort_by_key(|&i| u_list_ranks[i]);
+
+            let mut sorted_u_list_queries_t = Vec::with_capacity(u_list_queries.len());
+            for i in indices {
+                sorted_u_list_queries_t.push(u_list_queries[i].morton)
+            }
+
+            sorted_u_list_queries_t
+        };
+
+        self.neighbourhood_communicator_u =
+            NeighbourhoodCommunicator::new(&self.communicator, &u_list_to_send);
+        self.u_list_queries = u_list_queries;
+        self.u_list_ranks = u_list_ranks;
+        self.u_list_send_counts = u_list_send_counts;
+        self.u_list_to_send = u_list_to_send;
         self.multipoles = multipoles;
         self.locals = locals;
         self.leaf_multipoles = leaf_multipoles;
@@ -993,11 +1088,6 @@ where
         self.charge_index_pointers_sources = charge_index_pointer_targets;
         self.charge_index_pointers_sources = charge_index_pointer_sources;
         self.kernel_eval_size = eval_size;
-        self.multipole_query_packet = multipole_query_packet.into_iter().collect();
-        self.particle_query_packet = particle_query_packet.into_iter().collect();
-
-        // Compute ranges
-        self.gather_ranges();
 
         // At this point I can exchange charge data for particle query packet
         // self.u_list_exchange();

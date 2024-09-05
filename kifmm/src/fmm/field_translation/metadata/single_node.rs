@@ -729,14 +729,14 @@ where
                 .for_each(|(i, t)| {
                     let source_equivalent_surface = t.source.surface_grid(
                         equivalent_surface_order,
-                        self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain().unwrap(),
                         alpha,
                     );
                     let nsources = ncoeffs_kifmm(equivalent_surface_order);
 
                     let target_check_surface = t.target.surface_grid(
                         check_surface_order,
-                        self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain().unwrap(),
                         alpha,
                     );
                     let ntargets = ncoeffs_kifmm(check_surface_order);
@@ -883,6 +883,7 @@ where
             .tree
             .source_tree()
             .domain()
+            .unwrap()
             .side_length()
             .iter()
             .map(|d| *d / two)
@@ -890,11 +891,11 @@ where
 
         let point = midway
             .iter()
-            .zip(self.tree.source_tree().domain().origin())
+            .zip(self.tree.source_tree().domain().unwrap().origin())
             .map(|(m, o)| *m + *o)
             .collect_vec();
         let point = [point[0], point[1], point[2]];
-        let domain = self.tree.source_tree().domain();
+        let domain = self.tree.source_tree().domain().unwrap();
 
         let mut metadata = Vec::new();
 
@@ -980,13 +981,13 @@ where
 
                     let source_equivalent_surface = source.surface_grid(
                         equivalent_surface_order,
-                        self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain().unwrap(),
                         alpha,
                     );
 
                     let target_check_surface = target.surface_grid(
                         equivalent_surface_order,
-                        self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain().unwrap(),
                         alpha,
                     );
 
@@ -1010,7 +1011,7 @@ where
 
                         let (conv_grid, _) = source.convolution_grid(
                             equivalent_surface_order,
-                            self.tree.source_tree().domain(),
+                            self.tree.source_tree().domain().unwrap(),
                             alpha,
                             &conv_point_corner,
                             conv_point_corner_index,
@@ -1196,12 +1197,12 @@ where
 
                         let source_equivalent_surface = source.surface_grid(
                             equivalent_surface_order,
-                            self.tree.source_tree().domain(),
+                            self.tree.source_tree().domain().unwrap(),
                             alpha,
                         );
                         let target_check_surface = target.surface_grid(
                             equivalent_surface_order,
-                            self.tree.source_tree().domain(),
+                            self.tree.source_tree().domain().unwrap(),
                             alpha,
                         );
 
@@ -1225,7 +1226,7 @@ where
 
                             let (conv_grid, _) = source.convolution_grid(
                                 equivalent_surface_order,
-                                self.tree.source_tree().domain(),
+                                self.tree.source_tree().domain().unwrap(),
                                 alpha,
                                 &conv_point_corner,
                                 conv_point_corner_index,
@@ -1471,13 +1472,13 @@ where
             for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
                 let source_equivalent_surface = t.source.surface_grid(
                     equivalent_surface_order,
-                    self.tree.source_tree().domain(),
+                    self.tree.source_tree().domain().unwrap(),
                     alpha,
                 );
 
                 let target_check_surface = t.target.surface_grid(
                     check_surface_order,
-                    self.tree.source_tree().domain(),
+                    self.tree.source_tree().domain().unwrap(),
                     alpha,
                 );
 
@@ -1937,6 +1938,7 @@ where
             .tree
             .source_tree()
             .domain()
+            .unwrap()
             .side_length()
             .iter()
             .map(|d| *d / two)
@@ -1944,14 +1946,14 @@ where
 
         let point = midway
             .iter()
-            .zip(self.tree.source_tree().domain().origin())
+            .zip(self.tree.source_tree().domain().unwrap().origin())
             .map(|(m, o)| *m + *o)
             .collect_vec();
 
         let point = [point[0], point[1], point[2]];
 
         // Encode point in centre of domain and compute halo of parent, and their resp. children
-        let key = MortonKey::from_point(&point, self.tree.source_tree().domain(), 3, None);
+        let key = MortonKey::from_point(&point, self.tree.source_tree().domain().unwrap(), 3, None);
         let siblings = key.siblings();
         let parent = key.parent();
         let halo = parent.neighbors();
@@ -2021,12 +2023,12 @@ where
 
                     let source_equivalent_surface = source.surface_grid(
                         equivalent_surface_order,
-                        self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain().unwrap(),
                         alpha,
                     );
                     let target_check_surface = target.surface_grid(
                         equivalent_surface_order,
-                        self.tree.source_tree().domain(),
+                        self.tree.source_tree().domain().unwrap(),
                         alpha,
                     );
 
@@ -2050,7 +2052,7 @@ where
 
                         let (conv_grid, _) = source.convolution_grid(
                             equivalent_surface_order,
-                            self.tree.source_tree().domain(),
+                            self.tree.source_tree().domain().unwrap(),
                             alpha,
                             &conv_point_corner,
                             conv_point_corner_index,

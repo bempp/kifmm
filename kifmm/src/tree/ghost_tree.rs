@@ -5,7 +5,7 @@ use num::Float;
 use pulp::Scalar;
 use rlst::RlstScalar;
 
-use crate::fmm::types::IndexPointer;
+use crate::{fmm::types::IndexPointer, traits::tree::SingleNodeTreeTrait};
 
 use super::{
     domain,
@@ -18,7 +18,7 @@ where
 {
     /// Constructor
     pub fn from_ghost_data(
-        mut ghost_leaves: Vec<MortonKey<T>>,
+        mut ghost_leaves: Vec<MortonKey<T::Real>>,
         ghost_index_pointers: Vec<IndexPointer>,
         ghost_coordinates: Vec<T::Real>,
     ) -> Result<Self, std::io::Error> {
@@ -152,5 +152,205 @@ where
         result.multipoles = multipoles;
 
         Ok(result)
+    }
+}
+
+impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeU<T> {
+    type Domain = Domain<T::Real>;
+    type Node = MortonKey<T::Real>;
+    type Scalar = T::Real;
+
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
+        Some(&self.coordinates)
+    }
+
+    fn all_global_indices(&self) -> Option<&[usize]> {
+        None
+    }
+
+    fn all_keys(&self) -> Option<&[Self::Node]> {
+        None
+    }
+
+    fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>> {
+        None
+    }
+
+    fn all_leaves(&self) -> Option<&[Self::Node]> {
+        Some(&self.leaves)
+    }
+
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>> {
+        Some(&self.leaves_set)
+    }
+
+    fn contributing_range(&self) -> Option<[Self::Node; 2]> {
+        None
+    }
+
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
+            Some(&self.coordinates[l * 3..r * 3])
+        } else {
+            None
+        }
+    }
+
+    fn depth(&self) -> u64 {
+        self.depth
+    }
+
+    fn domain(&self) -> Option<&Self::Domain> {
+        None
+    }
+
+    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
+        None
+    }
+
+    fn index(&self, key: &Self::Node) -> Option<&usize> {
+        None
+    }
+
+    fn level_index(&self, key: &Self::Node) -> Option<&usize> {
+        None
+    }
+
+    fn keys(&self, level: u64) -> Option<&[Self::Node]> {
+        None
+    }
+
+    fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize> {
+        self.leaf_to_index.get(leaf)
+    }
+
+    fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
+        self.coordinates(leaf).map(|coords| coords.len() / 3)
+    }
+
+    fn n_coordinates_tot(&self) -> Option<usize> {
+        self.all_coordinates().map(|coords| coords.len() / 3)
+    }
+
+    fn n_keys(&self, level: u64) -> Option<usize> {
+        None
+    }
+
+    fn n_keys_tot(&self) -> Option<usize> {
+        None
+    }
+
+    fn n_leaves(&self) -> Option<usize> {
+        Some(self.leaves.len())
+    }
+
+    fn node(&self, idx: usize) -> Option<&Self::Node> {
+        None
+    }
+
+    fn owned_range(&self) -> Option<Self::Node> {
+        None
+    }
+}
+
+impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeV<T> {
+    type Domain = Domain<T::Real>;
+    type Node = MortonKey<T::Real>;
+    type Scalar = T::Real;
+
+    fn all_coordinates(&self) -> Option<&[Self::Scalar]> {
+        None
+    }
+
+    fn all_global_indices(&self) -> Option<&[usize]> {
+        None
+    }
+
+    fn all_keys(&self) -> Option<&[Self::Node]> {
+        Some(&self.keys)
+    }
+
+    fn all_keys_set(&self) -> Option<&'_ HashSet<Self::Node>> {
+        Some(&self.keys_set)
+    }
+
+    fn all_leaves(&self) -> Option<&[Self::Node]> {
+        None
+    }
+
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<Self::Node>> {
+        None
+    }
+
+    fn contributing_range(&self) -> Option<[Self::Node; 2]> {
+        None
+    }
+
+    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
+        None
+    }
+
+    fn depth(&self) -> u64 {
+        self.depth
+    }
+
+    fn domain(&self) -> Option<&Self::Domain> {
+        None
+    }
+
+    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
+        None
+    }
+
+    fn index(&self, key: &Self::Node) -> Option<&usize> {
+        self.key_to_index.get(key)
+    }
+
+    fn keys(&self, level: u64) -> Option<&[Self::Node]> {
+        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+            Some(&self.keys[l..r])
+        } else {
+            None
+        }
+    }
+
+    fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize> {
+        None
+    }
+
+    fn level_index(&self, key: &Self::Node) -> Option<&usize> {
+        self.key_to_level_index.get(key)
+    }
+
+    fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
+        None
+    }
+
+    fn n_coordinates_tot(&self) -> Option<usize> {
+        None
+    }
+
+    fn n_keys(&self, level: u64) -> Option<usize> {
+        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+            Some(r - l)
+        } else {
+            None
+        }
+    }
+
+    fn n_keys_tot(&self) -> Option<usize> {
+        Some(self.keys.len())
+    }
+
+    fn n_leaves(&self) -> Option<usize> {
+        None
+    }
+
+    fn node(&self, idx: usize) -> Option<&Self::Node> {
+        Some(&self.keys[idx])
+    }
+
+    fn owned_range(&self) -> Option<Self::Node> {
+        None
     }
 }

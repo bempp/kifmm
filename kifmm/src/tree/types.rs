@@ -356,16 +356,16 @@ where
     pub global_indices: Vec<usize>,
 
     /// The leaves that span the tree, and associated Point data.
-    pub leaves: MortonKeys<T>,
+    pub leaves: MortonKeys<T::Real>,
 
     /// Associate leaves with coordinate indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+    pub leaves_to_coordinates: HashMap<MortonKey<T::Real>, (usize, usize)>,
 
     /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+    pub leaf_to_index: HashMap<MortonKey<T::Real>, usize>,
 
     /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T>>,
+    pub leaves_set: HashSet<MortonKey<T::Real>>,
 }
 
 /// Ghost tree for received V list data

@@ -1,7 +1,5 @@
 //! FMM traits
-use crate::{
-    fmm::types::CommunicationMode, traits::tree::SingleNodeFmmTreeTrait, tree::types::MortonKey,
-};
+use crate::{traits::tree::SingleNodeFmmTreeTrait, tree::types::MortonKey};
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
@@ -260,7 +258,7 @@ where
 
 pub trait GhostExchange {
     /// Gather ranges controlled by each local tree
-    fn gather_ranges(&mut self);
+    fn set_layout(&mut self);
 
     /// Exchange V list data
     fn v_list_exchange(&mut self);

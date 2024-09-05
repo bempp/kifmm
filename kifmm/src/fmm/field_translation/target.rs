@@ -332,7 +332,7 @@ where
                                     let charges = u_list_indices
                                         .clone()
                                         .map(|&idx| {
-                                            let index_pointer =
+                                            let index_pointer: &(usize, usize) =
                                                 &self.charge_index_pointer_sources[idx];
                                             &self.charges[index_pointer.0..index_pointer.1]
                                         })
