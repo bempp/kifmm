@@ -7,8 +7,6 @@ use mpi::{
     traits::{Collection, Communicator, Equivalence},
 };
 use num::{Float, Zero};
-use pulp::Scalar;
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer,
@@ -712,7 +710,7 @@ impl<Scalar, SourceToTargetData> FmmOperatorData
     for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync + Default,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
 {
     fn fft_map_index(&self, level: u64) -> usize {

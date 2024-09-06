@@ -21,6 +21,7 @@ use mpi::{
 };
 
 use num::Float;
+use pulp::Scalar;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use rlst::RlstScalar;
@@ -35,7 +36,7 @@ use crate::{
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{
-            FmmOperatorData, GhostExchange, HomogenousKernel, MultiNodeFmm,
+            FmmMetadata, FmmOperatorData, GhostExchange, HomogenousKernel, MultiNodeFmm,
             SourceToTargetTranslation, SourceTranslation, TargetTranslation,
         },
         tree::SingleNodeTreeTrait,
@@ -45,12 +46,12 @@ use crate::{
         helpers::all_to_allv_sparse,
         types::{GhostTreeU, GhostTreeV, MortonKey},
     },
-    Fmm, MultiNodeFmmTree,
+    Fmm, MultiNodeFmmTree, SingleNodeFmmTree,
 };
 
 use super::{
     helpers::{expected_queries, sparse_point_to_point_v},
-    types::{IndexPointer, KiFmmMultiNode, Layout},
+    types::{IndexPointer, KiFmmMultiNode, KiFmmMultiNodeGlobal, Layout},
 };
 
 impl<Scalar, Kernel, SourceToTargetData> MultiNodeFmm
@@ -78,11 +79,10 @@ where
             self.times
                 .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
 
-            let local_depth = self.tree.source_tree.local_depth;
-            let global_depth = self.tree.source_tree.global_depth;
-            for level in ((global_depth + 1)..=(local_depth + global_depth)).rev() {
+            let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
+            for level in ((self.tree.source_tree.global_depth + 1)..=depth).rev() {
                 let s = Instant::now();
-                self.m2m(level)?;
+                self.m2m(level).unwrap();
                 self.times.push(FmmOperatorTime::from_instant(
                     FmmOperatorType::M2M(level),
                     s,
@@ -91,20 +91,17 @@ where
         }
 
         // At this point the exchange needs to happen of multipole data
-        {
-            self.v_list_exchange()
-        }
-
-        // Build up local data structures containing ghost data
+        self.v_list_exchange();
 
         // Gather root multipoles at nominated node
-        self.gather_root_multipoles();
+        self.gather_global_tree_at_root();
+
+        // Set metadata for ghost data, and root multipoles
 
         // Now can proceed with remainder of the upward pass on chosen node, and some of the downward pass
-        {}
 
         // Scatter root locals back to local trees
-        self.scatter_root_locals();
+        self.scatter_global_tree_from_root();
 
         // Now remainder of downward pass can happen in parallel on each process, similar to how I've written the local upward passes
         // new kernels have to reflect ghost data, and potentially multiple local source trees
@@ -175,33 +172,235 @@ impl<Scalar, Kernel, SourceToTargetData> GhostExchange
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync + Default,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: SourceTranslation,
 {
-    fn gather_root_multipoles(&mut self) {
+    fn gather_global_tree_at_root(&mut self) {
         let size = self.communicator.size();
         let rank = self.communicator.rank();
 
+        let mut result = KiFmm::<Scalar, Kernel, SourceToTargetData>::default();
+
         let nroot_multipoles = self.tree.source_tree.trees.len() as i32;
+        let nroot_locals = self.tree.target_tree.trees.len() as i32;
 
         // Nominated rank chosen to run global upward pass
         let root_rank = 0;
         let root_process = self.communicator.process_at_rank(root_rank);
 
         if rank == root_rank {
-            let mut all_nroot_multipoles = vec![0i32; size as usize];
-            root_process.gather_into_root(&nroot_multipoles, &mut all_nroot_multipoles);
+            // 1. Gather multipole data
+            let mut global_multipoles_counts = vec![0i32; size as usize];
+            root_process.gather_into_root(&nroot_multipoles, &mut global_multipoles_counts);
+
+            // Calculate displacements and counts for associated morton keys
+            let mut global_multipoles_displacements = Vec::new();
+            let mut displacement = 0;
+            for &count in global_multipoles_counts.iter() {
+                global_multipoles_displacements.push(displacement);
+                displacement += count
+            }
+
+            // Allocate memory for locally contained data
+            let mut local_roots = Vec::new();
+            let mut local_multipole = vec![
+                Scalar::default();
+                (nroot_multipoles as usize)
+                    * self.ncoeffs_equivalent_surface
+            ];
+
+            for (tree_idx, source_tree) in self.tree.source_tree.trees.iter().enumerate() {
+                let root_multipole = self.multipole(tree_idx, &source_tree.root).unwrap();
+                local_multipole[tree_idx * self.ncoeffs_equivalent_surface
+                    ..(tree_idx + 1) * self.ncoeffs_equivalent_surface]
+                    .copy_from_slice(root_multipole);
+                local_roots.push(source_tree.root)
+            }
+
+            // Calculate displacements and counts for multipole data
+            let global_multipoles_bufs_counts = global_multipoles_counts
+                .iter()
+                .map(|c| c * self.ncoeffs_equivalent_surface as i32)
+                .collect_vec();
+            let mut global_multipoles_bufs_displacements = Vec::new();
+            let mut displacement = 0;
+            for &count in global_multipoles_bufs_counts.iter() {
+                global_multipoles_bufs_displacements.push(displacement);
+                displacement += count
+            }
 
             // Allocate memory to store root multipoles
+            let n = global_multipoles_bufs_counts.iter().sum::<i32>();
+            let mut global_multipoles =
+                vec![Scalar::default(); (n as usize) * self.ncoeffs_equivalent_surface];
 
-            // Allocate memory for global tree on which global FMM is being run
+            let mut partition = PartitionMut::new(
+                &mut global_multipoles,
+                &global_multipoles_bufs_counts[..],
+                &global_multipoles_bufs_displacements[..],
+            );
+            root_process.gather_varcount_into_root(&local_multipole, &mut partition);
+
+            let n = global_multipoles_counts.iter().sum::<i32>();
+            let mut global_roots = vec![MortonKey::<Scalar::Real>::default(); n as usize];
+            let mut partition = PartitionMut::new(
+                &mut global_roots,
+                &global_multipoles_counts[..],
+                &global_multipoles_displacements[..],
+            );
+
+            root_process.gather_varcount_into_root(&local_roots, &mut partition);
+
+            // Need to also insert sibling data if it's missing into multipole buffer so that upward pass
+            // will run even if this doesn't exist remotely.
+            let mut global_roots_set: HashSet<_> = global_roots.iter().cloned().collect();
+            let mut global_roots_to_index = HashMap::new();
+            for (i, global_root) in global_roots.iter().enumerate() {
+                global_roots_to_index.insert(global_root, i);
+            }
+
+            for (i, global_root) in global_roots.iter().enumerate() {
+                let siblings = global_root.siblings();
+
+                for &sibling in siblings.iter() {
+                    if !global_roots_set.contains(&sibling) {
+                        global_roots_set.insert(sibling); // add siblings to obtained roots
+                    }
+                }
+            }
+
+            let mut global_roots = global_roots_set.into_iter().collect_vec();
+            global_roots.sort(); // Store in Morton order
+
+            // Global multipole data with missing siblings if they don't exist globally with zeros for coefficients
+            let mut global_multipoles_with_siblings =
+                vec![Scalar::zero(); global_roots.len() * self.ncoeffs_equivalent_surface];
+
+            for (new_idx, root) in global_roots.iter().enumerate() {
+                if let Some(old_idx) = global_roots_to_index.get(root) {
+                    let multipole = &global_multipoles[old_idx * self.ncoeffs_equivalent_surface
+                        ..(old_idx + 1) * self.ncoeffs_equivalent_surface];
+                    global_multipoles_with_siblings[new_idx * self.ncoeffs_equivalent_surface
+                        ..(new_idx + 1) * self.ncoeffs_equivalent_surface]
+                        .copy_from_slice(multipole);
+                }
+            }
+
+            // Insert multipoles and keys into result
+            result.multipoles = global_multipoles_with_siblings;
+            result.tree.source_tree.keys = global_roots.into();
+
+            // 2. Gather local data
+            let mut global_locals_counts = vec![0i32; size as usize];
+            root_process.gather_into_root(&nroot_locals, &mut global_locals_counts);
+
+            // Calculate displacements and counts for associated morton keys
+            let mut global_locals_displacements = Vec::new();
+            let mut displacement = 0;
+            for &count in global_locals_counts.iter() {
+                global_locals_displacements.push(displacement);
+                displacement += count
+            }
+
+            // Allocate memory for locally contained data
+            let mut local_roots = Vec::new();
+
+            for (_tree_idx, target_tree) in self.tree.target_tree.trees.iter().enumerate() {
+                local_roots.push(target_tree.root)
+            }
+
+            let n = global_locals_counts.iter().sum::<i32>();
+            let mut global_roots = vec![MortonKey::<Scalar::Real>::default(); n as usize];
+            let mut partition = PartitionMut::new(
+                &mut global_roots,
+                &global_locals_counts[..],
+                &global_locals_displacements[..],
+            );
+
+            root_process.gather_varcount_into_root(&local_roots, &mut partition);
+
+            // Need to also insert sibling data if it's missing into multipole buffer so that upward pass
+            // will run even if this doesn't exist remotely.
+            let mut global_roots_set: HashSet<_> = global_roots.iter().cloned().collect();
+            let mut global_roots_to_index = HashMap::new();
+            for (i, global_root) in global_roots.iter().enumerate() {
+                global_roots_to_index.insert(global_root, i);
+            }
+
+            for (_i, global_root) in global_roots.iter().enumerate() {
+                let siblings = global_root.siblings();
+
+                for &sibling in siblings.iter() {
+                    if !global_roots_set.contains(&sibling) {
+                        global_roots_set.insert(sibling); // add siblings to obtained roots
+                    }
+                }
+            }
+
+            let mut global_roots = global_roots_set.into_iter().collect_vec();
+            global_roots.sort(); // Store in Morton order
+
+            // Global locals data with missing siblings if they don't exist globally with zeros for coefficients
+            let global_locals_with_siblings =
+                vec![Scalar::zero(); global_roots.len() * self.ncoeffs_equivalent_surface];
+
+            // Insert multipoles and keys into result
+            result.locals = global_locals_with_siblings;
+            result.tree.target_tree.keys = global_roots.into();
         } else {
+            // 1. Send multipoles and multipole buffers
+            // Allocate buffers of send multipoles
+
             root_process.gather_into(&nroot_multipoles);
+
+            let mut local_multipole = vec![
+                Scalar::default();
+                (nroot_multipoles as usize)
+                    * self.ncoeffs_equivalent_surface
+            ];
+            let mut local_roots = Vec::new();
+
+            for (tree_idx, source_tree) in self.tree.source_tree.trees.iter().enumerate() {
+                let root_multipole = self.multipole(tree_idx, &source_tree.root).unwrap();
+                local_multipole[tree_idx * self.ncoeffs_equivalent_surface
+                    ..(tree_idx + 1) * self.ncoeffs_equivalent_surface]
+                    .copy_from_slice(root_multipole);
+                local_roots.push(source_tree.root)
+            }
+
+            root_process.gather_varcount_into(&local_multipole);
+            root_process.gather_varcount_into(&local_roots);
+
+            // 2. Send locals
+            root_process.gather_into(&nroot_locals);
+            let mut local_roots = Vec::new();
+
+            for (_tree_idx, target_tree) in self.tree.target_tree.trees.iter().enumerate() {
+                local_roots.push(target_tree.root)
+            }
+
+            root_process.gather_varcount_into(&local_roots);
+        }
+
+        if rank == root_rank {
+            // Set metadata on result
         }
     }
 
-    fn scatter_root_locals(&mut self) {}
+    fn scatter_global_tree_from_root(&mut self) {
+        // Have to identify locations of each local first via a gather.
+        // should really be in the 'gather ranges' part
+
+        let size = self.communicator.size();
+        let rank = self.communicator.rank();
+
+        let nroot_locals = 9;
+
+        // Nominated rank chosen to run global upward pass
+        let root_rank = 0;
+        let root_process = self.communicator.process_at_rank(root_rank);
+    }
 
     fn set_layout(&mut self) {
         let size = self.communicator.size();

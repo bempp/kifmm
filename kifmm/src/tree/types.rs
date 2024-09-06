@@ -355,6 +355,9 @@ where
     /// All global indices
     pub global_indices: Vec<usize>,
 
+    /// All charges
+    pub charges: Vec<T>,
+
     /// The leaves that span the tree, and associated Point data.
     pub leaves: MortonKeys<T::Real>,
 

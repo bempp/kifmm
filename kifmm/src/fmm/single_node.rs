@@ -186,6 +186,88 @@ where
         Some(&self.potentials)
     }
 
+    #[inline(always)]
+    fn upward_pass(&mut self, timed: bool) -> Result<(), FmmError> {
+        if timed {
+            {
+                let s = Instant::now();
+                self.p2m()?;
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
+
+                for level in (1..=self.tree().source_tree().depth()).rev() {
+                    let s = Instant::now();
+                    self.m2m(level)?;
+                    self.times.push(FmmOperatorTime::from_instant(
+                        FmmOperatorType::M2M(level),
+                        s,
+                    ));
+                }
+            }
+
+            Ok(())
+        } else {
+            {
+                self.p2m()?;
+
+                for level in (1..=self.tree().source_tree().depth()).rev() {
+                    self.m2m(level)?;
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn downward_pass(&mut self, timed: bool) -> Result<(), FmmError> {
+        if timed {
+            {
+                for level in 2..=self.tree().target_tree().depth() {
+                    if level > 2 {
+                        let s = Instant::now();
+                        self.l2l(level)?;
+                        self.times.push(FmmOperatorTime::from_instant(
+                            FmmOperatorType::L2L(level),
+                            s,
+                        ));
+                    }
+                    let s = Instant::now();
+                    self.m2l(level)?;
+                    self.times.push(FmmOperatorTime::from_instant(
+                        FmmOperatorType::M2L(level),
+                        s,
+                    ));
+                }
+
+                // Leaf level computation
+                let s = Instant::now();
+                self.p2p()?;
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
+                let s = Instant::now();
+                self.l2p()?;
+                self.times
+                    .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
+            }
+            Ok(())
+        } else {
+            {
+                for level in 2..=self.tree().target_tree().depth() {
+                    if level > 2 {
+                        self.l2l(level)?;
+                    }
+                    self.m2l(level)?;
+                }
+
+                // Leaf level computation
+                self.p2p()?;
+                self.l2p()?;
+            }
+            Ok(())
+        }
+    }
+
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
         // Upward pass
         if timed {

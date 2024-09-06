@@ -404,7 +404,7 @@ impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
 where
     Scalar: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync + Default,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
     Self: FmmOperatorData,
 {

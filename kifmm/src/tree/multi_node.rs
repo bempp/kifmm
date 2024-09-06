@@ -62,7 +62,6 @@ where
         global_depth: u64,
         global_indices: &[usize],
         world: &C,
-        hyksort_subcomm_size: i32,
         sort_kind: SortKind,
     ) -> Result<MultiNodeTreeNew<T, SimpleCommunicator>, std::io::Error> {
         let size = world.size();
@@ -166,9 +165,6 @@ where
             let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, world));
             let n_coords = coords_len / dim;
 
-            // Calculate subcommunicator size for hyksort
-            let hyksort_subcomm_size = 2;
-
             // Assign global indices
             let global_indices = global_indices(n_coords, world);
 
@@ -179,7 +175,6 @@ where
                 global_depth,
                 &global_indices,
                 world,
-                hyksort_subcomm_size,
                 sort_kind,
             );
         }

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use num::Float;
+use num::{Float, One, Zero};
 use pulp::Scalar;
 use rlst::RlstScalar;
 
@@ -59,6 +59,7 @@ where
                 curr = *point;
             }
         }
+
         leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
         // Ensure that final leaf set contains siblings of all encoded keys
@@ -78,11 +79,15 @@ where
             leaf_to_index.insert(*key, i);
         }
 
+        // TODO global indices
+        let charges = vec![T::one(); n_coords];
+
         result.leaves = leaves;
         result.leaves_set = leaves_set;
         result.coordinates = ghost_coordinates;
         result.leaf_to_index = leaf_to_index;
         result.leaves_to_coordinates = leaves_to_coordinates;
+        result.charges = charges;
         Ok(result)
     }
 }

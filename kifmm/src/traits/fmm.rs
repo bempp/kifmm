@@ -142,6 +142,12 @@ where
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
+    /// Evaluate only upward pass
+    fn upward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate only downward pass
+    fn downward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+
     /// Clear the data buffers and add new charge data for re-evaluation.
     ///
     /// # Arguments
@@ -267,8 +273,8 @@ pub trait GhostExchange {
     fn u_list_exchange(&mut self);
 
     /// Gather root multipoles from local trees at nominated node
-    fn gather_root_multipoles(&mut self);
+    fn gather_global_tree_at_root(&mut self);
 
     /// Scatter root locals back to local trees
-    fn scatter_root_locals(&mut self);
+    fn scatter_global_tree_from_root(&mut self);
 }

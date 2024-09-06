@@ -2,12 +2,10 @@
     - Test GhostTreeU creation
     - Ghost trees need metadata for M2L kernels to work properly
     - Metadata for MultiNode Tree needs to be implemented too.
+    - Metadata for nominated node
 
-- node election (easy)
-    - remainder of upward pass on elected node.
+- On global tree, not all leaves will have local data associated with them as source/target trees aren't linked
 
-- local data exchange to each local root (also easy)
-    - independent downward pass
 
 - Downward pass kernels harder on local trees
     - have to run sequentially over available local source trees and then the ghost tree for U and V list

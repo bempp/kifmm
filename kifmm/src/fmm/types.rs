@@ -411,6 +411,20 @@ where
     pub ghost_tree_v: GhostTreeV<Scalar>,
 }
 
+/// Stores global tree for global upward and downward passes
+#[derive(Default)]
+pub struct KiFmmMultiNodeGlobal<T>
+where
+    T: RlstScalar + Float + Default,
+{
+    pub multipoles: Vec<T>,
+    pub locals: Vec<T>,
+    pub level_multipoles: Vec<Vec<SendPtrMut<T>>>,
+    pub level_locals: Vec<Vec<SendPtrMut<T>>>,
+    pub level_index_pointer_multipoles: Vec<Vec<HashMap<MortonKey<T::Real>, usize>>>,
+    pub level_index_pointer_locals: Vec<Vec<HashMap<MortonKey<T::Real>, usize>>>,
+}
+
 impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar,
