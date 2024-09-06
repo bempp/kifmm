@@ -56,7 +56,7 @@ fn main() {
     //     fmm.communicator.rank(),
     //     fmm.neighbourhood_communicator_u.neighbours
     // );
-    fmm.evaluate(true);
+    // fmm.evaluate(true);
 
     // println!(
     //     "RANK {:?} {:?}",

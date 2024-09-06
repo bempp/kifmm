@@ -1089,7 +1089,7 @@ where
         self.charge_index_pointers_sources = charge_index_pointer_sources;
         self.kernel_eval_size = eval_size;
 
-        // At this point I can exchange charge data for particle query packet
-        // self.u_list_exchange();
+        // Exchange U list data
+        self.u_list_exchange();
     }
 }

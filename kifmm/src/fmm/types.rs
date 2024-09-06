@@ -13,7 +13,10 @@ use mpi::{
     datatype::{UncommittedUserDatatype, UserDatatype},
     raw::{AsRaw, FromRaw},
     topology::SimpleCommunicator,
-    traits::{Buffer, BufferMut, CommunicatorCollectives, PartitionedBuffer, PartitionedBufferMut, UncommittedDatatype},
+    traits::{
+        Buffer, BufferMut, CommunicatorCollectives, PartitionedBuffer, PartitionedBufferMut,
+        UncommittedDatatype,
+    },
     Address,
 };
 use num::traits::Float;
@@ -692,7 +695,6 @@ pub struct NeighbourhoodCommunicator {
 }
 
 impl NeighbourhoodCommunicator {
-
     pub fn size(&self) -> i32 {
         self.raw.size()
     }
@@ -701,9 +703,8 @@ impl NeighbourhoodCommunicator {
     pub fn all_to_all_into<S: ?Sized, R: ?Sized>(&self, sendbuf: &S, recvbuf: &mut R)
     where
         S: Buffer,
-        R: BufferMut
+        R: BufferMut,
     {
-
         let c_size = self.raw.size();
 
         unsafe {
@@ -714,7 +715,7 @@ impl NeighbourhoodCommunicator {
                 recvbuf.pointer_mut(),
                 recvbuf.count() / c_size,
                 recvbuf.as_datatype().as_raw(),
-                self.raw.as_raw()
+                self.raw.as_raw(),
             );
         }
     }
@@ -723,9 +724,8 @@ impl NeighbourhoodCommunicator {
     pub fn all_to_all_varcount_into<S: ?Sized, R: ?Sized>(&self, sendbuf: &S, recvbuf: &mut R)
     where
         S: PartitionedBuffer,
-        R: PartitionedBufferMut
+        R: PartitionedBufferMut,
     {
-
         unsafe {
             mpi_sys::MPI_Neighbor_alltoallv(
                 sendbuf.pointer(),
@@ -736,16 +736,13 @@ impl NeighbourhoodCommunicator {
                 recvbuf.counts().as_ptr(),
                 recvbuf.displs().as_ptr(),
                 recvbuf.as_datatype().as_raw(),
-                self.raw.as_raw()
+                self.raw.as_raw(),
             );
         }
     }
 
-
-
     /// Map from local rank to the global rank
     pub fn local_to_global_rank(&self, local_rank: i32) -> Option<i32> {
-
         if local_rank < (self.neighbours.len() - 1) as i32 {
             Some(self.neighbours[local_rank as usize])
         } else {
@@ -753,11 +750,9 @@ impl NeighbourhoodCommunicator {
         }
     }
 
-
     /// Map from the global rank to the local rank
     pub fn global_to_local_rank(&self, global_rank: i32) -> Option<i32> {
-
-        if let Some(idx) = self.neighbours.iter().position(|&g| global_rank == g ) {
+        if let Some(idx) = self.neighbours.iter().position(|&g| global_rank == g) {
             Some(self.neighbours[idx])
         } else {
             None
@@ -767,7 +762,7 @@ impl NeighbourhoodCommunicator {
     /// Constructor from locations to send to
     pub fn new(world_comm: &SimpleCommunicator, to_send: &[i32]) -> Self {
         let size = world_comm.size();
-        let rank = world_comm.rank();
+        let rank: i32 = world_comm.rank();
 
         // Communicate whether to expect to be involved in send/receive with these ranks
         let mut to_receive = vec![0i32; size as usize];

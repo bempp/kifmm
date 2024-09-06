@@ -278,31 +278,25 @@ where
     }
 
     fn u_list_exchange(&mut self) {
-        let world_rank = self.rank;
-        let size = self.communicator.size();
-
-
-
-    }
-
-    fn v_list_exchange(&mut self) {
-        // Two sets of communications, first for the multipoles that exist
-        // secondly for the associated coefficient data
-
-        // Begin by calculating receive counts, this requires an all to all over the neighbourhood
-        // communicator only
-        let neighbourhood_size = self.neighbourhood_communicator_v.size();
+        // Similar to V list, begin by calculating receive counts
+        let neighbourhood_size = self.neighbourhood_communicator_u.size();
 
         let mut neighbourhood_send_counts = vec![0i32; neighbourhood_size as usize];
 
-        for (global_rank, &send_count) in self.v_list_send_counts.iter().enumerate() {
-            if let Some(local_rank) = self.neighbourhood_communicator_v.global_to_local_rank(global_rank as i32) {
+        for (global_rank, &send_count) in self.u_list_send_counts.iter().enumerate() {
+            if let Some(local_rank) = self
+                .neighbourhood_communicator_u
+                .global_to_local_rank(global_rank as i32)
+            {
                 neighbourhood_send_counts[local_rank as usize] = send_count
             }
         }
 
         let mut neighbourhood_receive_counts = vec![0i32; neighbourhood_size as usize];
-        self.neighbourhood_communicator_v.all_to_all_into(&neighbourhood_send_counts, &mut neighbourhood_receive_counts);
+        self.neighbourhood_communicator_u.all_to_all_into(
+            &neighbourhood_send_counts,
+            &mut neighbourhood_receive_counts,
+        );
 
         // Now can create displacements
         let mut neighbourhood_send_displacements = Vec::new();
@@ -311,10 +305,13 @@ where
         let mut send_counter = 0;
         let mut receive_counter = 0;
 
-        for (send_count, receive_count) in neighbourhood_send_counts.iter().zip(neighbourhood_receive_counts.iter()) {
+        for (send_count, receive_count) in neighbourhood_send_counts
+            .iter()
+            .zip(neighbourhood_receive_counts.iter())
+        {
             neighbourhood_send_displacements.push(send_counter);
             neighbourhood_receive_displacements.push(receive_counter);
-            send_counter +=  send_count;
+            send_counter += send_count;
             receive_counter += receive_count;
         }
 
@@ -324,27 +321,238 @@ where
         let mut receive_counter = 0;
         let mut received_queries_source_ranks = vec![0i32; total_receive_count as usize];
         for (i, &receive_count) in neighbourhood_receive_counts.iter().enumerate() {
-
             let curr_receive_counter = receive_counter;
-            receive_counter +=  receive_count as usize;
+            receive_counter += receive_count as usize;
+
+            let rank = self.neighbourhood_communicator_u.neighbours[i];
+            let tmp = vec![rank as i32; receive_count as usize];
+            received_queries_source_ranks[curr_receive_counter..receive_counter]
+                .copy_from_slice(tmp.as_slice());
+        }
+
+        // Communicate queries for coordinate data
+        let mut received_queries = vec![0u64; total_receive_count as usize];
+        {
+            let partition_send = Partition::new(
+                &self.u_list_queries,
+                neighbourhood_send_counts,
+                neighbourhood_send_displacements,
+            );
+            let mut partition_receive = PartitionMut::new(
+                &mut received_queries,
+                neighbourhood_receive_counts,
+                &neighbourhood_receive_displacements[..],
+            );
+            self.neighbourhood_communicator_u
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
+        // Now have to check for locally contained keys from received queries
+        let mut available_queries_source_ranks = Vec::new();
+        let mut available_queries_sizes = Vec::new();
+        let mut available_queries_bufs = Vec::new();
+        for (&query, &source_rank) in received_queries
+            .iter()
+            .zip(received_queries_source_ranks.iter())
+        {
+            let key = MortonKey::from_morton(query, None);
+
+            // Lookup corresponding source tree at this rank
+            let mut tree_idx = 0;
+            for (i, tree) in self.tree.source_tree.trees.iter().enumerate() {
+                if tree.keys_set.contains(&key) {
+                    tree_idx = i;
+                    break;
+                }
+            }
+
+            // Only send back if it contains coordinate data
+            if let Some(coords) = self.tree.source_tree.trees[tree_idx].coordinates(&key) {
+                available_queries_source_ranks.push(source_rank);
+                available_queries_sizes.push(coords.len() as i32);
+                available_queries_bufs.push(coords)
+            }
+        }
+
+        // // Calculate send counts of available queries to send back
+        let mut received_queries_sizes_send_counts_ = HashMap::new(); // particle data counts
+        for (i, global_rank) in available_queries_source_ranks.iter().enumerate() {
+            *received_queries_sizes_send_counts_
+                .entry(*global_rank)
+                .or_insert(0) += available_queries_sizes[i];
+        }
+
+        let mut received_queries_sizes_send_counts = vec![0i32; neighbourhood_size as usize];
+
+        for (&global_rank, &send_count) in received_queries_sizes_send_counts_.iter() {
+            if let Some(local_rank) = self
+                .neighbourhood_communicator_v
+                .global_to_local_rank(global_rank)
+            {
+                received_queries_sizes_send_counts[local_rank as usize] = send_count;
+            }
+        }
+
+        // Calculate counts for requested queries associated coordinate data
+        let mut requested_queries_sizes_receive_counts = vec![0i32; neighbourhood_size as usize];
+        self.neighbourhood_communicator_u.all_to_all_into(
+            &received_queries_sizes_send_counts,
+            &mut requested_queries_sizes_receive_counts,
+        );
+
+        // Can now create displacements for coordinate data
+        let mut received_queries_sizes_send_displacements = Vec::new();
+        let mut requested_queries_sizes_receive_displacements = Vec::new();
+
+        let mut send_counter = 0;
+        let mut receive_counter = 0;
+
+        for (send_count, receive_count) in received_queries_sizes_send_counts
+            .iter()
+            .zip(requested_queries_sizes_receive_counts.iter())
+        {
+            received_queries_sizes_send_displacements.push(send_counter);
+            requested_queries_sizes_receive_displacements.push(receive_counter);
+            send_counter += send_count;
+            receive_counter += receive_count;
+        }
+
+        let total_receive_sizes_count = receive_counter;
+        let total_send_sizes_count = send_counter;
+
+        // Allocate buffers to store requested coordinate data to be send
+        let mut send_coordinates = vec![Scalar::Real::default(); total_send_sizes_count as usize];
+        let mut displacement = 0;
+        for buf in available_queries_bufs {
+            let new_displacement = displacement + buf.len();
+            send_coordinates[displacement..new_displacement].copy_from_slice(buf);
+            displacement = new_displacement;
+        }
+
+        // Allocate buffers to store requested coordinate data at this proc
+        let mut ghost_coordinates =
+            vec![Scalar::Real::default(); total_receive_sizes_count as usize];
+
+        // Communicate ghost coordinate data
+        {
+            let partition_send = Partition::new(
+                &send_coordinates,
+                received_queries_sizes_send_counts,
+                received_queries_sizes_send_displacements,
+            );
+            let mut partition_receive = PartitionMut::new(
+                &mut ghost_coordinates,
+                &requested_queries_sizes_receive_counts[..],
+                &requested_queries_sizes_receive_displacements[..],
+            );
+            self.neighbourhood_communicator_u
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
+        let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
+        let domain = &self.tree.domain;
+        self.ghost_tree_u = GhostTreeU::from_ghost_data(depth, domain, ghost_coordinates).unwrap();
+
+        if self.rank == 3 {
+            println!(
+                "rank {:?} {:?}",
+                self.rank, self.neighbourhood_communicator_u.neighbours
+            );
+            println!(
+                "rank {:?} {:?}",
+                self.rank,
+                &requested_queries_sizes_receive_counts.len()
+            );
+            println!(
+                "rank {:?} {:?}",
+                self.rank, &requested_queries_sizes_receive_displacements
+            );
+            println!(
+                "ghost tree {:?}",
+                self.ghost_tree_u.leaves_to_coordinates.keys().len()
+            );
+            println!("ghost tree {:?}", self.ghost_tree_u.leaves.len());
+        }
+    }
+
+    fn v_list_exchange(&mut self) {
+        // Begin by calculating receive counts, this requires an all to all over the neighbourhood
+        // communicator only
+        let neighbourhood_size = self.neighbourhood_communicator_v.size();
+
+        let mut neighbourhood_send_counts = vec![0i32; neighbourhood_size as usize];
+
+        for (global_rank, &send_count) in self.v_list_send_counts.iter().enumerate() {
+            if let Some(local_rank) = self
+                .neighbourhood_communicator_v
+                .global_to_local_rank(global_rank as i32)
+            {
+                neighbourhood_send_counts[local_rank as usize] = send_count
+            }
+        }
+
+        let mut neighbourhood_receive_counts = vec![0i32; neighbourhood_size as usize];
+        self.neighbourhood_communicator_v.all_to_all_into(
+            &neighbourhood_send_counts,
+            &mut neighbourhood_receive_counts,
+        );
+
+        // Now can create displacements
+        let mut neighbourhood_send_displacements = Vec::new();
+        let mut neighbourhood_receive_displacements = Vec::new();
+
+        let mut send_counter = 0;
+        let mut receive_counter = 0;
+
+        for (send_count, receive_count) in neighbourhood_send_counts
+            .iter()
+            .zip(neighbourhood_receive_counts.iter())
+        {
+            neighbourhood_send_displacements.push(send_counter);
+            neighbourhood_receive_displacements.push(receive_counter);
+            send_counter += send_count;
+            receive_counter += receive_count;
+        }
+
+        let total_receive_count = receive_counter;
+
+        // Assign origin ranks to all received queries
+        let mut receive_counter = 0;
+        let mut received_queries_source_ranks = vec![0i32; total_receive_count as usize];
+        for (i, &receive_count) in neighbourhood_receive_counts.iter().enumerate() {
+            let curr_receive_counter = receive_counter;
+            receive_counter += receive_count as usize;
 
             let rank = self.neighbourhood_communicator_v.neighbours[i];
             let tmp = vec![rank as i32; receive_count as usize];
-            received_queries_source_ranks[curr_receive_counter..receive_counter].copy_from_slice(tmp.as_slice());
+            received_queries_source_ranks[curr_receive_counter..receive_counter]
+                .copy_from_slice(tmp.as_slice());
         }
 
+        // Communicate queries for multipole data
         let mut received_queries = vec![0u64; total_receive_count as usize];
-        // Create partition
         {
-            let partition_send = Partition::new(&self.v_list_queries, neighbourhood_send_counts, neighbourhood_send_displacements);
-            let mut partition_receive = PartitionMut::new(&mut received_queries, neighbourhood_receive_counts, &neighbourhood_receive_displacements[..]);
-            self.neighbourhood_communicator_v.all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            let partition_send = Partition::new(
+                &self.v_list_queries,
+                neighbourhood_send_counts,
+                neighbourhood_send_displacements,
+            );
+            let mut partition_receive = PartitionMut::new(
+                &mut received_queries,
+                neighbourhood_receive_counts,
+                &neighbourhood_receive_displacements[..],
+            );
+            self.neighbourhood_communicator_v
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
-        // Now have to check for locally contained keys
+        // Now have to check for locally contained keys from received queries
         let mut available_queries = Vec::new();
         let mut available_queries_source_ranks = Vec::new();
-        for (&query, &source_rank) in received_queries.iter().zip(received_queries_source_ranks.iter()) {
+        for (&query, &source_rank) in received_queries
+            .iter()
+            .zip(received_queries_source_ranks.iter())
+        {
             let key = MortonKey::from_morton(query, None);
             if self.tree.source_tree.keys_set.contains(&key) {
                 available_queries.push(key.morton);
@@ -352,33 +560,58 @@ where
             }
         }
 
+        // Calculate send counts of available queries to send back
         let mut received_queries_send_counts_ = HashMap::new();
         for global_rank in available_queries_source_ranks.iter() {
-            *received_queries_send_counts_.entry(*global_rank).or_insert(0) += 1;
+            *received_queries_send_counts_
+                .entry(*global_rank)
+                .or_insert(0) += 1;
         }
 
         let mut received_queries_send_counts = vec![0i32; neighbourhood_size as usize];
 
         for (&global_rank, &send_count) in received_queries_send_counts_.iter() {
-            if let Some(local_rank) = self.neighbourhood_communicator_v.global_to_local_rank(global_rank) {
+            if let Some(local_rank) = self
+                .neighbourhood_communicator_v
+                .global_to_local_rank(global_rank)
+            {
                 received_queries_send_counts[local_rank as usize] = send_count;
             }
         }
 
-        let mut received_queries_receive_counts = vec![0i32; neighbourhood_size as usize];
-        self.neighbourhood_communicator_v.all_to_all_into(&received_queries_send_counts, &mut received_queries_receive_counts);
+        // Calculate counts for requested queries
+        let mut requested_queries_receive_counts = vec![0i32; neighbourhood_size as usize];
+        self.neighbourhood_communicator_v.all_to_all_into(
+            &received_queries_send_counts,
+            &mut requested_queries_receive_counts,
+        );
 
-        // Now can create displacements
+        // Now can create displacements for morton data and multipole data
         let mut received_queries_send_displacements = Vec::new();
-        let mut received_queries_receive_displacements = Vec::new();
+        let mut requested_queries_receive_displacements = Vec::new();
+        let mut send_multipoles_counts = Vec::new();
+        let mut receive_multipoles_counts = Vec::new();
+        let mut send_multipoles_displacements = Vec::new();
+        let mut receive_multipoles_displacements = Vec::new();
 
         let mut send_counter = 0;
         let mut receive_counter = 0;
 
-        for (send_count, receive_count) in received_queries_send_counts.iter().zip(received_queries_receive_counts.iter()) {
+        for (send_count, receive_count) in received_queries_send_counts
+            .iter()
+            .zip(requested_queries_receive_counts.iter())
+        {
             received_queries_send_displacements.push(send_counter);
-            received_queries_receive_displacements.push(receive_counter);
-            send_counter +=  send_count;
+            requested_queries_receive_displacements.push(receive_counter);
+
+            send_multipoles_counts.push(send_count * self.ncoeffs_equivalent_surface as i32);
+            receive_multipoles_counts.push(receive_count * self.ncoeffs_equivalent_surface as i32);
+            send_multipoles_displacements
+                .push(send_counter * self.ncoeffs_equivalent_surface as i32);
+            receive_multipoles_displacements
+                .push(send_counter * self.ncoeffs_equivalent_surface as i32);
+
+            send_counter += send_count;
             receive_counter += receive_count;
         }
 
@@ -388,17 +621,25 @@ where
         // Create partition and get back requests
         let mut requested_queries = vec![0u64; total_receive_count as usize];
         {
-            let partition_send = Partition::new(&available_queries, received_queries_send_counts, received_queries_send_displacements);
-            let mut partition_receive = PartitionMut::new(&mut requested_queries, received_queries_receive_counts, &received_queries_receive_displacements[..]);
-            self.neighbourhood_communicator_v.all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            let partition_send = Partition::new(
+                &available_queries,
+                received_queries_send_counts,
+                received_queries_send_displacements,
+            );
+            let mut partition_receive = PartitionMut::new(
+                &mut requested_queries,
+                requested_queries_receive_counts,
+                &requested_queries_receive_displacements[..],
+            );
+            self.neighbourhood_communicator_v
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
-
         // Allocate buffers to store requested multipole data
-        let mut send_multipoles = vec![Scalar::default(); (total_send_count as usize) * self.ncoeffs_equivalent_surface];
+        let mut send_multipoles =
+            vec![Scalar::default(); (total_send_count as usize) * self.ncoeffs_equivalent_surface];
         let mut multipole_idx = 0;
         for &query in available_queries.iter() {
-
             let key = MortonKey::from_morton(query, None);
 
             // Lookup corresponding source tree at this rank
@@ -406,31 +647,61 @@ where
             for (i, tree) in self.tree.source_tree.trees.iter().enumerate() {
                 if tree.keys_set.contains(&key) {
                     tree_idx = 0;
-                    break
+                    break;
                 }
             }
 
             let multipole = self.multipole(tree_idx, &key).unwrap();
 
-            send_multipoles[multipole_idx * self.ncoeffs_equivalent_surface..(multipole_idx + 1) * self.ncoeffs_equivalent_surface].copy_from_slice(
-                multipole
-            );
+            send_multipoles[multipole_idx * self.ncoeffs_equivalent_surface
+                ..(multipole_idx + 1) * self.ncoeffs_equivalent_surface]
+                .copy_from_slice(multipole);
 
             multipole_idx += 1;
         }
 
-        // Allocate buffers to store received multipole data
-        let mut receive_multipoles = vec![Scalar::default(); (total_receive_count as usize) * self.ncoeffs_equivalent_surface];
+        // Allocate buffers to store requested multipole data
+        let mut ghost_multipoles = vec![
+            Scalar::default();
+            (total_receive_count as usize)
+                * self.ncoeffs_equivalent_surface
+        ];
 
+        // Communicate requested multipole data
+        {
+            let partition_send = Partition::new(
+                &send_multipoles,
+                send_multipoles_counts,
+                send_multipoles_displacements,
+            );
+            let mut partition_receive = PartitionMut::new(
+                &mut ghost_multipoles,
+                receive_multipoles_counts,
+                &receive_multipoles_displacements[..],
+            );
+            self.neighbourhood_communicator_v
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
 
-        // Have to create multipole displacements and counts
+        let depth = self.tree.source_tree.global_depth + self.tree.source_tree.local_depth;
 
+        let ghost_keys = requested_queries
+            .iter()
+            .map(|&k| MortonKey::from_morton(k, None))
+            .collect_vec();
 
+        self.ghost_tree_v = GhostTreeV::from_ghost_data(
+            ghost_keys,
+            ghost_multipoles,
+            depth,
+            self.ncoeffs_equivalent_surface,
+        )
+        .unwrap();
 
         // if self.rank == 3 {
         //     println!("rank {:?} {:?}", self.rank, self.neighbourhood_communicator_v.neighbours);
-        //     println!("rank {:?} {:?}", self.rank, &received_queries.len());
-        //     println!("rank {:?} {:?}", self.rank, &requested_queries[0..3]);
+        //     println!("rank {:?} {:?}", self.rank, &self.ncoeffs_equivalent_surface);
+        //     println!("rank {:?} {:?}", self.rank, &receive_multipoles.len());
         //     println!("rank {:?} {:?}", self.rank, &requested_queries.len());
         // }
 
@@ -439,9 +710,5 @@ where
         //     println!("rank {:?} {:?}", self.rank, &received_queries.len());
         //     println!("rank {:?} {:?}", self.rank, &received_queries[0..4]);
         // }
-
-
-
     }
 }
-

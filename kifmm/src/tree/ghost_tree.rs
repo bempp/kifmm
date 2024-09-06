@@ -8,8 +8,9 @@ use rlst::RlstScalar;
 use crate::{fmm::types::IndexPointer, traits::tree::SingleNodeTreeTrait};
 
 use super::{
+    constants::DEEPEST_LEVEL,
     domain,
-    types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MortonKeys},
+    types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MortonKeys, Point, Points},
 };
 
 impl<T> GhostTreeU<T>
@@ -18,26 +19,63 @@ where
 {
     /// Constructor
     pub fn from_ghost_data(
-        mut ghost_leaves: Vec<MortonKey<T::Real>>,
-        ghost_index_pointers: Vec<IndexPointer>,
+        depth: u64,
+        domain: &Domain<T::Real>,
         ghost_coordinates: Vec<T::Real>,
     ) -> Result<Self, std::io::Error> {
         let mut result = Self::default();
 
-        let leaves = MortonKeys::from(ghost_leaves);
-        let leaves_set: HashSet<_> = leaves.iter().cloned().collect();
+        let dim = 3;
+        let n_coords = ghost_coordinates.len() / dim;
+
+        // Convert column major coordinate into `Point`, containing Morton encoding
+        let mut points: Vec<Point<T::Real>> = Points::default();
+        for i in 0..n_coords {
+            let coord: &[T::Real; 3] = &ghost_coordinates[i * dim..(i + 1) * dim]
+                .try_into()
+                .unwrap();
+
+            let base_key = MortonKey::<T::Real>::from_point(coord, &domain, DEEPEST_LEVEL, None);
+            let encoded_key = MortonKey::<T::Real>::from_point(coord, &domain, depth, None);
+            points.push(Point {
+                coordinate: *coord,
+                base_key,
+                encoded_key,
+                global_index: 0,
+            })
+        }
+
+        // Morton sort over points
+        points.sort();
+        // Group coordinates by leaves
+        let mut leaves_to_coordinates = HashMap::new();
+        let mut curr = points[0];
+        let mut curr_idx = 0;
+
+        for (i, point) in points.iter().enumerate() {
+            if point.encoded_key != curr.encoded_key {
+                leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
+                curr_idx = i;
+                curr = *point;
+            }
+        }
+        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
+
+        // Ensure that final leaf set contains siblings of all encoded keys
+        let leaves_set: HashSet<MortonKey<_>> = leaves_to_coordinates
+            .keys()
+            .flat_map(|k| k.siblings())
+            .collect();
+
+        // Sort leaves before returning
+        let mut leaves = leaves_set.iter().cloned().collect_vec();
+        leaves.sort();
+        let leaves = MortonKeys::from(leaves);
 
         let mut leaf_to_index = HashMap::new();
 
         for (i, key) in leaves.iter().enumerate() {
             leaf_to_index.insert(*key, i);
-        }
-
-        let mut leaves_to_coordinates = HashMap::new();
-
-        for (key, index_pointer) in leaves.iter().zip(ghost_index_pointers) {
-            leaves_to_coordinates
-                .insert(*key, (index_pointer.0 as usize, index_pointer.1 as usize));
         }
 
         result.leaves = leaves;
