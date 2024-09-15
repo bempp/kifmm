@@ -406,4 +406,7 @@ where
 
     /// Source to target data associated with ghost tree
     pub source_to_target: V,
+
+    /// Index pointers to each key at a given level, indexed by level.
+    pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<T::Real>, usize>>,
 }

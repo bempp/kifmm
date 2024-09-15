@@ -33,17 +33,17 @@ pub trait SourceToTargetTranslationMetadata {
 
     /// Map between source/target nodes, indexed by level.
     fn displacements(&mut self);
-
-    /// Map between source/target nodes if they are explicitly provided
-    fn displacements_explicit<T: RlstScalar + Float>(
-        &mut self,
-        source_trees: &[SingleNodeTree<T>],
-        target_trees: &[SingleNodeTree<T>],
-    );
 }
 
 pub trait SourceToTargetTranslationMetadataGhostTrees {
-    fn displacements<T: RlstScalar + Float>(&mut self, target_trees: &[SingleNodeTree<T>]);
+    type Scalar: RlstScalar;
+
+    fn displacements(
+        &mut self,
+        target_trees: &[SingleNodeTree<<Self::Scalar as RlstScalar>::Real>],
+        total_depth: u64,
+        global_depth: u64,
+    );
 }
 
 pub trait SourceToTargetTranslationMultiNode {

@@ -327,14 +327,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
-    fn displacements_explicit<T: RlstScalar + Float>(
-        &mut self,
-        source_trees: &[crate::tree::SingleNodeTree<T>],
-        target_trees: &[crate::tree::SingleNodeTree<T>],
-    ) {
-    }
 
-    // Must be run AFTER multipole exchange.
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
         let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
@@ -827,12 +820,6 @@ where
 
         let nsource_trees = self.nsource_trees;
         let ntarget_trees = self.ntarget_trees;
-        let mut ntarget_points = 0;
-        let mut nsource_points = 0;
-        let mut nsource_keys = 0;
-        let mut ntarget_keys = 0;
-        let mut ntarget_leaves = 0;
-        let mut nsource_leaves = 0;
 
         // Allocate buffers to store multipole and local data
         let mut multipoles = Vec::new();
@@ -862,12 +849,12 @@ where
         }
 
         // Index pointer of multipole and local data, indexed by fmm index, then by level
-        let mut level_index_pointer_multipoles = level_index_pointer_multinode(
+        let level_index_pointer_multipoles = level_index_pointer_multinode(
             &self.tree.source_tree.trees,
             self.tree.source_tree.local_depth,
             self.tree.source_tree.global_depth,
         );
-        let mut level_index_pointer_locals = level_index_pointer_multinode(
+        let level_index_pointer_locals = level_index_pointer_multinode(
             &self.tree.target_tree.trees,
             self.tree.target_tree.local_depth,
             self.tree.source_tree.global_depth,
@@ -878,8 +865,8 @@ where
         let mut leaf_downward_equivalent_surfaces_targets = Vec::new();
 
         // Precompute surfaces
-        for fmm_idx in 0..nsource_trees {
-            let source_tree = &self.tree.source_tree.trees[fmm_idx];
+        for source_tree_index in 0..nsource_trees {
+            let source_tree = &self.tree.source_tree.trees[source_tree_index];
 
             let leaf_upward_equivalent_surfaces_sources_i = leaf_surfaces(
                 source_tree,
@@ -899,8 +886,8 @@ where
             leaf_upward_check_surfaces_sources.push(leaf_upward_check_surfaces_sources_i);
         }
 
-        for fmm_idx in 0..ntarget_trees {
-            let target_tree = &self.tree.target_tree.trees[fmm_idx];
+        for target_tree_index in 0..ntarget_trees {
+            let target_tree = &self.tree.target_tree.trees[target_tree_index];
             let leaf_downward_equivalent_surfaces_targets_i = leaf_surfaces(
                 target_tree,
                 self.ncoeffs_equivalent_surface,
@@ -971,7 +958,6 @@ where
 
         // New: Need to figure out which multipole data needs to be queried for and isn't contained in source
         // trees locally, local trees ideally need a tree ID, which associates them with a local and global rank.
-
         let mut locally_owned_domains = HashSet::new();
         for tree in self.tree.source_tree.trees.iter() {
             locally_owned_domains.insert(tree.root);

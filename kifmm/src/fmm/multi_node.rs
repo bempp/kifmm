@@ -53,7 +53,7 @@ where
         + SourceToTargetTranslation
         + SourceToTargetTranslationMetadata,
     KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>: Fmm + SourceToTargetTranslationMetadata,
-    GhostTreeV<Scalar, SourceToTargetData>: SourceToTargetTranslationMetadataGhostTrees,
+    GhostTreeV<Scalar, SourceToTargetData>: SourceToTargetTranslationMetadataGhostTrees<Scalar = Scalar>,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -65,14 +65,16 @@ where
 
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
         // Run upward pass on local trees, up to local depth
+        let total_depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
+        let global_depth = self.tree.source_tree.global_depth;
+
         {
             let s = Instant::now();
             self.p2m()?;
             self.times
                 .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
 
-            let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
-            for level in ((self.tree.source_tree.global_depth + 1)..=depth).rev() {
+            for level in ((global_depth + 1)..=total_depth).rev() {
                 let s = Instant::now();
                 self.m2m(level).unwrap();
                 self.times.push(FmmOperatorTime::from_instant(
@@ -92,7 +94,7 @@ where
 
         // M2L displacements depend on existence, so must happen at runtime for Ghost tree and Global FMM Tree
         self.ghost_tree_v
-            .displacements(&self.tree.target_tree.trees);
+            .displacements(&self.tree.target_tree.trees[..], total_depth, global_depth);
 
         if self.rank == 0 {
             self.global_fmm.displacements(); // at root rank,
@@ -213,7 +215,7 @@ where
             Scalar = Scalar,
             Tree = MultiNodeFmmTree<<Scalar as RlstScalar>::Real, SimpleCommunicator>,
         >,
-    KiFmm<Scalar, Kernel, SourceToTargetData>:
+    KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>:
         SourceToTargetTranslationMetadata + FmmMetadata<Scalar = Scalar, Charges = Scalar>,
 {
     fn gather_global_fmm_at_root(&mut self) {
@@ -228,9 +230,9 @@ where
         let root_process = self.communicator.process_at_rank(root_rank);
 
         if rank == root_rank {
-            let mut result = KiFmm::<Scalar, Kernel, SourceToTargetData>::default();
 
-            // 0. Set metadata for result
+            // 0. Set metadata for result, stored in a new single node FMM
+            let mut result = KiFmm::<Scalar, Kernel, SourceToTargetDataSingleNode>::default();
             result.equivalent_surface_order = vec![self.equivalent_surface_order];
             result.check_surface_order = vec![self.check_surface_order];
             result.ncoeffs_equivalent_surface = vec![self.ncoeffs_equivalent_surface];
@@ -402,6 +404,9 @@ where
 
             root_process.gather_varcount_into_root(&local_roots, &mut partition);
 
+            // Save somewhere the origin of all the local roots so I can broadcast back
+
+
             // Need to also insert sibling data if it's missing into multipole buffer so that upward pass
             // will run even if this doesn't exist remotely.
             // Also insert ancestor data
@@ -463,10 +468,12 @@ where
                 self.tree.target_tree.global_depth,
                 &self.tree.domain,
             );
+
+            // Set global fmm to result
+            self.global_fmm = result;
         } else {
             // 1. Send multipoles and multipole buffers
             // Allocate buffers of send multipoles
-
             root_process.gather_into(&nroot_multipoles);
 
             let mut local_multipole = vec![
@@ -498,9 +505,6 @@ where
             root_process.gather_varcount_into(&local_roots);
         }
 
-        if rank == root_rank {
-            // Set metadata on result
-        }
     }
 
     fn scatter_global_fmm_from_root(&mut self) {
@@ -515,6 +519,7 @@ where
         // Nominated rank chosen to run global upward pass
         let root_rank = 0;
         let root_process = self.communicator.process_at_rank(root_rank);
+
     }
 
     fn set_layout(&mut self) {

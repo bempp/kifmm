@@ -611,12 +611,6 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements_explicit<T: RlstScalar + Float>(
-        &mut self,
-        source_trees: &[SingleNodeTree<T>],
-        target_trees: &[SingleNodeTree<T>],
-    ) {
-    }
 
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
@@ -828,12 +822,6 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements_explicit<T: RlstScalar + Float>(
-        &mut self,
-        source_trees: &[SingleNodeTree<T>],
-        target_trees: &[SingleNodeTree<T>],
-    ) {
-    }
 
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
@@ -1393,12 +1381,6 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements_explicit<T: RlstScalar + Float>(
-        &mut self,
-        source_trees: &[SingleNodeTree<T>],
-        target_trees: &[SingleNodeTree<T>],
-    ) {
-    }
 
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
@@ -1899,12 +1881,6 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements_explicit<T: RlstScalar + Float>(
-        &mut self,
-        source_trees: &[SingleNodeTree<T>],
-        target_trees: &[SingleNodeTree<T>],
-    ) {
-    }
 
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
