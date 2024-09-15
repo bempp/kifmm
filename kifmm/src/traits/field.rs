@@ -1,4 +1,9 @@
 //! Field Traits
+
+use num::Float;
+use rlst::RlstScalar;
+
+use crate::tree::SingleNodeTree;
 /// Marker trait for field translations
 pub trait SourceToTargetData {
     /// Metadata for applying each to source to target translation, depends on both the kernel
@@ -28,6 +33,17 @@ pub trait SourceToTargetTranslationMetadata {
 
     /// Map between source/target nodes, indexed by level.
     fn displacements(&mut self);
+
+    /// Map between source/target nodes if they are explicitly provided
+    fn displacements_explicit<T: RlstScalar + Float>(
+        &mut self,
+        source_trees: &[SingleNodeTree<T>],
+        target_trees: &[SingleNodeTree<T>],
+    );
+}
+
+pub trait SourceToTargetTranslationMetadataGhostTrees {
+    fn displacements<T: RlstScalar + Float>(&mut self, target_trees: &[SingleNodeTree<T>]);
 }
 
 pub trait SourceToTargetTranslationMultiNode {

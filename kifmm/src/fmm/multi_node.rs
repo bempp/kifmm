@@ -2,8 +2,6 @@
 //! Single Node FMM
 use std::{
     collections::{HashMap, HashSet},
-    hash::Hash,
-    os::raw::c_void,
     time::Instant,
 };
 
@@ -11,57 +9,51 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use itertools::{izip, Itertools};
 use mpi::{
-    collective::SystemOperation,
     datatype::{Partition, PartitionMut},
-    ffi::RSMPI_SUM,
-    raw::{AsRaw, FromRaw},
-    request::WaitGuard,
     topology::{Color, SimpleCommunicator},
     traits::{Communicator, Destination, Equivalence, Group, Partitioned, Root, Source},
 };
 
 use num::Float;
-use pulp::Scalar;
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
 use rlst::RlstScalar;
 
 use mpi::collective::CommunicatorCollectives;
 
 use crate::{
-    fmm::{
-        helpers::sparse_point_to_point,
-        types::{FmmEvalType, KiFmm},
-    },
+    fmm::types::{FmmEvalType, KiFmm},
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
+        field::{
+            SourceToTargetData as SourceToTargetDataTrait, SourceToTargetTranslationMetadata,
+            SourceToTargetTranslationMetadataGhostTrees,
+        },
         fmm::{
-            FmmMetadata, FmmOperatorData, GhostExchange, HomogenousKernel, MultiNodeFmm,
-            SourceToTargetTranslation, SourceTranslation, TargetTranslation,
+            FmmGlobalFmmMetadata, FmmMetadata, FmmOperatorData, GhostExchange, HomogenousKernel,
+            MultiNodeFmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation,
         },
         tree::SingleNodeTreeTrait,
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    tree::{
-        helpers::all_to_allv_sparse,
-        types::{GhostTreeU, GhostTreeV, MortonKey},
-    },
-    Fmm, MultiNodeFmmTree, SingleNodeFmmTree,
+    tree::types::{GhostTreeU, GhostTreeV, MortonKey},
+    Fmm, MultiNodeFmmTree,
 };
 
-use super::{
-    helpers::{expected_queries, sparse_point_to_point_v},
-    types::{IndexPointer, KiFmmMultiNode, KiFmmMultiNodeGlobal, Layout},
-};
+use super::types::{KiFmmMultiNode, Layout};
 
-impl<Scalar, Kernel, SourceToTargetData> MultiNodeFmm
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode> MultiNodeFmm
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    Self: SourceTranslation + GhostExchange,
+    Self: SourceTranslation
+        + GhostExchange
+        + TargetTranslation
+        + SourceToTargetTranslation
+        + SourceToTargetTranslationMetadata,
+    KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>: Fmm + SourceToTargetTranslationMetadata,
+    GhostTreeV<Scalar, SourceToTargetData>: SourceToTargetTranslationMetadataGhostTrees,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -93,18 +85,59 @@ where
         // At this point the exchange needs to happen of multipole data
         self.v_list_exchange();
 
-        // Gather root multipoles at nominated node
-        self.gather_global_tree_at_root();
+        // Can construct Metadata for ghost data at this point
 
-        // Set metadata for ghost data, and root multipoles
+        // Gather root multipoles at nominated node
+        self.gather_global_fmm_at_root();
+
+        // M2L displacements depend on existence, so must happen at runtime for Ghost tree and Global FMM Tree
+        self.ghost_tree_v
+            .displacements(&self.tree.target_tree.trees);
+
+        if self.rank == 0 {
+            self.global_fmm.displacements(); // at root rank,
+        }
 
         // Now can proceed with remainder of the upward pass on chosen node, and some of the downward pass
+        if self.rank == 0 {
+            self.global_fmm.upward_pass(timed)?;
+            self.global_fmm.downward_pass(timed)?; // avoid leaf level computations
+        }
 
         // Scatter root locals back to local trees
-        self.scatter_global_tree_from_root();
+        self.scatter_global_fmm_from_root();
 
         // Now remainder of downward pass can happen in parallel on each process, similar to how I've written the local upward passes
         // new kernels have to reflect ghost data, and potentially multiple local source trees
+        // {
+        //     let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
+        //     for level in 2..=depth {
+        //         if level > 2 {
+        //             let s = Instant::now();
+        //             self.l2l(level)?;
+        //             self.times.push(FmmOperatorTime::from_instant(
+        //                 FmmOperatorType::L2L(level),
+        //                 s,
+        //             ));
+        //         }
+        //         let s = Instant::now();
+        //         self.m2l(level)?;
+        //         self.times.push(FmmOperatorTime::from_instant(
+        //             FmmOperatorType::M2L(level),
+        //             s,
+        //         ));
+        //     }
+
+        //     // Leaf level computation
+        //     let s = Instant::now();
+        //     self.p2p()?;
+        //     self.times
+        //         .push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
+        //     let s = Instant::now();
+        //     self.l2p()?;
+        //     self.times
+        //         .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
+        // }
 
         Ok(())
     }
@@ -167,20 +200,25 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> GhostExchange
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode> GhostExchange
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync + Default,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync + Default,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    Self: SourceTranslation,
+    Self: SourceTranslation
+        + MultiNodeFmm<
+            Scalar = Scalar,
+            Tree = MultiNodeFmmTree<<Scalar as RlstScalar>::Real, SimpleCommunicator>,
+        >,
+    KiFmm<Scalar, Kernel, SourceToTargetData>:
+        SourceToTargetTranslationMetadata + FmmMetadata<Scalar = Scalar, Charges = Scalar>,
 {
-    fn gather_global_tree_at_root(&mut self) {
+    fn gather_global_fmm_at_root(&mut self) {
         let size = self.communicator.size();
         let rank = self.communicator.rank();
-
-        let mut result = KiFmm::<Scalar, Kernel, SourceToTargetData>::default();
 
         let nroot_multipoles = self.tree.source_tree.trees.len() as i32;
         let nroot_locals = self.tree.target_tree.trees.len() as i32;
@@ -190,6 +228,15 @@ where
         let root_process = self.communicator.process_at_rank(root_rank);
 
         if rank == root_rank {
+            let mut result = KiFmm::<Scalar, Kernel, SourceToTargetData>::default();
+
+            // 0. Set metadata for result
+            result.equivalent_surface_order = vec![self.equivalent_surface_order];
+            result.check_surface_order = vec![self.check_surface_order];
+            result.ncoeffs_equivalent_surface = vec![self.ncoeffs_equivalent_surface];
+            result.ncoeffs_check_surface = vec![self.ncoeffs_check_surface];
+            result.kernel_eval_size = 1;
+
             // 1. Gather multipole data
             let mut global_multipoles_counts = vec![0i32; size as usize];
             root_process.gather_into_root(&nroot_multipoles, &mut global_multipoles_counts);
@@ -254,42 +301,77 @@ where
 
             // Need to also insert sibling data if it's missing into multipole buffer so that upward pass
             // will run even if this doesn't exist remotely.
-            let mut global_roots_set: HashSet<_> = global_roots.iter().cloned().collect();
-            let mut global_roots_to_index = HashMap::new();
+            // Also need to insert ancestors
+            let mut global_keys_set: HashSet<_> = global_roots.iter().cloned().collect();
+            let mut global_keys_to_index = HashMap::new();
             for (i, global_root) in global_roots.iter().enumerate() {
-                global_roots_to_index.insert(global_root, i);
+                global_keys_to_index.insert(global_root, i);
             }
+
+            let mut global_leaves_set: HashSet<_> = global_roots.iter().cloned().collect();
 
             for (i, global_root) in global_roots.iter().enumerate() {
                 let siblings = global_root.siblings();
+                let ancestors = global_root.ancestors(None);
 
                 for &sibling in siblings.iter() {
-                    if !global_roots_set.contains(&sibling) {
-                        global_roots_set.insert(sibling); // add siblings to obtained roots
+                    if !global_keys_set.contains(&sibling) {
+                        global_keys_set.insert(sibling); // add siblings to obtained roots
+                    }
+                    if !global_leaves_set.contains(&sibling) {
+                        global_leaves_set.insert(sibling); // add siblings to obtained roots
+                    }
+                }
+
+                for &ancestor in ancestors.iter() {
+                    if !global_keys_set.contains(&ancestor) {
+                        global_keys_set.insert(ancestor); // add siblings to obtained roots
                     }
                 }
             }
 
-            let mut global_roots = global_roots_set.into_iter().collect_vec();
-            global_roots.sort(); // Store in Morton order
+            // Ensure that all siblings of ancestors are also included
+            let global_keys_set: HashSet<_> = global_keys_set
+                .iter()
+                .flat_map(|key| {
+                    if key.level() != 0 {
+                        key.siblings()
+                    } else {
+                        vec![*key]
+                    }
+                })
+                .collect();
+
+            let mut global_keys = global_keys_set.iter().cloned().collect_vec();
+            global_keys.sort(); // Store in Morton order
+
+            let mut global_leaves = global_leaves_set.iter().cloned().collect_vec();
+            global_leaves.sort(); // Store in Morton order
 
             // Global multipole data with missing siblings if they don't exist globally with zeros for coefficients
-            let mut global_multipoles_with_siblings =
-                vec![Scalar::zero(); global_roots.len() * self.ncoeffs_equivalent_surface];
+            let mut global_multipoles_with_ancestors =
+                vec![Scalar::zero(); global_keys.len() * self.ncoeffs_equivalent_surface];
 
-            for (new_idx, root) in global_roots.iter().enumerate() {
-                if let Some(old_idx) = global_roots_to_index.get(root) {
+            for (new_idx, root) in global_keys.iter().enumerate() {
+                if let Some(old_idx) = global_keys_to_index.get(root) {
                     let multipole = &global_multipoles[old_idx * self.ncoeffs_equivalent_surface
                         ..(old_idx + 1) * self.ncoeffs_equivalent_surface];
-                    global_multipoles_with_siblings[new_idx * self.ncoeffs_equivalent_surface
+                    global_multipoles_with_ancestors[new_idx * self.ncoeffs_equivalent_surface
                         ..(new_idx + 1) * self.ncoeffs_equivalent_surface]
                         .copy_from_slice(multipole);
                 }
             }
 
             // Insert multipoles and keys into result
-            result.multipoles = global_multipoles_with_siblings;
-            result.tree.source_tree.keys = global_roots.into();
+            result.multipole_metadata(
+                global_multipoles_with_ancestors,
+                global_keys_set,
+                global_keys,
+                global_leaves_set,
+                global_leaves,
+                self.tree.source_tree.global_depth,
+                &self.tree.domain,
+            );
 
             // 2. Gather local data
             let mut global_locals_counts = vec![0i32; size as usize];
@@ -322,32 +404,65 @@ where
 
             // Need to also insert sibling data if it's missing into multipole buffer so that upward pass
             // will run even if this doesn't exist remotely.
-            let mut global_roots_set: HashSet<_> = global_roots.iter().cloned().collect();
-            let mut global_roots_to_index = HashMap::new();
+            // Also insert ancestor data
+            let mut global_keys_set: HashSet<_> = global_roots.iter().cloned().collect();
+            let mut global_leaves_set: HashSet<_> = global_roots.iter().cloned().collect();
+            let mut global_keys_to_index = HashMap::new();
             for (i, global_root) in global_roots.iter().enumerate() {
-                global_roots_to_index.insert(global_root, i);
+                global_keys_to_index.insert(global_root, i);
             }
 
             for (_i, global_root) in global_roots.iter().enumerate() {
                 let siblings = global_root.siblings();
+                let ancestors = global_root.ancestors(None);
 
                 for &sibling in siblings.iter() {
-                    if !global_roots_set.contains(&sibling) {
-                        global_roots_set.insert(sibling); // add siblings to obtained roots
+                    if !global_keys_set.contains(&sibling) {
+                        global_keys_set.insert(sibling); // add siblings to obtained roots
+                    }
+                    if !global_leaves_set.contains(&sibling) {
+                        global_leaves_set.insert(sibling); // add siblings to obtained roots
+                    }
+                }
+
+                for &ancestor in ancestors.iter() {
+                    if !global_keys_set.contains(&ancestor) {
+                        global_keys_set.insert(ancestor); // add siblings to obtained roots
                     }
                 }
             }
 
-            let mut global_roots = global_roots_set.into_iter().collect_vec();
-            global_roots.sort(); // Store in Morton order
+            let global_keys_set: HashSet<_> = global_keys_set
+                .iter()
+                .flat_map(|key| {
+                    if key.level() != 0 {
+                        key.siblings()
+                    } else {
+                        vec![*key]
+                    }
+                })
+                .collect();
+
+            let mut global_keys = global_keys_set.iter().cloned().collect_vec();
+            global_keys.sort(); // Store in Morton order
+
+            let mut global_leaves = global_leaves_set.iter().cloned().collect_vec();
+            global_leaves.sort(); // Store in Morton order
 
             // Global locals data with missing siblings if they don't exist globally with zeros for coefficients
-            let global_locals_with_siblings =
-                vec![Scalar::zero(); global_roots.len() * self.ncoeffs_equivalent_surface];
+            let global_locals_with_ancestors =
+                vec![Scalar::zero(); global_keys.len() * self.ncoeffs_equivalent_surface];
 
-            // Insert multipoles and keys into result
-            result.locals = global_locals_with_siblings;
-            result.tree.target_tree.keys = global_roots.into();
+            // Insert locals and keys into result
+            result.local_metadata(
+                global_locals_with_ancestors,
+                global_keys_set,
+                global_keys,
+                global_leaves_set,
+                global_leaves,
+                self.tree.target_tree.global_depth,
+                &self.tree.domain,
+            );
         } else {
             // 1. Send multipoles and multipole buffers
             // Allocate buffers of send multipoles
@@ -388,7 +503,7 @@ where
         }
     }
 
-    fn scatter_global_tree_from_root(&mut self) {
+    fn scatter_global_fmm_from_root(&mut self) {
         // Have to identify locations of each local first via a gather.
         // should really be in the 'gather ranges' part
 

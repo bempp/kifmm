@@ -39,7 +39,10 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
+        fmm::{
+            FmmGlobalFmmMetadata, FmmMetadata, FmmOperatorData, HomogenousKernel,
+            SourceToTargetTranslation,
+        },
         general::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
     },
@@ -48,7 +51,8 @@ use crate::{
             ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM,
         },
         helpers::find_corners,
-        types::MortonKey,
+        types::{Domain, MortonKey},
+        SingleNodeTree,
     },
     Fmm,
 };
@@ -607,6 +611,13 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
 {
+    fn displacements_explicit<T: RlstScalar + Float>(
+        &mut self,
+        source_trees: &[SingleNodeTree<T>],
+        target_trees: &[SingleNodeTree<T>],
+    ) {
+    }
+
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -817,6 +828,13 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
+    fn displacements_explicit<T: RlstScalar + Float>(
+        &mut self,
+        source_trees: &[SingleNodeTree<T>],
+        target_trees: &[SingleNodeTree<T>],
+    ) {
+    }
+
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -1375,6 +1393,13 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
 {
+    fn displacements_explicit<T: RlstScalar + Float>(
+        &mut self,
+        source_trees: &[SingleNodeTree<T>],
+        target_trees: &[SingleNodeTree<T>],
+    ) {
+    }
+
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -1874,6 +1899,13 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
+    fn displacements_explicit<T: RlstScalar + Float>(
+        &mut self,
+        source_trees: &[SingleNodeTree<T>],
+        target_trees: &[SingleNodeTree<T>],
+    ) {
+    }
+
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
 
@@ -2281,6 +2313,172 @@ where
 
     fn displacement_index(&self, level: u64) -> usize {
         (level - 2) as usize
+    }
+}
+
+impl<Scalar, Kernel, SourceToTargetData> FmmGlobalFmmMetadata
+    for KiFmm<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default + Float,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+    KiFmm<Scalar, Kernel, SourceToTargetData>:
+        SourceToTargetTranslationMetadata + FmmMetadata<Scalar = Scalar, Charges = Scalar>,
+{
+    type Scalar = Scalar;
+
+    fn local_metadata(
+        &mut self,
+        locals: Vec<Self::Scalar>,
+        keys_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        mut keys: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        depth: u64,
+        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
+    ) {
+        keys.sort_by_key(|a| a.level());
+
+        let mut levels_to_keys = HashMap::new();
+        let mut curr = keys[0];
+        let mut curr_idx = 0;
+        for (i, key) in keys.iter().enumerate() {
+            if key.level() != curr.level() {
+                levels_to_keys.insert(curr.level(), (curr_idx, i));
+                curr_idx = i;
+                curr = *key;
+            }
+        }
+        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+        // Return tree in sorted order, by level and then by Morton key
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
+
+        let mut key_to_level_index = HashMap::new();
+        // Compute key to level index
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let keys = &keys[l..r];
+            for (i, key) in keys.iter().enumerate() {
+                key_to_level_index.insert(*key, i);
+            }
+        }
+
+        let mut key_to_index = HashMap::new();
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
+
+        let mut leaf_to_index = HashMap::new();
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
+
+        self.tree.domain = domain.clone(); // Ensure FMM tree domain is set, messy to do it here. should sepaarate out tree setting
+        self.tree.target_tree.root = MortonKey::root(Some(0));
+        self.tree.target_tree.depth = depth;
+        self.tree.target_tree.domain = domain.clone();
+        self.tree.target_tree.leaves_set = leaves_set;
+        self.tree.target_tree.keys_set = keys_set;
+        self.tree.target_tree.key_to_index = key_to_index;
+        self.tree.target_tree.leaf_to_index = leaf_to_index;
+        self.tree.target_tree.key_to_level_index = key_to_level_index;
+
+        // Form local metadata
+        let level_index_pointer_locals = level_index_pointer(&self.tree.target_tree);
+        let level_locals = level_expansion_pointers(
+            &self.tree.target_tree,
+            &self.ncoeffs_equivalent_surface,
+            1, // TODO Must be dynamically driven at some point from input data
+            &locals,
+        );
+
+        self.level_index_pointer_multipoles = level_index_pointer_locals;
+        self.level_multipoles = level_locals;
+        self.locals = locals;
+    }
+
+    fn multipole_metadata(
+        &mut self,
+        multipoles: Vec<Self::Scalar>,
+        keys_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        mut keys: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        depth: u64,
+        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
+    ) {
+        // Form tree metadata
+
+        // Group by level to perform efficient lookup
+        keys.sort_by_key(|a| a.level());
+
+        let mut levels_to_keys = HashMap::new();
+        let mut curr = keys[0];
+        let mut curr_idx = 0;
+        for (i, key) in keys.iter().enumerate() {
+            if key.level() != curr.level() {
+                levels_to_keys.insert(curr.level(), (curr_idx, i));
+                curr_idx = i;
+                curr = *key;
+            }
+        }
+        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+        // Return tree in sorted order, by level and then by Morton key
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
+
+        let mut key_to_level_index = HashMap::new();
+        // Compute key to level index
+        for l in 0..=depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let keys = &keys[l..r];
+            for (i, key) in keys.iter().enumerate() {
+                key_to_level_index.insert(*key, i);
+            }
+        }
+
+        let mut key_to_index = HashMap::new();
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
+
+        let mut leaf_to_index = HashMap::new();
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
+
+        self.tree.domain = domain.clone(); // Ensure FMM tree domain is set, messy to do it here. should sepaarate out tree setting
+        self.tree.source_tree.root = MortonKey::root(Some(0));
+        self.tree.source_tree.depth = depth;
+        self.tree.source_tree.domain = domain.clone();
+        self.tree.source_tree.leaves_set = leaves_set;
+        self.tree.source_tree.keys_set = keys_set;
+        self.tree.source_tree.key_to_index = key_to_index;
+        self.tree.source_tree.leaf_to_index = leaf_to_index;
+        self.tree.source_tree.key_to_level_index = key_to_level_index;
+
+        // Form multipole metadata
+        let level_index_pointer_multipoles = level_index_pointer(&self.tree.source_tree);
+        let level_multipoles = level_expansion_pointers(
+            &self.tree.source_tree,
+            &self.ncoeffs_equivalent_surface,
+            1, // TODO Must be dynamically driven at some point from input data
+            &multipoles,
+        );
+
+        self.level_index_pointer_multipoles = level_index_pointer_multipoles;
+        self.level_multipoles = level_multipoles;
+        self.multipoles = multipoles;
     }
 }
 

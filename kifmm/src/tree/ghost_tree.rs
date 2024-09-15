@@ -1,11 +1,15 @@
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
+use mpi::traits::Source;
 use num::{Float, One, Zero};
 use pulp::Scalar;
 use rlst::RlstScalar;
 
-use crate::{fmm::types::IndexPointer, traits::tree::SingleNodeTreeTrait};
+use crate::{
+    fmm::types::IndexPointer,
+    traits::{field::SourceToTargetData, tree::SingleNodeTreeTrait},
+};
 
 use super::{
     constants::DEEPEST_LEVEL,
@@ -92,9 +96,10 @@ where
     }
 }
 
-impl<T> GhostTreeV<T>
+impl<T, V> GhostTreeV<T, V>
 where
     T: RlstScalar + Float,
+    V: SourceToTargetData + Default,
 {
     /// Convert ghost data into a tree like object
     pub fn from_ghost_data(
@@ -296,7 +301,7 @@ impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeU<T> {
     }
 }
 
-impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeV<T> {
+impl<T: RlstScalar + Float, V: SourceToTargetData> SingleNodeTreeTrait for GhostTreeV<T, V> {
     type Domain = Domain<T::Real>;
     type Node = MortonKey<T::Real>;
     type Scalar = T::Real;

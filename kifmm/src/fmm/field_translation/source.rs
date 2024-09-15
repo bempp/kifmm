@@ -3,10 +3,7 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
-use mpi::{
-    topology::SimpleCommunicator,
-    traits::{Communicator, Equivalence},
-};
+use mpi::traits::Equivalence;
 use num::Float;
 use rayon::prelude::*;
 
@@ -399,14 +396,15 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode> SourceTranslation
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync + Default,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync + Default,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
-    Self: FmmOperatorData,
+    Self: FmmOperatorData + MultiNodeFmm<Scalar = Scalar>,
 {
     fn p2m(&self) -> Result<(), FmmError> {
         let dim = 3;

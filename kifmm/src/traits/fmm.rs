@@ -1,6 +1,13 @@
 //! FMM traits
-use crate::{traits::tree::SingleNodeFmmTreeTrait, tree::types::MortonKey};
+use std::collections::{HashMap, HashSet};
+
+use crate::{
+    traits::tree::SingleNodeFmmTreeTrait,
+    tree::types::{Domain, MortonKey},
+};
 use green_kernels::{traits::Kernel, types::EvalType};
+use num::Float;
+use pulp::Scalar;
 use rlst::RlstScalar;
 
 use super::{
@@ -206,6 +213,32 @@ pub trait FmmMetadata {
     fn metadata<'a>(&mut self, eval_type: EvalType, charges: &'a [Self::Charges]);
 }
 
+/// Want to build global single node FMM at nominated node(s)
+pub trait FmmGlobalFmmMetadata {
+    type Scalar: RlstScalar + Float;
+
+    fn multipole_metadata(
+        &mut self,
+        multipoles: Vec<Self::Scalar>,
+        keys_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        keys: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        depth: u64,
+        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
+    );
+    fn local_metadata(
+        &mut self,
+        locals: Vec<Self::Scalar>,
+        keys_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        keys: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves_set: HashSet<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        leaves: Vec<MortonKey<<Self::Scalar as RlstScalar>::Real>>,
+        depth: u64,
+        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
+    );
+}
+
 pub trait FmmMetadataMultiNode {
     type Scalar;
 
@@ -273,8 +306,8 @@ pub trait GhostExchange {
     fn u_list_exchange(&mut self);
 
     /// Gather root multipoles from local trees at nominated node
-    fn gather_global_tree_at_root(&mut self);
+    fn gather_global_fmm_at_root(&mut self);
 
     /// Scatter root locals back to local trees
-    fn scatter_global_tree_from_root(&mut self);
+    fn scatter_global_fmm_from_root(&mut self);
 }

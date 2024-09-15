@@ -312,11 +312,12 @@ where
 
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
-pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
     pub times: Vec<FmmOperatorTime>,
@@ -408,7 +409,9 @@ where
 
     pub ghost_tree_u: GhostTreeU<Scalar::Real>,
 
-    pub ghost_tree_v: GhostTreeV<Scalar>,
+    pub ghost_tree_v: GhostTreeV<Scalar, SourceToTargetData>,
+
+    pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>,
 }
 
 /// Stores global tree for global upward and downward passes
@@ -632,11 +635,12 @@ where
 }
 
 #[derive(Default)]
-pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Equivalence,
     Kernel: KernelTrait<T = Scalar> + Clone,
     SourceToTargetData: SourceToTargetDataTrait,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
     /// Kernel
@@ -653,6 +657,8 @@ where
 
     /// Data and metadata for field translations
     pub source_to_target: Option<SourceToTargetData>,
+
+    pub source_to_target_single_node: Option<SourceToTargetDataSingleNode>,
 
     pub equivalent_surface_order: Option<usize>,
 
@@ -935,8 +941,8 @@ where
     /// Unique transfer vectors to lookup m2l unique kernel interactions
     pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
 
-    /// The map between sources/targets in the field translation, indexed by level, then by source index.
-    pub displacements: Vec<Vec<Vec<RwLock<Vec<usize>>>>>,
+    /// The map between sources/targets in the field translation, indexed by target ree index, source tree index, level then by source index
+    pub displacements: Vec<Vec<Vec<Vec<RwLock<Vec<usize>>>>>>,
 }
 
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.

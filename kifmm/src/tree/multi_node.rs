@@ -19,12 +19,8 @@ use mpi::{
     Rank,
 };
 use num::{zero, Float, Zero};
-use pulp::Scalar;
 use rlst::RlstScalar;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::collections::{HashMap, HashSet};
 
 use super::types::MultiNodeTreeNew;
 

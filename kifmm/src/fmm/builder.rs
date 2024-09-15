@@ -1,5 +1,5 @@
 //! Builder objects to construct FMMs
-use std::{collections::HashSet, marker::PhantomData};
+use std::{collections::HashSet, default, marker::PhantomData};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
@@ -288,15 +288,18 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
+    MultiNodeBuilder<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + Clone + HomogenousKernel + Clone + Default,
-    SourceToTargetData: SourceToTargetDataTrait,
-    KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>: SourceAndTargetTranslationMetadata
-        + SourceToTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar, Charges = Vec<Scalar>>,
+    SourceToTargetData: SourceToTargetDataTrait + Default,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Default,
+    KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>:
+        SourceAndTargetTranslationMetadata
+            + SourceToTargetTranslationMetadata
+            + FmmMetadata<Scalar = Scalar, Charges = Vec<Scalar>>,
 {
     pub fn new() -> Self {
         Self {
@@ -306,6 +309,7 @@ where
             equivalent_surface_order: None,
             isa: None,
             source_to_target: None,
+            source_to_target_single_node: None,
             check_surface_order: None,
             ncoeffs_check_surface: None,
             ncoeffs_equivalent_surface: None,
@@ -416,7 +420,10 @@ where
 
     pub fn build(
         self,
-    ) -> Result<KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>, std::io::Error> {
+    ) -> Result<
+        KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>,
+        std::io::Error,
+    > {
         if self.tree.is_none() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -487,6 +494,7 @@ where
                 u_list_ranks: Vec::default(),
                 u_list_send_counts: Vec::default(),
                 u_list_to_send: Vec::default(),
+                global_fmm: KiFmm::default(),
             };
 
             result.source();
@@ -501,7 +509,7 @@ where
             // the final point distribution, actually both need to be done in application code to attach charges,
             // new multipoles and metadata re-alloc.
             // Charges must be exchanged to near field octants too, which must be done as a part of the ghost exchange.
-            // result.displacements(); // Must be run after ghost exchange.
+            result.displacements();
 
             Ok(result)
         }

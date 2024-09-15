@@ -239,16 +239,6 @@ where
                         s,
                     ));
                 }
-
-                // Leaf level computation
-                let s = Instant::now();
-                self.p2p()?;
-                self.times
-                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
-                let s = Instant::now();
-                self.l2p()?;
-                self.times
-                    .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
             }
             Ok(())
         } else {
@@ -259,10 +249,6 @@ where
                     }
                     self.m2l(level)?;
                 }
-
-                // Leaf level computation
-                self.p2p()?;
-                self.l2p()?;
             }
             Ok(())
         }

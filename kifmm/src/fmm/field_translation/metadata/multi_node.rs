@@ -7,6 +7,7 @@ use mpi::{
     traits::{Collection, Communicator, Equivalence},
 };
 use num::{Float, Zero};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, Array,
     BaseArray, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer,
@@ -48,7 +49,7 @@ use crate::{
         },
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::Epsilon,
-        tree::{FmmTreeNode, SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
+        tree::{FmmTreeNode, SingleNodeTreeTrait},
     },
     tree::{
         constants::{ALPHA_INNER, ALPHA_OUTER},
@@ -57,12 +58,14 @@ use crate::{
     MultiNodeFmmTree,
 };
 
-impl<Scalar, Kernel, SourceToTargetData> SourceToTargetTranslationMultiNode
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
+    SourceToTargetTranslationMultiNode
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: SourceToTargetTranslation,
     MultiNodeFmmTree<Scalar, SimpleCommunicator>: Default,
@@ -117,11 +120,17 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, SourceToTargetData, SourceToTargetDataSingleNode> SourceAndTargetTranslationMetadata
+    for KiFmmMultiNode<
+        Scalar,
+        Laplace3dKernel<Scalar>,
+        SourceToTargetData,
+        SourceToTargetDataSingleNode,
+    >
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: SourceToTargetTranslation + MultiNodeFmm,
 {
@@ -210,6 +219,9 @@ where
         self.source_vec = vec![m2m_vec];
         self.uc2e_inv_1 = uc2e_inv_1;
         self.uc2e_inv_2 = uc2e_inv_2;
+
+        // Should create a redundant copy for the data in the global FMM
+        // self.global_fmm.uc2e_inv_1 = uc2e_inv_1;
     }
 
     fn target(&mut self) {
@@ -293,11 +305,19 @@ where
         self.target_vec = vec![l2l];
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
+
+        // Should create a redundant copy for the data in the global FMM
+        // self.global_fmm.dc2e_inv_1 = dc2e_inv_1;
     }
 }
 
 impl<Scalar> SourceToTargetTranslationMetadata
-    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslationMultiNode<Scalar>>
+    for KiFmmMultiNode<
+        Scalar,
+        Laplace3dKernel<Scalar>,
+        FftFieldTranslationMultiNode<Scalar>,
+        FftFieldTranslation<Scalar>,
+    >
 where
     Scalar: RlstScalar
         + Equivalence
@@ -307,66 +327,82 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
+    fn displacements_explicit<T: RlstScalar + Float>(
+        &mut self,
+        source_trees: &[crate::tree::SingleNodeTree<T>],
+        target_trees: &[crate::tree::SingleNodeTree<T>],
+    ) {
+    }
+
     // Must be run AFTER multipole exchange.
     fn displacements(&mut self) {
-        // let mut displacements = Vec::new();
-        // let depth = self.tree.source_tree.local_depth + self.tree.target_tree.global_depth;
+        let mut displacements = Vec::new();
+        let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
+        let global_depth = self.tree.source_tree.global_depth;
 
-        // for fmm_index in 0..self.nfmms {
-        //     let mut tmp = Vec::new();
+        for target_tree_index in 0..self.tree.target_tree.trees.len() {
+            let target_tree = &self.tree.target_tree.trees[target_tree_index];
+            let mut result_t = Vec::new();
 
-        //     for level in 2..=depth {
-        //         let targets = self.tree.target_tree.trees[fmm_index].keys(level).unwrap();
-        //         let targets_parents: HashSet<MortonKey<_>> =
-        //             targets.iter().map(|target| target.parent()).collect();
-        //         let mut targets_parents = targets_parents.into_iter().collect_vec();
-        //         targets_parents.sort();
-        //         let ntargets_parents = targets_parents.len();
+            for source_tree_index in 0..self.tree.source_tree.trees.len() {
+                let source_tree = &self.tree.source_tree.trees[source_tree_index];
+                let mut result_s = Vec::new();
 
-        //         let sources = self.tree.source_tree.trees[fmm_index].keys(level).unwrap();
+                for level in global_depth..depth {
+                    let result_l = vec![Vec::new(); NHALO];
+                    let result_l = result_l.into_iter().map(RwLock::new).collect_vec();
 
-        //         let sources_parents: HashSet<MortonKey<_>> =
-        //             sources.iter().map(|source| source.parent()).collect();
-        //         let mut sources_parents = sources_parents.into_iter().collect_vec();
-        //         sources_parents.sort();
-        //         let nsources_parents = sources_parents.len();
+                    let targets = target_tree.keys(level).unwrap();
+                    let targets_parents: HashSet<MortonKey<_>> =
+                        targets.iter().map(|target| target.parent()).collect();
+                    let mut targets_parents = targets_parents.into_iter().collect_vec();
+                    targets_parents.sort();
+                    let ntargets_parents = targets_parents.len();
 
-        //         let result = vec![Vec::new(); NHALO];
-        //         let result = result.into_iter().map(RwLock::new).collect_vec();
+                    let sources = source_tree.keys(level).unwrap();
 
-        //         let targets_parents_neighbors = targets_parents
-        //             .iter()
-        //             .map(|parent| parent.all_neighbors())
-        //             .collect_vec();
+                    let sources_parents: HashSet<MortonKey<_>> =
+                        sources.iter().map(|source| source.parent()).collect();
+                    let mut sources_parents = sources_parents.into_iter().collect_vec();
+                    sources_parents.sort();
+                    let nsources_parents = sources_parents.len();
 
-        //         let zero_displacement = nsources_parents * NSIBLINGS;
+                    let targets_parents_neighbors = targets_parents
+                        .iter()
+                        .map(|parent| parent.all_neighbors())
+                        .collect_vec();
 
-        //         (0..NHALO).into_par_iter().for_each(|i| {
-        //             let mut result_i = result[i].write().unwrap();
-        //             for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-        //                 // Check if neighbor exists in a valid tree
-        //                 if let Some(neighbor) = all_neighbors[i] {
-        //                     // If it does, check if first child exists in the source tree
-        //                     let first_child = neighbor.first_child();
-        //                     if let Some(neighbor_displacement) = self.level_index_pointer_multipoles
-        //                         [fmm_index][level as usize]
-        //                         .get(&first_child)
-        //                     {
-        //                         result_i.push(*neighbor_displacement)
-        //                     } else {
-        //                         result_i.push(zero_displacement)
-        //                     }
-        //                 } else {
-        //                     result_i.push(zero_displacement)
-        //                 }
-        //             }
-        //         });
+                    let zero_displacement = nsources_parents * NSIBLINGS;
+                    (0..NHALO).into_par_iter().for_each(|i| {
+                        let mut result_li = result_l[i].write().unwrap();
+                        for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents)
+                        {
+                            // Check if neighbor exists in a valid tree
+                            if let Some(neighbor) = all_neighbors[i] {
+                                // If it does, check if first child exists in the source tree
+                                let first_child = neighbor.first_child();
+                                if let Some(neighbor_displacement) = self
+                                    .level_index_pointer_multipoles[source_tree_index]
+                                    [level as usize]
+                                    .get(&first_child)
+                                {
+                                    result_li.push(*neighbor_displacement)
+                                } else {
+                                    result_li.push(zero_displacement)
+                                }
+                            } else {
+                                result_li.push(zero_displacement)
+                            }
+                        }
+                    });
 
-        //         tmp.push(result);
-        //     }
-        //     displacements.push(tmp);
-        // }
-        // self.source_to_target.displacements = displacements;
+                    result_s.push(result_l)
+                }
+                result_t.push(result_s)
+            }
+            displacements.push(result_t);
+        }
+        self.source_to_target.displacements = displacements;
     }
 
     fn source_to_target(&mut self) {
@@ -580,10 +616,19 @@ where
             Self::compute_surf_to_conv_map(equivalent_surface_order);
         self.source_to_target.surf_to_conv_map = vec![surf_to_conv_map];
         self.source_to_target.conv_to_surf_map = vec![conv_to_surf_map];
+
+        // Calculate for global FMM
+        self.global_fmm.source_to_target();
     }
 }
 
-impl<Scalar> KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslationMultiNode<Scalar>>
+impl<Scalar>
+    KiFmmMultiNode<
+        Scalar,
+        Laplace3dKernel<Scalar>,
+        FftFieldTranslationMultiNode<Scalar>,
+        FftFieldTranslation<Scalar>,
+    >
 where
     Scalar: RlstScalar + AsComplex + Default + Dft + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
@@ -706,12 +751,19 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmOperatorData
-    for KiFmmMultiNode<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, SourceToTargetData, SourceToTargetDataSingleNode> FmmOperatorData
+    for KiFmmMultiNode<
+        Scalar,
+        Laplace3dKernel<Scalar>,
+        SourceToTargetData,
+        SourceToTargetDataSingleNode,
+    >
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync + Default,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync + Default,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
+    Self: FmmMetadata,
 {
     fn fft_map_index(&self, level: u64) -> usize {
         0
@@ -742,12 +794,13 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> FmmMetadata
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode> FmmMetadata
+    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Self: GhostExchange,
 {

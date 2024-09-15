@@ -1,11 +1,15 @@
 - multipole data exchange implementation
+    - Need to properly template so that 'global fmm' can be stored in multinode fmm on root nodde
     - Test GhostTreeU creation
+    - Ghost trees should also be stored as FMM objects so that all kernels can be run with a single trait implementation
     - Ghost trees need metadata for M2L kernels to work properly
     - Metadata for MultiNode Tree needs to be implemented too.
     - Metadata for nominated node
 
-- On global tree, not all leaves will have local data associated with them as source/target trees aren't linked
+- Once local data is found, need to keep in mind exactly where it's associated with in terms of MPI rank to send back
 
+
+- In multinode builder, root/depth/surfaces must set correctly for the global FMM, and need to incldue this in metadata calculations.
 
 - Downward pass kernels harder on local trees
     - have to run sequentially over available local source trees and then the ghost tree for U and V list

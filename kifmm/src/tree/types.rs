@@ -12,6 +12,8 @@ use std::{
     marker::PhantomData,
 };
 
+use crate::traits::field::SourceToTargetData;
+
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
 /// # Fields
@@ -373,9 +375,10 @@ where
 
 /// Ghost tree for received V list data
 #[derive(Default)]
-pub struct GhostTreeV<T>
+pub struct GhostTreeV<T, V>
 where
     T: RlstScalar + Float,
+    V: SourceToTargetData,
 {
     /// Depth of a tree.
     pub depth: u64,
@@ -400,4 +403,7 @@ where
 
     /// multipole data
     pub multipoles: Vec<T>,
+
+    /// Source to target data associated with ghost tree
+    pub source_to_target: V,
 }
