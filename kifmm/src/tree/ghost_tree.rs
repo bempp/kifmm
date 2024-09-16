@@ -1,19 +1,14 @@
+//! Implementations for Ghost Tree data structures
 use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
-use mpi::traits::Source;
-use num::{Float, One, Zero};
-use pulp::Scalar;
+use num::Float;
 use rlst::RlstScalar;
 
-use crate::{
-    fmm::types::IndexPointer,
-    traits::{field::SourceToTargetData, tree::SingleNodeTreeTrait},
-};
+use crate::traits::{field::SourceToTargetData, tree::SingleNodeTreeTrait};
 
 use super::{
     constants::DEEPEST_LEVEL,
-    domain,
     types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MortonKeys, Point, Points},
 };
 
@@ -232,10 +227,6 @@ impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeU<T> {
         Some(&self.leaves_set)
     }
 
-    fn contributing_range(&self) -> Option<[Self::Node; 2]> {
-        None
-    }
-
     fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             Some(&self.coordinates[l * 3..r * 3])
@@ -252,19 +243,19 @@ impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeU<T> {
         None
     }
 
-    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
+    fn global_indices(&self, _leaf: &Self::Node) -> Option<&[usize]> {
         None
     }
 
-    fn index(&self, key: &Self::Node) -> Option<&usize> {
+    fn index(&self, _key: &Self::Node) -> Option<&usize> {
         None
     }
 
-    fn level_index(&self, key: &Self::Node) -> Option<&usize> {
+    fn level_index(&self, _key: &Self::Node) -> Option<&usize> {
         None
     }
 
-    fn keys(&self, level: u64) -> Option<&[Self::Node]> {
+    fn keys(&self, _level: u64) -> Option<&[Self::Node]> {
         None
     }
 
@@ -280,7 +271,7 @@ impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeU<T> {
         self.all_coordinates().map(|coords| coords.len() / 3)
     }
 
-    fn n_keys(&self, level: u64) -> Option<usize> {
+    fn n_keys(&self, _level: u64) -> Option<usize> {
         None
     }
 
@@ -292,7 +283,7 @@ impl<T: RlstScalar + Float> SingleNodeTreeTrait for GhostTreeU<T> {
         Some(self.leaves.len())
     }
 
-    fn node(&self, idx: usize) -> Option<&Self::Node> {
+    fn node(&self, _idx: usize) -> Option<&Self::Node> {
         None
     }
 
@@ -330,11 +321,7 @@ impl<T: RlstScalar + Float, V: SourceToTargetData> SingleNodeTreeTrait for Ghost
         None
     }
 
-    fn contributing_range(&self) -> Option<[Self::Node; 2]> {
-        None
-    }
-
-    fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
+    fn coordinates(&self, _leaf: &Self::Node) -> Option<&[Self::Scalar]> {
         None
     }
 
@@ -346,7 +333,7 @@ impl<T: RlstScalar + Float, V: SourceToTargetData> SingleNodeTreeTrait for Ghost
         None
     }
 
-    fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
+    fn global_indices(&self, _leaf: &Self::Node) -> Option<&[usize]> {
         None
     }
 
@@ -362,7 +349,7 @@ impl<T: RlstScalar + Float, V: SourceToTargetData> SingleNodeTreeTrait for Ghost
         }
     }
 
-    fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize> {
+    fn leaf_index(&self, _leaf: &Self::Node) -> Option<&usize> {
         None
     }
 
@@ -370,7 +357,7 @@ impl<T: RlstScalar + Float, V: SourceToTargetData> SingleNodeTreeTrait for Ghost
         self.key_to_level_index.get(key)
     }
 
-    fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
+    fn n_coordinates(&self, _leaf: &Self::Node) -> Option<usize> {
         None
     }
 

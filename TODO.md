@@ -7,6 +7,18 @@
 
     - Load balancing (low priority)
 
+- Global FMM needs operator metadata if I'm calling upward/downward pass on it
+    - must be setup in the multinode builder
+
+- The ghost component can be handled in the implementation of m2l for the distributed FMM object.
+
+
+- I don't feel comfortable implementing the kernels due to the vast quantity of untested code.
+    - test trees, and sort methods
+    - test upward pass
+    - test global upward pass
+    - test on threadripper, with more threads, cannot use simple sort
+    - 
 
 
 - In multinode builder, root/depth/surfaces must set correctly for the global FMM, and need to incldue this in metadata calculations.

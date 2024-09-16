@@ -1,5 +1,5 @@
 //! Builder objects to construct FMMs
-use std::{collections::HashSet, default, marker::PhantomData};
+use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
@@ -22,14 +22,11 @@ use crate::{
         },
         fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
-        tree::{
-            MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait,
-        },
+        tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
     },
     tree::{
-        multi_node::SortKind,
-        types::{Domain, GhostTreeU, GhostTreeV, MultiNodeTreeNew},
-        MultiNodeTree, SingleNodeTree,
+        types::{Domain, GhostTreeU, GhostTreeV, MultiNodeTree, SortKind},
+        SingleNodeTree,
     },
     MultiNodeFmmTree,
 };
@@ -301,6 +298,7 @@ where
             + SourceToTargetTranslationMetadata
             + FmmMetadata<Scalar = Scalar, Charges = Vec<Scalar>>,
 {
+    /// Constructor
     pub fn new() -> Self {
         Self {
             domain: None,
@@ -317,11 +315,10 @@ where
             fmm_eval_type: None,
             charges: None,
             kernel: None,
-            nsource_trees: None,
-            ntarget_trees: None,
         }
     }
 
+    /// Tree
     pub fn tree(
         mut self,
         sources: &[Scalar::Real],
@@ -357,7 +354,7 @@ where
             // Calculate union of domains for source and target points, needed to define operators
             let domain = source_domain.union(&target_domain);
 
-            let source_tree = MultiNodeTreeNew::new(
+            let source_tree = MultiNodeTree::new(
                 sources,
                 local_depth,
                 global_depth,
@@ -367,7 +364,7 @@ where
                 sort_kind.clone(),
             )?;
 
-            let target_tree = MultiNodeTreeNew::new(
+            let target_tree = MultiNodeTree::new(
                 targets,
                 local_depth,
                 global_depth,
@@ -384,13 +381,12 @@ where
             };
 
             self.communicator = Some(world.duplicate());
-            self.nsource_trees = Some(fmm_tree.n_source_trees());
-            self.ntarget_trees = Some(fmm_tree.n_target_trees());
             self.tree = Some(fmm_tree);
             Ok(self)
         }
     }
 
+    /// Parameters
     pub fn parameters(
         mut self,
         expansion_order: usize,
@@ -418,6 +414,7 @@ where
         }
     }
 
+    /// Initialise
     pub fn build(
         self,
     ) -> Result<
@@ -442,8 +439,6 @@ where
                 communicator,
                 neighbourhood_communicator_v,
                 neighbourhood_communicator_u,
-                nsource_trees: self.nsource_trees.unwrap(),
-                ntarget_trees: self.ntarget_trees.unwrap(),
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),
@@ -481,13 +476,9 @@ where
                 potentials_send_pointers: Vec::default(),
                 v_list_queries: Vec::default(),
                 u_list_queries: Vec::default(),
-                ghost_u_list_octants: Vec::default(),
-                ghost_v_list_octants: Vec::default(),
-                ghost_u_list_data: Vec::default(),
-                ghost_v_list_data: Vec::default(),
                 ghost_tree_u: GhostTreeU::default(),
                 ghost_tree_v: GhostTreeV::default(),
-                layout: Layout::default(),
+                source_layout: Layout::default(),
                 v_list_ranks: Vec::default(),
                 v_list_send_counts: Vec::default(),
                 v_list_to_send: Vec::default(),
@@ -495,6 +486,9 @@ where
                 u_list_send_counts: Vec::default(),
                 u_list_to_send: Vec::default(),
                 global_fmm: KiFmm::default(),
+                local_roots_counts: Vec::default(),
+                local_roots_displacements: Vec::default(),
+                local_roots: Vec::default(),
             };
 
             result.source();

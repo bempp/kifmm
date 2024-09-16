@@ -13,7 +13,7 @@ fn main() {
     use kifmm::{
         fmm::types::{FftFieldTranslationMultiNode, MultiNodeBuilder},
         traits::fmm::MultiNodeFmm,
-        tree::{helpers::points_fixture, types::MultiNodeTreeNew},
+        tree::{helpers::points_fixture, types::MultiNodeTree},
         FftFieldTranslation,
     };
     use mpi::{environment::Universe, traits::Communicator};

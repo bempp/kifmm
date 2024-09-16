@@ -1,6 +1,5 @@
 //! Field Traits
 
-use num::Float;
 use rlst::RlstScalar;
 
 use crate::tree::SingleNodeTree;
@@ -35,17 +34,16 @@ pub trait SourceToTargetTranslationMetadata {
     fn displacements(&mut self);
 }
 
+/// Set M2L metadata associated with a kernel, for the Ghost data
 pub trait SourceToTargetTranslationMetadataGhostTrees {
+    /// Associated scalar type
     type Scalar: RlstScalar;
 
+    /// Map between source/target nodes, sources are from Ghost tree, target are local target trees
     fn displacements(
         &mut self,
         target_trees: &[SingleNodeTree<<Self::Scalar as RlstScalar>::Real>],
         total_depth: u64,
         global_depth: u64,
     );
-}
-
-pub trait SourceToTargetTranslationMultiNode {
-    fn ranges(&mut self);
 }

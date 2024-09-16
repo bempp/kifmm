@@ -1,11 +1,10 @@
 //! Helper Functions
-use std::{collections::HashMap, default};
+use std::collections::HashMap;
 
 use itertools::Itertools;
 use mpi::{
-    collective::SystemOperation,
     topology::SimpleCommunicator,
-    traits::{Communicator, CommunicatorCollectives, Destination, Equivalence, Source},
+    traits::{Communicator, Destination, Equivalence, Source},
 };
 use num::traits::Float;
 use rlst::{
@@ -14,7 +13,7 @@ use rlst::{
 };
 
 use crate::{
-    fmm::{tree, types::SendPtrMut},
+    fmm::types::SendPtrMut,
     traits::tree::{FmmTreeNode, SingleNodeTreeTrait},
     tree::types::{MortonKey, SingleNodeTree},
 };
@@ -209,6 +208,7 @@ where
     result
 }
 
+/// Create index pointers for each key at each level of an octree
 pub fn level_index_pointer_multinode<T>(
     trees: &[SingleNodeTree<T>],
     local_depth: u64,
@@ -284,6 +284,7 @@ where
     result
 }
 
+/// Create mutable pointers corresponding to each multipole expansion at each level of an octree
 pub fn level_expansion_pointers_multinode<T>(
     trees: &[SingleNodeTree<T::Real>],
     ncoeffs: usize,

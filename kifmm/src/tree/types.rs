@@ -4,7 +4,6 @@
 use mpi::traits::{Communicator, Equivalence};
 
 use num::Float;
-use pulp::Scalar;
 use rlst::RlstScalar;
 
 use std::{
@@ -84,110 +83,14 @@ where
     pub index: usize,
 }
 
-/// Represents an MPI distributed tree structure equipped with spatial indexing capabilities for 3D
-/// particle data.
-///
-/// The struct is similar to `SingleNodeTree`, however the associated data is now local to a given
-/// processor. The major difference is that each processor owns a contiguous, non-overlapping, set of
-/// leaf nodes, as well as __all__ ancestors to their owned leaf nodes. This means that ancestor nodes
-/// may be duplicated across processors, but not leaf nodes.
-///
-/// # Fields
-/// - `world` - The global MPI communicator for this tree.
-///
-/// - `range` - The range represented as the minimum and maximum leaf key associated owned by
-/// each processor, as well as the processor's MPI rank.
-///
-/// - `depth` - The depth of the tree.
-///
-/// - `domain` - The spatial domain covered by the tree's associated point data.
-///
-/// - `coordinates` - A flat vector storing the coordinates of all points managed by the tree,
-///   in row-major format (e.g., `[x1, y1, z1, ..., xn, yn, zn]`), for efficient retrieval.
-///
-/// - `global_indices` - A vector of unique global indices corresponding to each point, allowing
-///   for efficient identification and lookup of points across different parts of the system.
-///
-/// - `leaves` - `MortonKeys` representing the leaves of the tree, each associated with specific
-///   point data encoded via Morton encoding, in Morton sorted order
-///
-/// - `keys` - `MortonKeys` representing all leaves and their ancestors.
-///
-/// - `leaves_to_coordinates` - A mapping from Morton-encoded leaves to their corresponding
-///   indices in the `coordinates` vector.
-///
-/// - `levels_to_keys` - A mapping from tree levels to indices in the `keys` vector,
-///   allowing for level-wise traversal and manipulation of the tree structure.
-///
-/// - `key_to_index` - A hash map linking each node key to its index within the
-///   `keys` vector, enabling efficient node lookup and operations.
-///
-/// - `leaf_to_index` - A hash map linking each leaf key (MortonKey) to its index within the
-///   `leaves` vector, supporting efficient leaf operations and data retrieval.
-///
-/// - `leaves_set` - A set of all MortonKeys representing the leaves, used for quick existence
-///   checks and deduplication.
-///
-/// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
-///   checks and deduplication.
+/// MPI distributed tree, consists of up to N single node trees
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T, C: Communicator>
 where
     T: RlstScalar + Float + Equivalence,
 {
-    /// Global communicator for this Tree
-    pub world: C,
-
-    /// Range of leaf keys at this processor, and their current rank [rank, min, max]
-    pub range: [u64; 3],
-
-    /// Depth of the tree
-    pub depth: u64,
-
-    /// Domain spanned by the points.
-    pub domain: Domain<T>,
-
-    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T>,
-
-    /// All global indices
-    pub global_indices: Vec<usize>,
-
-    /// The leaves that span the tree.
-    pub leaves: MortonKeys<T>,
-
-    /// All nodes in tree.
-    pub keys: MortonKeys<T>,
-
-    /// Associate leaves with point indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
-
-    /// Associate levels with key indices.
-    pub levels_to_keys: HashMap<u64, (usize, usize)>,
-
-    /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T>, usize>,
-
-    /// Map between a key and its index at a level
-    pub key_to_level_index: HashMap<MortonKey<T>, usize>,
-
-    /// Map between a leaf and its index
-    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
-
-    /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T>>,
-
-    /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T>>,
-}
-
-#[cfg(feature = "mpi")]
-pub struct MultiNodeTreeNew<T, C: Communicator>
-where
-    T: RlstScalar + Float + Equivalence,
-{
-    /// Global communicator for this Tree
-    pub world: C,
+    /// Communicator associated with this tree
+    pub comm: C,
 
     /// MPI Rank
     pub rank: i32,
@@ -198,9 +101,19 @@ where
     /// Depth of each local tree
     pub local_depth: u64,
 
+    /// Total depth of the tree, sum of local and global depths
+    pub total_depth: u64,
+
     /// Single node trees at this rank
     pub trees: Vec<SingleNodeTree<T>>,
 
+    /// Roots associated with trees at this rank
+    pub roots: Vec<MortonKey<T>>,
+
+    /// Number of single node trees at this rank
+    pub n_trees: usize,
+
+    /// All associated keys, for rapid inclusion checking
     pub keys_set: HashSet<MortonKey<T>>,
 }
 
@@ -292,10 +205,6 @@ pub struct SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {
-    pub global_rank: i32,
-
-    pub local_rank: i32,
-
     /// Associated root node
     pub root: MortonKey<T>,
 
@@ -409,4 +318,23 @@ where
 
     /// Index pointers to each key at a given level, indexed by level.
     pub level_index_pointer_multipoles: Vec<HashMap<MortonKey<T::Real>, usize>>,
+}
+
+/// Select sort kind for multinode trees
+#[derive(Clone)]
+pub enum SortKind {
+    /// Hypercube communication scheme based quicksort
+    Hyksort {
+        /// Subcommunicator size, restricted to being a power of 2
+        k: i32,
+    },
+
+    /// Sample sort, variant of bucket sort
+    Samplesort {
+        /// The size of each sample from each MPI process
+        k: usize,
+    },
+
+    /// Simple sort, variant of bucket sort
+    Simplesort,
 }

@@ -2,10 +2,7 @@ use std::{collections::HashSet, sync::RwLock};
 
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
-use mpi::{
-    topology::SimpleCommunicator,
-    traits::{Collection, Communicator, Equivalence},
-};
+use mpi::traits::{Communicator, Equivalence};
 use num::{Float, Zero};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use rlst::{
@@ -17,9 +14,8 @@ use crate::{
     fmm::{
         helpers::{
             coordinate_index_pointer_multinode, flip3, homogenous_kernel_scale,
-            leaf_expansion_pointers_multinode, leaf_surfaces, level_expansion_pointers,
-            level_expansion_pointers_multinode, level_index_pointer, level_index_pointer_multinode,
-            potential_pointers_multinode,
+            leaf_expansion_pointers_multinode, leaf_surfaces, level_expansion_pointers_multinode,
+            level_index_pointer_multinode, potential_pointers_multinode,
         },
         types::{FftFieldTranslationMultiNode, FftMetadata, NeighbourhoodCommunicator},
     },
@@ -29,7 +25,6 @@ use crate::{
         field::SourceToTargetTranslationMetadata,
         fmm::{FmmMetadata, GhostExchange, MultiNodeFmm},
         general::AsComplex,
-        tree::MultiNodeFmmTreeTrait,
     },
     tree::{
         constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
@@ -39,13 +34,10 @@ use crate::{
 };
 
 use crate::{
-    bindings::MortonKeys,
-    fmm::{helpers::ncoeffs_kifmm, types::KiFmmMultiNode, KiFmm},
-    linalg::pinv,
+    fmm::{helpers::ncoeffs_kifmm, types::KiFmmMultiNode},
     traits::{
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
-            SourceToTargetTranslationMultiNode,
         },
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::Epsilon,
@@ -55,70 +47,7 @@ use crate::{
         constants::{ALPHA_INNER, ALPHA_OUTER},
         types::MortonKey,
     },
-    MultiNodeFmmTree,
 };
-
-impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
-    SourceToTargetTranslationMultiNode
-    for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
-where
-    Scalar: RlstScalar + Default + Equivalence + Float,
-    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    SourceToTargetDataSingleNode: SourceToTargetDataTrait + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    Self: SourceToTargetTranslation,
-    MultiNodeFmmTree<Scalar, SimpleCommunicator>: Default,
-{
-    fn ranges(&mut self) {
-        // All ranges for FMMs at this processor
-        let mut ranges = Vec::new();
-
-        for source_tree in self.tree.source_tree.trees.iter() {
-            // Union of interaction lists for each FMM at this proc
-            let mut interaction_lists = HashSet::new();
-
-            for level in (2..=source_tree.depth) {
-                let sources = source_tree.keys(level).unwrap();
-
-                for source in sources.iter() {
-                    let interaction_list = source
-                        .parent()
-                        .neighbors()
-                        .iter()
-                        .flat_map(|pn| pn.children())
-                        .filter(|pnc| !source.is_adjacent(pnc))
-                        .collect_vec();
-
-                    for source in interaction_list.iter() {
-                        interaction_lists.insert(*source);
-                    }
-                }
-            }
-
-            let mut interaction_lists = interaction_lists.into_iter().collect_vec();
-            interaction_lists.sort();
-
-            let range = (
-                interaction_lists
-                    .iter()
-                    .min()
-                    .unwrap()
-                    .finest_first_child()
-                    .morton,
-                interaction_lists
-                    .iter()
-                    .max()
-                    .unwrap()
-                    .finest_last_child()
-                    .morton,
-            );
-            ranges.push(range);
-        }
-
-        // self.ranges = ranges;
-    }
-}
 
 impl<Scalar, SourceToTargetData, SourceToTargetDataSingleNode> SourceAndTargetTranslationMetadata
     for KiFmmMultiNode<
@@ -327,7 +256,6 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
-
     fn displacements(&mut self) {
         let mut displacements = Vec::new();
         let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
@@ -626,6 +554,13 @@ where
     Scalar: RlstScalar + AsComplex + Default + Dft + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
+    /// Computes the unique Green's function evaluations and places them on a convolution grid on the source box wrt to a given
+    /// target point on the target box surface grid.
+    ///
+    /// # Arguments
+    /// * `expansion_order` - The expansion order of the FMM
+    /// * `convolution_grid` - Cartesian coordinates of points on the convolution grid at a source box, expected in row major order.
+    /// * `target_pt` - The point on the target box's surface grid, with which kernels are being evaluated with respect to.
     pub fn evaluate_greens_fct_convolution_grid(
         &self,
         expansion_order: usize,
@@ -758,31 +693,31 @@ where
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Self: FmmMetadata,
 {
-    fn fft_map_index(&self, level: u64) -> usize {
+    fn fft_map_index(&self, _level: u64) -> usize {
         0
     }
 
-    fn expansion_index(&self, level: u64) -> usize {
+    fn expansion_index(&self, _level: u64) -> usize {
         0
     }
 
-    fn c2e_operator_index(&self, level: u64) -> usize {
+    fn c2e_operator_index(&self, _level: u64) -> usize {
         0
     }
 
-    fn m2m_operator_index(&self, level: u64) -> usize {
+    fn m2m_operator_index(&self, _level: u64) -> usize {
         0
     }
 
-    fn l2l_operator_index(&self, level: u64) -> usize {
+    fn l2l_operator_index(&self, _level: u64) -> usize {
         0
     }
 
-    fn m2l_operator_index(&self, level: u64) -> usize {
+    fn m2l_operator_index(&self, _level: u64) -> usize {
         0
     }
 
-    fn displacement_index(&self, level: u64) -> usize {
+    fn displacement_index(&self, _level: u64) -> usize {
         0
     }
 }
@@ -800,7 +735,7 @@ where
     type Scalar = Scalar;
     type Charges = Vec<Self::Scalar>;
 
-    fn metadata<'a>(&mut self, eval_type: EvalType, charges: &'a [Self::Charges]) {
+    fn metadata<'a>(&mut self, eval_type: EvalType, _charges: &'a [Self::Charges]) {
         // In a multinode setting this method sets the required metdata for the local upward passes, before ghost exchange.
 
         let alpha_outer = Scalar::real(ALPHA_OUTER);
@@ -818,8 +753,8 @@ where
             EvalType::ValueDeriv => 4,
         };
 
-        let nsource_trees = self.nsource_trees;
-        let ntarget_trees = self.ntarget_trees;
+        let nsource_trees = self.tree.source_tree.n_trees;
+        let ntarget_trees = self.tree.target_tree.n_trees;
 
         // Allocate buffers to store multipole and local data
         let mut multipoles = Vec::new();
@@ -991,7 +926,7 @@ where
                             .iter()
                             .filter_map(|key| {
                                 // Try to get the rank from the key
-                                if let Some(rank) = self.layout.rank_from_key(key) {
+                                if let Some(rank) = self.source_layout.rank_from_key(key) {
                                     // Filter out if the rank is equal to my_rank
                                     if rank != &self.rank {
                                         return Some(key);
@@ -1015,7 +950,7 @@ where
         let mut v_list_to_send = vec![0i32; self.communicator.size() as usize];
 
         for query in v_list_queries.iter() {
-            let rank = self.layout.rank_from_key(query).unwrap();
+            let rank = self.source_layout.rank_from_key(query).unwrap();
             v_list_ranks.push(*rank);
             v_list_send_counts[*rank as usize] += 1;
         }
@@ -1058,7 +993,7 @@ where
                     .iter()
                     .filter_map(|key| {
                         // Try to get the rank from the key
-                        if let Some(rank) = self.layout.rank_from_key(key) {
+                        if let Some(rank) = self.source_layout.rank_from_key(key) {
                             // Filter out if the rank is equal to my_rank
                             if rank != &self.rank {
                                 return Some(key);
@@ -1080,7 +1015,7 @@ where
         let mut u_list_to_send = vec![0i32; self.communicator.size() as usize];
 
         for query in u_list_queries.iter() {
-            let rank = self.layout.rank_from_key(query).unwrap();
+            let rank = self.source_layout.rank_from_key(query).unwrap();
             u_list_ranks.push(*rank);
             u_list_send_counts[*rank as usize] += 1;
         }

@@ -1,7 +1,7 @@
 //! Tree Traits
 use std::{collections::HashSet, hash::Hash};
 
-use rlst::{dense::linalg::qr, RlstScalar};
+use rlst::RlstScalar;
 
 use num::traits::Float;
 
@@ -97,21 +97,26 @@ pub trait SingleNodeTreeTrait {
     /// - `idx` - Index being query.
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 
-    // Defines owned octants by each local root, defined as all descendents of each local root
+    /// Defined by all descendants of the root
     fn owned_range(&self) -> Option<Self::Node>;
-
-    // Defines larger region which contributes to each local root's tree via the union of their interaction lists
-    fn contributing_range(&self) -> Option<[Self::Node; 2]>;
 }
 
+/// Interface for multi node trees
 pub trait MultiNodeTreeTrait {
+    /// Type of single node tree
     type Tree: SingleNodeTreeTrait;
 
+    /// Associated MPI rank
     fn rank(&self) -> i32;
 
+    /// All the single node trees associated with this rank
     fn trees<'a>(&'a self) -> &'a [Self::Tree];
 
-    fn n_roots(&self) -> usize;
+    /// Number of single node trees associated with this rank
+    fn n_trees(&self) -> usize;
+
+    /// Roots associated with trees at this rank
+    fn roots<'a>(&'a self) -> &'a [<Self::Tree as SingleNodeTreeTrait>::Node];
 }
 
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
@@ -138,20 +143,28 @@ where
     ) -> Option<Vec<<Self::Tree as SingleNodeTreeTrait>::Node>>;
 }
 
+/// Interface for trees required by multinde FMM, which require separate trees for source and target data.
+/// Now however, each MPI rank can contain multiple single node source and target trees.
 pub trait MultiNodeFmmTreeTrait
 where
     Self::Tree: MultiNodeTreeTrait,
 {
+    /// Tree associated with FMM tree
     type Tree: MultiNodeTreeTrait;
 
+    /// Current MPI rank
     fn rank(&self) -> i32;
 
+    /// The source tree, defined by a number of single node trees
     fn source_tree(&self) -> &Self::Tree;
 
+    /// The target tree, defined by a number of single node trees
     fn target_tree(&self) -> &Self::Tree;
 
+    /// Number of single node trees associated with the source tree
     fn n_source_trees(&self) -> usize;
 
+    /// Number of single trees associated with target tree
     fn n_target_trees(&self) -> usize;
 }
 

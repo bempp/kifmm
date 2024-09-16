@@ -5,10 +5,8 @@ use rlst::RlstScalar;
 
 use crate::{
     fmm::types::SingleNodeFmmTree,
-    traits::tree::{
-        MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait,
-    },
-    tree::types::MultiNodeTreeNew,
+    traits::tree::{MultiNodeFmmTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
+    tree::types::MultiNodeTree,
     tree::types::SingleNodeTree,
     MultiNodeFmmTree,
 };
@@ -18,7 +16,7 @@ where
     T: RlstScalar + Float + Default + Equivalence,
     C: Communicator,
 {
-    type Tree = MultiNodeTreeNew<T, C>;
+    type Tree = MultiNodeTree<T, C>;
 
     fn rank(&self) -> i32 {
         self.source_tree.rank

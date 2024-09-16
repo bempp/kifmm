@@ -8,9 +8,15 @@ use mpi::{
     datatype::{Partition, PartitionMut},
     topology::SimpleCommunicator,
     traits::{Communicator, CommunicatorCollectives, Equivalence},
-    Count, Rank,
+    Count,
 };
 
+/// Simple sort is a bucket style sort specialised for octrees. In this case, the number of 'splitters'
+/// defines the leaves of an octree of depth log(n_spliters). This means that the number of octree leaves
+/// must match the number of MPI processes.
+///
+/// This is suitable for approximately uniform distributions, with low-numbers of MPI processes. In which case
+/// it assures a relatively uniform load balance, such that each MPI process is pinned to a given physical CPU.
 pub fn simplesort<T>(
     arr: &mut Vec<T>,
     comm: &SimpleCommunicator,
@@ -38,7 +44,7 @@ where
     let mut count = 0;
     let mut splitter_indices = vec![(0i32, 0i32); nsplitters as usize];
 
-    for (i, item) in arr.iter().enumerate() {
+    for (_i, item) in arr.iter().enumerate() {
         while splitter_index < nsplitters && item >= &splitters[splitter_index as usize] {
             if count > 0 {
                 // Record the segment from l to l + count - 1
@@ -98,7 +104,6 @@ where
     comm.all_to_all_varcount_into(&partition_snd, &mut partition_received);
     received.sort();
 
-    // println!("FOO RANK {:?} counts send {:?} displs snd {:?}", comm.rank(), counts_snd, total);
     *arr = received;
 
     Ok(())

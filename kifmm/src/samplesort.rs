@@ -1,6 +1,7 @@
+//! Implementation of Sample Sort algorithm
 use std::fmt::Debug;
 
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 use mpi::{
     datatype::{Partition, PartitionMut},
     topology::SimpleCommunicator,
@@ -9,6 +10,8 @@ use mpi::{
 };
 use rand::{thread_rng, Rng};
 
+/// A sample sort implementation, where 'k' is the number of samples to take from each sub-array.
+/// Will be approximately load balanced for uniform distributions.
 pub fn samplesort<T>(
     arr: &mut Vec<T>,
     comm: &SimpleCommunicator,
@@ -61,7 +64,7 @@ where
     let mut count = 0;
     let mut splitter_indices = vec![(0i32, 0i32); nsplitters as usize];
 
-    for (i, item) in arr.iter().enumerate() {
+    for (_i, item) in arr.iter().enumerate() {
         while splitter_index < nsplitters && item >= &splitters[splitter_index as usize] {
             if count > 0 {
                 // Record the segment from l to l + count - 1
@@ -97,8 +100,6 @@ where
             Some(tmp)
         })
         .collect_vec();
-
-    // println!("rank {:?} {:?} {:?} {:?} {:?}",comm.rank(), counts_snd, counts_snd.iter().sum::<Count>(), 1, splitter_indices);
 
     let mut counts_recv = vec![0 as Count; size as usize];
 

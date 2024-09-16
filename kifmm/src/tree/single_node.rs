@@ -8,7 +8,6 @@ use itertools::Itertools;
 use rlst::RlstScalar;
 
 use crate::{
-    fftw::array,
     traits::tree::SingleNodeTreeTrait,
     tree::{
         constants::{DEEPEST_LEVEL, LEVEL_SIZE},
@@ -16,8 +15,6 @@ use crate::{
         types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
     },
 };
-
-use super::point;
 
 impl<T> SingleNodeTree<T>
 where
@@ -173,8 +170,6 @@ where
         }
 
         Ok(SingleNodeTree {
-            global_rank: 0,
-            local_rank: 0,
             root,
             depth,
             coordinates,
@@ -350,8 +345,6 @@ where
         }
 
         Ok(SingleNodeTree {
-            global_rank: 0,
-            local_rank: 0,
             root,
             depth,
             coordinates,
@@ -373,13 +366,11 @@ where
     /// From a set of specified roots, create a number of single node trees of matching
     // length
     pub fn from_roots(
-        rank: i32,
         roots: &MortonKeys<T>,
         points: &mut Points<T>,
         global_domain: &Domain<T>,
         global_depth: u64,
         local_depth: u64,
-        prune_empty: bool,
     ) -> Vec<SingleNodeTree<T>> {
         let mut result = Vec::new();
 
@@ -400,7 +391,7 @@ where
 
                 let root_label = i as i32;
 
-                let mut tree = SingleNodeTree::new(
+                let tree = SingleNodeTree::new(
                     &local_coordinates,
                     depth,
                     true,
@@ -410,9 +401,6 @@ where
                     Some(root_label),
                 )
                 .unwrap();
-
-                tree.local_rank = i as i32;
-                tree.global_rank = rank;
 
                 result.push(tree)
             }
@@ -572,6 +560,7 @@ where
         unmapped
     }
 
+    /// Also returns the indices of mapped points,
     pub fn assign_nodes_to_points_new(
         nodes: &MortonKeys<T>,
         points: &mut Points<T>,
@@ -616,6 +605,7 @@ where
 
         (unmapped, index_map)
     }
+
     /// Completes a minimal tree structure by filling gaps between a given set of `seed` octants.
     ///
     /// Seeds are a set of octants that serve as the starting points for building the complete tree,
@@ -887,15 +877,6 @@ where
 
     fn owned_range(&self) -> Option<Self::Node> {
         Some(self.root)
-    }
-
-    // Want the option to calculate this at runtime as interaction list calculation can be slow
-    // Only run M2L locally for L_global + 1, so consider the union of interaction lists for everything below this.
-    fn contributing_range(&self) -> Option<[Self::Node; 2]> {
-        let mut neighbours = self.root.neighbors();
-        neighbours.push(self.root);
-        neighbours.sort();
-        Some([neighbours[0], *neighbours.last().unwrap()])
     }
 }
 

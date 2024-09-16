@@ -7,11 +7,11 @@ use std::{
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 use mpi::{
     datatype::{Partition, PartitionMut},
-    topology::{Color, SimpleCommunicator},
-    traits::{Communicator, Destination, Equivalence, Group, Partitioned, Root, Source},
+    topology::SimpleCommunicator,
+    traits::{Communicator, Equivalence, Partitioned, Root},
 };
 
 use num::Float;
@@ -20,7 +20,7 @@ use rlst::RlstScalar;
 use mpi::collective::CommunicatorCollectives;
 
 use crate::{
-    fmm::types::{FmmEvalType, KiFmm},
+    fmm::types::KiFmm,
     traits::{
         field::{
             SourceToTargetData as SourceToTargetDataTrait, SourceToTargetTranslationMetadata,
@@ -34,7 +34,7 @@ use crate::{
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
     tree::types::{GhostTreeU, GhostTreeV, MortonKey},
-    Fmm, MultiNodeFmmTree,
+    Fmm, MultiNodeFmmTree, SingleNodeFmmTree,
 };
 
 use super::types::{KiFmmMultiNode, Layout};
@@ -53,7 +53,8 @@ where
         + SourceToTargetTranslation
         + SourceToTargetTranslationMetadata,
     KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>: Fmm + SourceToTargetTranslationMetadata,
-    GhostTreeV<Scalar, SourceToTargetData>: SourceToTargetTranslationMetadataGhostTrees<Scalar = Scalar>,
+    GhostTreeV<Scalar, SourceToTargetData>:
+        SourceToTargetTranslationMetadataGhostTrees<Scalar = Scalar>,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;
@@ -93,8 +94,11 @@ where
         self.gather_global_fmm_at_root();
 
         // M2L displacements depend on existence, so must happen at runtime for Ghost tree and Global FMM Tree
-        self.ghost_tree_v
-            .displacements(&self.tree.target_tree.trees[..], total_depth, global_depth);
+        self.ghost_tree_v.displacements(
+            &self.tree.target_tree.trees[..],
+            total_depth,
+            global_depth,
+        );
 
         if self.rank == 0 {
             self.global_fmm.displacements(); // at root rank,
@@ -102,7 +106,7 @@ where
 
         // Now can proceed with remainder of the upward pass on chosen node, and some of the downward pass
         if self.rank == 0 {
-            self.global_fmm.upward_pass(timed)?;
+            self.global_fmm.upward_pass(timed)?; // Needs metadata
             self.global_fmm.downward_pass(timed)?; // avoid leaf level computations
         }
 
@@ -148,30 +152,31 @@ where
         &self.kernel
     }
 
-    fn check_surface_order(&self, level: u64) -> usize {
+    fn check_surface_order(&self, _level: u64) -> usize {
         self.check_surface_order
     }
 
-    fn equivalent_surface_order(&self, level: u64) -> usize {
+    fn equivalent_surface_order(&self, _level: u64) -> usize {
         self.equivalent_surface_order
     }
 
-    fn ncoeffs_check_surface(&self, level: u64) -> usize {
+    fn ncoeffs_check_surface(&self, _level: u64) -> usize {
         self.ncoeffs_check_surface
     }
 
-    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize {
+    fn ncoeffs_equivalent_surface(&self, _level: u64) -> usize {
         self.ncoeffs_equivalent_surface
     }
 
     fn multipole(
         &self,
-        fmm_idx: usize,
+        source_tree_idx: usize,
         key: &<<<Self::Tree as crate::traits::tree::MultiNodeFmmTreeTrait>::Tree as crate::traits::tree::MultiNodeTreeTrait>::Tree as crate::traits::tree::SingleNodeTreeTrait>::Node,
     ) -> Option<&[Self::Scalar]> {
-        if fmm_idx < self.nsource_trees {
-            if let Some(&key_idx) = self.tree.source_tree.trees[fmm_idx].level_index(key) {
-                let multipole_ptr = self.level_multipoles[fmm_idx][key.level() as usize][key_idx];
+        if source_tree_idx < self.tree.source_tree.n_trees {
+            if let Some(&key_idx) = self.tree.source_tree.trees[source_tree_idx].level_index(key) {
+                let multipole_ptr =
+                    self.level_multipoles[source_tree_idx][key.level() as usize][key_idx];
                 unsafe {
                     Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
@@ -186,10 +191,12 @@ where
         }
     }
 
-    fn multipoles(&self, fmm_idx: usize, level: u64) -> Option<&[Self::Scalar]> {
-        if fmm_idx < self.nsource_trees {
-            let multipole_ptr = &self.level_multipoles[fmm_idx][level as usize][0];
-            let nsources = self.tree.source_tree.trees[fmm_idx].n_keys(level).unwrap();
+    fn multipoles(&self, source_tree_idx: usize, level: u64) -> Option<&[Self::Scalar]> {
+        if source_tree_idx < self.tree.source_tree.n_trees {
+            let multipole_ptr = &self.level_multipoles[source_tree_idx][level as usize][0];
+            let nsources = self.tree.source_tree.trees[source_tree_idx]
+                .n_keys(level)
+                .unwrap();
             unsafe {
                 Some(std::slice::from_raw_parts(
                     multipole_ptr.raw,
@@ -215,8 +222,10 @@ where
             Scalar = Scalar,
             Tree = MultiNodeFmmTree<<Scalar as RlstScalar>::Real, SimpleCommunicator>,
         >,
-    KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>:
-        SourceToTargetTranslationMetadata + FmmMetadata<Scalar = Scalar, Charges = Scalar>,
+    KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>: SourceToTargetTranslationMetadata
+        + FmmMetadata<Scalar = Scalar, Charges = Scalar>
+        + FmmOperatorData
+        + Fmm<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>,
 {
     fn gather_global_fmm_at_root(&mut self) {
         let size = self.communicator.size();
@@ -230,7 +239,6 @@ where
         let root_process = self.communicator.process_at_rank(root_rank);
 
         if rank == root_rank {
-
             // 0. Set metadata for result, stored in a new single node FMM
             let mut result = KiFmm::<Scalar, Kernel, SourceToTargetDataSingleNode>::default();
             result.equivalent_surface_order = vec![self.equivalent_surface_order];
@@ -312,7 +320,7 @@ where
 
             let mut global_leaves_set: HashSet<_> = global_roots.iter().cloned().collect();
 
-            for (i, global_root) in global_roots.iter().enumerate() {
+            for (_i, global_root) in global_roots.iter().enumerate() {
                 let siblings = global_root.siblings();
                 let ancestors = global_root.ancestors(None);
 
@@ -405,7 +413,9 @@ where
             root_process.gather_varcount_into_root(&local_roots, &mut partition);
 
             // Save somewhere the origin of all the local roots so I can broadcast back
-
+            self.local_roots = global_roots.iter().cloned().collect();
+            self.local_roots_counts = global_locals_counts;
+            self.local_roots_displacements = global_locals_displacements;
 
             // Need to also insert sibling data if it's missing into multipole buffer so that upward pass
             // will run even if this doesn't exist remotely.
@@ -504,22 +514,55 @@ where
 
             root_process.gather_varcount_into(&local_roots);
         }
-
     }
 
     fn scatter_global_fmm_from_root(&mut self) {
         // Have to identify locations of each local first via a gather.
         // should really be in the 'gather ranges' part
 
-        let size = self.communicator.size();
         let rank = self.communicator.rank();
 
-        let nroot_locals = 9;
+        let nroots = self.tree.target_tree.trees.len();
+        let receive_buffer_size = nroots * self.ncoeffs_equivalent_surface;
+        let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
 
         // Nominated rank chosen to run global upward pass
         let root_rank = 0;
         let root_process = self.communicator.process_at_rank(root_rank);
 
+        if rank == root_rank {
+            let send_buffer_size = self.local_roots.len() * self.ncoeffs_equivalent_surface;
+            let mut send_buffer = vec![Scalar::default(); send_buffer_size];
+
+            // Lookup local data to be sent back from global FMM
+            let mut root_idx = 0;
+            for root in self.local_roots.iter() {
+                if let Some(local) = self.global_fmm.local(root) {
+                    send_buffer[root_idx * self.ncoeffs_equivalent_surface
+                        ..(root_idx + 1) * self.ncoeffs_equivalent_surface]
+                        .copy_from_slice(local);
+                    root_idx += 1;
+                }
+            }
+
+            // Displace items to send back by ncoeffs
+            let counts = self
+                .local_roots_counts
+                .iter()
+                .map(|&c| c * (self.ncoeffs_equivalent_surface as i32))
+                .collect_vec();
+            let displacements = self
+                .local_roots_displacements
+                .iter()
+                .map(|&d| d * (self.ncoeffs_equivalent_surface as i32))
+                .collect_vec();
+
+            let partition = Partition::new(&send_buffer, counts, &displacements[..]);
+
+            root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
+        } else {
+            root_process.scatter_varcount_into(&mut receive_buffer);
+        }
     }
 
     fn set_layout(&mut self) {
@@ -527,7 +570,7 @@ where
 
         // 1. Gather ranges_min on all processes (should be defined also by interaction lists)
         let mut ranges = Vec::new();
-        for tree_idx in 0..self.nsource_trees {
+        for tree_idx in 0..self.tree.source_tree.n_trees {
             ranges.push(self.tree.source_tree.trees[tree_idx].owned_range().unwrap());
         }
 
@@ -554,8 +597,8 @@ where
                 PartitionMut::new(&mut raw, all_ranges_counts, &all_ranges_displacements[..]);
             self.communicator
                 .all_gather_varcount_into(&ranges, &mut partition);
-            counts = partition.counts().clone().to_vec();
-            displacements = partition.displs().clone().to_vec();
+            counts = partition.counts().to_vec();
+            displacements = partition.displs().to_vec();
         }
 
         let raw_set = raw.iter().cloned().collect();
@@ -593,7 +636,7 @@ where
             range_to_rank,
         };
 
-        self.layout = layout;
+        self.source_layout = layout;
     }
 
     fn u_list_exchange(&mut self) {
@@ -963,7 +1006,7 @@ where
 
             // Lookup corresponding source tree at this rank
             let mut tree_idx = 0;
-            for (i, tree) in self.tree.source_tree.trees.iter().enumerate() {
+            for (_i, tree) in self.tree.source_tree.trees.iter().enumerate() {
                 if tree.keys_set.contains(&key) {
                     tree_idx = 0;
                     break;

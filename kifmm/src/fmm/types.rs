@@ -1,29 +1,18 @@
 //! Data structures for kernel independent FMM
 use std::{
     collections::{HashMap, HashSet},
-    default,
-    marker::PhantomData,
     sync::RwLock,
 };
 
-use bytemuck::offset_of;
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
 use mpi::{
-    datatype::{UncommittedUserDatatype, UserDatatype},
     raw::{AsRaw, FromRaw},
     topology::SimpleCommunicator,
-    traits::{
-        Buffer, BufferMut, CommunicatorCollectives, PartitionedBuffer, PartitionedBufferMut,
-        UncommittedDatatype,
-    },
-    Address,
+    traits::{Buffer, BufferMut, CommunicatorCollectives, PartitionedBuffer, PartitionedBufferMut},
 };
 use num::traits::Float;
-use rlst::{
-    dense::layout, rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer,
-    VectorContainer,
-};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
 use crate::{
     linalg::rsvd::Normaliser,
@@ -31,9 +20,7 @@ use crate::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex, types::FmmOperatorTime,
     },
-    tree::types::{
-        Domain, GhostTreeU, GhostTreeV, MortonKey, MultiNodeTreeNew, Point, SingleNodeTree,
-    },
+    tree::types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MultiNodeTree, SingleNodeTree},
 };
 
 #[cfg(feature = "mpi")]
@@ -310,6 +297,7 @@ where
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
 }
 
+/// Holds all required data and metadata for evaluating a kernel independent FMM on multiple nodes.
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
 pub struct KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
@@ -320,43 +308,107 @@ where
     SourceToTargetDataSingleNode: SourceToTargetDataTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
+    /// Operator runtimes
     pub times: Vec<FmmOperatorTime>,
-    pub nsource_trees: usize,
-    pub ntarget_trees: usize,
+
+    /// Instruction set architecture
     pub isa: Isa,
+
+    /// Associated MPI communicator
     pub communicator: SimpleCommunicator,
+
+    /// Neighbourhood communicator for V list communication
+    pub neighbourhood_communicator_v: NeighbourhoodCommunicator,
+
+    /// Neighbourhood communicator for U list communication
+    pub neighbourhood_communicator_u: NeighbourhoodCommunicator,
+
+    /// Associated MPI rank
     pub rank: i32,
+
+    /// The associated kernel function
     pub kernel: Kernel,
+
+    /// A multi node tree
     pub tree: MultiNodeFmmTree<<Scalar as RlstScalar>::Real, SimpleCommunicator>,
+
+    /// Charges associated with each source tree
     pub charges: Vec<Vec<Scalar>>,
+
+    /// The expansion order used to construct check surfaces
     pub check_surface_order: usize,
+
+    /// The expansion order of the FMM, used to construct equivalent surfaces.
     pub equivalent_surface_order: usize,
+
+    /// The number of coefficients, corresponding to points discretising the equivalent surface
     pub ncoeffs_equivalent_surface: usize,
+
+    /// The number of coefficients, corresponding to points discretising the check surface
     pub ncoeffs_check_surface: usize,
+
+    /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub kernel_eval_type: EvalType,
+
+    /// The FMM evaluation type, either for a vector or matrix of input charges.
     pub fmm_eval_type: FmmEvalType,
+
+    /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub kernel_eval_size: usize,
-    pub charge_index_pointers_sources: Vec<Vec<(usize, usize)>>, // One for each of nfmm
-    pub charge_index_pointers_targets: Vec<Vec<(usize, usize)>>,
-    pub leaf_upward_equivalent_surfaces_sources: Vec<Vec<Scalar::Real>>,
-    pub leaf_upward_check_surfaces_sources: Vec<Vec<Scalar::Real>>,
-    pub leaf_downward_equivalent_surfaces_targets: Vec<Vec<Scalar::Real>>,
-    pub leaf_scales_sources: Vec<Vec<Scalar>>,
+
+    /// Index pointer for source coordinates
+    pub charge_index_pointers_sources: Vec<Vec<(usize, usize)>>, // indexed by source tree
+
+    /// Index pointer for target coordinates
+    pub charge_index_pointers_targets: Vec<Vec<(usize, usize)>>, // indexed by target tree
+
+    /// Upward surfaces associated with source leaves
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Vec<Scalar::Real>>, // indexed by source tree
+
+    /// Upward surfaces associated with source leaves
+    pub leaf_upward_check_surfaces_sources: Vec<Vec<Scalar::Real>>, // indexed by source tree
+
+    /// Upward surfaces associated with target leaves
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Vec<Scalar::Real>>, // indexed by target tree
+
+    /// Scales of each source leaf box
+    pub leaf_scales_sources: Vec<Vec<Scalar>>, // indexed by source tree
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+
+    /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+
+    /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
+    /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+
+    /// Data and metadata for field translations
     pub source_to_target: SourceToTargetData,
 
+    /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
     pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+
+    /// The metadata required for source to source translation
     pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+
+    /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
     pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
 
-    // This will have to be re-allocated upon receiving ghost data, all of the stuff below, after point + multipoles have been
-    // exchanged.
-    // Multipole exchange should be done at trait level, over the kiFMM.
-    pub multipoles: Vec<Vec<Scalar>>, // outer FMM, inner each buffer
-    pub locals: Vec<Vec<Scalar>>,
+    /// Multipoles associated with locally owned data
+    pub multipoles: Vec<Vec<Scalar>>, // outer indexed by source trees, inner each buffer
+
+    /// Locals associated with locally owned data
+    pub locals: Vec<Vec<Scalar>>, // outer indexed by target trees
+
+    /// Potentials associated with locally owned data
     pub potentials: Vec<Vec<Scalar>>,
 
     /// Multipole expansions at leaf level
@@ -383,48 +435,71 @@ where
     /// Can form query packet during pre-computation, but don't in principle know about existence
     /// of these multipoles, or where they are physically located, which must be checked at runtime
     pub v_list_queries: Vec<u64>,
+
+    /// Associated ranks of queries, same length as queries
     pub v_list_ranks: Vec<i32>,
+
+    /// Is of 'size' in length, count of queries to each rank in communication with this one
     pub v_list_send_counts: Vec<i32>,
+
+    /// Is of 'size' in length, and is a marker of whether a given rank is in communication with this one
     pub v_list_to_send: Vec<i32>,
 
     /// Form a similar query packet during pre-computation for particle data
     pub u_list_queries: Vec<u64>,
+
+    /// Associated ranks of queries, same length as queries
     pub u_list_ranks: Vec<i32>,
+
+    /// Is of 'size' in length, count of queries to each rank in communication with this one
     pub u_list_send_counts: Vec<i32>,
+
+    /// Is of 'size' in length, and is a marker of whether a given rank is in communication with this one
     pub u_list_to_send: Vec<i32>,
 
-    pub layout: Layout<Scalar>,
-    pub neighbourhood_communicator_v: NeighbourhoodCommunicator,
-    pub neighbourhood_communicator_u: NeighbourhoodCommunicator,
+    /// Defines layout specified by roots owned by each rank
+    pub source_layout: Layout<Scalar>,
 
-    /// ghost octants for v list
-    pub ghost_v_list_octants: Vec<Vec<MortonKey<Scalar::Real>>>,
-
-    pub ghost_v_list_data: Vec<Vec<Scalar>>,
-
-    /// ghost octants for u list
-    pub ghost_u_list_octants: Vec<Vec<MortonKey<Scalar::Real>>>,
-
-    pub ghost_u_list_data: Vec<Vec<Scalar::Real>>,
-
+    /// Ghost tree for U list data
     pub ghost_tree_u: GhostTreeU<Scalar::Real>,
 
+    /// Ghost tree for V list data
     pub ghost_tree_v: GhostTreeV<Scalar, SourceToTargetData>,
 
+    /// Object holding global FMM, to be run on nominated node
     pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>,
+
+    /// Store origin ranks of target trees to which I must send local expansion coeffs after global FMM has been
+    /// executed on nominated node.
+    pub local_roots_counts: Vec<i32>,
+    /// Should remove and store with global FMM
+    pub local_roots_displacements: Vec<i32>,
+    /// Same as above
+    pub local_roots: Vec<MortonKey<Scalar::Real>>, // Corresponding morton keys
 }
 
-/// Stores global tree for global upward and downward passes
+/// Stores global tree for global upward and downward passes on nominated node(s)
 #[derive(Default)]
 pub struct KiFmmMultiNodeGlobal<T>
 where
     T: RlstScalar + Float + Default,
 {
+    /// Global multipoles
     pub multipoles: Vec<T>,
+
+    /// Global locals
     pub locals: Vec<T>,
+
+    /// By level, then by each key
     pub level_multipoles: Vec<Vec<SendPtrMut<T>>>,
+
+    /// By level, then by each key
     pub level_locals: Vec<Vec<SendPtrMut<T>>>,
+
+    /// By level, outer index is target tree, inner index is level
     pub level_index_pointer_multipoles: Vec<Vec<HashMap<MortonKey<T::Real>, usize>>>,
+
+    /// By level, outer index is target tree, inner index is level
     pub level_index_pointer_locals: Vec<Vec<HashMap<MortonKey<T::Real>, usize>>>,
 }
 
@@ -634,6 +709,7 @@ where
     pub depth_set: Option<bool>,
 }
 
+/// Builder for multinode trees
 #[derive(Default)]
 pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
@@ -649,19 +725,25 @@ where
     /// Tree
     pub tree: Option<MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>>,
 
+    /// Associated communicator
     pub communicator: Option<SimpleCommunicator>,
 
+    /// Associated global domain
     pub domain: Option<Domain<Scalar::Real>>,
 
+    /// Associated ISA
     pub isa: Option<Isa>,
 
     /// Data and metadata for field translations
     pub source_to_target: Option<SourceToTargetData>,
 
+    /// Associated field translation
     pub source_to_target_single_node: Option<SourceToTargetDataSingleNode>,
 
+    /// Equivalent surface order, variable expansion order not supported
     pub equivalent_surface_order: Option<usize>,
 
+    /// Check surface order, variable expansion order not supported
     pub check_surface_order: Option<usize>,
 
     /// Number of coefficients
@@ -676,26 +758,34 @@ where
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
 
-    /// Charges associated with each local FMM
+    /// Charges associated with each source tree
     pub charges: Option<Vec<Vec<Scalar>>>,
-
-    pub nsource_trees: Option<usize>,
-
-    pub ntarget_trees: Option<usize>,
 }
 
 /// Specified owned range (defined by roots) of each rank
 #[derive(Default)]
 pub struct Layout<T: RlstScalar + Float> {
+    /// Splitters in terms of Morton keys
     pub raw: Vec<MortonKey<T::Real>>,
+
+    /// All splitters as a set
     pub raw_set: HashSet<MortonKey<T::Real>>,
+
+    /// Counts
     pub counts: Vec<i32>,
+
+    /// Displacements
     pub displacements: Vec<i32>,
+
+    /// Ranks
     pub ranks: Vec<i32>,
+
+    /// Map between range and associated rank
     pub range_to_rank: HashMap<MortonKey<T::Real>, i32>,
 }
 
 impl<T: RlstScalar + Float> Layout<T> {
+    /// rank associated with this rank
     pub fn rank_from_key(&self, key: &MortonKey<T::Real>) -> Option<&i32> {
         let ancestors = key.ancestors(None);
         // assuming of length 1
@@ -715,6 +805,7 @@ pub struct NeighbourhoodCommunicator {
 }
 
 impl NeighbourhoodCommunicator {
+    /// Number of associated ranks
     pub fn size(&self) -> i32 {
         self.raw.size()
     }
@@ -876,9 +967,9 @@ pub struct SingleNodeFmmTree<T: RlstScalar + Float + Default> {
 #[cfg(feature = "mpi")]
 pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator> {
     /// An octree structure containing the source points for the FMM calculation.
-    pub source_tree: MultiNodeTreeNew<T, C>,
+    pub source_tree: MultiNodeTree<T, C>,
     /// An octree structure containing the target points for the FMM calculation.
-    pub target_tree: MultiNodeTreeNew<T, C>,
+    pub target_tree: MultiNodeTree<T, C>,
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T>,
 }
@@ -1270,32 +1361,4 @@ pub enum Isa {
     /// Default is no vectorisation
     #[default]
     Default,
-}
-
-#[repr(C)]
-#[derive(Default, Clone, Copy, Debug)]
-pub struct IndexPointer(pub i32, pub i32);
-
-impl IndexPointer {
-    pub fn new(l: i32, r: i32) -> Self {
-        Self(l, r)
-    }
-}
-
-unsafe impl Equivalence for IndexPointer {
-    type Out = UserDatatype;
-
-    fn equivalent_datatype() -> Self::Out {
-        UserDatatype::structured(
-            &[1, 1],
-            &[
-                offset_of!(IndexPointer, 0) as Address,
-                offset_of!(IndexPointer, 1) as Address,
-            ],
-            &[
-                UncommittedUserDatatype::contiguous(1, &i32::equivalent_datatype()).as_ref(),
-                UncommittedUserDatatype::contiguous(1, &i32::equivalent_datatype()).as_ref(),
-            ],
-        )
-    }
 }

@@ -256,27 +256,6 @@ where
     }
 }
 
-impl<T> MortonKeys<T>
-where
-    T: RlstScalar + Float,
-{
-    pub fn from_hashset(keys: HashSet<MortonKey<T>>, rank: i32) -> Self {
-        let keys = MortonKeys {
-            keys: keys
-                .iter()
-                .map(|k| MortonKey {
-                    anchor: k.anchor,
-                    morton: k.morton,
-                    rank: rank,
-                    scalar: PhantomData,
-                })
-                .collect_vec(),
-            index: 0,
-        };
-        keys
-    }
-}
-
 impl<T> PartialEq for MortonKey<T>
 where
     T: RlstScalar + Float,

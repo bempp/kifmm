@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use mpi::{topology::SimpleCommunicator, traits::Equivalence};
+use mpi::traits::Equivalence;
 use num::{Float, One, Zero};
 
 use rayon::prelude::*;
@@ -404,11 +404,11 @@ where
     Self: FmmOperatorData,
     <Scalar as Dft>::Plan: Sync,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, _level: u64) -> Result<(), FmmError> {
         Ok(())
     }
 
-    fn p2l(&self, level: u64) -> Result<(), FmmError> {
+    fn p2l(&self, _level: u64) -> Result<(), FmmError> {
         Ok(())
     }
 }

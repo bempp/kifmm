@@ -1,5 +1,5 @@
 //! FMM traits
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use crate::{
     traits::tree::SingleNodeFmmTreeTrait,
@@ -7,7 +7,6 @@ use crate::{
 };
 use green_kernels::{traits::Kernel, types::EvalType};
 use num::Float;
-use pulp::Scalar;
 use rlst::RlstScalar;
 
 use super::{
@@ -162,6 +161,7 @@ where
     fn clear(&mut self, charges: &[Self::Scalar]);
 }
 
+/// Interface for multinode KiFMM
 pub trait MultiNodeFmm
 where
     Self::Scalar: RlstScalar,
@@ -184,21 +184,33 @@ where
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
+    /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
     fn equivalent_surface_order(&self, level: u64) -> usize;
 
+    /// Get the expansion order associated with this FMM, used to discretise the check surface.
     fn check_surface_order(&self, level: u64) -> usize;
 
+    /// Get the number of multipole/local coefficients associated with this FMM
     fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
 
+    /// Get the number of multipole/local coefficients associated with this FMM
     fn ncoeffs_check_surface(&self, level: u64) -> usize;
 
+    /// Get the multipole expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `source_tree_idx` - associated source tree index.
+    /// * `key` - The source node.
     fn multipole(
         &self,
-        fmm_idx: usize,
+        source_tree_idx: usize,
         key: &<<<Self::Tree as MultiNodeFmmTreeTrait>::Tree as MultiNodeTreeTrait>::Tree as SingleNodeTreeTrait>::Node,
     ) -> Option<&[Self::Scalar]>;
 
-    fn multipoles(&self, fmm_idx: usize, level: u64) -> Option<&[Self::Scalar]>;
+    /// Get the multipole expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `source_tree_idx` - associated source tree index.
+    /// * `level` - The tree level.
+    fn multipoles(&self, source_tree_idx: usize, level: u64) -> Option<&[Self::Scalar]>;
 }
 
 /// Set all metadata required for FMMs
@@ -206,6 +218,7 @@ pub trait FmmMetadata {
     /// Associated scalar
     type Scalar: RlstScalar;
 
+    /// Associated charge data
     type Charges;
 
     /// Compute all metadata required for FMM.
@@ -215,8 +228,10 @@ pub trait FmmMetadata {
 
 /// Want to build global single node FMM at nominated node(s)
 pub trait FmmGlobalFmmMetadata {
+    /// Associated scalar
     type Scalar: RlstScalar + Float;
 
+    /// Add multipole data to global FMM object on nominated node(s)
     fn multipole_metadata(
         &mut self,
         multipoles: Vec<Self::Scalar>,
@@ -227,6 +242,8 @@ pub trait FmmGlobalFmmMetadata {
         depth: u64,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
     );
+
+    /// Add local data to global FMM object on nominated node(s)
     fn local_metadata(
         &mut self,
         locals: Vec<Self::Scalar>,
@@ -237,25 +254,6 @@ pub trait FmmGlobalFmmMetadata {
         depth: u64,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
     );
-}
-
-pub trait FmmMetadataMultiNode {
-    type Scalar;
-
-    // After ghost exchange, insert new charges and associated leaf data into local trees
-    fn update_charges(&mut self, new_charges: &[Self::Scalar]);
-
-    // After ghost exchange and local upward passses, insert new multipole data, and associated keys into local trees
-    fn update_multipoles(
-        &mut self,
-        new_multipoles: &[Self::Scalar],
-        keys: &[Self::Scalar],
-        expansion_order: usize,
-    );
-
-    /// Called after multipoles updated, creates new displacement data structure for looking up appropriate M2L data, which in a multi-node setting must be done at
-    /// runtime due to ghost exchange.
-    fn displacements(&mut self);
 }
 
 /// Defines how metadata associated with field translations is looked up at runtime.
@@ -295,19 +293,20 @@ where
     fn is_homogenous(&self) -> bool;
 }
 
+/// Interface for ghost exchange implementations
 pub trait GhostExchange {
     /// Gather ranges controlled by each local tree
     fn set_layout(&mut self);
 
-    /// Exchange V list data
+    /// Exchange V list data, must be done at runtime as it relies on node existence
     fn v_list_exchange(&mut self);
 
-    /// Exchange U list data
+    /// Exchange U list data, can be done during pre-computation
     fn u_list_exchange(&mut self);
 
-    /// Gather root multipoles from local trees at nominated node
+    /// Gather root multipoles from local source trees at nominated node
     fn gather_global_fmm_at_root(&mut self);
 
-    /// Scatter root locals back to local trees
+    /// Scatter root locals back to local target trees
     fn scatter_global_fmm_from_root(&mut self);
 }

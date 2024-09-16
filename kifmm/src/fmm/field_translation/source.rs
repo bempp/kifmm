@@ -424,7 +424,6 @@ where
             let check_surface_size = ncoeffs_check_surface * dim;
 
             let coordinates = tree.all_coordinates().unwrap();
-            let ncoordinates = coordinates.len() / dim;
             let operator_index = 0;
             let depth = self.tree.source_tree.local_depth + self.tree.source_tree.global_depth;
 

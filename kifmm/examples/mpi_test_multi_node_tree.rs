@@ -11,7 +11,7 @@ use kifmm::{traits::tree::SingleNodeTreeTrait, tree::helpers::points_fixture};
 use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};
 
 #[cfg(feature = "mpi")]
-use kifmm::tree::types::{Domain, MortonKey, MultiNodeTreeNew};
+use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
 
 // /// Test that the leaves on separate nodes do not overlap.
 // #[cfg(feature = "mpi")]
@@ -99,10 +99,10 @@ use kifmm::tree::types::{Domain, MortonKey, MultiNodeTreeNew};
 #[cfg(feature = "mpi")]
 fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &SimpleCommunicator,
-    tree: &MultiNodeTreeNew<T, SimpleCommunicator>,
+    tree: &MultiNodeTree<T, SimpleCommunicator>,
     points_per_proc: usize,
 ) {
-    use kifmm::tree::types::MultiNodeTreeNew;
+    use kifmm::tree::types::MultiNodeTree;
 
     let mut n_points = 0;
 
@@ -127,7 +127,7 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 fn main() {
     // Setup an MPI environment
 
-    use kifmm::tree::types::MultiNodeTreeNew;
+    use kifmm::tree::types::MultiNodeTree;
 
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
