@@ -1,9 +1,9 @@
 //! FMM traits
-use crate::traits::tree::FmmTree;
+use crate::traits::tree::SingleFmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{tree::Tree, types::FmmError};
+use super::{tree::SingleTree, types::FmmError};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -70,7 +70,7 @@ where
     type Scalar;
 
     /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
-    type Tree: FmmTree;
+    type Tree: SingleFmmTree;
 
     /// Kernel associated with this FMMl
     type Kernel: Kernel<T = Self::Scalar>;
@@ -80,7 +80,7 @@ where
     /// * `key` - The source node.
     fn multipole(
         &self,
-        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
     ) -> Option<&[Self::Scalar]>;
 
     /// Get the multipole expansion data associated with a tree level as a slice
@@ -91,8 +91,10 @@ where
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
-    fn local(&self, key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node)
-        -> Option<&[Self::Scalar]>;
+    fn local(
+        &self,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+    ) -> Option<&[Self::Scalar]>;
 
     /// Get the local expansion data associated with a tree level as a slice
     /// # Arguments
@@ -104,7 +106,7 @@ where
     /// * `key` - The target leaf node.
     fn potential(
         &self,
-        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        leaf: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
 
     /// Get all potential data at all particles, stored in order by global index

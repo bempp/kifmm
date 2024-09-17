@@ -19,7 +19,7 @@ use crate::{
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
         fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation},
-        tree::{FmmTree, Tree},
+        tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
     tree::constants::NSIBLINGS,

@@ -5,7 +5,7 @@ use rand::distributions::uniform::SampleUniform;
 
 use rlst::{RawAccess, RlstScalar};
 
-use kifmm::{traits::tree::Tree, tree::helpers::points_fixture};
+use kifmm::{traits::tree::SingleTree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};
@@ -20,8 +20,8 @@ fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
     tree: &MultiNodeTree<T, SimpleCommunicator>,
 ) {
     // Communicate bounds from each process
-    let max = tree.all_leaves_set().unwrap().iter().max().unwrap();
-    let min = tree.all_leaves_set().unwrap().iter().min().unwrap();
+    let max = tree.roots.iter().max().unwrap();
+    let min = tree.roots.iter().min().unwrap();
 
     // Gather all bounds at root
     let size = world.size();
@@ -76,33 +76,16 @@ fn test_global_bounds<T: RlstScalar + Equivalence + Float + SampleUniform>(
 
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
-fn test_n_leaves<T: RlstScalar + Equivalence + Float + SampleUniform>(
-    world: &SimpleCommunicator,
-    tree: &MultiNodeTree<T, SimpleCommunicator>,
-) {
-    let n_leaves = tree.n_leaves().unwrap();
-
-    let size = world.size() as usize;
-    let mut counts = vec![0usize; size];
-
-    world.all_gather_into(&n_leaves, &mut counts[..]);
-
-    let n_leaves_tot = counts.iter().sum::<usize>() as i32;
-    let expected = 8i32.pow(tree.depth() as u32);
-
-    if world.rank() == 0 {
-        assert_eq!(n_leaves_tot, expected)
-    }
-}
-
-/// Test that all leaves are mapped
-#[cfg(feature = "mpi")]
 fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &SimpleCommunicator,
     tree: &MultiNodeTree<T, SimpleCommunicator>,
     points_per_proc: usize,
 ) {
-    let n_points = tree.n_coordinates_tot().unwrap();
+    let mut n_points = 0;
+
+    for t in tree.trees.iter() {
+        n_points += t.n_coordinates_tot().unwrap();
+    }
 
     let size = world.size() as usize;
     let mut counts = vec![0usize; size];
@@ -121,20 +104,33 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 fn main() {
     // Setup an MPI environment
 
+    use kifmm::tree::types::SortKind;
+
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
     let comm = world.duplicate();
 
     // Setup tree parameters
     let prune_empty = false;
-    let depth = 5;
     let n_points = 10000;
+    let local_depth = 3;
+    let global_depth = 1;
+    let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
 
     // Create a uniform tree
-    let uniform = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
+    let uniform = MultiNodeTree::new(
+        &comm,
+        points.data(),
+        local_depth,
+        global_depth,
+        None,
+        sort_kind,
+        prune_empty,
+    )
+    .unwrap();
 
     test_no_overlaps(&comm, &uniform);
     if world.rank() == 0 {
@@ -146,32 +142,9 @@ fn main() {
         println!("\t ... test_global_bounds passed on uniform tree");
     }
 
-    test_n_leaves(&comm, &uniform);
-    if world.rank() == 0 {
-        println!("\t ... test_n_leaves passed on uniform tree");
-    }
-
     test_n_points(&comm, &uniform, n_points);
     if world.rank() == 0 {
         println!("\t ... test_n_points passed on uniform tree");
-    }
-
-    let prune_empty = true;
-    let sparse = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
-
-    test_no_overlaps(&comm, &sparse);
-    if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on sparse tree");
-    }
-
-    test_global_bounds::<f32>(&comm);
-    if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on sparse tree");
-    }
-
-    test_n_points(&comm, &sparse, n_points);
-    if world.rank() == 0 {
-        println!("\t ... test_n_points passed on sparse tree");
     }
 }
 

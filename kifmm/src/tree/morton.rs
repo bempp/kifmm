@@ -653,6 +653,22 @@ where
         ancestors
     }
 
+    /// Return set of all ancestors of this Morton Key up to a specified level
+    pub fn ancestors_to_level(&self, level: u64) -> HashSet<MortonKey<T>> {
+        let mut ancestors = HashSet::<MortonKey<_>>::new();
+
+        let mut current = *self;
+
+        ancestors.insert(current);
+
+        while current.level() > level {
+            current = current.parent();
+            ancestors.insert(current);
+        }
+
+        ancestors
+    }
+
     /// Return descendants `n` levels down from a key.
     ///
     /// # Arguments

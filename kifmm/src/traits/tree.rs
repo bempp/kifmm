@@ -5,8 +5,8 @@ use rlst::RlstScalar;
 
 use num::traits::Float;
 
-/// Interface for single and multi-node trees
-pub trait Tree {
+/// Interface for single node trees
+pub trait SingleTree {
     /// Scalar type
     type Scalar: RlstScalar + Float;
 
@@ -98,13 +98,41 @@ pub trait Tree {
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 }
 
+/// Interface for multinode trees
+#[cfg(feature = "mpi")]
+pub trait MultiTree {
+    /// Associated single node trees
+    type SingleTree: SingleTree;
+
+    /// Total depth of tree
+    fn total_depth(&self) -> u64;
+
+    /// Depth of local trees
+    fn local_depth(&self) -> u64;
+
+    /// Depth of global tree
+    fn global_depth(&self) -> u64;
+
+    /// Associated MPI rank
+    fn rank(&self) -> i32;
+
+    /// All the single node trees associated with this rank
+    fn trees<'a>(&'a self) -> &'a [Self::SingleTree];
+
+    /// Number of single node trees associated with this rank
+    fn n_trees(&self) -> usize;
+
+    /// Roots associated with trees at this rank
+    fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node];
+}
+
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
-pub trait FmmTree
+pub trait SingleFmmTree
 where
-    Self::Tree: Tree,
+    Self::Tree: SingleTree,
 {
     /// Tree associated with this FMM tree
-    type Tree: Tree;
+    type Tree: SingleTree;
 
     /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
@@ -113,13 +141,36 @@ where
     fn target_tree(&self) -> &Self::Tree;
 
     /// Get the domain
-    fn domain(&self) -> &<Self::Tree as Tree>::Domain;
+    fn domain(&self) -> &<Self::Tree as SingleTree>::Domain;
 
     /// Get the near field of a leaf node
     fn near_field(
         &self,
-        leaf: &<Self::Tree as Tree>::Node,
-    ) -> Option<Vec<<Self::Tree as Tree>::Node>>;
+        leaf: &<Self::Tree as SingleTree>::Node,
+    ) -> Option<Vec<<Self::Tree as SingleTree>::Node>>;
+}
+
+/// Interface for trees required by multinde FMM, which require separate trees for source and target data.
+/// Now however, each MPI rank can contain multiple single node source and target trees.
+#[cfg(feature = "mpi")]
+pub trait MultiNodeFmmTreeTrait {
+    /// Tree associated with FMM tree
+    type Tree: MultiTree;
+
+    /// Current MPI rank
+    fn rank(&self) -> i32;
+
+    /// The source tree, defined by a number of single node trees
+    fn source_tree(&self) -> &Self::Tree;
+
+    /// The target tree, defined by a number of single node trees
+    fn target_tree(&self) -> &Self::Tree;
+
+    /// Number of single node trees associated with the source tree
+    fn n_source_trees(&self) -> usize;
+
+    /// Number of single trees associated with target tree
+    fn n_target_trees(&self) -> usize;
 }
 
 /// Interface for tree nodes

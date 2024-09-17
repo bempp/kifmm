@@ -13,7 +13,7 @@ use crate::{
             FmmOperatorData, HomogenousKernel, SourceToTargetTranslation, SourceTranslation,
             TargetTranslation,
         },
-        tree::{FmmTree, Tree},
+        tree::{SingleFmmTree, SingleTree},
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
     Fmm, SingleNodeFmmTree,
@@ -69,7 +69,7 @@ where
 
     fn multipole(
         &self,
-        key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
+        key: &<<Self::Tree as crate::traits::tree::SingleFmmTree>::Tree as crate::traits::tree::SingleTree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(&key_idx) = self.tree().source_tree().level_index(key) {
             let multipole_ptr = &self.level_multipoles[key.level() as usize][key_idx][0];
@@ -110,7 +110,7 @@ where
 
     fn local(
         &self,
-        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
     ) -> Option<&[Self::Scalar]> {
         if let Some(&key_idx) = self.tree().target_tree().level_index(key) {
             let local_ptr = &self.level_locals[key.level() as usize][key_idx][0];
@@ -151,7 +151,7 @@ where
 
     fn potential(
         &self,
-        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
+        leaf: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>> {
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
@@ -348,7 +348,7 @@ mod test {
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::tree::{FmmTree, FmmTreeNode, Tree},
+        traits::tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
     };

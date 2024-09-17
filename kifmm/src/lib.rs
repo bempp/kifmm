@@ -80,9 +80,9 @@
 #![allow(clippy::macro_metavars_in_unsafe)]
 pub mod fftw;
 pub mod fmm;
-#[cfg(feature = "mpi")]
-pub mod hyksort;
 pub mod linalg;
+#[cfg(feature = "mpi")]
+pub mod sorting;
 pub mod traits;
 pub mod tree;
 

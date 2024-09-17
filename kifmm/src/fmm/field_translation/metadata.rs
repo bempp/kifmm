@@ -41,7 +41,7 @@ use crate::{
         },
         fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         general::{AsComplex, Epsilon},
-        tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
+        tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
     tree::{
         constants::{
