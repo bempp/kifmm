@@ -1,5 +1,8 @@
 //! Data structures for kernel independent FMM
-use std::{collections::{HashMap, HashSet}, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::RwLock,
+};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
@@ -8,7 +11,8 @@ use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, Ve
 use crate::{
     linalg::rsvd::Normaliser,
     traits::{
-        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel, general::AsComplex, types::FmmOperatorTime
+        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
+        general::AsComplex, types::FmmOperatorTime,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
 };
@@ -403,7 +407,7 @@ pub enum FmmEvalType {
 /// ```
 /// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 /// use kifmm::traits::fmm::Fmm;
-/// use kifmm::traits::tree::FmmTree;
+/// use kifmm::traits::tree::SingleFmmTree;
 /// use kifmm::tree::helpers::points_fixture;
 /// use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 /// use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
@@ -496,6 +500,56 @@ where
 
     /// Has depth or ncrit been set
     pub depth_set: Option<bool>,
+}
+
+/// Builder for multinode FMM
+#[derive(Default)]
+#[cfg(feature = "mpi")]
+pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default + Equivalence,
+    Kernel: KernelTrait<T = Scalar> + Clone,
+    SourceToTargetData: SourceToTargetDataTrait,
+    <Scalar as RlstScalar>::Real: Default + Equivalence,
+{
+    /// Kernel
+    pub kernel: Option<Kernel>,
+
+    /// Tree
+    pub tree: Option<MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>>,
+
+    /// Associated communicator
+    pub communicator: Option<SimpleCommunicator>,
+
+    /// Associated global domain
+    pub domain: Option<Domain<Scalar::Real>>,
+
+    /// Associated ISA
+    pub isa: Option<Isa>,
+
+    /// Data and metadata for field translations
+    pub source_to_target: Option<SourceToTargetData>,
+
+    /// Equivalent surface order, variable expansion order not supported
+    pub equivalent_surface_order: Option<usize>,
+
+    /// Check surface order, variable expansion order not supported
+    pub check_surface_order: Option<usize>,
+
+    /// Number of coefficients
+    pub ncoeffs_equivalent_surface: Option<usize>,
+
+    /// Number of coefficients
+    pub ncoeffs_check_surface: Option<usize>,
+
+    /// Kernel eval type
+    pub kernel_eval_type: Option<EvalType>,
+
+    /// FMM eval type
+    pub fmm_eval_type: Option<FmmEvalType>,
+
+    /// Charges associated with each source tree
+    pub charges: Option<Vec<Vec<Scalar>>>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -914,7 +968,6 @@ pub enum Isa {
     Default,
 }
 
-
 /// Data structure holding data for multinode FMM
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
@@ -925,7 +978,6 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
 {
-
     /// Operator runtimes
     pub times: Vec<FmmOperatorTime>,
 
@@ -1083,7 +1135,6 @@ where
 
     // /// Ghost tree for V list data
     // pub ghost_tree_v: GhostTreeV<Scalar, SourceToTargetData>,
-
     /// Object holding global FMM, to be run on nominated node
     // pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetDataSingleNode>,
 
@@ -1096,10 +1147,9 @@ where
     pub local_roots: Vec<MortonKey<Scalar::Real>>, // Corresponding morton keys
 }
 
-
 /// Specified owned range (defined by roots) of each rank
-#[derive(Default)]
 #[cfg(feature = "mpi")]
+#[derive(Default)]
 pub struct Layout<T: RlstScalar + Float> {
     /// Splitters in terms of Morton keys
     pub raw: Vec<MortonKey<T::Real>>,

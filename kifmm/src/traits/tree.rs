@@ -127,8 +127,7 @@ pub trait MultiTree {
 }
 
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
-pub trait SingleFmmTree
-{
+pub trait SingleFmmTree {
     /// Tree associated with this FMM tree
     type Tree: SingleTree;
 
@@ -147,7 +146,6 @@ pub trait SingleFmmTree
         leaf: &<Self::Tree as SingleTree>::Node,
     ) -> Option<Vec<<Self::Tree as SingleTree>::Node>>;
 }
-
 
 /// Interface for trees required by multinde FMM, which require separate trees for source and target data.
 /// Now however, each MPI rank can contain multiple single node source and target trees.

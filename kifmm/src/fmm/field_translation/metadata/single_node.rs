@@ -76,7 +76,7 @@ where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation,
+    Self: Fmm,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -306,7 +306,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation,
+    Self: Fmm,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();

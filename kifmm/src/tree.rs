@@ -23,8 +23,11 @@
 //!     points.data(),
 //!     depth,
 //!     prune_empty,
-//!     domain
-//! ).unwrap();
+//!     domain,
+//!     None,
+//!     None
+//! )
+//! .unwrap();
 //!  ```
 //!
 //! For more examples, including the creation of multi-node trees, see the `examples` folder

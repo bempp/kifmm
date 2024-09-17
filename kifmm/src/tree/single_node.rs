@@ -569,9 +569,7 @@ where
     }
 
     /// Construct a single node tree from V list ghost octants
-    pub fn from_ghost_octants_v(
-        _depth: u64,
-        _keys: &MortonKeys<T>) {}
+    pub fn from_ghost_octants_v(_depth: u64, _keys: &MortonKeys<T>) {}
 
     /// Calculates the minimum depth of a tree required to ensure that each leaf box contains at most `n_crit` points,
     /// assuming a uniform distribution of points.

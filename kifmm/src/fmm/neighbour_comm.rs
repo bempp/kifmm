@@ -1,6 +1,11 @@
 //! Neighbourhood communicator wrapper
 use itertools::Itertools;
-use mpi::{topology::{SimpleCommunicator, Communicator}, raw::{FromRaw, AsRaw}, traits::{Buffer, BufferMut, PartitionedBuffer, PartitionedBufferMut}, collective::CommunicatorCollectives};
+use mpi::{
+    collective::CommunicatorCollectives,
+    raw::{AsRaw, FromRaw},
+    topology::{Communicator, SimpleCommunicator},
+    traits::{Buffer, BufferMut, PartitionedBuffer, PartitionedBufferMut},
+};
 use mpi_sys;
 
 use super::types::NeighbourhoodCommunicator;
