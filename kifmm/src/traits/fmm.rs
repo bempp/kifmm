@@ -149,6 +149,8 @@ where
     fn clear(&mut self, charges: &[Self::Scalar]);
 }
 
+
+/// Interface for multi node FMM
 #[cfg(feature = "mpi")]
 pub trait MultiFmm
 where

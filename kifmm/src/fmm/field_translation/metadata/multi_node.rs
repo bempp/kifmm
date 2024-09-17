@@ -6,10 +6,13 @@ use num::Float;
 use rlst::{
     rlst_dynamic_array3, Array, BaseArray, MatrixSvd, RawAccessMut, RlstScalar, VectorContainer,
 };
+use std::collections::HashMap;
 
 use crate::traits::fftw::Dft;
-use crate::traits::fmm::FmmMetadata;
+use crate::traits::fmm::{FmmMetadata, MultiFmm};
 use crate::traits::general::AsComplex;
+use crate::traits::parallel::GhostExchange;
+use crate::traits::tree::{MultiFmmTree, MultiTree, SingleTree};
 use crate::FftFieldTranslation;
 use crate::{
     fmm::types::KiFmmMulti,
@@ -22,6 +25,7 @@ use crate::{
         fmm::{HomogenousKernel, SourceToTargetTranslation},
         general::Epsilon,
     },
+    tree::constants::{ALPHA_INNER, ALPHA_OUTER},
     BlasFieldTranslationSaRcmp,
 };
 
@@ -71,10 +75,85 @@ where
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    Self: MultiFmm + GhostExchange,
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {}
+    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
+        let dim = self.dim();
+        let alpha_outer = Scalar::real(ALPHA_OUTER);
+        let alpha_inner = Scalar::real(ALPHA_INNER);
+
+        // Check if computing potentials, or potentials and derivatives
+        match eval_type {
+            EvalType::Value => {}
+            EvalType::ValueDeriv => {
+                panic!("Only potential computation supported for now")
+            }
+        }
+        let eval_size = match eval_type {
+            EvalType::Value => 1,
+            EvalType::ValueDeriv => 4,
+        };
+
+        let source_trees = self.tree.source_tree().trees();
+        let target_trees = self.tree.target_tree().trees();
+        let global_depth = self.tree.source_tree().global_depth();
+        let local_depth = self.tree.source_tree().local_depth();
+        let total_depth = self.tree.source_tree().local_depth();
+
+        // Allocate buffers to store locally available multipole, local and potential data
+        // multipole and local data is arranged by level
+
+        let mut source_counts = Vec::new(); // arranged by level, then by tree
+        let mut source_displacement = Vec::new(); // arranged by level, then by tree
+        let mut n_sources = 0; // total number of source boxes
+        let mut level_displacement = 0;
+
+        let mut source_to_index = HashMap::new();
+
+        for level in global_depth..=total_depth {
+            let mut tree_displacement = Vec::new();
+            let mut tree_counts = Vec::new();
+            let mut tree_displacement_ = level_displacement;
+
+            for tree in source_trees.iter() {
+                let keys = tree.keys(level).unwrap();
+                let n_keys = keys.len();
+                tree_displacement.push(tree_displacement_);
+                tree_counts.push(n_keys);
+
+                for (key_idx, k) in keys.iter().enumerate() {
+                    source_to_index.insert(*k, key_idx + tree_displacement_);
+                }
+
+                tree_displacement_ += n_keys;
+                n_sources += n_keys;
+            }
+
+            level_displacement += tree_displacement_;
+            source_counts.push(tree_counts);
+            source_displacement.push(tree_displacement);
+        }
+
+        let mut tree_displacement = 0;
+        let mut source_to_leaf_index = HashMap::new();
+        for tree in source_trees.iter() {
+            for (leaf_idx, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+                source_to_leaf_index.insert(*leaf, leaf_idx + tree_displacement);
+            }
+
+            tree_displacement += tree.n_leaves().unwrap();
+        }
+
+        let mut multipoles = vec![Scalar::default(); n_sources * self.ncoeffs_equivalent_surface];
+
+        // Set layout
+        self.set_source_layout();
+
+        // Set metadata
+        self.multipoles = multipoles;
+    }
 }
 
 impl<Scalar, Kernel> KiFmmMulti<Scalar, Kernel, FftFieldTranslation<Scalar>>

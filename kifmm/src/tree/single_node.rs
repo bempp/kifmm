@@ -972,6 +972,10 @@ where
     type Domain = Domain<T>;
     type Node = MortonKey<T>;
 
+    fn root(&self) -> Self::Node {
+        self.root
+    }
+
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize> {
         self.coordinates(leaf).map(|coords| coords.len() / 3)
     }

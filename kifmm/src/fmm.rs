@@ -18,3 +18,6 @@ pub mod layout;
 mod eval;
 #[cfg(feature = "mpi")]
 pub mod neighbour_comm;
+
+#[cfg(feature = "mpi")]
+mod ghost_exchange;

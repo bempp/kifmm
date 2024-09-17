@@ -5,7 +5,6 @@ use std::sync::Mutex;
 use itertools::Itertools;
 use mpi::traits::Equivalence;
 use num::Float;
-use pulp::Scalar;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,

@@ -16,6 +16,9 @@ pub trait SingleTree {
     /// A tree node.
     type Node: TreeNode<Scalar = Self::Scalar, Domain = Self::Domain> + Clone + Copy;
 
+    /// Root node
+    fn root(&self) -> Self::Node;
+
     /// Number of leaves
     fn n_leaves(&self) -> Option<usize>;
 
