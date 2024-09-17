@@ -13,3 +13,9 @@ pub mod types;
 mod field_translation;
 
 pub use types::KiFmm;
+
+#[cfg(feature = "mpi")]
+pub mod layout;
+
+#[cfg(feature = "mpi")]
+pub mod neighbour_comm;
