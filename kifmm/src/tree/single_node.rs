@@ -559,6 +559,16 @@ where
         result
     }
 
+    pub fn from_ghost_octants_u(
+        depth: u64,
+        coordinates_row_major: &[T],
+        global_indices: &[usize],
+        leaves: &MortonKeys<T>,
+    ) {
+    }
+
+    pub fn from_ghost_octants_v(depth: u64, keys: &MortonKeys<T>) {}
+
     /// Calculates the minimum depth of a tree required to ensure that each leaf box contains at most `n_crit` points,
     /// assuming a uniform distribution of points.
     ///
