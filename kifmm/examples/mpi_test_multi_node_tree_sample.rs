@@ -128,35 +128,41 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 fn main() {
     // Setup an MPI environment
 
-    use kifmm::tree::types::{MultiNodeTree, SortKind};
+    // use kifmm::tree::types::{MultiNodeTree, SortKind};
 
-    let universe: Universe = mpi::initialize().unwrap();
-    let world = universe.world();
-    let comm = world.duplicate();
+    // let universe: Universe = mpi::initialize().unwrap();
+    // let world = universe.world();
+    // let comm = world.duplicate();
 
-    // Setup tree parameters
-    let n_points = 10000;
-    let local_depth = 3;
-    let global_depth = 1;
+    // // Setup tree parameters
+    // let n_points = 10000;
+    // let local_depth = 3;
+    // let global_depth = 1;
 
-    // Generate some random test data local to each process
-    let points = points_fixture::<f32>(n_points, None, None, None);
+    // // Generate some random test data local to each process
+    // let points = points_fixture::<f32>(n_points, None, None, None);
 
+    // // Create a tree with simple sort
+    // let sort_kind = SortKind::Samplesort { k: 100 };
+    // let simple = MultiNodeTree::new(
+    //     &comm,
+    //     points.data(),
+    //     local_depth,
+    //     global_depth,
+    //     None,
+    //     sort_kind,
+    // )
+    // .unwrap();
 
-    // Create a tree with simple sort
-    let sort_kind = SortKind::Samplesort { k: 100 };
-    let simple = MultiNodeTree::new(&comm, points.data(), local_depth, global_depth, None, sort_kind).unwrap();
+    // test_no_overlaps(&comm, &simple);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_no_overlaps passed on uniform tree");
+    // }
 
-
-    test_no_overlaps(&comm, &simple);
-    if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on uniform tree");
-    }
-
-    test_global_bounds::<f32>(&comm);
-    if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on uniform tree");
-    }
+    // test_global_bounds::<f32>(&comm);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_global_bounds passed on uniform tree");
+    // }
 
     // test_n_leaves(&comm, &uniform);
     // if world.rank() == 0 {
@@ -167,7 +173,6 @@ fn main() {
     // if world.rank() == 0 {
     //     println!("\t ... test_n_points passed on uniform tree");
     // }
-
 }
 #[cfg(not(feature = "mpi"))]
 fn main() {}

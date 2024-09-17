@@ -1,4 +1,7 @@
-use std::{collections::HashSet, sync::RwLock};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::RwLock,
+};
 
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
@@ -13,7 +16,9 @@ use rlst::{
 use crate::{
     fmm::{
         constants::DEFAULT_M2L_FFT_BLOCK_SIZE,
-        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
+        field_translation::{
+            source_to_target::transfer_vector::compute_transfer_vectors_at_level, target,
+        },
         helpers::{
             coordinate_index_pointer_multinode, flip3, homogenous_kernel_scale,
             leaf_expansion_pointers_multinode, leaf_surfaces, level_expansion_pointers_multinode,
@@ -35,7 +40,7 @@ use crate::{
             SourceToTargetTranslation,
         },
         general::{AsComplex, Epsilon},
-        tree::{FmmTreeNode, SingleNodeTreeTrait},
+        tree::{FmmTreeNode, MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeTreeTrait},
     },
     tree::{
         constants::{ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
@@ -734,6 +739,7 @@ where
     fn metadata<'a>(&mut self, eval_type: EvalType, _charges: &'a [Self::Charges]) {
         // In a multinode setting this method sets the required metdata for the local upward passes, before ghost exchange.
 
+        let dim = 3;
         let alpha_outer = Scalar::real(ALPHA_OUTER);
         let alpha_inner = Scalar::real(ALPHA_INNER);
 
@@ -749,313 +755,470 @@ where
             EvalType::ValueDeriv => 4,
         };
 
-        let nsource_trees = self.tree.source_tree.n_trees;
-        let ntarget_trees = self.tree.target_tree.n_trees;
-
-        // Allocate buffers to store multipole and local data
-        let mut multipoles = Vec::new();
-        let mut locals = Vec::new();
-
-        // Allocate buffer to store potential data at target points
-        let mut potentials = Vec::new();
-
-        for fmm_idx in 0..nsource_trees {
-            let nsource_keys = self.tree.source_tree.trees[fmm_idx].n_keys_tot().unwrap();
-            multipoles.push(vec![
-                Scalar::default();
-                nsource_keys * self.ncoeffs_equivalent_surface
-            ]);
-        }
-
-        for fmm_idx in 0..ntarget_trees {
-            let ntarget_keys = self.tree.target_tree.trees[fmm_idx].n_keys_tot().unwrap();
-            let ntarget_points = self.tree.target_tree.trees[fmm_idx]
-                .n_coordinates_tot()
-                .unwrap();
-            potentials.push(vec![Scalar::default(); ntarget_points * eval_size]);
-            locals.push(vec![
-                Scalar::default();
-                ntarget_keys * self.ncoeffs_equivalent_surface
-            ]);
-        }
-
-        // Index pointer of multipole and local data, indexed by fmm index, then by level
-        let level_index_pointer_multipoles = level_index_pointer_multinode(
-            &self.tree.source_tree.trees,
-            self.tree.source_tree.local_depth,
-            self.tree.source_tree.global_depth,
-        );
-        let level_index_pointer_locals = level_index_pointer_multinode(
-            &self.tree.target_tree.trees,
-            self.tree.target_tree.local_depth,
-            self.tree.source_tree.global_depth,
-        );
-
-        let mut leaf_upward_equivalent_surfaces_sources = Vec::new();
-        let mut leaf_upward_check_surfaces_sources = Vec::new();
-        let mut leaf_downward_equivalent_surfaces_targets = Vec::new();
-
-        // Precompute surfaces
-        for source_tree_index in 0..nsource_trees {
-            let source_tree = &self.tree.source_tree.trees[source_tree_index];
-
-            let leaf_upward_equivalent_surfaces_sources_i = leaf_surfaces(
-                source_tree,
-                self.ncoeffs_equivalent_surface,
-                alpha_inner,
-                self.equivalent_surface_order,
-            );
-
-            let leaf_upward_check_surfaces_sources_i = leaf_surfaces(
-                source_tree,
-                self.ncoeffs_check_surface,
-                alpha_outer,
-                self.check_surface_order,
-            );
-
-            leaf_upward_equivalent_surfaces_sources.push(leaf_upward_equivalent_surfaces_sources_i);
-            leaf_upward_check_surfaces_sources.push(leaf_upward_check_surfaces_sources_i);
-        }
-
-        for target_tree_index in 0..ntarget_trees {
-            let target_tree = &self.tree.target_tree.trees[target_tree_index];
-            let leaf_downward_equivalent_surfaces_targets_i = leaf_surfaces(
-                target_tree,
-                self.ncoeffs_equivalent_surface,
-                alpha_outer,
-                self.equivalent_surface_order,
-            );
-
-            leaf_downward_equivalent_surfaces_targets
-                .push(leaf_downward_equivalent_surfaces_targets_i);
-        }
-
-        // Create mutalbe pointers to multipole and local data, indexed by fmm index, then by level.
-        let level_multipoles = level_expansion_pointers_multinode(
-            &self.tree.source_tree.trees,
-            self.ncoeffs_equivalent_surface,
-            &multipoles,
-            self.tree.source_tree.local_depth,
-            self.tree.source_tree.global_depth,
-        );
-
-        let level_locals = level_expansion_pointers_multinode(
-            &self.tree.target_tree.trees,
-            self.ncoeffs_equivalent_surface,
-            &locals,
-            self.tree.target_tree.local_depth,
-            self.tree.target_tree.global_depth,
-        );
-
-        // Create mutable pointers to multipole and local data only at leaf level
-        let leaf_multipoles = leaf_expansion_pointers_multinode(
-            &self.tree.source_tree.trees,
-            self.ncoeffs_equivalent_surface,
-            &multipoles,
-            self.tree.source_tree.local_depth,
-            self.tree.source_tree.global_depth,
-        );
-
-        let leaf_locals = leaf_expansion_pointers_multinode(
-            &self.tree.target_tree.trees,
-            self.ncoeffs_equivalent_surface,
-            &locals,
-            self.tree.target_tree.local_depth,
-            self.tree.target_tree.global_depth,
-        );
-
-        // Mutable pointers to potential data at each target leaf
-        let potentials_send_pointers = potential_pointers_multinode(
-            &self.tree.target_tree.trees,
-            self.kernel_eval_size,
-            &potentials,
-        );
-
-        // TODO: Replace with real charge distribution
-        let mut charges = Vec::new();
-
-        for fmm_idx in 0..nsource_trees {
-            let nsource_points = self.tree.source_tree.trees[fmm_idx]
-                .n_coordinates_tot()
-                .unwrap();
-            charges.push(vec![Scalar::one(); nsource_points]);
-        }
-
-        // TODO: real coordinate index pointers
-        let charge_index_pointer_targets =
-            coordinate_index_pointer_multinode(&self.tree.target_tree.trees);
-        let charge_index_pointer_sources =
-            coordinate_index_pointer_multinode(&self.tree.source_tree.trees);
-
-        // New: Need to figure out which multipole data needs to be queried for and isn't contained in source
-        // trees locally, local trees ideally need a tree ID, which associates them with a local and global rank.
-        let mut locally_owned_domains = HashSet::new();
-        for tree in self.tree.source_tree.trees.iter() {
-            locally_owned_domains.insert(tree.root);
-        }
-
-        // Compute ranges on all processors
+        // Discover global layout of Morton keys
         self.set_layout();
 
-        // Defines all non-locally contained multipole data, as well as established possibility of existence
-        //  as defined by local roots,
-        // Don't necessarily know if they contain data and therefore exist.
-        let mut v_list_queries = HashSet::new();
+        let source_trees = self.tree.source_tree().trees();
+        let target_trees = self.tree.target_tree().trees();
+        let global_depth = self.tree.source_tree().global_depth();
+        let local_depth = self.tree.source_tree().local_depth();
+        let total_depth = self.tree.source_tree().total_depth();
 
-        for target_tree in self.tree.target_tree.trees.iter() {
-            for level in self.tree.target_tree.global_depth
-                ..=(self.tree.target_tree.local_depth + self.tree.target_tree.global_depth)
-            {
-                if let Some(keys) = target_tree.keys(level) {
-                    for key in keys.iter() {
-                        // Compute interaction list
-                        let interaction_list = key
-                            .parent()
-                            .neighbors()
-                            .iter()
-                            .flat_map(|pn| pn.children())
-                            .filter(|pnc| !key.is_adjacent(pnc))
-                            .collect_vec();
+        // Allocate buffers to store locally available multipole, local and potential data
+        // multipole and local data is arranged by level
 
-                        // Filter for those contained on foreign ranks
-                        let interaction_list = interaction_list
-                            .iter()
-                            .filter_map(|key| {
-                                // Try to get the rank from the key
-                                if let Some(rank) = self.source_layout.rank_from_key(key) {
-                                    // Filter out if the rank is equal to my_rank
-                                    if rank != &self.rank {
-                                        return Some(key);
-                                    }
-                                }
-                                None
-                            })
-                            .collect_vec();
+        let mut source_counts = Vec::new(); // arranged by level, then by tree
+        let mut source_displacement = Vec::new(); // arranged by level, then by tree
+        let mut n_sources = 0; // total number of source boxes
+        let mut level_displacement = 0;
 
-                        for key in interaction_list {
-                            v_list_queries.insert(*key);
-                        }
-                    }
+        let mut source_to_index = HashMap::new();
+
+        for level in global_depth..=total_depth {
+            let mut tree_displacement = Vec::new();
+            let mut tree_counts = Vec::new();
+            let mut tree_displacement_ = level_displacement;
+
+            for tree in source_trees.iter() {
+                let keys = tree.keys(level).unwrap();
+                let n_keys = keys.len();
+                tree_displacement.push(tree_displacement_);
+                tree_counts.push(n_keys);
+
+                for (key_idx, k) in keys.iter().enumerate() {
+                    source_to_index.insert(*k, key_idx + tree_displacement_);
                 }
-            }
-        }
 
-        let v_list_queries = v_list_queries.into_iter().collect_vec();
-        let mut v_list_ranks = Vec::new();
-        let mut v_list_send_counts = vec![0i32; self.communicator.size() as usize];
-        let mut v_list_to_send = vec![0i32; self.communicator.size() as usize];
-
-        for query in v_list_queries.iter() {
-            let rank = self.source_layout.rank_from_key(query).unwrap();
-            v_list_ranks.push(*rank);
-            v_list_send_counts[*rank as usize] += 1;
-        }
-
-        for (i, &value) in v_list_send_counts.iter().enumerate() {
-            if value > 0 {
-                v_list_to_send[i] = 1;
-            }
-        }
-
-        // Sort queries by rank
-        let v_list_queries = {
-            let mut indices = (0..v_list_queries.len()).collect_vec();
-            indices.sort_by_key(|&i| v_list_ranks[i]);
-
-            let mut sorted_v_list_queries_t = Vec::with_capacity(v_list_queries.len());
-            for i in indices {
-                sorted_v_list_queries_t.push(v_list_queries[i].morton)
+                tree_displacement_ += n_keys;
+                n_sources += n_keys;
             }
 
-            sorted_v_list_queries_t
-        };
-
-        self.neighbourhood_communicator_v =
-            NeighbourhoodCommunicator::new(&self.communicator, &v_list_to_send);
-
-        self.v_list_queries = v_list_queries;
-        self.v_list_ranks = v_list_ranks;
-        self.v_list_send_counts = v_list_send_counts;
-        self.v_list_to_send = v_list_to_send;
-
-        let mut u_list_queries = HashSet::new();
-        for target_tree in self.tree.target_tree.trees.iter() {
-            for leaf in target_tree.leaves.iter() {
-                // Compute interaction list
-                let interaction_list = leaf.neighbors();
-
-                // Filter for those contained on foreign ranks
-                let interaction_list = interaction_list
-                    .iter()
-                    .filter_map(|key| {
-                        // Try to get the rank from the key
-                        if let Some(rank) = self.source_layout.rank_from_key(key) {
-                            // Filter out if the rank is equal to my_rank
-                            if rank != &self.rank {
-                                return Some(key);
-                            }
-                        }
-                        None
-                    })
-                    .collect_vec();
-
-                for key in interaction_list {
-                    u_list_queries.insert(*key);
-                }
-            }
+            level_displacement += tree_displacement_;
+            source_counts.push(tree_counts);
+            source_displacement.push(tree_displacement);
         }
 
-        let u_list_queries = u_list_queries.into_iter().collect_vec();
-        let mut u_list_ranks = Vec::new();
-        let mut u_list_send_counts = vec![0i32; self.communicator.size() as usize];
-        let mut u_list_to_send = vec![0i32; self.communicator.size() as usize];
-
-        for query in u_list_queries.iter() {
-            let rank = self.source_layout.rank_from_key(query).unwrap();
-            u_list_ranks.push(*rank);
-            u_list_send_counts[*rank as usize] += 1;
-        }
-        for (i, &value) in u_list_send_counts.iter().enumerate() {
-            if value > 0 {
-                u_list_to_send[i] = 1;
-            }
-        }
-        // Sort queries by rank
-        let u_list_queries = {
-            let mut indices = (0..u_list_queries.len()).collect_vec();
-            indices.sort_by_key(|&i| u_list_ranks[i]);
-
-            let mut sorted_u_list_queries_t = Vec::with_capacity(u_list_queries.len());
-            for i in indices {
-                sorted_u_list_queries_t.push(u_list_queries[i].morton)
+        let mut tree_displacement = 0;
+        let mut source_to_leaf_index = HashMap::new();
+        for tree in source_trees.iter() {
+            for (leaf_idx, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+                source_to_leaf_index.insert(*leaf, leaf_idx + tree_displacement);
             }
 
-            sorted_u_list_queries_t
-        };
+            tree_displacement += tree.n_leaves().unwrap();
+        }
 
-        self.neighbourhood_communicator_u =
-            NeighbourhoodCommunicator::new(&self.communicator, &u_list_to_send);
-        self.u_list_queries = u_list_queries;
-        self.u_list_ranks = u_list_ranks;
-        self.u_list_send_counts = u_list_send_counts;
-        self.u_list_to_send = u_list_to_send;
-        self.multipoles = multipoles;
-        self.locals = locals;
-        self.leaf_multipoles = leaf_multipoles;
-        self.level_multipoles = level_multipoles;
-        self.leaf_locals = leaf_locals;
-        self.level_locals = level_locals;
-        self.level_index_pointer_locals = level_index_pointer_locals;
-        self.level_index_pointer_multipoles = level_index_pointer_multipoles;
-        self.potentials = potentials;
-        self.potentials_send_pointers = potentials_send_pointers;
-        self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
-        self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
-        self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
-        self.charges = charges.to_vec();
-        self.charge_index_pointers_sources = charge_index_pointer_targets;
-        self.charge_index_pointers_sources = charge_index_pointer_sources;
-        self.kernel_eval_size = eval_size;
+        let mut multipoles = vec![Scalar::default(); n_sources * self.ncoeffs_equivalent_surface];
+
+        // let mut local_counts = Vec::new();
+        // for tree in target_trees.iter() {
+        //     local_counts.push(tree.n_keys_tot().unwrap() * self.ncoeffs_equivalent_surface)
+        // }
+
+        // let mut potential_counts = Vec::new();
+        // for tree in target_trees.iter() {
+        //     potential_counts.push(tree.n_coordinates_tot().unwrap());
+        // }
+
+        // let multipole_displacements = multipole_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let local_displacements = local_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let potential_displacements = potential_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let n_multipole_coeffs = multipole_counts.iter().sum();
+        // let n_local_coeffs = multipole_counts.iter().sum();
+        // let n_potentials = potential_counts.iter().sum();
+
+        // let multipoles = vec![Scalar::default(); n_multipole_coeffs];
+        // let locals = vec![Scalar::default(); n_local_coeffs];
+        // let potentials = vec![Scalar::default(); n_potentials];
+
+        // // Index pointer of multipole and local data, indexed by fmm index, then by level
+        // let level_index_pointer_multipoles = level_index_pointer_multinode(
+        //     source_trees,
+        //     total_depth,
+        //     global_depth,
+        //     &multipole_displacements,
+        // );
+
+        // let level_index_pointer_locals = level_index_pointer_multinode(
+        //     target_trees,
+        //     total_depth,
+        //     global_depth,
+        //     &local_displacements,
+        // );
+
+        // // Find counts/displacements for all leaves and keys stored at this rank
+        // let mut source_leaves_counts = Vec::new();
+        // for tree in source_trees.iter() {
+        //     source_leaves_counts.push(tree.n_leaves().unwrap())
+        // }
+
+        // let mut target_leaves_counts = Vec::new();
+        // for tree in target_trees.iter() {
+        //     target_leaves_counts.push(tree.n_leaves().unwrap())
+        // }
+
+        // let source_leaves_displacements = source_leaves_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let target_leaves_displacements = target_leaves_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let n_source_leaves = source_leaves_counts.iter().sum::<usize>();
+        // let n_target_leaves = target_leaves_counts.iter().sum::<usize>();
+
+        // let mut source_keys_counts = Vec::new();
+        // for tree in source_trees.iter() {
+        //     source_keys_counts.push(tree.n_keys_tot().unwrap())
+        // }
+
+        // let mut target_keys_counts= Vec::new();
+        // for tree in target_trees.iter() {
+        //     target_keys_counts.push(tree.n_keys_tot().unwrap())
+        // }
+
+        // let source_keys_displacements = source_keys_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let target_keys_displacements = target_keys_counts
+        //     .iter()
+        //     .scan(0, |acc, &x| {
+        //         let current = *acc;
+        //         *acc += x;
+        //         Some(current)
+        //     })
+        //     .collect_vec();
+
+        // let n_source_keys = source_keys_counts.iter().sum::<usize>();
+        // let n_target_keys = target_keys_counts.iter().sum::<usize>();
+
+        // // Use these to create maps over all keys/leaves stored at this rank
+        // let mut source_keys_to_index = HashMap::new();
+
+        // let mut level_displacement = 0;
+        // for level in global_depth..=total_depth {
+
+        //     for (i, tree) in source_trees.iter().enumerate() {
+
+        //         let displacement = source_keys_displacements[i];
+        //         for key in tree.keys(level).iter() {
+
+        //         }
+        //     }
+
+        // }
+
+        // // Pre-compute surfaces
+
+        // let mut leaf_upward_equivalent_surfaces_sources = vec![Scalar::Real::default(); self.ncoeffs_equivalent_surface * n_source_leaves * dim];
+        // let mut leaf_upward_check_surfaces_sources = vec![Scalar::Real::default(); self.ncoeffs_equivalent_surface * n_source_leaves * dim];
+        // let mut leaf_downward_equivalent_surfaces_targets = vec![Scalar::Real::default(); self.ncoeffs_equivalent_surface * n_target_leaves * dim];
+        // for (i, tree) in source_trees.iter().enumerate() {
+
+        //     let leaf_upward_equivalent_surfaces_sources_i = leaf_surfaces(
+        //         tree,
+        //         self.ncoeffs_equivalent_surface,
+        //         alpha_inner,
+        //         self.equivalent_surface_order,
+        //     );
+
+        //     let leaf_upward_check_surfaces_sources_i = leaf_surfaces(
+        //         tree,
+        //         self.ncoeffs_check_surface,
+        //         alpha_outer,
+        //         self.check_surface_order,
+        //     );
+
+        //     let l = source_leaves_displacements[i]*self.ncoeffs_equivalent_surface*dim;
+        //     let r = l + source_leaves_counts[i]*self.ncoeffs_equivalent_surface*dim;
+
+        //     leaf_upward_equivalent_surfaces_sources[l..r].copy_from_slice(&leaf_upward_equivalent_surfaces_sources_i);
+        //     leaf_upward_check_surfaces_sources[l..r].copy_from_slice(&leaf_upward_check_surfaces_sources_i);
+
+        // }
+
+        // for (i, tree) in target_trees.iter().enumerate() {
+
+        //     let leaf_downward_equivalent_surfaces_targets_i = leaf_surfaces(
+        //         tree,
+        //         self.ncoeffs_equivalent_surface,
+        //         alpha_outer,
+        //         self.equivalent_surface_order,
+        //     );
+
+        //     let l = target_leaves_displacements[i]*self.ncoeffs_equivalent_surface*dim;
+        //     let r = l + target_leaves_counts[i]*self.ncoeffs_equivalent_surface*dim;
+        //     leaf_downward_equivalent_surfaces_targets[l..r].copy_from_slice(&leaf_downward_equivalent_surfaces_targets_i);
+        // }
+
+        // Create mutable pointers to multipole and local data, indexed by fmm index, then by level.
+
+        // let level_multipoles = level_expansion_pointers_multinode(
+        //     &self.tree.source_tree.trees,
+        //     self.ncoeffs_equivalent_surface,
+        //     &multipoles,
+        //     self.tree.source_tree.local_depth,
+        //     self.tree.source_tree.global_depth,
+        // );
+
+        // let level_locals = level_expansion_pointers_multinode(
+        //     &self.tree.target_tree.trees,
+        //     self.ncoeffs_equivalent_surface,
+        //     &locals,
+        //     self.tree.target_tree.local_depth,
+        //     self.tree.target_tree.global_depth,
+        // );
+
+        // // Create mutable pointers to multipole and local data only at leaf level
+        // let leaf_multipoles = leaf_expansion_pointers_multinode(
+        //     &self.tree.source_tree.trees,
+        //     self.ncoeffs_equivalent_surface,
+        //     &multipoles,
+        //     self.tree.source_tree.local_depth,
+        //     self.tree.source_tree.global_depth,
+        // );
+
+        // let leaf_locals = leaf_expansion_pointers_multinode(
+        //     &self.tree.target_tree.trees,
+        //     self.ncoeffs_equivalent_surface,
+        //     &locals,
+        //     self.tree.target_tree.local_depth,
+        //     self.tree.target_tree.global_depth,
+        // );
+
+        // // Mutable pointers to potential data at each target leaf
+        // let potentials_send_pointers = potential_pointers_multinode(
+        //     &self.tree.target_tree.trees,
+        //     self.kernel_eval_size,
+        //     &potentials,
+        // );
+
+        // // TODO: Replace with real charge distribution
+        // let mut charges = Vec::new();
+
+        // for fmm_idx in 0..n_source_trees {
+        //     let nsource_points = self.tree.source_tree.trees[fmm_idx]
+        //         .n_coordinates_tot()
+        //         .unwrap();
+        //     charges.push(vec![Scalar::one(); nsource_points]);
+        // }
+
+        // // TODO: real coordinate index pointers
+        // let charge_index_pointer_targets =
+        //     coordinate_index_pointer_multinode(&self.tree.target_tree.trees);
+        // let charge_index_pointer_sources =
+        //     coordinate_index_pointer_multinode(&self.tree.source_tree.trees);
+
+        // // New: Need to figure out which multipole data needs to be queried for and isn't contained in source
+        // // trees locally, local trees ideally need a tree ID, which associates them with a local and global rank.
+        // let mut locally_owned_domains = HashSet::new();
+        // for tree in self.tree.source_tree.trees.iter() {
+        //     locally_owned_domains.insert(tree.root);
+        // }
+
+        // // Compute ranges on all processors
+        // self.set_layout();
+
+        // // Defines all non-locally contained multipole data, as well as established possibility of existence
+        // //  as defined by local roots,
+        // // Don't necessarily know if they contain data and therefore exist.
+        // let mut v_list_queries = HashSet::new();
+
+        // for target_tree in self.tree.target_tree.trees.iter() {
+        //     for level in self.tree.target_tree.global_depth
+        //         ..=(self.tree.target_tree.local_depth + self.tree.target_tree.global_depth)
+        //     {
+        //         if let Some(keys) = target_tree.keys(level) {
+        //             for key in keys.iter() {
+        //                 // Compute interaction list
+        //                 let interaction_list = key
+        //                     .parent()
+        //                     .neighbors()
+        //                     .iter()
+        //                     .flat_map(|pn| pn.children())
+        //                     .filter(|pnc| !key.is_adjacent(pnc))
+        //                     .collect_vec();
+
+        //                 // Filter for those contained on foreign ranks
+        //                 let interaction_list = interaction_list
+        //                     .iter()
+        //                     .filter_map(|key| {
+        //                         // Try to get the rank from the key
+        //                         if let Some(rank) = self.source_layout.rank_from_key(key) {
+        //                             // Filter out if the rank is equal to my_rank
+        //                             if rank != &self.rank {
+        //                                 return Some(key);
+        //                             }
+        //                         }
+        //                         None
+        //                     })
+        //                     .collect_vec();
+
+        //                 for key in interaction_list {
+        //                     v_list_queries.insert(*key);
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        // let v_list_queries = v_list_queries.into_iter().collect_vec();
+        // let mut v_list_ranks = Vec::new();
+        // let mut v_list_send_counts = vec![0i32; self.communicator.size() as usize];
+        // let mut v_list_to_send = vec![0i32; self.communicator.size() as usize];
+
+        // for query in v_list_queries.iter() {
+        //     let rank = self.source_layout.rank_from_key(query).unwrap();
+        //     v_list_ranks.push(*rank);
+        //     v_list_send_counts[*rank as usize] += 1;
+        // }
+
+        // for (i, &value) in v_list_send_counts.iter().enumerate() {
+        //     if value > 0 {
+        //         v_list_to_send[i] = 1;
+        //     }
+        // }
+
+        // // Sort queries by rank
+        // let v_list_queries = {
+        //     let mut indices = (0..v_list_queries.len()).collect_vec();
+        //     indices.sort_by_key(|&i| v_list_ranks[i]);
+
+        //     let mut sorted_v_list_queries_t = Vec::with_capacity(v_list_queries.len());
+        //     for i in indices {
+        //         sorted_v_list_queries_t.push(v_list_queries[i].morton)
+        //     }
+
+        //     sorted_v_list_queries_t
+        // };
+
+        // self.neighbourhood_communicator_v =
+        //     NeighbourhoodCommunicator::new(&self.communicator, &v_list_to_send);
+
+        // self.v_list_queries = v_list_queries;
+        // self.v_list_ranks = v_list_ranks;
+        // self.v_list_send_counts = v_list_send_counts;
+        // self.v_list_to_send = v_list_to_send;
+
+        // let mut u_list_queries = HashSet::new();
+        // for target_tree in self.tree.target_tree.trees.iter() {
+        //     for leaf in target_tree.leaves.iter() {
+        //         // Compute interaction list
+        //         let interaction_list = leaf.neighbors();
+
+        //         // Filter for those contained on foreign ranks
+        //         let interaction_list = interaction_list
+        //             .iter()
+        //             .filter_map(|key| {
+        //                 // Try to get the rank from the key
+        //                 if let Some(rank) = self.source_layout.rank_from_key(key) {
+        //                     // Filter out if the rank is equal to my_rank
+        //                     if rank != &self.rank {
+        //                         return Some(key);
+        //                     }
+        //                 }
+        //                 None
+        //             })
+        //             .collect_vec();
+
+        //         for key in interaction_list {
+        //             u_list_queries.insert(*key);
+        //         }
+        //     }
+        // }
+
+        // let u_list_queries = u_list_queries.into_iter().collect_vec();
+        // let mut u_list_ranks = Vec::new();
+        // let mut u_list_send_counts = vec![0i32; self.communicator.size() as usize];
+        // let mut u_list_to_send = vec![0i32; self.communicator.size() as usize];
+
+        // for query in u_list_queries.iter() {
+        //     let rank = self.source_layout.rank_from_key(query).unwrap();
+        //     u_list_ranks.push(*rank);
+        //     u_list_send_counts[*rank as usize] += 1;
+        // }
+        // for (i, &value) in u_list_send_counts.iter().enumerate() {
+        //     if value > 0 {
+        //         u_list_to_send[i] = 1;
+        //     }
+        // }
+        // // Sort queries by rank
+        // let u_list_queries = {
+        //     let mut indices = (0..u_list_queries.len()).collect_vec();
+        //     indices.sort_by_key(|&i| u_list_ranks[i]);
+
+        //     let mut sorted_u_list_queries_t = Vec::with_capacity(u_list_queries.len());
+        //     for i in indices {
+        //         sorted_u_list_queries_t.push(u_list_queries[i].morton)
+        //     }
+
+        //     sorted_u_list_queries_t
+        // };
+
+        // self.neighbourhood_communicator_u =
+        //     NeighbourhoodCommunicator::new(&self.communicator, &u_list_to_send);
+        // self.u_list_queries = u_list_queries;
+        // self.u_list_ranks = u_list_ranks;
+        // self.u_list_send_counts = u_list_send_counts;
+        // self.u_list_to_send = u_list_to_send;
+        // self.multipoles = multipoles;
+        // self.locals = locals;
+        // self.leaf_multipoles = leaf_multipoles;
+        // self.level_multipoles = level_multipoles;
+        // self.leaf_locals = leaf_locals;
+        // self.level_locals = level_locals;
+        // self.level_index_pointer_locals = level_index_pointer_locals;
+        // self.level_index_pointer_multipoles = level_index_pointer_multipoles;
+        // self.potentials = potentials;
+        // self.potentials_send_pointers = potentials_send_pointers;
+        // self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
+        // self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
+        // self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
+        // self.charges = charges.to_vec();
+        // self.charge_index_pointers_sources = charge_index_pointer_targets;
+        // self.charge_index_pointers_sources = charge_index_pointer_sources;
+        // self.kernel_eval_size = eval_size;
 
         // Exchange U list data
         self.u_list_exchange();

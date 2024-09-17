@@ -207,30 +207,28 @@ where
 /// Create index pointers for each key at each level of an octree
 pub fn level_index_pointer_multinode<T>(
     trees: &[SingleNodeTree<T>],
-    local_depth: u64,
+    total_depth: u64,
     global_depth: u64,
-) -> Vec<Vec<HashMap<MortonKey<T>, usize>>>
+    displacements: &[usize],
+) -> Vec<HashMap<MortonKey<T>, usize>>
 where
     T: RlstScalar + Float,
 {
-    let depth = local_depth + global_depth;
+    let mut result = vec![HashMap::new(); (total_depth + 1).try_into().unwrap()];
 
-    let mut global_result = Vec::new();
-    for tree in trees.iter() {
-        let mut result = vec![HashMap::new(); (depth + 1).try_into().unwrap()];
+    for (i, tree) in trees.iter().enumerate() {
+        let displacement = displacements[i];
 
-        for level in global_depth..=depth {
+        for level in global_depth..=total_depth {
             if let Some(keys) = tree.keys(level) {
                 for (level_idx, key) in keys.iter().enumerate() {
-                    result[level as usize].insert(*key, level_idx);
+                    result[level as usize].insert(*key, level_idx + displacement);
                 }
             }
         }
-
-        global_result.push(result)
     }
 
-    global_result
+    result
 }
 
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
@@ -280,52 +278,114 @@ where
     result
 }
 
+// /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
+// pub fn level_expansion_pointers_multinode<T>(
+//     trees: &[SingleNodeTree<T::Real>],
+//     ncoeffs: usize,
+//     expansions: &[Vec<T>],
+//     local_depth: u64,
+//     global_depth: u64,
+// ) -> Vec<Vec<Vec<SendPtrMut<T>>>>
+// where
+//     T: RlstScalar,
+// {
+//     let nfmms = trees.len();
+
+//     let depth = local_depth + global_depth;
+//     let mut global_result = Vec::new();
+
+//     for fmm_idx in 0..nfmms {
+//         let tree = &trees[fmm_idx];
+//         let expansions_i = &expansions[fmm_idx];
+
+//         let mut result = vec![Vec::new(); (depth + 1).try_into().unwrap()];
+//         let mut level_displacement = 0;
+
+//         for level in global_depth..=depth {
+//             let mut tmp_expansions = Vec::new();
+
+//             if let Some(keys) = tree.keys(level) {
+//                 let nkeys_level = keys.len();
+
+//                 for (key_idx, _) in keys.iter().enumerate() {
+//                     let key_displacement = level_displacement + ncoeffs * key_idx;
+//                     let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
+//                     tmp_expansions.push(SendPtrMut { raw });
+//                 }
+
+//                 result[level as usize] = tmp_expansions;
+//                 level_displacement += nkeys_level * ncoeffs;
+//             }
+//         }
+
+//         global_result.push(result)
+//     }
+
+//     global_result
+// }
+
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
 pub fn level_expansion_pointers_multinode<T>(
     trees: &[SingleNodeTree<T::Real>],
     ncoeffs: usize,
-    expansions: &[Vec<T>],
-    local_depth: u64,
+    expansions: &[T],
+    key_displacements: &[usize],
+    key_counts: &[usize],
+    expansions_counts: &[usize],
+    expansions_displacements: &[usize],
+    total_depth: u64,
     global_depth: u64,
-) -> Vec<Vec<Vec<SendPtrMut<T>>>>
+) -> Vec<Vec<SendPtrMut<T>>>
 where
     T: RlstScalar,
 {
-    let nfmms = trees.len();
+    let mut result = vec![Vec::new(); (total_depth + 1).try_into().unwrap()];
 
-    let depth = local_depth + global_depth;
-    let mut global_result = Vec::new();
+    for (i, tree) in trees.iter().enumerate() {
+        let l = expansions_displacements[i] * ncoeffs;
+        let r = l + expansions_counts[i] * ncoeffs;
+        let expansions_i = &expansions[l..r];
 
-    for fmm_idx in 0..nfmms {
-        let tree = &trees[fmm_idx];
-        let expansions_i = &expansions[fmm_idx];
-
-        let mut result = vec![Vec::new(); (depth + 1).try_into().unwrap()];
-        let mut level_displacement = 0;
-
-        for level in global_depth..=depth {
-            let mut tmp_expansions = Vec::new();
-
-            if let Some(keys) = tree.keys(level) {
-                let nkeys_level = keys.len();
-
-                for (key_idx, _) in keys.iter().enumerate() {
-                    let key_displacement = level_displacement + ncoeffs * key_idx;
-                    let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
-                    tmp_expansions.push(SendPtrMut { raw });
-                }
-
-                result[level as usize] = tmp_expansions;
-                level_displacement += nkeys_level * ncoeffs;
-            }
+        for level in global_depth..=total_depth {
+            if let Some(keys) = tree.keys(level) {}
         }
-
-        global_result.push(result)
     }
 
-    global_result
-}
+    // let mut global_result = Vec::new();
 
+    // for (i, tree) in trees.iter().enumerate() {
+
+    //     let l = displacements[i]*ncoeffs;
+    //     let r = l + counts[i]*ncoeffs;
+
+    //     let expansions_i = &expansions[l..r];
+
+    //     let mut result = vec![Vec::new(); (total_depth + 1).try_into().unwrap()];
+    //     let mut level_displacement = 0;
+
+    //     for level in global_depth..=total_depth {
+    //         let mut tmp_expansions = Vec::new();
+
+    //         if let Some(keys) = tree.keys(level) {
+    //             let nkeys_level = keys.len();
+
+    //             for (key_idx, _) in keys.iter().enumerate() {
+    //                 let key_displacement = level_displacement + ncoeffs * key_idx;
+    //                 let raw = unsafe { expansions_i.as_ptr().add(key_displacement) as *mut T };
+    //                 tmp_expansions.push(SendPtrMut { raw });
+    //             }
+
+    //             result[level as usize] = tmp_expansions;
+    //             level_displacement += nkeys_level * ncoeffs;
+    //         }
+    //     }
+
+    //     global_result.push(result)
+    // }
+
+    // global_result
+    result
+}
 /// Create mutable pointers for leaf expansions in a tree
 pub fn leaf_expansion_pointers<T>(
     tree: &SingleNodeTree<T::Real>,

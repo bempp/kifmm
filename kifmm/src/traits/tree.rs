@@ -107,6 +107,15 @@ pub trait MultiNodeTreeTrait {
     /// Type of single node tree
     type Tree: SingleNodeTreeTrait;
 
+    /// Total depth of tree
+    fn total_depth(&self) -> u64;
+
+    /// Depth of local trees
+    fn local_depth(&self) -> u64;
+
+    /// Depth of global tree
+    fn global_depth(&self) -> u64;
+
     /// Associated MPI rank
     fn rank(&self) -> i32;
 

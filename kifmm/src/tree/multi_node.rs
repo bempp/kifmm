@@ -155,6 +155,18 @@ where
 {
     type Tree = SingleNodeTree<T>;
 
+    fn total_depth(&self) -> u64 {
+        self.global_depth + self.local_depth
+    }
+
+    fn global_depth(&self) -> u64 {
+        self.global_depth
+    }
+
+    fn local_depth(&self) -> u64 {
+        self.global_depth
+    }
+
     fn rank(&self) -> i32 {
         self.rank
     }
