@@ -50,7 +50,7 @@ use crate::{
         helpers::find_corners,
         types::MortonKey,
     },
-    Fmm,
+    SingleFmm,
 };
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
@@ -76,7 +76,7 @@ where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: Fmm,
+    Self: SingleFmm,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -306,7 +306,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: Fmm,
+    Self: SingleFmm,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -2550,7 +2550,7 @@ mod test {
 
     use crate::fmm::helpers::flip3;
     use crate::tree::helpers::points_fixture;
-    use crate::Fmm;
+    use crate::SingleFmm;
     use crate::SingleNodeBuilder;
 
     use super::*;

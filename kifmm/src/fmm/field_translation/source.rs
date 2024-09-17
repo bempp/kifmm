@@ -23,7 +23,7 @@ use crate::{
         types::FmmError,
     },
     tree::constants::NSIBLINGS,
-    Fmm,
+    SingleFmm,
 };
 
 impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
@@ -33,7 +33,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData + Fmm<Scalar = Scalar>,
+    Self: FmmOperatorData + SingleFmm<Scalar = Scalar>,
 {
     fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {

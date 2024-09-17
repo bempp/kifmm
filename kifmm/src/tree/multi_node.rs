@@ -1,11 +1,12 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
 use crate::{
     sorting::{hyksort, samplesort, simplesort},
-    traits::tree::{MultiTree, SingleTree},
+    traits::tree::{MultiFmmTree, MultiTree, SingleTree},
     tree::{
         constants::DEEPEST_LEVEL,
         types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
     },
+    MultiNodeFmmTree,
 };
 
 use itertools::Itertools;
@@ -187,6 +188,30 @@ where
 
     fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node] {
         self.roots.as_ref()
+    }
+}
+
+impl<T, C> MultiFmmTree for MultiNodeFmmTree<T, C>
+where
+    T: RlstScalar + Default + Float + Equivalence,
+    C: Communicator,
+{
+    type Tree = MultiNodeTree<T, C>;
+
+    fn n_source_trees(&self) -> usize {
+        self.source_tree().n_trees()
+    }
+
+    fn n_target_trees(&self) -> usize {
+        self.target_tree().n_trees()
+    }
+
+    fn source_tree<'a>(&'a self) -> &'a Self::Tree {
+        &self.source_tree
+    }
+
+    fn target_tree<'a>(&'a self) -> &'a Self::Tree {
+        &self.target_tree
     }
 }
 

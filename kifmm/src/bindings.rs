@@ -1279,7 +1279,7 @@ pub mod api {
         fmm::types::FmmEvalType,
         traits::tree::{SingleFmmTree, SingleTree, TreeNode},
         tree::types::MortonKey,
-        BlasFieldTranslationIa, FftFieldTranslation, Fmm,
+        BlasFieldTranslationIa, FftFieldTranslation, SingleFmm,
     };
 
     use super::{

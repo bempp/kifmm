@@ -6,6 +6,9 @@ use green_kernels::traits::Kernel as KernelTrait;
 use rlst::RlstScalar;
 
 use crate::{
+    fmm::helpers::{
+        leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
+    },
     fmm::types::{FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
@@ -16,14 +19,10 @@ use crate::{
         tree::{SingleFmmTree, SingleTree},
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    Fmm, SingleNodeFmmTree,
+    SingleFmm, SingleNodeFmmTree,
 };
 
-use super::helpers::{
-    leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
-};
-
-impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, SourceToTargetData> SingleFmm for KiFmm<Scalar, Kernel, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
@@ -350,12 +349,13 @@ mod test {
         fmm::types::BlasFieldTranslationIa,
         traits::tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+        BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleFmm, SingleNodeBuilder,
+        SingleNodeFmmTree,
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
-            dyn Fmm<
+            dyn SingleFmm<
                 Scalar = T::Real,
                 Kernel = Laplace3dKernel<T::Real>,
                 Tree = SingleNodeFmmTree<T::Real>,
@@ -408,7 +408,11 @@ mod test {
 
     fn test_single_node_helmholtz_fmm_matrix_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+            dyn SingleFmm<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         eval_type: EvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
@@ -457,7 +461,11 @@ mod test {
 
     fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+            dyn SingleFmm<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         eval_type: EvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
@@ -504,7 +512,7 @@ mod test {
 
     fn test_single_node_laplace_fmm_vector_helper<T: RlstScalar + Float + Default>(
         fmm: Box<
-            dyn Fmm<
+            dyn SingleFmm<
                 Scalar = T::Real,
                 Kernel = Laplace3dKernel<T::Real>,
                 Tree = SingleNodeFmmTree<T::Real>,
@@ -549,7 +557,7 @@ mod test {
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
         fmm: Box<
-            dyn Fmm<
+            dyn SingleFmm<
                 Scalar = T::Real,
                 Kernel = Laplace3dKernel<T::Real>,
                 Tree = SingleNodeFmmTree<T::Real>,
@@ -618,7 +626,11 @@ mod test {
 
     fn test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+            dyn SingleFmm<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,

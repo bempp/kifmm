@@ -29,7 +29,7 @@ use crate::{
         constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
         types::MortonKey,
     },
-    FftFieldTranslation, Fmm,
+    FftFieldTranslation, SingleFmm,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation

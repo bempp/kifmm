@@ -18,7 +18,7 @@
 //!
 //! ```rust
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
-//! use kifmm::{Fmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
+//! use kifmm::{SingleFmm, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 //! use kifmm::tree::helpers::points_fixture;
 //! use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 //!
@@ -105,7 +105,7 @@ pub use fmm::types::SingleNodeFmmTree;
 pub use fmm::types::MultiNodeFmmTree;
 
 #[doc(inline)]
-pub use traits::fmm::Fmm;
+pub use traits::fmm::SingleFmm;
 #[cfg_attr(feature = "strict", deny(warnings))]
 #[warn(missing_docs)]
 pub mod bindings;

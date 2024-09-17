@@ -1,21 +1,22 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 #![allow(unused_imports)]
-use num::traits::Float;
-use rand::distributions::uniform::SampleUniform;
-
-use rlst::{RawAccess, RlstScalar};
-
-use kifmm::{traits::tree::SingleTree, tree::helpers::points_fixture};
-
-#[cfg(feature = "mpi")]
-use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};
-
-#[cfg(feature = "mpi")]
-use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
 
 #[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
+
+    use num::traits::Float;
+    use rand::distributions::uniform::SampleUniform;
+
+    use rlst::{RawAccess, RlstScalar};
+
+    use kifmm::{traits::fmm::MultiFmm, traits::tree::SingleTree, tree::helpers::points_fixture};
+
+    use mpi::{
+        environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*,
+    };
+
+    use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};
 
     use green_kernels::laplace_3d::Laplace3dKernel;
     use kifmm::{fmm::types::MultiNodeBuilder, tree::types::SortKind, FftFieldTranslation};
@@ -52,7 +53,10 @@ fn main() {
         .unwrap()
         .parameters(expansion_order, kernel, source_to_target)
         .unwrap()
-        .build();
+        .build()
+        .unwrap();
+
+    fmm.evaluate(false).unwrap();
 }
 
 #[cfg(not(feature = "mpi"))]

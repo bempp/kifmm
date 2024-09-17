@@ -4,9 +4,7 @@ pub mod constants;
 pub mod helpers;
 pub mod isa;
 mod kernel;
-mod multi_node;
 mod send_ptr;
-mod single_node;
 mod tree;
 pub mod types;
 
@@ -17,5 +15,6 @@ pub use types::KiFmm;
 #[cfg(feature = "mpi")]
 pub mod layout;
 
+mod eval;
 #[cfg(feature = "mpi")]
 pub mod neighbour_comm;

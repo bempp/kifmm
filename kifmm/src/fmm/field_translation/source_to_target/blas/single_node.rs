@@ -23,7 +23,7 @@ use crate::{
         types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationSaRcmp, Fmm,
+    BlasFieldTranslationSaRcmp, SingleFmm,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation

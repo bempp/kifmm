@@ -154,9 +154,6 @@ pub trait MultiFmmTree {
     /// Tree associated with FMM tree
     type Tree: MultiTree;
 
-    /// Current MPI rank
-    fn rank(&self) -> i32;
-
     /// The source tree, defined by a number of single node trees
     fn source_tree(&self) -> &Self::Tree;
 
