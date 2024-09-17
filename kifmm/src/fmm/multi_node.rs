@@ -28,7 +28,7 @@ use crate::{
         },
         fmm::{
             FmmGlobalFmmMetadata, FmmMetadata, FmmOperatorData, GhostExchange, HomogenousKernel,
-            MultiNodeFmm, SourceToTargetTranslation, SourceTranslation, TargetTranslation,
+            SourceToTargetTranslation, SourceTranslation, TargetTranslation,
         },
         tree::SingleNodeTreeTrait,
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
@@ -37,8 +37,13 @@ use crate::{
     Fmm, MultiNodeFmmTree, SingleNodeFmmTree,
 };
 
-use super::types::{KiFmmMultiNode, Layout};
+#[cfg(feature = "mpi")]
+use crate::{
+    fmm::types::{KiFmmMultiNode, Layout},
+    traits::fmm::MultiNodeFmm,
+};
 
+#[cfg(feature = "mpi")]
 impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode> MultiNodeFmm
     for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where

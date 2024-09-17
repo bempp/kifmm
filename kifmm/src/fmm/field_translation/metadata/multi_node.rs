@@ -12,41 +12,37 @@ use rlst::{
 
 use crate::{
     fmm::{
+        constants::DEFAULT_M2L_FFT_BLOCK_SIZE,
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::{
             coordinate_index_pointer_multinode, flip3, homogenous_kernel_scale,
             leaf_expansion_pointers_multinode, leaf_surfaces, level_expansion_pointers_multinode,
-            level_index_pointer_multinode, potential_pointers_multinode,
+            level_index_pointer_multinode, ncoeffs_kifmm, potential_pointers_multinode,
         },
-        types::{FftFieldTranslationMultiNode, FftMetadata, NeighbourhoodCommunicator},
+        types::{
+            FftFieldTranslationMultiNode, FftMetadata, KiFmmMultiNode, NeighbourhoodCommunicator,
+        },
     },
     linalg::pinv::pinv,
     traits::{
         fftw::{Dft, DftType},
-        field::SourceToTargetTranslationMetadata,
-        fmm::{FmmMetadata, GhostExchange, MultiNodeFmm},
-        general::AsComplex,
-    },
-    tree::{
-        constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
-        helpers::find_corners,
-    },
-    FftFieldTranslation,
-};
-
-use crate::{
-    fmm::{helpers::ncoeffs_kifmm, types::KiFmmMultiNode},
-    traits::{
         field::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
+            SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
-        general::Epsilon,
+        fmm::{
+            FmmMetadata, FmmOperatorData, GhostExchange, HomogenousKernel, MultiNodeFmm,
+            SourceToTargetTranslation,
+        },
+        general::{AsComplex, Epsilon},
         tree::{FmmTreeNode, SingleNodeTreeTrait},
     },
     tree::{
-        constants::{ALPHA_INNER, ALPHA_OUTER},
+        constants::{ALPHA_INNER, ALPHA_OUTER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
+        helpers::find_corners,
         types::MortonKey,
     },
+    FftFieldTranslation,
 };
 
 impl<Scalar, SourceToTargetData, SourceToTargetDataSingleNode> SourceAndTargetTranslationMetadata
@@ -1063,5 +1059,36 @@ where
 
         // Exchange U list data
         self.u_list_exchange();
+    }
+}
+
+impl<Scalar> FftFieldTranslationMultiNode<Scalar>
+where
+    Scalar: RlstScalar + AsComplex + Dft + Default,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
+{
+    /// Constructor for FFT based field translations
+    pub fn new(block_size: Option<usize>) -> Self {
+        Self {
+            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
+            block_size: block_size.unwrap_or(DEFAULT_M2L_FFT_BLOCK_SIZE),
+            ..Default::default()
+        }
+    }
+}
+
+impl<Scalar> SourceToTargetDataTrait for FftFieldTranslationMultiNode<Scalar>
+where
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default,
+{
+    type Metadata = FftMetadata<<Scalar as AsComplex>::ComplexType>;
+
+    fn overdetermined(&self) -> bool {
+        false
+    }
+
+    fn surface_diff(&self) -> usize {
+        0
     }
 }

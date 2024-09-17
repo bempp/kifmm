@@ -2,8 +2,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use mpi::traits::Equivalence;
-use num::{Float, One, Zero};
+use num::{One, Zero};
 
 use rayon::prelude::*;
 use rlst::{
@@ -16,7 +15,7 @@ use crate::{
     fftw::array::{AlignedAllocable, AlignedVec},
     fmm::{
         helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
-        types::{FftFieldTranslationMultiNode, FmmEvalType, KiFmmMultiNode, SendPtrMut},
+        types::{FmmEvalType, SendPtrMut},
         KiFmm,
     },
     traits::{
@@ -32,6 +31,14 @@ use crate::{
     },
     FftFieldTranslation, Fmm,
 };
+
+#[cfg(feature = "mpi")]
+use crate::fmm::types::{FftFieldTranslationMultiNode, KiFmmMultiNode};
+#[cfg(feature = "mpi")]
+use num::Float;
+
+#[cfg(feature = "mpi")]
+use mpi::traits::Equivalence;
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
@@ -382,6 +389,7 @@ where
     }
 }
 
+#[cfg(feature = "mpi")]
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmmMultiNode<
         Scalar,

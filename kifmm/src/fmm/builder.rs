@@ -3,11 +3,6 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
-use mpi::{
-    topology::SimpleCommunicator,
-    traits::{Communicator, Equivalence},
-};
-use num::Float;
 use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
@@ -24,14 +19,24 @@ use crate::{
         general::Epsilon,
         tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
     },
-    tree::{
-        types::{Domain, GhostTreeU, GhostTreeV, MultiNodeTree, SortKind},
-        SingleNodeTree,
-    },
-    MultiNodeFmmTree,
+    tree::{types::Domain, SingleNodeTree},
 };
 
+#[cfg(feature = "mpi")]
 use super::types::{KiFmmMultiNode, Layout, MultiNodeBuilder, NeighbourhoodCommunicator};
+#[cfg(feature = "mpi")]
+use crate::{
+    tree::types::{GhostTreeU, GhostTreeV, MultiNodeTree, SortKind},
+    MultiNodeFmmTree,
+};
+#[cfg(feature = "mpi")]
+use num::Float;
+
+#[cfg(feature = "mpi")]
+use mpi::{
+    topology::SimpleCommunicator,
+    traits::{Communicator, Equivalence},
+};
 
 impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
@@ -285,6 +290,7 @@ where
     }
 }
 
+#[cfg(feature = "mpi")]
 impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
     MultiNodeBuilder<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
@@ -321,12 +327,11 @@ where
     /// Tree
     pub fn tree(
         mut self,
+        comm: &SimpleCommunicator,
         sources: &[Scalar::Real],
         targets: &[Scalar::Real],
         local_depth: u64,
         global_depth: u64,
-        prune_empty: bool,
-        world: &SimpleCommunicator,
         sort_kind: SortKind,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
@@ -348,29 +353,27 @@ where
             ))
         } else {
             // Source and target trees calcualted over the same domain
-            let source_domain = Domain::from_global_points(sources, world);
-            let target_domain = Domain::from_global_points(targets, world);
+            let source_domain = Domain::from_global_points(sources, comm);
+            let target_domain = Domain::from_global_points(targets, comm);
 
             // Calculate union of domains for source and target points, needed to define operators
             let domain = source_domain.union(&target_domain);
 
             let source_tree = MultiNodeTree::new(
+                comm,
                 sources,
                 local_depth,
                 global_depth,
-                prune_empty,
                 Some(domain),
-                world,
                 sort_kind.clone(),
             )?;
 
             let target_tree = MultiNodeTree::new(
+                comm,
                 targets,
                 local_depth,
                 global_depth,
-                prune_empty,
                 Some(domain),
-                world,
                 sort_kind.clone(),
             )?;
 
@@ -380,7 +383,7 @@ where
                 domain,
             };
 
-            self.communicator = Some(world.duplicate());
+            self.communicator = Some(comm.duplicate());
             self.tree = Some(fmm_tree);
             Ok(self)
         }

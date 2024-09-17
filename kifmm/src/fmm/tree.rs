@@ -1,16 +1,20 @@
 //! Implementation of FMM compatible trees
-use mpi::traits::{Communicator, Equivalence};
 use num::traits::Float;
 use rlst::RlstScalar;
 
 use crate::{
     fmm::types::SingleNodeFmmTree,
-    traits::tree::{MultiNodeFmmTreeTrait, SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
-    tree::types::MultiNodeTree,
+    traits::tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
     tree::types::SingleNodeTree,
-    MultiNodeFmmTree,
 };
 
+#[cfg(feature = "mpi")]
+use crate::{traits::tree::MultiNodeFmmTreeTrait, tree::types::MultiNodeTree, MultiNodeFmmTree};
+
+#[cfg(feature = "mpi")]
+use mpi::traits::{Communicator, Equivalence};
+
+#[cfg(feature = "mpi")]
 impl<T, C> MultiNodeFmmTreeTrait for MultiNodeFmmTree<T, C>
 where
     T: RlstScalar + Float + Default + Equivalence,

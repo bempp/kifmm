@@ -3,8 +3,6 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use itertools::Itertools;
-use mpi::traits::Equivalence;
-use num::Float;
 use rayon::prelude::*;
 
 use rlst::{
@@ -15,18 +13,30 @@ use rlst::{
 use crate::{
     fmm::{
         constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
-        helpers::{chunk_size, homogenous_kernel_scale},
-        types::{FmmEvalType, KiFmm, KiFmmMultiNode},
+        helpers::chunk_size,
+        types::{FmmEvalType, KiFmm},
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperatorData, HomogenousKernel, MultiNodeFmm, SourceTranslation},
+        fmm::{FmmOperatorData, HomogenousKernel, SourceTranslation},
         tree::{SingleNodeFmmTreeTrait, SingleNodeTreeTrait},
         types::FmmError,
     },
     tree::constants::NSIBLINGS,
     Fmm,
 };
+
+#[cfg(feature = "mpi")]
+use num::Float;
+
+#[cfg(feature = "mpi")]
+use crate::{
+    fmm::{helpers::homogenous_kernel_scale, types::KiFmmMultiNode},
+    traits::fmm::MultiNodeFmm,
+};
+
+#[cfg(feature = "mpi")]
+use mpi::traits::Equivalence;
 
 impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
     for KiFmm<Scalar, Kernel, SourceToTargetData>
@@ -396,6 +406,7 @@ where
     }
 }
 
+#[cfg(feature = "mpi")]
 impl<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode> SourceTranslation
     for KiFmmMultiNode<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where

@@ -101,6 +101,7 @@ pub trait SingleNodeTreeTrait {
     fn owned_range(&self) -> Option<Self::Node>;
 }
 
+#[cfg(feature = "mpi")]
 /// Interface for multi node trees
 pub trait MultiNodeTreeTrait {
     /// Type of single node tree
@@ -145,6 +146,7 @@ where
 
 /// Interface for trees required by multinde FMM, which require separate trees for source and target data.
 /// Now however, each MPI rank can contain multiple single node source and target trees.
+#[cfg(feature = "mpi")]
 pub trait MultiNodeFmmTreeTrait
 where
     Self::Tree: MultiNodeTreeTrait,

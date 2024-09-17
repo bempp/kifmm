@@ -9,10 +9,10 @@ use green_kernels::{traits::Kernel, types::EvalType};
 use num::Float;
 use rlst::RlstScalar;
 
-use super::{
-    tree::{MultiNodeFmmTreeTrait, MultiNodeTreeTrait, SingleNodeTreeTrait},
-    types::FmmError,
-};
+use super::{tree::SingleNodeTreeTrait, types::FmmError};
+
+#[cfg(feature = "mpi")]
+use super::tree::{MultiNodeFmmTreeTrait, MultiNodeTreeTrait};
 
 /// Interface for source field translations.
 pub trait SourceTranslation {
@@ -162,6 +162,7 @@ where
 }
 
 /// Interface for multinode KiFMM
+#[cfg(feature = "mpi")]
 pub trait MultiNodeFmm
 where
     Self::Scalar: RlstScalar,

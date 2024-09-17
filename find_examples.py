@@ -1,17 +1,3 @@
-"""
-Script to make .sh file to run all examples.
-
-Type of run can be controlled by including a comment starting with `//?` in
-a file. For example, including:
-
-```rust
-//? mpirun -n {{NPROCESSES}} --features "mpi"
-```
-
-would make this script use mpirun with the -n flag set to a number of processes
-and the "mpi" features turned on.
-"""
-
 import os
 import argparse
 
@@ -30,15 +16,16 @@ root_dir = os.path.dirname(os.path.realpath(__file__))
 
 files = []
 example_dir = os.path.join(root_dir, "kifmm/examples")
-for file in os.listdir(example_dir):
-    if (
-        not file.startswith(".")
-        and file.endswith(".rs")
-        and os.path.isfile(os.path.join(example_dir, file))
-    ):
-        files.append((os.path.join(example_dir, file), file[:-3]))
 
-# Check that two examples do not share a name
+# Recursively find all .rs files in the example directory and its subdirectories
+for dirpath, _, filenames in os.walk(example_dir):
+    for filename in filenames:
+        if filename.endswith(".rs"):
+            # Get the file name without the directory structure or extension
+            example_name = filename[:-3]
+            files.append((os.path.join(dirpath, filename), example_name))
+
+# Check that two examples do not share a name (this checks based on the constructed example name)
 for i, j in files:
     assert len([a for a, b in files if b == j]) == 1
 

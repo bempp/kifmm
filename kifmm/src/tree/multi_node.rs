@@ -113,23 +113,22 @@ where
 
     /// Constructor for multinode trees
     pub fn new(
+        comm: &C,
         coordinates_row_major: &[T],
         local_depth: u64,
         global_depth: u64,
-        _prune_empty: bool, // currently being done by default
         domain: Option<Domain<T>>,
-        world: &C,
         sort_kind: SortKind,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         let dim = 3;
         let coords_len = coordinates_row_major.len();
 
         if !coordinates_row_major.is_empty() && coords_len & dim == 0 {
-            let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, world));
+            let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, comm));
             let n_coords = coords_len / dim;
 
             // Assign global indices
-            let global_indices = global_indices(n_coords, world);
+            let global_indices = global_indices(n_coords, comm);
 
             return MultiNodeTree::uniform_tree(
                 coordinates_row_major,
@@ -137,7 +136,7 @@ where
                 local_depth,
                 global_depth,
                 &global_indices,
-                world,
+                comm,
                 sort_kind,
             );
         }

@@ -4,6 +4,7 @@ pub mod constants;
 pub mod helpers;
 pub mod isa;
 mod kernel;
+#[cfg(feature = "mpi")]
 mod multi_node;
 mod send_ptr;
 mod single_node;

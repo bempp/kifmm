@@ -5,6 +5,12 @@
     - Need to save origin of all local global roots so that I can broadcast back the evalauted locals after the root FMM has completed.
     - Need to complete all downward pass kernels for local downward pass
 
+    - All multipole and local buffers should be contiguous on each MPI rank, this makes it way easier to write the kernels.
+    - can avoid the double loop in the M2L kernel
+    - the ghost data should also be added, to avoid extra M2L with 0s in the FFT M2L ...
+    instead just a single loop over
+        - the locally contained data and the ghost data
+
     - Load balancing (low priority)
 
 - Global FMM needs operator metadata if I'm calling upward/downward pass on it
@@ -18,7 +24,7 @@
     - test upward pass
     - test global upward pass
     - test on threadripper, with more threads, cannot use simple sort
-    - 
+    -
 
 
 - In multinode builder, root/depth/surfaces must set correctly for the global FMM, and need to incldue this in metadata calculations.

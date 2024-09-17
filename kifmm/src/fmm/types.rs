@@ -1,16 +1,7 @@
 //! Data structures for kernel independent FMM
-use std::{
-    collections::{HashMap, HashSet},
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
-use itertools::Itertools;
-use mpi::{
-    raw::{AsRaw, FromRaw},
-    topology::SimpleCommunicator,
-    traits::{Buffer, BufferMut, CommunicatorCollectives, PartitionedBuffer, PartitionedBufferMut},
-};
 use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
@@ -20,11 +11,25 @@ use crate::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
         general::AsComplex, types::FmmOperatorTime,
     },
-    tree::types::{Domain, GhostTreeU, GhostTreeV, MortonKey, MultiNodeTree, SingleNodeTree},
+    tree::types::{Domain, MortonKey, SingleNodeTree},
 };
 
 #[cfg(feature = "mpi")]
-use mpi::traits::{Communicator, Equivalence};
+use crate::tree::types::{GhostTreeU, GhostTreeV, MultiNodeTree};
+#[cfg(feature = "mpi")]
+use itertools::Itertools;
+#[cfg(feature = "mpi")]
+use std::collections::HashSet;
+
+#[cfg(feature = "mpi")]
+use mpi::{
+    raw::{AsRaw, FromRaw},
+    topology::SimpleCommunicator,
+    traits::{
+        Buffer, BufferMut, Communicator, CommunicatorCollectives, Equivalence, PartitionedBuffer,
+        PartitionedBufferMut,
+    },
+};
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in row-major order.
@@ -479,6 +484,7 @@ where
 }
 
 /// Stores global tree for global upward and downward passes on nominated node(s)
+#[cfg(feature = "mpi")]
 #[derive(Default)]
 pub struct KiFmmMultiNodeGlobal<T>
 where
@@ -711,6 +717,7 @@ where
 
 /// Builder for multinode trees
 #[derive(Default)]
+#[cfg(feature = "mpi")]
 pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData, SourceToTargetDataSingleNode>
 where
     Scalar: RlstScalar + Default + Equivalence,
@@ -764,6 +771,7 @@ where
 
 /// Specified owned range (defined by roots) of each rank
 #[derive(Default)]
+#[cfg(feature = "mpi")]
 pub struct Layout<T: RlstScalar + Float> {
     /// Splitters in terms of Morton keys
     pub raw: Vec<MortonKey<T::Real>>,
@@ -784,6 +792,7 @@ pub struct Layout<T: RlstScalar + Float> {
     pub range_to_rank: HashMap<MortonKey<T::Real>, i32>,
 }
 
+#[cfg(feature = "mpi")]
 impl<T: RlstScalar + Float> Layout<T> {
     /// rank associated with this rank
     pub fn rank_from_key(&self, key: &MortonKey<T::Real>) -> Option<&i32> {
@@ -796,6 +805,7 @@ impl<T: RlstScalar + Float> Layout<T> {
 
 /// Each rank starts off knowing with whom it wants to communicate, but they don't have knowledge
 /// of this rank. The communicator is defined by the octants controlled by each rank
+#[cfg(feature = "mpi")]
 pub struct NeighbourhoodCommunicator {
     /// Neighbour ranks
     pub neighbours: Vec<i32>,
@@ -804,6 +814,7 @@ pub struct NeighbourhoodCommunicator {
     pub raw: SimpleCommunicator,
 }
 
+#[cfg(feature = "mpi")]
 impl NeighbourhoodCommunicator {
     /// Number of associated ranks
     pub fn size(&self) -> i32 {
@@ -1012,6 +1023,7 @@ where
 }
 
 /// - `transfer_vectors`- Contains unique transfer vectors that facilitate lookup of M2L unique kernel interactions.
+#[cfg(feature = "mpi")]
 #[derive(Default)]
 pub struct FftFieldTranslationMultiNode<Scalar>
 where
