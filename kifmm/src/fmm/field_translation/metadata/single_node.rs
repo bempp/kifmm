@@ -21,9 +21,9 @@ use crate::{
     fmm::{
         constants::DEFAULT_M2L_FFT_BLOCK_SIZE,
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
-        helpers::{
+        helpers::single_node::{
             coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
-            leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
+            leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer_single_node,
             ncoeffs_kifmm, potential_pointers,
         },
         types::{
@@ -2299,43 +2299,44 @@ where
             EvalType::ValueDeriv => self.dim + 1,
         };
 
-        let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
-        let nsource_points = self.tree.source_tree.all_coordinates().unwrap().len() / self.dim;
-        let nmatvecs = charges.len() / nsource_points;
-        let nsource_keys = self.tree.source_tree.n_keys_tot().unwrap();
-        let ntarget_keys = self.tree.target_tree.n_keys_tot().unwrap();
-        let ntarget_leaves = self.tree.target_tree.n_leaves().unwrap();
-        let nsource_leaves = self.tree.source_tree.n_leaves().unwrap();
+        let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
+        let n_source_points = self.tree.source_tree.n_coordinates_tot().unwrap();
+        let nmatvecs = charges.len() / n_source_points;
+        let n_source_keys = self.tree.source_tree.n_keys_tot().unwrap();
+        let n_target_keys = self.tree.target_tree.n_keys_tot().unwrap();
+        let n_target_leaves = self.tree.target_tree.n_leaves().unwrap();
+        let n_source_leaves = self.tree.source_tree.n_leaves().unwrap();
 
         // Buffers to store all multipole and local data
-        let nmultipole_coeffs;
-        let nlocal_coeffs;
+        let n_multipole_coeffs;
+        let n_local_coeffs;
         if self.equivalent_surface_order.len() > 1 {
-            nmultipole_coeffs = (0..=self.tree.source_tree().depth())
+            n_multipole_coeffs = (0..=self.tree.source_tree().depth())
                 .zip(self.ncoeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
                     acc + self.tree.source_tree().n_keys(level).unwrap() * ncoeffs
                 });
 
-            nlocal_coeffs = (0..=self.tree.target_tree().depth())
+            n_local_coeffs = (0..=self.tree.target_tree().depth())
                 .zip(self.ncoeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
                     acc + self.tree.target_tree().n_keys(level).unwrap() * ncoeffs
                 })
         } else {
-            nmultipole_coeffs = nsource_keys * self.ncoeffs_equivalent_surface.last().unwrap();
-            nlocal_coeffs = ntarget_keys * self.ncoeffs_equivalent_surface.last().unwrap();
+            n_multipole_coeffs = n_source_keys * self.ncoeffs_equivalent_surface.last().unwrap();
+            n_local_coeffs = n_target_keys * self.ncoeffs_equivalent_surface.last().unwrap();
         }
 
-        let multipoles = vec![Scalar::default(); nmultipole_coeffs * nmatvecs];
-        let locals = vec![Scalar::default(); nlocal_coeffs * nmatvecs];
+        let multipoles = vec![Scalar::default(); n_multipole_coeffs * nmatvecs];
+        let locals = vec![Scalar::default(); n_local_coeffs * nmatvecs];
 
         // Index pointers of multipole and local data, indexed by level
-        let level_index_pointer_multipoles = level_index_pointer(&self.tree.source_tree);
-        let level_index_pointer_locals = level_index_pointer(&self.tree.target_tree);
+        let level_index_pointer_multipoles =
+            level_index_pointer_single_node(&self.tree.source_tree);
+        let level_index_pointer_locals = level_index_pointer_single_node(&self.tree.target_tree);
 
         // Buffer to store evaluated potentials and/or gradients at target points
-        let potentials = vec![Scalar::default(); ntarget_points * eval_size * nmatvecs];
+        let potentials = vec![Scalar::default(); n_target_points * eval_size * nmatvecs];
 
         // Kernel scale at each target and source leaf
         let source_leaf_scales = leaf_scales::<Scalar>(
@@ -2386,7 +2387,7 @@ where
             &self.tree.source_tree,
             &self.ncoeffs_equivalent_surface,
             nmatvecs,
-            nsource_leaves,
+            n_source_leaves,
             &multipoles,
         );
 
@@ -2394,7 +2395,7 @@ where
             &self.tree.target_tree,
             &self.ncoeffs_equivalent_surface,
             nmatvecs,
-            ntarget_leaves,
+            n_target_leaves,
             &locals,
         );
 
@@ -2402,8 +2403,8 @@ where
         let potentials_send_pointers = potential_pointers(
             &self.tree.target_tree,
             nmatvecs,
-            ntarget_leaves,
-            ntarget_points,
+            n_target_leaves,
+            n_target_points,
             eval_size,
             &potentials,
         );

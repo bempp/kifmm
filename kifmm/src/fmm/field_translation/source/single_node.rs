@@ -13,7 +13,7 @@ use rlst::{
 use crate::{
     fmm::{
         constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
-        helpers::chunk_size,
+        helpers::single_node::chunk_size,
         types::{FmmEvalType, KiFmm},
     },
     traits::{

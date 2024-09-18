@@ -14,7 +14,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use crate::{
     fftw::array::{AlignedAllocable, AlignedVec},
     fmm::{
-        helpers::{chunk_size, homogenous_kernel_scale, m2l_scale},
+        helpers::single_node::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
         KiFmm,
     },

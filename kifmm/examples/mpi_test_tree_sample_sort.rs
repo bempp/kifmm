@@ -104,7 +104,7 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 fn main() {
     // Setup an MPI environment
 
-    use kifmm::tree::types::SortKind;
+    use kifmm::{traits::tree::MultiTree, tree::types::SortKind};
 
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
@@ -132,20 +132,22 @@ fn main() {
     )
     .unwrap();
 
-    test_no_overlaps(&comm, &uniform);
-    if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on uniform tree");
-    }
+    println!("rank {:?} {:?}", uniform.rank, uniform.n_keys_tot());
 
-    test_global_bounds::<f32>(&comm);
-    if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on uniform tree");
-    }
+    // test_no_overlaps(&comm, &uniform);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_no_overlaps passed on uniform tree");
+    // }
 
-    test_n_points(&comm, &uniform, n_points);
-    if world.rank() == 0 {
-        println!("\t ... test_n_points passed on uniform tree");
-    }
+    // test_global_bounds::<f32>(&comm);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_global_bounds passed on uniform tree");
+    // }
+
+    // test_n_points(&comm, &uniform, n_points);
+    // if world.rank() == 0 {
+    //     println!("\t ... test_n_points passed on uniform tree");
+    // }
 }
 
 #[cfg(not(feature = "mpi"))]

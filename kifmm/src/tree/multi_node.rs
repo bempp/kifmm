@@ -13,8 +13,9 @@ use itertools::Itertools;
 use mpi::topology::SimpleCommunicator;
 use mpi::traits::{Communicator, CommunicatorCollectives, Equivalence};
 use num::Float;
+use pulp::Scalar;
 use rlst::RlstScalar;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::types::{MultiNodeTree, SortKind};
 
@@ -92,16 +93,104 @@ where
             prune_empty,
         );
 
-        let mut keys_set = HashSet::new();
+        // MultiTree parameters
+        let total_depth = local_depth + global_depth;
+        let mut keys = Vec::new();
+        let mut leaves = Vec::new();
         let mut roots = Vec::new();
+        let mut points = Vec::new();
 
         for tree in trees.iter() {
-            keys_set.extend(&mut tree.keys.clone());
-            roots.push(tree.root)
+            // Morton data
+            keys.extend_from_slice(tree.keys.as_slice());
+            leaves.extend_from_slice(tree.leaves.as_slice());
+            roots.push(tree.root);
+
+            // coordinate data
+            points.extend_from_slice(tree.points.as_slice());
         }
 
-        let total_depth = local_depth + global_depth;
-        let ntrees = roots.len();
+        keys.sort();
+        leaves.sort();
+        points.sort();
+
+        // Group coordinates by leaves
+        let mut leaves_to_coordinates = HashMap::new();
+        let mut curr = points[0];
+        let mut curr_idx = 0;
+        for (i, point) in points.iter().enumerate() {
+            if point.encoded_key != curr.encoded_key {
+                leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
+                curr_idx = i;
+                curr = *point;
+            }
+        }
+        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
+
+        let leaves = MortonKeys::from(leaves);
+        let mut keys = MortonKeys::from(keys);
+
+        // Sets for inclusion testing
+        let keys_set = keys.iter().cloned().collect();
+        let leaves_set = leaves.iter().cloned().collect();
+
+        // Number of subtrees
+        let n_trees = roots.len();
+
+        // Group key by level for efficient lookup
+        keys.sort_by_key(|a| a.level());
+
+        let mut levels_to_keys = HashMap::new();
+        let mut curr = keys[0];
+        let mut curr_idx = 0;
+        for (i, key) in keys.iter().enumerate() {
+            if key.level() != curr.level() {
+                levels_to_keys.insert(curr.level(), (curr_idx, i));
+                curr_idx = i;
+                curr = *key;
+            }
+        }
+        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+        // Return tree in sorted order, by level and then by Morton key
+        for l in global_depth..=total_depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let subset = &mut keys[l..r];
+            subset.sort();
+        }
+
+        let mut key_to_level_index = HashMap::new();
+        // Compute key to level index
+        for l in global_depth..=total_depth {
+            let &(l, r) = levels_to_keys.get(&l).unwrap();
+            let keys = &keys[l..r];
+            for (i, key) in keys.iter().enumerate() {
+                key_to_level_index.insert(*key, i);
+            }
+        }
+
+        // Collect coordinates in row-major order, for ease of lookup
+        let coordinates = points
+            .iter()
+            .map(|p| p.coordinate)
+            .flat_map(|[x, y, z]| vec![x, y, z])
+            .collect_vec();
+
+        // Collect global indices, in Morton sorted order
+        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
+
+        // Map between keys/leaves and their respective indices
+        let mut key_to_index = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
+
+        let mut leaf_to_index = HashMap::new();
+
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
 
         Ok(MultiNodeTree {
             comm: world.duplicate(),
@@ -109,10 +198,21 @@ where
             global_depth,
             local_depth,
             total_depth,
-            n_trees: ntrees,
+            n_trees,
             trees,
             roots,
+            coordinates,
+            points,
             keys_set,
+            leaves_set,
+            key_to_index,
+            leaf_to_index,
+            key_to_level_index,
+            global_indices,
+            leaves,
+            keys,
+            leaves_to_coordinates,
+            levels_to_keys,
         })
     }
 
@@ -162,18 +262,6 @@ where
 {
     type SingleTree = SingleNodeTree<T>;
 
-    fn total_depth(&self) -> u64 {
-        self.global_depth + self.local_depth
-    }
-
-    fn global_depth(&self) -> u64 {
-        self.global_depth
-    }
-
-    fn local_depth(&self) -> u64 {
-        self.global_depth
-    }
-
     fn rank(&self) -> i32 {
         self.rank
     }
@@ -188,6 +276,93 @@ where
 
     fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node] {
         self.roots.as_ref()
+    }
+
+    fn n_coordinates(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<usize> {
+        self.coordinates(leaf).map(|coords| coords.len() / 3)
+    }
+
+    fn n_coordinates_tot(&self) -> Option<usize> {
+        self.all_coordinates().map(|coords| coords.len() / 3)
+    }
+
+    fn node(&self, idx: usize) -> Option<&<Self::SingleTree as SingleTree>::Node> {
+        Some(&self.keys[idx])
+    }
+
+    fn n_keys(&self, level: u64) -> Option<usize> {
+        Some(self.keys.len())
+    }
+
+    fn n_leaves(&self) -> Option<usize> {
+        Some(self.leaves.len())
+    }
+
+    fn n_keys_tot(&self) -> Option<usize> {
+        Some(self.keys.len())
+    }
+
+    fn total_depth(&self) -> u64 {
+        self.global_depth + self.local_depth
+    }
+
+    fn global_depth(&self) -> u64 {
+        self.global_depth
+    }
+
+    fn local_depth(&self) -> u64 {
+        self.global_depth
+    }
+
+    fn keys(&self, level: u64) -> Option<&[<Self::SingleTree as SingleTree>::Node]> {
+        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+            Some(&self.keys[l..r])
+        } else {
+            None
+        }
+    }
+
+    fn all_keys(&self) -> Option<&[<Self::SingleTree as SingleTree>::Node]> {
+        Some(&self.keys)
+    }
+
+    fn all_keys_set(&self) -> Option<&'_ HashSet<<Self::SingleTree as SingleTree>::Node>> {
+        Some(&self.keys_set)
+    }
+
+    fn all_leaves(&self) -> Option<&[<Self::SingleTree as SingleTree>::Node]> {
+        Some(&self.leaves)
+    }
+
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<<Self::SingleTree as SingleTree>::Node>> {
+        Some(&self.leaves_set)
+    }
+
+    fn coordinates(
+        &self,
+        leaf: &<Self::SingleTree as SingleTree>::Node,
+    ) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]> {
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
+            Some(&self.coordinates[l * 3..r * 3])
+        } else {
+            None
+        }
+    }
+
+    fn all_coordinates(&self) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]> {
+        Some(&self.coordinates)
+    }
+
+    fn index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize> {
+        self.key_to_index.get(key)
+    }
+
+    fn level_index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize> {
+        self.key_to_level_index.get(key)
+    }
+
+    fn leaf_index(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize> {
+        self.leaf_to_index.get(leaf)
     }
 }
 

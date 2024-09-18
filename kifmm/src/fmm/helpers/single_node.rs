@@ -154,16 +154,19 @@ where
 }
 
 /// Create index pointers for each key at each level of an octree
-pub fn level_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<HashMap<MortonKey<T>, usize>>
+pub fn level_index_pointer_single_node<T>(
+    tree: &SingleNodeTree<T>,
+) -> Vec<HashMap<MortonKey<T>, usize>>
 where
     T: RlstScalar + Float,
 {
     let mut result = vec![HashMap::new(); (tree.depth() + 1).try_into().unwrap()];
 
     for level in 0..=tree.depth() {
-        let keys = tree.keys(level).unwrap();
-        for (level_idx, key) in keys.iter().enumerate() {
-            result[level as usize].insert(*key, level_idx);
+        if let Some(keys) = tree.keys(level) {
+            for (level_idx, key) in keys.iter().enumerate() {
+                result[level as usize].insert(*key, level_idx);
+            }
         }
     }
     result

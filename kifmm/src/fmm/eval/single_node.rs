@@ -6,7 +6,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::helpers::{
+    fmm::helpers::single_node::{
         leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
     },
     fmm::types::{FmmEvalType, KiFmm},

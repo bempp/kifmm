@@ -152,8 +152,41 @@ where
     /// Number of single node trees at this rank
     pub n_trees: usize,
 
+    /// All associated keys
+    pub keys: MortonKeys<T>,
+
+    /// All associated leaves
+    pub leaves: MortonKeys<T>,
+
     /// All associated keys, for rapid inclusion checking
     pub keys_set: HashSet<MortonKey<T>>,
+
+    /// All associated keys, for rapid inclusion checking
+    pub leaves_set: HashSet<MortonKey<T>>,
+
+    /// Map between a key and its index at a level
+    pub key_to_level_index: HashMap<MortonKey<T>, usize>,
+
+    /// Associated global indices
+    pub global_indices: Vec<usize>,
+
+    /// Map between key and index
+    pub key_to_index: HashMap<MortonKey<T>, usize>,
+
+    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
+    pub coordinates: Vec<T>,
+
+    /// All points coordinate with associated morton key
+    pub points: Points<T>,
+
+    /// Map between leaf key and leaf index
+    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+
+    /// Associate leaves with coordinate indices.
+    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+
+    /// Associate levels with key indices.
+    pub levels_to_keys: HashMap<u64, (usize, usize)>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -255,6 +288,9 @@ where
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
     pub coordinates: Vec<T>,
+
+    /// All points coordinate with associated morton key
+    pub points: Points<T>,
 
     /// All global indices
     pub global_indices: Vec<usize>,

@@ -64,13 +64,13 @@ pub trait SingleTree {
     /// Total number of coordinates (local in a multi node setting)
     fn n_coordinates_tot(&self) -> Option<usize>;
 
-    /// Gets global indices at a leaf node (local in multi node setting)
+    /// gets global indices at a leaf node (local in multi node setting)
     ///
-    /// # Arguments
-    /// - `leaf` - Node being query.
+    /// # arguments
+    /// - `leaf` - node being query.
     fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]>;
 
-    /// Gets all global indices (local in mult inode setting)
+    /// gets all global indices (local in mult inode setting)
     fn all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points, gets global domain in multi node setting.
@@ -107,6 +107,27 @@ pub trait MultiTree {
     /// Associated single node trees
     type SingleTree: SingleTree;
 
+    /// Associated MPI rank
+    fn rank(&self) -> i32;
+
+    /// Roots associated with trees at this rank
+    fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node];
+
+    /// All the single node trees associated with this rank
+    fn trees<'a>(&'a self) -> &'a [Self::SingleTree];
+
+    /// Number of single node trees associated with this rank
+    fn n_trees(&self) -> usize;
+
+    /// Number of leaves
+    fn n_leaves(&self) -> Option<usize>;
+
+    /// Total number of keys associated with this MPI rank
+    fn n_keys_tot(&self) -> Option<usize>;
+
+    /// Number of keys at a given tree level
+    fn n_keys(&self, level: u64) -> Option<usize>;
+
     /// Total depth of tree
     fn total_depth(&self) -> u64;
 
@@ -116,17 +137,65 @@ pub trait MultiTree {
     /// Depth of global tree
     fn global_depth(&self) -> u64;
 
-    /// Associated MPI rank
-    fn rank(&self) -> i32;
+    /// Get a reference to all leaves, gets local keys in multi-node setting.
+    fn all_leaves(&self) -> Option<&[<Self::SingleTree as SingleTree>::Node]>;
 
-    /// All the single node trees associated with this rank
-    fn trees<'a>(&'a self) -> &'a [Self::SingleTree];
+    /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
+    fn keys(&self, level: u64) -> Option<&[<Self::SingleTree as SingleTree>::Node]>;
 
-    /// Number of single node trees associated with this rank
-    fn n_trees(&self) -> usize;
+    /// Get a reference to all keys, gets local keys in a multi-node setting.
+    fn all_keys(&self) -> Option<&[<Self::SingleTree as SingleTree>::Node]>;
 
-    /// Roots associated with trees at this rank
-    fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node];
+    /// Get a reference to all keys as a set, gets local keys in a multi-node setting.
+    fn all_keys_set(&self) -> Option<&'_ HashSet<<Self::SingleTree as SingleTree>::Node>>;
+
+    /// Get a reference to all leaves as a set, gets local keys in a multi-node setting.
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<<Self::SingleTree as SingleTree>::Node>>;
+
+    /// Gets a reference to the coordinates contained with a leaf node.
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn coordinates(
+        &self,
+        leaf: &<Self::SingleTree as SingleTree>::Node,
+    ) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]>;
+
+    /// Query number of coordinates contained at a given leaf node
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn n_coordinates(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<usize>;
+
+    /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
+    fn all_coordinates(&self) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]>;
+
+    /// Total number of coordinates (local in a multi node setting)
+    fn n_coordinates_tot(&self) -> Option<usize>;
+
+    /// Map from the key to index position in sorted keys
+    ///
+    /// # Arguments
+    /// - `key` - Node being query.
+    fn index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
+
+    /// Map from the key to index position in sorted keys at a given level
+    ///
+    /// # Arguments
+    /// - `key` - Node being query.
+    fn level_index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
+
+    /// Map from the leaf to its index position in sorted leaves
+    ///
+    /// # Arguments
+    /// - `leaf` - Node being query.
+    fn leaf_index(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
+
+    /// Map from an index position to a node
+    ///
+    /// # Arguments
+    /// - `idx` - Index being query.
+    fn node(&self, idx: usize) -> Option<&<Self::SingleTree as SingleTree>::Node>;
 }
 
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data

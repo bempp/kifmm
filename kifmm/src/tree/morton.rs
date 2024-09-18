@@ -1,5 +1,5 @@
 //! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
-use crate::fmm::helpers::ncoeffs_kifmm;
+use crate::fmm::helpers::single_node::ncoeffs_kifmm;
 use crate::traits::tree::{FmmTreeNode, TreeNode};
 use crate::tree::{
     constants::{

@@ -171,6 +171,7 @@ where
         Ok(SingleNodeTree {
             root,
             depth,
+            points,
             coordinates,
             global_indices,
             domain,
@@ -331,6 +332,7 @@ where
         Ok(SingleNodeTree {
             root,
             depth,
+            points,
             coordinates,
             global_indices,
             domain,
@@ -385,29 +387,9 @@ where
         // Morton sort over points
         points.sort();
 
-        // Group coordinates by leaves
-        let mut leaves_to_coordinates = HashMap::new();
-        let mut curr = points[0];
-        let mut curr_idx = 0;
-
-        for (i, point) in points.iter().enumerate() {
-            if point.encoded_key != curr.encoded_key {
-                leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
-                curr_idx = i;
-                curr = *point;
-            }
-        }
-        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
-
         // Ensure that final leaf set contains siblings of all encoded keys
-        let leaves: HashSet<MortonKey<_>> = leaves_to_coordinates
-            .keys()
-            .flat_map(|k| k.siblings())
-            .collect();
-
-        // Sort leaves before returning
-        let mut leaves = MortonKeys::from(leaves);
-        leaves.sort();
+        let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
+        let leaves = MortonKeys::from(leaves);
 
         // Find all keys in tree up to root (if specified) or level 0 otherwise
         let root_level = root.level();
@@ -436,43 +418,7 @@ where
             })
             .collect();
 
-        let mut keys = MortonKeys::from(tmp);
-
-        // Create sets for inclusion testing
-        let leaves_set: HashSet<MortonKey<_>> = leaves.iter().cloned().collect();
-        let keys_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
-
-        // Group by level to perform efficient lookup
-        keys.sort_by_key(|a| a.level());
-
-        let mut levels_to_keys = HashMap::new();
-        let mut curr = keys[0];
-        let mut curr_idx = 0;
-        for (i, key) in keys.iter().enumerate() {
-            if key.level() != curr.level() {
-                levels_to_keys.insert(curr.level(), (curr_idx, i));
-                curr_idx = i;
-                curr = *key;
-            }
-        }
-        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
-
-        // Return tree in sorted order, by level and then by Morton key
-        for l in root_level..=depth {
-            let &(l, r) = levels_to_keys.get(&l).unwrap();
-            let subset = &mut keys[l..r];
-            subset.sort();
-        }
-
-        let mut key_to_level_index = HashMap::new();
-        // Compute key to level index
-        for l in root_level..=depth {
-            let &(l, r) = levels_to_keys.get(&l).unwrap();
-            let keys = &keys[l..r];
-            for (i, key) in keys.iter().enumerate() {
-                key_to_level_index.insert(*key, i);
-            }
-        }
+        let keys = MortonKeys::from(tmp);
 
         // Collect coordinates in row-major order, for ease of lookup
         let coordinates = points
@@ -481,37 +427,22 @@ where
             .flat_map(|[x, y, z]| vec![x, y, z])
             .collect_vec();
 
-        // Collect global indices, in Morton sorted order
-        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
-
-        // Map between keys/leaves and their respective indices
-        let mut key_to_index = HashMap::new();
-
-        for (i, key) in keys.iter().enumerate() {
-            key_to_index.insert(*key, i);
-        }
-
-        let mut leaf_to_index = HashMap::new();
-
-        for (i, key) in leaves.iter().enumerate() {
-            leaf_to_index.insert(*key, i);
-        }
-
         Ok(SingleNodeTree {
             root,
             depth,
+            points,
             coordinates,
-            global_indices,
             domain,
             leaves,
             keys,
-            leaves_to_coordinates,
-            key_to_index,
-            key_to_level_index,
-            leaf_to_index,
-            leaves_set,
-            keys_set,
-            levels_to_keys,
+            global_indices: Vec::default(),
+            leaves_to_coordinates: HashMap::default(),
+            key_to_index: HashMap::default(),
+            key_to_level_index: HashMap::default(),
+            leaf_to_index: HashMap::default(),
+            leaves_set: HashSet::default(),
+            keys_set: HashSet::default(),
+            levels_to_keys: HashMap::default(),
         })
     }
 
