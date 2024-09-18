@@ -407,6 +407,7 @@ where
     T: RlstScalar + Default + Float + Equivalence,
     C: Communicator,
 {
+    /// Configure queries to send from this rank for either U or V list data
     pub fn set_queries(&mut self, admissible: bool) {
         let mut queries = HashSet::new();
 

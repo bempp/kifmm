@@ -206,8 +206,6 @@ where
                 ..Default::default()
             };
 
-            // Can exchange U list queries at this point
-
             let mut result = KiFmmMulti {
                 dim: 3,
                 times: Vec::default(),
@@ -225,8 +223,10 @@ where
                 source_to_target: source_to_target,
                 fmm_eval_type: fmm_eval_type,
                 kernel_eval_type: kernel_eval_type,
-                charges: Vec::default(),
+                global_fmm,
                 kernel_eval_size: 1,
+                source: tmp_arr,
+                charges: Vec::default(),
                 charge_index_pointer_sources: Vec::default(),
                 charge_index_pointer_targets: Vec::default(),
                 leaf_upward_check_surfaces_sources: Vec::default(),
@@ -237,7 +237,6 @@ where
                 uc2e_inv_2: Vec::default(),
                 dc2e_inv_1: Vec::default(),
                 dc2e_inv_2: Vec::default(),
-                source: tmp_arr,
                 source_vec: Vec::default(),
                 target_vec: Vec::default(),
                 multipoles: Vec::default(),
@@ -250,17 +249,8 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                v_list_queries: Vec::default(),
-                u_list_queries: Vec::default(),
-                v_list_ranks: Vec::default(),
-                v_list_send_counts: Vec::default(),
-                v_list_to_send: Vec::default(),
-                u_list_ranks: Vec::default(),
-                u_list_send_counts: Vec::default(),
-                u_list_to_send: Vec::default(),
                 // ghost_tree_u: GhostTreeU::default(),
                 // ghost_tree_v: GhostTreeV::default(),
-                global_fmm,
                 local_roots_counts: Vec::default(),
                 local_roots_displacements: Vec::default(),
                 local_roots: Vec::default(),

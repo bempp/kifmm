@@ -2,7 +2,7 @@
 
 /// Interface for ghost exchange implementations
 pub trait GhostExchange {
-    /// Exchange V list data, must be done at runtime as it relies on node existence
+    /// Exchange V list data, must be done at runtime as relies on partially completed upward pass
     fn v_list_exchange(&mut self);
 
     /// Exchange U list data, can be done during pre-computation

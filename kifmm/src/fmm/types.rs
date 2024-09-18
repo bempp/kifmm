@@ -1116,31 +1116,6 @@ where
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>, // outer fmm
 
-    /// Can form query packet during pre-computation, but don't in principle know about existence
-    /// of these multipoles, or where they are physically located, which must be checked at runtime
-    pub v_list_queries: Vec<u64>,
-
-    /// Associated ranks of queries, same length as queries
-    pub v_list_ranks: Vec<i32>,
-
-    /// Is of 'size' in length, count of queries to each rank in communication with this one
-    pub v_list_send_counts: Vec<i32>,
-
-    /// Is of 'size' in length, and is a marker of whether a given rank is in communication with this one
-    pub v_list_to_send: Vec<i32>,
-
-    /// Form a similar query packet during pre-computation for particle data
-    pub u_list_queries: Vec<u64>,
-
-    /// Associated ranks of queries, same length as queries
-    pub u_list_ranks: Vec<i32>,
-
-    /// Is of 'size' in length, count of queries to each rank in communication with this one
-    pub u_list_send_counts: Vec<i32>,
-
-    /// Is of 'size' in length, and is a marker of whether a given rank is in communication with this one
-    pub u_list_to_send: Vec<i32>,
-
     // /// Ghost tree for U list data
     // pub ghost_tree_u: GhostTreeU<Scalar::Real>,
     // /// Ghost tree for V list data

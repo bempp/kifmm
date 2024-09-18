@@ -25,7 +25,7 @@ use crate::traits::tree::{FmmTreeNode, MultiFmmTree, MultiTree};
 use crate::tree::types::MortonKey;
 use crate::FftFieldTranslation;
 use crate::{
-    fmm::types::KiFmmMulti,
+    fmm::types::{KiFmmMulti, NeighbourhoodCommunicator},
     linalg::rsvd::MatrixRsvd,
     traits::{
         field::{
@@ -350,6 +350,15 @@ where
             coordinate_index_pointer_multi_node(&self.tree.target_tree);
         let charge_index_pointer_sources =
             coordinate_index_pointer_multi_node(&self.tree.source_tree);
+
+        // Set neighbourhood communicators
+        self.neighbourhood_communicator_v =
+            NeighbourhoodCommunicator::new(&self.communicator, &self.tree.v_list_query.send_marker);
+        self.neighbourhood_communicator_u =
+            NeighbourhoodCommunicator::new(&self.communicator, &self.tree.u_list_query.send_marker);
+
+        // Can perform U list exchange now
+        self.u_list_exchange();
 
         // Set metadata
         self.multipoles = multipoles;
