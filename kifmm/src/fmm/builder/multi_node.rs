@@ -245,7 +245,7 @@ where
 
             // pass dummy charges for now.
             result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]); // Everything required for the local upward passes
-            // result.displacements();
+                                                                                   // result.displacements();
 
             Ok(result)
         }
