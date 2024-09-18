@@ -540,10 +540,10 @@ where
     pub check_surface_order: Option<usize>,
 
     /// Number of coefficients
-    pub ncoeffs_equivalent_surface: Option<usize>,
+    pub n_coeffs_equivalent_surface: Option<usize>,
 
     /// Number of coefficients
-    pub ncoeffs_check_surface: Option<usize>,
+    pub n_coeffs_check_surface: Option<usize>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,
@@ -989,6 +989,8 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
 {
+    pub dim: usize,
+
     /// Operator runtimes
     pub times: Vec<FmmOperatorTime>,
 
@@ -1023,10 +1025,10 @@ where
     pub equivalent_surface_order: usize,
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs_equivalent_surface: usize,
+    pub n_coeffs_equivalent_surface: usize,
 
     /// The number of coefficients, corresponding to points discretising the check surface
-    pub ncoeffs_check_surface: usize,
+    pub n_coeffs_check_surface: usize,
 
     /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub kernel_eval_type: EvalType,
@@ -1057,31 +1059,31 @@ where
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// Data and metadata for field translations
     pub source_to_target: SourceToTargetData,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
 
     /// The metadata required for source to source translation
-    pub source_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+    pub source_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub target_vec: Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+    pub target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// Multipoles associated with locally owned data
     pub multipoles: Vec<Scalar>,

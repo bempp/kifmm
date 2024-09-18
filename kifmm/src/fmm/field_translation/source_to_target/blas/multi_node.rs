@@ -34,7 +34,6 @@ where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    // Self: FmmOperatorData,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         Ok(())

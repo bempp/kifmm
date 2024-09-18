@@ -5,7 +5,7 @@ use mpi::topology::SimpleCommunicator;
 use mpi::traits::Equivalence;
 use num::Float;
 use rlst::{
-    rlst_dynamic_array3, Array, BaseArray, MatrixSvd, RawAccessMut, RlstScalar, VectorContainer,
+    empty_array, rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, VectorContainer
 };
 use std::collections::HashMap;
 
@@ -14,11 +14,14 @@ use crate::fmm::helpers::multi_node::{
     leaf_scales_multi_node, leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
     level_index_pointer_multi_node, potential_pointers_multi_node,
 };
+use crate::fmm::helpers::single_node::homogenous_kernel_scale;
+use crate::linalg::pinv::pinv;
 use crate::traits::fftw::Dft;
 use crate::traits::fmm::{FmmMetadata, MultiFmm};
 use crate::traits::general::AsComplex;
 use crate::traits::parallel::GhostExchange;
-use crate::traits::tree::{MultiFmmTree, MultiTree, SingleTree};
+use crate::traits::tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleTree};
+use crate::tree::types::MortonKey;
 use crate::FftFieldTranslation;
 use crate::{
     fmm::types::KiFmmMulti,
@@ -42,10 +45,178 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
 {
-    fn source(&mut self) {}
+    fn source(&mut self) {
 
-    fn target(&mut self) {}
+        let root = MortonKey::<Scalar::Real>::root();
+        let equivalent_surface_order = self.equivalent_surface_order;
+        let check_surface_order = self.check_surface_order;
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
+        let n_coeffs_check_surface = self.n_coeffs_check_surface;
+
+        // Cast surface parameters
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
+        let domain = self.tree.domain();
+
+        let mut m2m= rlst_dynamic_array2!(Scalar, [n_coeffs_equivalent_surface, 8*n_coeffs_equivalent_surface]);
+        let mut m2m_vec= Vec::new();
+
+        // Compute required surfaces
+        let upward_equivalent_surface = root.surface_grid(
+            equivalent_surface_order,
+            domain,
+            alpha_inner
+        );
+
+        let upward_check_surface = root.surface_grid(
+            check_surface_order,
+            domain,
+            alpha_outer
+        );
+
+        // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+        // As well as estimating their inverses using SVD
+        let mut uc2e = rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_coeffs_equivalent_surface]);
+
+        self.kernel.assemble_st(
+            EvalType::Value,
+            &upward_check_surface,
+            &upward_equivalent_surface,
+            uc2e.data_mut()
+        );
+
+        let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = Scalar::from_real(s[i]);
+        }
+
+        let uc2e_inv_1 = vec![
+            empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())
+        ];
+
+        let uc2e_inv_2 = vec![
+            ut
+        ];
+
+        let parent_upward_check_surface = root.surface_grid(check_surface_order, domain, alpha_outer);
+        let children = root.children();
+
+
+        for (i, child) in children.iter().enumerate() {
+            let child_upward_equivalent_surface =
+                child.surface_grid(equivalent_surface_order, domain, alpha_inner);
+
+            let mut ce2pc =
+                rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_coeffs_equivalent_surface]);
+
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &parent_upward_check_surface,
+                &child_upward_equivalent_surface,
+                ce2pc.data_mut()
+            );
+
+            let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                uc2e_inv_1[0].view(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    uc2e_inv_2[0].view(),
+                    ce2pc.view(),
+                ),
+            );
+
+            let l = i * n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
+            let r = l + n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
+
+            m2m.data_mut()[l..r].copy_from_slice(tmp.data());
+            m2m_vec.push(tmp);
+        }
+
+        self.source = m2m;
+        self.source_vec = m2m_vec;
+        self.uc2e_inv_1 = uc2e_inv_1;
+        self.uc2e_inv_2 = uc2e_inv_2;
+
+    }
+
+    fn target(&mut self) {
+
+        let root = MortonKey::<Scalar::Real>::root();
+        let equivalent_surface_order = self.equivalent_surface_order;
+        let check_surface_order = self.check_surface_order;
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
+        let n_coeffs_check_surface = self.n_coeffs_check_surface;
+
+        // Cast surface parameters
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
+        let domain = self.tree.domain();
+
+        let mut l2l = Vec::new();
+
+        let downward_equivalent_surface =
+            root.surface_grid(equivalent_surface_order, domain, alpha_outer);
+        let downward_check_surface =
+            root.surface_grid(check_surface_order, domain, alpha_inner);
+
+        let mut dc2e = rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_coeffs_equivalent_surface]);
+        self.kernel.assemble_st(
+            EvalType::Value,
+            &downward_check_surface[..],
+            &downward_equivalent_surface[..],
+            dc2e.data_mut(),
+        );
+
+        let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
+
+        let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+        for i in 0..s.len() {
+            mat_s[[i, i]] = Scalar::from_real(s[i]);
+        }
+
+        let dc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let dc2e_inv_2 = vec![ut];
+
+        let parent_downward_equivalent_surface = root.surface_grid(equivalent_surface_order, domain, alpha_outer);
+
+        let children = root.children();
+
+        for child in children.iter() {
+            let child_downward_check_surface =
+                child.surface_grid(check_surface_order, domain, alpha_inner);
+
+            // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
+            let mut pe2cc =
+                rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_coeffs_equivalent_surface]);
+            self.kernel.assemble_st(
+                EvalType::Value,
+                &child_downward_check_surface,
+                &parent_downward_equivalent_surface,
+                pe2cc.data_mut(),
+            );
+
+            let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                dc2e_inv_1[0].view(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    dc2e_inv_2[0].view(),
+                    pe2cc.view(),
+                ),
+            );
+
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+
+            l2l.push(tmp);
+        }
+
+        self.target_vec = l2l;
+        self.dc2e_inv_1 = dc2e_inv_1;
+        self.dc2e_inv_2 = dc2e_inv_2;
+    }
 }
+
 
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
@@ -111,8 +282,8 @@ where
 
         let equivalent_surface_order = self.equivalent_surface_order;
         let check_surface_order = self.check_surface_order;
-        let n_coeffs_equivalent_surface = self.ncoeffs_equivalent_surface;
-        let n_coeffs_check_surface = self.ncoeffs_check_surface;
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
+        let n_coeffs_check_surface = self.n_coeffs_check_surface;
 
         // Allocate multipole and local buffers for all locally owned source/target octants
         let mut multipoles = vec![Scalar::default(); n_source_keys * n_coeffs_equivalent_surface];

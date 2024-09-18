@@ -3,7 +3,7 @@ use mpi::{
     traits::Equivalence,
 };
 use num::Float;
-use rlst::{MatrixSvd, RlstScalar};
+use rlst::{rlst_array_from_slice2, rlst_dynamic_array2, MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
@@ -51,8 +51,8 @@ where
             domain: None,
             equivalent_surface_order: None,
             check_surface_order: None,
-            ncoeffs_equivalent_surface: None,
-            ncoeffs_check_surface: None,
+            n_coeffs_equivalent_surface: None,
+            n_coeffs_check_surface: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
         }
@@ -152,8 +152,8 @@ where
             ))
         } else {
             // TODO: Mapping of global indices needs to happen here eventually.
-            self.ncoeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
-            self.ncoeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
+            self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
+            self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
             self.fmm_eval_type = Some(FmmEvalType::Vector);
             self.kernel_eval_type = Some(EvalType::Value);
@@ -179,7 +179,10 @@ where
             let neighbourhood_communicator_u = NeighbourhoodCommunicator::from_comm(&communicator);
             let rank = communicator.rank();
 
+            let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
+
             let mut result = KiFmmMulti {
+                dim: 3,
                 times: Vec::default(),
                 isa: self.isa.unwrap(),
                 communicator,
@@ -190,8 +193,8 @@ where
                 tree: self.tree.unwrap(),
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
-                ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
-                ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
+                n_coeffs_equivalent_surface: self.n_coeffs_equivalent_surface.unwrap(),
+                n_coeffs_check_surface: self.n_coeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
@@ -207,7 +210,7 @@ where
                 uc2e_inv_2: Vec::default(),
                 dc2e_inv_1: Vec::default(),
                 dc2e_inv_2: Vec::default(),
-                source: Vec::default(),
+                source: tmp_arr,
                 source_vec: Vec::default(),
                 target_vec: Vec::default(),
                 multipoles: Vec::default(),

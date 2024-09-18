@@ -229,6 +229,9 @@ pub trait MultiFmmTree {
     /// Tree associated with FMM tree
     type Tree: MultiTree;
 
+    /// Global domain
+    fn domain(&self) -> &<<Self::Tree as MultiTree>::SingleTree as SingleTree>::Domain;
+
     /// The source tree, defined by a number of single node trees
     fn source_tree(&self) -> &Self::Tree;
 

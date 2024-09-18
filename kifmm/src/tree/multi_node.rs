@@ -381,6 +381,10 @@ where
 {
     type Tree = MultiNodeTree<T, C>;
 
+    fn domain(&self) -> &<<Self::Tree as MultiTree>::SingleTree as SingleTree>::Domain {
+        &self.domain
+    }
+
     fn n_source_trees(&self) -> usize {
         self.source_tree().n_trees()
     }
