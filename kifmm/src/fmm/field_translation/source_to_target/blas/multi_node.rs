@@ -15,7 +15,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
     fmm::{
-        helpers::{homogenous_kernel_scale, m2l_scale},
+        helpers::single_node::{homogenous_kernel_scale, m2l_scale},
         types::{BlasFieldTranslationIa, FmmEvalType, KiFmmMulti, SendPtrMut},
         KiFmm,
     },

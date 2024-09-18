@@ -8,7 +8,7 @@ use rlst::{
 };
 use std::collections::HashMap;
 
-use crate::fmm::helpers::level_index_pointer_multi_node;
+use crate::fmm::helpers::multi_node::level_index_pointer_multi_node;
 use crate::traits::fftw::Dft;
 use crate::traits::fmm::{FmmMetadata, MultiFmm};
 use crate::traits::general::AsComplex;

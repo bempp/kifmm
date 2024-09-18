@@ -7,7 +7,7 @@ use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
-        helpers::ncoeffs_kifmm,
+        helpers::single_node::ncoeffs_kifmm,
         types::{
             FmmEvalType, Isa, KiFmmMulti, Layout, MultiNodeBuilder, NeighbourhoodCommunicator,
         },
