@@ -21,7 +21,7 @@ use crate::traits::fftw::Dft;
 use crate::traits::fmm::{FmmMetadata, MultiFmm};
 use crate::traits::general::AsComplex;
 use crate::traits::parallel::GhostExchange;
-use crate::traits::tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleTree};
+use crate::traits::tree::{FmmTreeNode, MultiFmmTree, MultiTree};
 use crate::tree::types::MortonKey;
 use crate::FftFieldTranslation;
 use crate::{
@@ -254,9 +254,6 @@ where
     type Scalar = Scalar;
 
     fn metadata(&mut self, eval_type: EvalType, _charges: &[Self::Scalar]) {
-        let alpha_outer = Scalar::real(ALPHA_OUTER);
-        let alpha_inner = Scalar::real(ALPHA_INNER);
-
         // Check if computing potentials, or potentials and derivatives
         match eval_type {
             EvalType::Value => {}
@@ -269,13 +266,11 @@ where
             EvalType::ValueDeriv => 4,
         };
 
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
         let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
         let n_source_points = self.tree.source_tree.n_coordinates_tot().unwrap();
         let n_source_keys = self.tree.source_tree().n_keys_tot().unwrap();
         let n_target_keys = self.tree.target_tree().n_keys_tot().unwrap();
-        let global_depth = self.tree.source_tree().global_depth();
-        let local_depth = self.tree.source_tree().local_depth();
-        let total_depth = self.tree.source_tree().local_depth();
 
         let equivalent_surface_order = self.equivalent_surface_order;
         let check_surface_order = self.check_surface_order;
@@ -283,8 +278,8 @@ where
         let n_coeffs_check_surface = self.n_coeffs_check_surface;
 
         // Allocate multipole and local buffers for all locally owned source/target octants
-        let mut multipoles = vec![Scalar::default(); n_source_keys * n_coeffs_equivalent_surface];
-        let mut locals = vec![Scalar::default(); n_target_keys * n_coeffs_equivalent_surface];
+        let multipoles = vec![Scalar::default(); n_source_keys * n_coeffs_equivalent_surface];
+        let locals = vec![Scalar::default(); n_target_keys * n_coeffs_equivalent_surface];
 
         // Index pointers of multipole and local data, indexed by level
         let level_index_pointer_multipoles = level_index_pointer_multi_node(&self.tree.source_tree);
@@ -360,9 +355,11 @@ where
         self.multipoles = multipoles;
         self.leaf_multipoles = leaf_multipoles;
         self.level_multipoles = level_multipoles;
+        self.level_index_pointer_multipoles = level_index_pointer_multipoles;
         self.locals = locals;
         self.leaf_locals = leaf_locals;
         self.level_locals = level_locals;
+        self.level_index_pointer_locals = level_index_pointer_locals;
         self.potentials = potentials;
         self.potentials_send_pointers = potential_send_pointers;
         self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;

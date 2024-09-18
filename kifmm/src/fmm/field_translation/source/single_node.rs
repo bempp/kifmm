@@ -284,10 +284,12 @@ where
                     parent_multipoles.push(parent_multipole);
                 }
 
-                let mut max_chunk_size = nparents;
-                if max_chunk_size > M2M_MAX_BLOCK_SIZE {
-                    max_chunk_size = M2M_MAX_BLOCK_SIZE
-                }
+                let max_chunk_size = if nparents > M2M_MAX_BLOCK_SIZE {
+                    M2M_MAX_BLOCK_SIZE
+                } else {
+                    nparents
+                };
+
                 let chunk_size = chunk_size(nparents, max_chunk_size);
 
                 child_multipoles

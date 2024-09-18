@@ -3,7 +3,10 @@ use crate::traits::tree::SingleFmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{tree::SingleTree, types::FmmError};
+use super::{
+    tree::{MultiTree, SingleTree},
+    types::FmmError,
+};
 
 #[cfg(feature = "mpi")]
 use super::tree::MultiFmmTree;
@@ -164,18 +167,18 @@ where
     /// Kernel associated with this FMMl
     type Kernel: Kernel<T = Self::Scalar>;
 
-    // /// Get the multipole expansion data associated with a node as a slice
-    // /// # Arguments
-    // /// * `key` - The source node.
-    // fn multipole(
-    //     &self,
-    //     key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-    // ) -> Option<&[Self::Scalar]>;
+    /// Get the multipole expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The source node.
+    fn multipole(
+        &self,
+        key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
+    ) -> Option<&[Self::Scalar]>;
 
-    // /// Get the multipole expansion data associated with a tree level as a slice
-    // /// # Arguments
-    // /// * `level` - The tree level.
-    // fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
+    /// Get the multipole expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
 
     // /// Get the local expansion data associated with a node as a slice
     // /// # Arguments

@@ -12,6 +12,7 @@ use crate::{
             FmmEvalType, Isa, KiFmmMulti, Layout, MultiNodeBuilder, NeighbourhoodCommunicator,
             Query,
         },
+        KiFmm,
     },
     traits::{
         field::{
@@ -20,6 +21,7 @@ use crate::{
         },
         fmm::{FmmMetadata, HomogenousKernel},
         general::Epsilon,
+        parallel::GhostExchange,
     },
     tree::{
         types::{Domain, SortKind},
@@ -36,6 +38,9 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     SourceToTargetData: SourceToTargetDataTrait + Default,
     KiFmmMulti<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
+        + SourceAndTargetTranslationMetadata
+        + FmmMetadata<Scalar = Scalar>,
+    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
         + FmmMetadata<Scalar = Scalar>,
 {
@@ -178,8 +183,30 @@ where
             let neighbourhood_communicator_v = NeighbourhoodCommunicator::from_comm(&communicator);
             let neighbourhood_communicator_u = NeighbourhoodCommunicator::from_comm(&communicator);
             let rank = communicator.rank();
+            let source_to_target = self.source_to_target.unwrap();
+            let fmm_eval_type = self.fmm_eval_type.unwrap();
+            let kernel_eval_type = self.kernel_eval_type.unwrap();
+            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface.unwrap();
+            let n_coeffs_check_surface = self.n_coeffs_check_surface.unwrap();
+            let equivalent_surface_order = self.equivalent_surface_order.unwrap();
+            let check_surface_order = self.check_surface_order.unwrap();
 
             let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
+            let global_fmm: KiFmm<Scalar, Kernel, SourceToTargetData> = KiFmm {
+                isa: self.isa.unwrap(),
+                equivalent_surface_order: vec![equivalent_surface_order],
+                check_surface_order: vec![check_surface_order],
+                variable_expansion_order: false,
+                ncoeffs_equivalent_surface: vec![n_coeffs_check_surface],
+                ncoeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                fmm_eval_type: fmm_eval_type.clone(),
+                kernel_eval_type: kernel_eval_type.clone(),
+                kernel: kernel.clone(),
+                dim: 3,
+                ..Default::default()
+            };
+
+            // Can exchange U list queries at this point
 
             let mut result = KiFmmMulti {
                 dim: 3,
@@ -191,13 +218,13 @@ where
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),
-                equivalent_surface_order: self.equivalent_surface_order.unwrap(),
-                check_surface_order: self.check_surface_order.unwrap(),
-                n_coeffs_equivalent_surface: self.n_coeffs_equivalent_surface.unwrap(),
-                n_coeffs_check_surface: self.n_coeffs_check_surface.unwrap(),
-                source_to_target: self.source_to_target.unwrap(),
-                fmm_eval_type: self.fmm_eval_type.unwrap(),
-                kernel_eval_type: self.kernel_eval_type.unwrap(),
+                equivalent_surface_order: equivalent_surface_order,
+                check_surface_order: check_surface_order,
+                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface,
+                n_coeffs_check_surface: n_coeffs_check_surface,
+                source_to_target: source_to_target,
+                fmm_eval_type: fmm_eval_type,
+                kernel_eval_type: kernel_eval_type,
                 charges: Vec::default(),
                 kernel_eval_size: 1,
                 charge_index_pointer_sources: Vec::default(),
@@ -233,7 +260,7 @@ where
                 u_list_to_send: Vec::default(),
                 // ghost_tree_u: GhostTreeU::default(),
                 // ghost_tree_v: GhostTreeV::default(),
-                // global_fmm: KiFmm::default(),
+                global_fmm,
                 local_roots_counts: Vec::default(),
                 local_roots_displacements: Vec::default(),
                 local_roots: Vec::default(),

@@ -989,6 +989,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     SourceToTargetData: SourceToTargetDataTrait,
 {
+    /// Dimension
     pub dim: usize,
 
     /// Operator runtimes
@@ -1145,7 +1146,7 @@ where
     // /// Ghost tree for V list data
     // pub ghost_tree_v: GhostTreeV<Scalar, SourceToTargetData>,
     /// Object holding global FMM, to be run on nominated node
-    // pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetData>,
+    pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetData>,
 
     /// Store origin ranks of target trees to which I must send local expansion coeffs after global FMM has been
     /// executed on nominated node.
