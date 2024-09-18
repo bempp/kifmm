@@ -2,9 +2,6 @@
 
 /// Interface for ghost exchange implementations
 pub trait GhostExchange {
-    /// Gather source box ranges controlled by each local tree
-    fn set_source_layout(&mut self);
-
     /// Exchange V list data, must be done at runtime as it relies on node existence
     fn v_list_exchange(&mut self);
 

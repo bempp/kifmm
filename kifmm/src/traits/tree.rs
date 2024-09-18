@@ -196,6 +196,9 @@ pub trait MultiTree {
     /// # Arguments
     /// - `idx` - Index being query.
     fn node(&self, idx: usize) -> Option<&<Self::SingleTree as SingleTree>::Node>;
+
+    /// Get domain defined by the points, gets global domain in multi node setting.
+    fn domain(&self) -> &<Self::SingleTree as SingleTree>::Domain;
 }
 
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data

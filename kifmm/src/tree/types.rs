@@ -128,6 +128,9 @@ pub struct MultiNodeTree<T, C: Communicator>
 where
     T: RlstScalar + Float + Equivalence,
 {
+    /// Get domain defined by the points, gets global domain in multi node setting.
+    pub domain: Domain<T>,
+
     /// Communicator associated with this tree
     pub comm: C,
 

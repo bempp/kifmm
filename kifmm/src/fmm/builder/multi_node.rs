@@ -10,6 +10,7 @@ use crate::{
         helpers::single_node::ncoeffs_kifmm,
         types::{
             FmmEvalType, Isa, KiFmmMulti, Layout, MultiNodeBuilder, NeighbourhoodCommunicator,
+            Query,
         },
     },
     traits::{
@@ -113,11 +114,23 @@ where
                 prune_empty,
             )?;
 
-            let fmm_tree = MultiNodeFmmTree {
+            // Create an FMM tree, and set its layout of source boxes
+            let mut fmm_tree = MultiNodeFmmTree {
                 source_tree,
                 target_tree,
                 domain,
+                source_layout: Layout::default(),
+                v_list_query: Query::default(),
+                u_list_query: Query::default(),
             };
+
+            // Global communication to set the source layout required
+            fmm_tree.set_source_layout();
+
+            // Set requires queries at this point for U and V list data, can be intensive for deep trees
+            // as manually constructs interaction lists
+            fmm_tree.set_queries(true);
+            fmm_tree.set_queries(false);
 
             self.communicator = Some(comm.duplicate());
             self.tree = Some(fmm_tree);
@@ -141,7 +154,6 @@ where
             // TODO: Mapping of global indices needs to happen here eventually.
             self.ncoeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
             self.ncoeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
-
             self.kernel = Some(kernel);
             self.fmm_eval_type = Some(FmmEvalType::Vector);
             self.kernel_eval_type = Some(EvalType::Value);
@@ -185,8 +197,8 @@ where
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
                 charges: Vec::default(),
                 kernel_eval_size: 1,
-                charge_index_pointers_sources: Vec::default(),
-                charge_index_pointers_targets: Vec::default(),
+                charge_index_pointer_sources: Vec::default(),
+                charge_index_pointer_targets: Vec::default(),
                 leaf_upward_check_surfaces_sources: Vec::default(),
                 leaf_downward_equivalent_surfaces_targets: Vec::default(),
                 leaf_upward_equivalent_surfaces_sources: Vec::default(),
@@ -210,7 +222,6 @@ where
                 potentials_send_pointers: Vec::default(),
                 v_list_queries: Vec::default(),
                 u_list_queries: Vec::default(),
-                source_layout: Layout::default(),
                 v_list_ranks: Vec::default(),
                 v_list_send_counts: Vec::default(),
                 v_list_to_send: Vec::default(),
@@ -228,15 +239,9 @@ where
             result.source();
             result.target();
             result.source_to_target();
+
             // pass dummy charges for now.
             result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]); // Everything required for the local upward passes
-
-            // metadata computation needs to be split into two, one for before upward pass
-            // one for after upward pass
-            // second one must be done in application code in order to attach charges, which depends on
-            // the final point distribution, actually both need to be done in application code to attach charges,
-            // new multipoles and metadata re-alloc.
-            // Charges must be exchanged to near field octants too, which must be done as a part of the ghost exchange.
             // result.displacements();
 
             Ok(result)

@@ -1,8 +1,5 @@
 //! Data structures for kernel independent FMM
-use std::{
-    collections::{HashMap, HashSet},
-    sync::RwLock,
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
 use num::traits::Float;
@@ -21,10 +18,16 @@ use crate::{
 use crate::tree::types::MultiNodeTree;
 
 #[cfg(feature = "mpi")]
+use std::collections::HashSet;
+
+#[cfg(feature = "mpi")]
 use mpi::topology::SimpleCommunicator;
 
 #[cfg(feature = "mpi")]
-use mpi::traits::{Communicator, Equivalence};
+use mpi::{
+    traits::{Communicator, Equivalence},
+    Count, Rank,
+};
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in row-major order.
@@ -602,6 +605,14 @@ pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator
     pub target_tree: MultiNodeTree<T, C>,
     /// The computational domain associated with this FMM calculation.
     pub domain: Domain<T>,
+    /// Layout of sources at each rank
+    pub source_layout: Layout<T>,
+
+    /// V list queries
+    pub v_list_query: Query,
+
+    /// U list query
+    pub u_list_query: Query,
 }
 
 /// Stores data and metadata for FFT based acceleration scheme for field translation.
@@ -1003,7 +1014,7 @@ where
     pub tree: MultiNodeFmmTree<<Scalar as RlstScalar>::Real, SimpleCommunicator>,
 
     /// Charges associated with each source tree
-    pub charges: Vec<Vec<Scalar>>,
+    pub charges: Vec<Scalar>,
 
     /// The expansion order used to construct check surfaces
     pub check_surface_order: usize,
@@ -1027,22 +1038,22 @@ where
     pub kernel_eval_size: usize,
 
     /// Index pointer for source coordinates
-    pub charge_index_pointers_sources: Vec<Vec<(usize, usize)>>, // indexed by source tree
+    pub charge_index_pointer_sources: Vec<(usize, usize)>, // indexed by source tree
 
     /// Index pointer for target coordinates
-    pub charge_index_pointers_targets: Vec<Vec<(usize, usize)>>, // indexed by target tree
+    pub charge_index_pointer_targets: Vec<(usize, usize)>, // indexed by target tree
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_equivalent_surfaces_sources: Vec<Vec<Scalar::Real>>, // indexed by source tree
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Scalar::Real>, // indexed by source tree
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_check_surfaces_sources: Vec<Vec<Scalar::Real>>, // indexed by source tree
+    pub leaf_upward_check_surfaces_sources: Vec<Scalar::Real>, // indexed by source tree
 
     /// Upward surfaces associated with target leaves
-    pub leaf_downward_equivalent_surfaces_targets: Vec<Vec<Scalar::Real>>, // indexed by target tree
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>, // indexed by target tree
 
     /// Scales of each source leaf box
-    pub leaf_scales_sources: Vec<Vec<Scalar>>, // indexed by source tree
+    pub leaf_scales_sources: Vec<Scalar>, // indexed by source tree
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
@@ -1127,9 +1138,6 @@ where
     /// Is of 'size' in length, and is a marker of whether a given rank is in communication with this one
     pub u_list_to_send: Vec<i32>,
 
-    /// Defines layout specified by roots owned by each rank
-    pub source_layout: Layout<Scalar>,
-
     // /// Ghost tree for U list data
     // pub ghost_tree_u: GhostTreeU<Scalar::Real>,
     // /// Ghost tree for V list data
@@ -1151,10 +1159,10 @@ where
 #[derive(Default)]
 pub struct Layout<T: RlstScalar + Float> {
     /// Splitters in terms of Morton keys
-    pub raw: Vec<MortonKey<T::Real>>,
+    pub raw: Vec<MortonKey<T>>,
 
     /// All splitters as a set
-    pub raw_set: HashSet<MortonKey<T::Real>>,
+    pub raw_set: HashSet<MortonKey<T>>,
 
     /// Counts
     pub counts: Vec<i32>,
@@ -1166,7 +1174,7 @@ pub struct Layout<T: RlstScalar + Float> {
     pub ranks: Vec<i32>,
 
     /// Map between range and associated rank
-    pub range_to_rank: HashMap<MortonKey<T::Real>, i32>,
+    pub range_to_rank: HashMap<MortonKey<T>, i32>,
 }
 /// Each rank starts off knowing with whom it wants to communicate, but they don't have knowledge
 /// of this rank. The communicator is defined by the octants controlled by each rank
@@ -1177,4 +1185,18 @@ pub struct NeighbourhoodCommunicator {
 
     /// Wrapper around a simple communicator type
     pub raw: SimpleCommunicator,
+}
+
+/// Stores queries
+#[derive(Default)]
+#[cfg(feature = "mpi")]
+pub struct Query {
+    /// Queries sorted into rank order
+    pub queries: Vec<u64>,
+    /// Associated ranks, keys.len() long
+    pub ranks: Vec<Rank>,
+    /// Send counts for each rank in global communicator
+    pub send_counts: Vec<Count>,
+    /// Each index marks a rank in the global communicator that is involved in this query
+    pub send_marker: Vec<Rank>,
 }

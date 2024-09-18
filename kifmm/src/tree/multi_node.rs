@@ -1,5 +1,6 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
 use crate::{
+    fmm::types::{Layout, Query},
     sorting::{hyksort, samplesort, simplesort},
     traits::tree::{MultiFmmTree, MultiTree, SingleTree},
     tree::{
@@ -10,8 +11,11 @@ use crate::{
 };
 
 use itertools::Itertools;
-use mpi::topology::SimpleCommunicator;
-use mpi::traits::{Communicator, CommunicatorCollectives, Equivalence};
+use mpi::{datatype::PartitionMut, datatype::Partitioned, topology::SimpleCommunicator};
+use mpi::{
+    traits::{Communicator, CommunicatorCollectives, Equivalence},
+    Count, Rank,
+};
 use num::Float;
 use pulp::Scalar;
 use rlst::RlstScalar;
@@ -30,11 +34,11 @@ where
         local_depth: u64,
         global_depth: u64,
         global_indices: &[usize],
-        world: &C,
+        comm: &C,
         sort_kind: SortKind,
         prune_empty: bool,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
-        let rank = world.rank();
+        let rank = comm.rank();
 
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
@@ -56,11 +60,10 @@ where
         }
 
         // Perform parallel Morton sort over encoded points
-        let comm = world.duplicate();
 
         match sort_kind {
-            SortKind::Hyksort { k } => hyksort(&mut points, k, comm)?,
-            SortKind::Samplesort { k } => samplesort(&mut points, &comm, k)?,
+            SortKind::Hyksort { k } => hyksort(&mut points, k, comm.duplicate())?,
+            SortKind::Samplesort { k } => samplesort(&mut points, &comm.duplicate(), k)?,
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters
@@ -74,7 +77,7 @@ where
                     .collect_vec();
                 splitters.sort();
                 let splitters = &splitters[1..];
-                simplesort(&mut points, &comm, &splitters)?;
+                simplesort(&mut points, &comm.duplicate(), &splitters)?;
             }
         }
 
@@ -193,7 +196,8 @@ where
         }
 
         Ok(MultiNodeTree {
-            comm: world.duplicate(),
+            domain,
+            comm: comm.duplicate(),
             rank,
             global_depth,
             local_depth,
@@ -261,6 +265,10 @@ where
     C: Communicator,
 {
     type SingleTree = SingleNodeTree<T>;
+
+    fn domain(&self) -> &<Self::SingleTree as SingleTree>::Domain {
+        &self.domain
+    }
 
     fn rank(&self) -> i32 {
         self.rank
@@ -387,6 +395,187 @@ where
 
     fn target_tree<'a>(&'a self) -> &'a Self::Tree {
         &self.target_tree
+    }
+}
+
+impl<T, C> MultiNodeFmmTree<T, C>
+where
+    T: RlstScalar + Default + Float + Equivalence,
+    C: Communicator,
+{
+    pub fn set_queries(&mut self, admissible: bool) {
+        let mut queries = HashSet::new();
+
+        if admissible {
+            // V list queries
+            for key in self.target_tree.all_keys().unwrap() {
+                // Compute interaction list
+                let interaction_list = key
+                    .parent()
+                    .neighbors()
+                    .iter()
+                    .flat_map(|pn| pn.children())
+                    .filter(|pnc| !key.is_adjacent(pnc))
+                    .collect_vec();
+
+                // Filter for those contained on foreign ranks
+                let interaction_list = interaction_list
+                    .into_iter()
+                    .filter_map(|key| {
+                        // Try to get the rank from the key
+                        if let Some(&rank) = self.source_layout.rank_from_key(&key) {
+                            // Filter out if the rank is equal to this rank
+                            if rank != self.source_tree.rank() {
+                                return Some(key);
+                            }
+                        }
+                        None
+                    })
+                    .collect_vec();
+
+                queries.extend(interaction_list);
+            }
+        } else {
+            for leaf in self.target_tree.all_leaves().unwrap() {
+                let interaction_list = leaf.neighbors();
+
+                // Filter for those contained on foreign ranks
+                let interaction_list = interaction_list
+                    .iter()
+                    .filter_map(|key| {
+                        // Try to get the rank from the key
+                        if let Some(&rank) = self.source_layout.rank_from_key(key) {
+                            // Filter out if the rank is equal to my_rank
+                            if rank != self.source_tree.rank() {
+                                return Some(key);
+                            }
+                        }
+                        None
+                    })
+                    .collect_vec();
+
+                queries.extend(interaction_list);
+            }
+        }
+
+        // Compute the send ranks, counts, and mark each global process involved in query
+        // communication
+        let queries = queries.into_iter().collect_vec();
+        let mut ranks = Vec::new();
+        let mut send_counts = vec![0 as Count; self.source_tree.comm.size() as usize];
+        let mut send_marker = vec![0 as Rank; self.source_tree.comm.size() as usize];
+
+        for query in queries.iter() {
+            let rank = *self.source_layout.rank_from_key(query).unwrap();
+            ranks.push(rank);
+            send_counts[rank as usize] += 1;
+        }
+
+        for (rank, &send_count) in send_counts.iter().enumerate() {
+            if send_count > 0 {
+                send_marker[rank] = 1;
+            }
+        }
+
+        // Sort queries by destination rank
+        let queries = {
+            let mut indices = (0..queries.len()).collect_vec();
+            indices.sort_by_key(|&i| ranks[i]);
+
+            let mut sorted_queries_ = Vec::with_capacity(queries.len());
+            for i in indices {
+                sorted_queries_.push(queries[i].morton)
+            }
+            sorted_queries_
+        };
+
+        let query = Query {
+            queries,
+            ranks,
+            send_counts,
+            send_marker,
+        };
+
+        if admissible {
+            self.v_list_query = query
+        } else {
+            self.u_list_query = query
+        }
+    }
+
+    /// Gather source box ranges controlled by each local rank
+    pub fn set_source_layout(&mut self) {
+        let size = self.source_tree.comm.size();
+
+        // 1. Gather ranges on all processes, define by roots they own
+        let mut ranges = Vec::new();
+        for tree_idx in 0..self.source_tree.n_trees {
+            ranges.push(self.source_tree.trees[tree_idx].root());
+        }
+
+        let n_ranges = ranges.len() as i32;
+        let mut all_ranges_counts = vec![0i32; size as usize];
+        self.source_tree
+            .comm
+            .all_gather_into(&n_ranges, &mut all_ranges_counts);
+
+        let mut all_ranges_displacements = Vec::new();
+        let mut displacement = 0;
+        for &count in all_ranges_counts.iter() {
+            all_ranges_displacements.push(displacement);
+            displacement += count
+        }
+
+        let total_ranges = all_ranges_counts.iter().sum::<i32>();
+
+        let mut raw = vec![MortonKey::<T>::default(); total_ranges as usize];
+        let counts;
+        let displacements;
+
+        {
+            let mut partition =
+                PartitionMut::new(&mut raw, all_ranges_counts, &all_ranges_displacements[..]);
+            self.source_tree
+                .comm
+                .all_gather_varcount_into(&ranges, &mut partition);
+            counts = partition.counts().to_vec();
+            displacements = partition.displs().to_vec();
+        }
+
+        let raw_set = raw.iter().cloned().collect();
+
+        let mut ranks = Vec::new();
+
+        for i in 0..raw.len() as i32 {
+            let mut rank = 0;
+
+            while rank < displacements.len() - 1 {
+                let curr_displacement = displacements[rank + 1];
+
+                if i < curr_displacement {
+                    break;
+                }
+
+                rank += 1;
+            }
+
+            ranks.push(rank as i32);
+        }
+
+        let mut range_to_rank = HashMap::new();
+
+        for (&range, &rank) in raw.iter().zip(ranks.iter()) {
+            range_to_rank.insert(range, rank);
+        }
+
+        self.source_layout = Layout {
+            raw,
+            raw_set,
+            counts,
+            displacements,
+            ranks,
+            range_to_rank,
+        };
     }
 }
 

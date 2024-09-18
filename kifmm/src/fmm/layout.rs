@@ -9,7 +9,7 @@ use super::types::Layout;
 
 impl<T: RlstScalar + Float> Layout<T> {
     /// rank associated with this rank
-    pub fn rank_from_key(&self, key: &MortonKey<T::Real>) -> Option<&i32> {
+    pub fn rank_from_key(&self, key: &MortonKey<T>) -> Option<&i32> {
         let ancestors = key.ancestors();
         // assuming of length 1
         let intersection = ancestors.intersection(&self.raw_set).collect_vec();

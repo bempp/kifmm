@@ -1,6 +1,7 @@
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::traits::Kernel as KernelTrait;
 use green_kernels::types::EvalType;
+use mpi::topology::SimpleCommunicator;
 use mpi::traits::Equivalence;
 use num::Float;
 use rlst::{
@@ -8,7 +9,11 @@ use rlst::{
 };
 use std::collections::HashMap;
 
-use crate::fmm::helpers::multi_node::level_index_pointer_multi_node;
+use crate::fmm::helpers::multi_node::{
+    coordinate_index_pointer_multi_node, leaf_expansion_pointers_multi_node,
+    leaf_scales_multi_node, leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
+    level_index_pointer_multi_node, potential_pointers_multi_node,
+};
 use crate::traits::fftw::Dft;
 use crate::traits::fmm::{FmmMetadata, MultiFmm};
 use crate::traits::general::AsComplex;
@@ -80,7 +85,7 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
+    fn metadata(&mut self, eval_type: EvalType, _charges: &[Self::Scalar]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
         let alpha_inner = Scalar::real(ALPHA_INNER);
 
@@ -91,39 +96,115 @@ where
                 panic!("Only potential computation supported for now")
             }
         }
-        let eval_size = match eval_type {
+        let kernel_eval_size = match eval_type {
             EvalType::Value => 1,
             EvalType::ValueDeriv => 4,
         };
 
         let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
         let n_source_points = self.tree.source_tree.n_coordinates_tot().unwrap();
-        let source_trees = self.tree.source_tree().trees();
-        let target_trees = self.tree.target_tree().trees();
         let n_source_keys = self.tree.source_tree().n_keys_tot().unwrap();
         let n_target_keys = self.tree.target_tree().n_keys_tot().unwrap();
         let global_depth = self.tree.source_tree().global_depth();
         let local_depth = self.tree.source_tree().local_depth();
         let total_depth = self.tree.source_tree().local_depth();
 
+        let equivalent_surface_order = self.equivalent_surface_order;
+        let check_surface_order = self.check_surface_order;
+        let n_coeffs_equivalent_surface = self.ncoeffs_equivalent_surface;
+        let n_coeffs_check_surface = self.ncoeffs_check_surface;
+
         // Allocate multipole and local buffers for all locally owned source/target octants
-        let mut multipoles =
-            vec![Scalar::default(); n_source_keys * self.ncoeffs_equivalent_surface];
-        let mut locals = vec![Scalar::default(); n_target_keys * self.ncoeffs_equivalent_surface];
+        let mut multipoles = vec![Scalar::default(); n_source_keys * n_coeffs_equivalent_surface];
+        let mut locals = vec![Scalar::default(); n_target_keys * n_coeffs_equivalent_surface];
 
         // Index pointers of multipole and local data, indexed by level
         let level_index_pointer_multipoles = level_index_pointer_multi_node(&self.tree.source_tree);
         let level_index_pointer_locals = level_index_pointer_multi_node(&self.tree.target_tree);
 
         // Allocate buffers for local potential data
-        let potentials = vec![Scalar::default(); n_target_points * eval_size];
+        let potentials = vec![Scalar::default(); n_target_points * kernel_eval_size];
 
-        // Set layout of local and remote sources
-        self.set_source_layout();
+        // Kernel scale at each target and source leaf
+        let leaf_scales_sources =
+            leaf_scales_multi_node::<Scalar>(&self.tree.source_tree, n_coeffs_equivalent_surface);
+
+        // Pre compute check surfaces
+        let leaf_upward_equivalent_surfaces_sources = leaf_surfaces_multi_node(
+            &self.tree.source_tree,
+            n_coeffs_equivalent_surface,
+            alpha_outer,
+            check_surface_order,
+        );
+
+        let leaf_upward_check_surfaces_sources = leaf_surfaces_multi_node(
+            &self.tree.source_tree,
+            n_coeffs_equivalent_surface,
+            alpha_outer,
+            check_surface_order,
+        );
+
+        let leaf_downward_equivalent_surfaces_targets = leaf_surfaces_multi_node(
+            &self.tree.target_tree,
+            n_coeffs_equivalent_surface,
+            alpha_outer,
+            equivalent_surface_order,
+        );
+
+        // Mutable pointers to multipole and local data, indexed by level
+        let level_multipoles = level_expansion_pointers_multi_node(
+            &self.tree.source_tree,
+            n_coeffs_equivalent_surface,
+            &multipoles,
+        );
+
+        let level_locals = level_expansion_pointers_multi_node(
+            &self.tree.target_tree,
+            n_coeffs_equivalent_surface,
+            &locals,
+        );
+
+        // Mutable pointers to multipole and local data only at leaf level, for utility
+        let leaf_multipoles = leaf_expansion_pointers_multi_node(
+            &self.tree.source_tree,
+            n_coeffs_equivalent_surface,
+            &multipoles,
+        );
+
+        let leaf_locals = leaf_expansion_pointers_multi_node(
+            &self.tree.target_tree,
+            n_coeffs_equivalent_surface,
+            &locals,
+        );
+
+        // Mutable pointers to potential data at each target leaf
+        let potential_send_pointers =
+            potential_pointers_multi_node(&self.tree.target_tree, kernel_eval_size, &potentials);
+
+        // TODO: Add functionality for charges at some point
+        let charges = vec![Scalar::one(); self.tree.source_tree().n_coordinates_tot().unwrap()];
+        let charge_index_pointer_targets =
+            coordinate_index_pointer_multi_node(&self.tree.target_tree);
+        let charge_index_pointer_sources =
+            coordinate_index_pointer_multi_node(&self.tree.source_tree);
 
         // Set metadata
         self.multipoles = multipoles;
+        self.leaf_multipoles = leaf_multipoles;
+        self.level_multipoles = level_multipoles;
         self.locals = locals;
+        self.leaf_locals = leaf_locals;
+        self.level_locals = level_locals;
+        self.potentials = potentials;
+        self.potentials_send_pointers = potential_send_pointers;
+        self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
+        self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
+        self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
+        self.charges = charges;
+        self.charge_index_pointer_sources = charge_index_pointer_sources;
+        self.charge_index_pointer_targets = charge_index_pointer_targets;
+        self.leaf_scales_sources = leaf_scales_sources;
+        self.kernel_eval_size = kernel_eval_size;
     }
 }
 

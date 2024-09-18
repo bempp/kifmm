@@ -76,27 +76,20 @@ pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
 ///
 /// # Arguments
 /// * `tree`- Single node tree
-/// * `ncoeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales<T>(
-    tree: &SingleNodeTree<T::Real>,
-    homogenous: bool,
-    ncoeffs_leaf: usize,
-) -> Vec<T>
+/// * `n_coeffs`- Number of interpolation points on leaf box
+pub fn leaf_scales_single_node<T>(tree: &SingleNodeTree<T::Real>, n_coeffs_leaf: usize) -> Vec<T>
 where
     T: RlstScalar + Default,
 {
-    let mut result = vec![T::default(); tree.n_leaves().unwrap() * ncoeffs_leaf];
+    let mut result = vec![T::default(); tree.n_leaves().unwrap() * n_coeffs_leaf];
 
-    if homogenous {
-        for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-            // Assign scales
-            let l = i * ncoeffs_leaf;
-            let r = l + ncoeffs_leaf;
+    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+        // Assign scales
+        let l = i * n_coeffs_leaf;
+        let r = l + n_coeffs_leaf;
 
-            result[l..r].copy_from_slice(
-                vec![homogenous_kernel_scale(leaf.level()); ncoeffs_leaf].as_slice(),
-            );
-        }
+        result[l..r]
+            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); n_coeffs_leaf].as_slice());
     }
     result
 }
@@ -105,12 +98,12 @@ where
 ///
 /// # Arguments
 /// * `tree`- Single node tree
-/// * `ncoeffs`- Number of interpolation points on leaf box
+/// * `n_coeffs`- Number of interpolation points on leaf box
 /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
 /// * `expansion_order` - Expansion order of the FMM
-pub fn leaf_surfaces<T>(
+pub fn leaf_surfaces_single_node<T>(
     tree: &SingleNodeTree<T>,
-    ncoeffs_leaf: usize,
+    n_coeffs_leaf: usize,
     alpha: T,
     expansion_order_leaf: usize,
 ) -> Vec<T>
@@ -119,12 +112,12 @@ where
 {
     let dim = 3;
     let n_keys = tree.n_leaves().unwrap();
-    let mut result = vec![T::default(); ncoeffs_leaf * dim * n_keys];
+    let mut result = vec![T::default(); n_coeffs_leaf * dim * n_keys];
 
-    for (i, key) in tree.all_leaves().unwrap().iter().enumerate() {
-        let l = i * ncoeffs_leaf * dim;
-        let r = l + ncoeffs_leaf * dim;
-        let surface = key.surface_grid(expansion_order_leaf, tree.domain(), alpha);
+    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+        let l = i * n_coeffs_leaf * dim;
+        let r = l + n_coeffs_leaf * dim;
+        let surface = leaf.surface_grid(expansion_order_leaf, tree.domain(), alpha);
 
         result[l..r].copy_from_slice(&surface);
     }
@@ -134,7 +127,7 @@ where
 
 /// Create an index pointer for the coordinates in a source and a target tree
 /// between the local indices for each leaf and their associated charges
-pub fn coordinate_index_pointer<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
+pub fn coordinate_index_pointer_single_node<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
 where
     T: RlstScalar + Float,
 {
@@ -173,10 +166,10 @@ where
 }
 
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
-pub fn level_expansion_pointers<T>(
+pub fn level_expansion_pointers_single_node<T>(
     tree: &SingleNodeTree<T::Real>,
-    ncoeffs: &[usize],
-    nmatvecs: usize,
+    n_coeffs: &[usize],
+    n_matvecs: usize,
     expansions: &[T],
 ) -> Vec<Vec<Vec<SendPtrMut<T>>>>
 where
@@ -188,20 +181,20 @@ where
     for level in 0..=tree.depth() {
         let mut tmp_multipoles = Vec::new();
 
-        let ncoeffs = if ncoeffs.len() > 1 {
-            ncoeffs[level as usize]
+        let n_coeffs = if n_coeffs.len() > 1 {
+            n_coeffs[level as usize]
         } else {
-            ncoeffs[0]
+            n_coeffs[0]
         };
 
         let keys = tree.keys(level).unwrap();
-        let nkeys_level = keys.len();
+        let n_keys_level = keys.len();
 
-        for (key_idx, _key) in keys.iter().enumerate() {
-            let key_displacement = level_displacement + ncoeffs * nmatvecs * key_idx;
+        for key_idx in 0..n_keys_level {
+            let key_displacement = level_displacement + n_coeffs * n_matvecs * key_idx;
             let mut key_multipoles = Vec::new();
-            for eval_idx in 0..nmatvecs {
-                let eval_displacement = ncoeffs * eval_idx;
+            for eval_idx in 0..n_matvecs {
+                let eval_displacement = n_coeffs * eval_idx;
                 let raw = unsafe {
                     expansions
                         .as_ptr()
@@ -213,44 +206,45 @@ where
         }
         result[level as usize] = tmp_multipoles;
 
-        level_displacement += nkeys_level * ncoeffs * nmatvecs;
+        level_displacement += n_keys_level * n_coeffs * n_matvecs;
     }
 
     result
 }
 
 /// Create mutable pointers for leaf expansions in a tree
-pub fn leaf_expansion_pointers<T>(
+pub fn leaf_expansion_pointers_single_node<T>(
     tree: &SingleNodeTree<T::Real>,
-    ncoeffs: &[usize],
-    nmatvecs: usize,
-    n_leaves: usize,
+    n_coeffs: &[usize],
+    n_matvecs: usize,
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
     T: RlstScalar,
 {
+    let n_leaves = tree.n_leaves().unwrap();
+
     let mut result = vec![Vec::new(); n_leaves];
 
-    let iterator = if ncoeffs.len() > 1 {
-        (0..tree.depth()).zip(ncoeffs.to_vec()).collect_vec()
+    let iterator = if n_coeffs.len() > 1 {
+        (0..tree.depth()).zip(n_coeffs.to_vec()).collect_vec()
     } else {
         (0..tree.depth())
-            .zip(vec![*ncoeffs.last().unwrap(); tree.depth() as usize])
+            .zip(vec![*n_coeffs.last().unwrap(); tree.depth() as usize])
             .collect_vec()
     };
 
-    let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
-        acc + tree.n_keys(level).unwrap() * ncoeffs * nmatvecs
+    let level_displacement = iterator.iter().fold(0usize, |acc, &(level, n_coeffs)| {
+        acc + tree.n_keys(level).unwrap() * n_coeffs * n_matvecs
     });
 
-    let &ncoeffs_leaf = ncoeffs.last().unwrap();
+    let &n_coeffs_leaf = n_coeffs.last().unwrap();
 
-    for (leaf_idx, _leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let key_displacement = level_displacement + (leaf_idx * ncoeffs_leaf) * nmatvecs;
+    for leaf_idx in 0..n_leaves {
+        let key_displacement = level_displacement + (leaf_idx * n_coeffs_leaf) * n_matvecs;
 
-        for eval_idx in 0..nmatvecs {
-            let eval_displacement = ncoeffs_leaf * eval_idx;
+        for eval_idx in 0..n_matvecs {
+            let eval_displacement = n_coeffs_leaf * eval_idx;
             let raw = unsafe {
                 expansions
                     .as_ptr()
@@ -265,22 +259,21 @@ where
 }
 
 /// Create mutable pointers for potentials in a tree
-pub fn potential_pointers<T>(
+pub fn potential_pointers_single_node<T>(
     tree: &SingleNodeTree<T::Real>,
-    nmatvecs: usize,
-    n_leaves: usize,
-    n_points: usize,
+    n_matvecs: usize,
     kernel_eval_size: usize,
     potentials: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
     T: RlstScalar,
 {
-    let mut result = vec![SendPtrMut::default(); n_leaves * nmatvecs];
-    let dim = 3;
+    let n_points = tree.n_coordinates_tot().unwrap();
+    let n_leaves = tree.n_leaves().unwrap();
+    let mut result = vec![SendPtrMut::default(); n_leaves * n_matvecs];
 
     let mut raw_pointers = Vec::new();
-    for eval_idx in 0..nmatvecs {
+    for eval_idx in 0..n_matvecs {
         let ptr = unsafe {
             potentials
                 .as_ptr()
@@ -290,17 +283,15 @@ where
     }
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let n_points;
-        let nevals;
+        let n_evals;
 
-        if let Some(coordinates) = tree.coordinates(leaf) {
-            n_points = coordinates.len() / dim;
-            nevals = n_points * kernel_eval_size;
+        if let Some(n_points) = tree.n_coordinates(leaf) {
+            n_evals = n_points * kernel_eval_size;
         } else {
-            nevals = 0;
+            n_evals = 0;
         }
 
-        for j in 0..nmatvecs {
+        for j in 0..n_matvecs {
             result[n_leaves * j + i] = SendPtrMut {
                 raw: raw_pointers[j],
             }
@@ -308,7 +299,7 @@ where
 
         // Update raw pointer with number of points at this leaf
         for ptr in raw_pointers.iter_mut() {
-            *ptr = unsafe { ptr.add(nevals) }
+            *ptr = unsafe { ptr.add(n_evals) }
         }
     }
 
@@ -319,12 +310,12 @@ where
 pub fn map_charges<T: RlstScalar>(
     global_indices: &[usize],
     charges: &[T],
-    nmatvecs: usize,
+    n_matvecs: usize,
 ) -> Vec<T> {
-    let ncharges = charges.len() / nmatvecs;
+    let ncharges = charges.len() / n_matvecs;
     let mut reordered_charges = vec![T::zero(); charges.len()];
 
-    for eval_idx in 0..nmatvecs {
+    for eval_idx in 0..n_matvecs {
         let eval_displacement = eval_idx * ncharges;
         for (new_idx, old_idx) in global_indices.iter().enumerate() {
             reordered_charges[new_idx + eval_displacement] = charges[old_idx + eval_displacement];
