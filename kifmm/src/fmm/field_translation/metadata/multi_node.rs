@@ -23,8 +23,10 @@ use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
 use crate::linalg::pinv::pinv;
 use crate::traits::fftw::{Dft, DftType};
 use crate::traits::fmm::{FmmMetadata, MultiFmm};
-use crate::traits::general::AsComplex;
-use crate::traits::parallel::GhostExchange;
+use crate::traits::general::{
+    multi_node::GhostExchange,
+    single_node::{AsComplex, Epsilon},
+};
 use crate::traits::tree::{Domain, FmmTreeNode, MultiFmmTree, MultiTree};
 use crate::tree::constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM};
 use crate::tree::helpers::find_corners;
@@ -38,7 +40,6 @@ use crate::{
             SourceToTargetTranslationMetadata,
         },
         fmm::HomogenousKernel,
-        general::Epsilon,
     },
     tree::constants::{ALPHA_INNER, ALPHA_OUTER},
     BlasFieldTranslationSaRcmp,
@@ -234,10 +235,10 @@ where
 
         for level in 2..=self.tree.source_tree().total_depth() {
             let sources = self.tree.source_tree().keys(level).unwrap_or_default();
-            let nsources = sources.len();
+            let n_sources = sources.len();
 
-            let sentinel = nsources;
-            let result = vec![vec![sentinel; nsources]; 316];
+            let sentinel = n_sources;
+            let result = vec![vec![sentinel; n_sources]; 316];
             let result = result.into_iter().map(RwLock::new).collect_vec();
 
             let tmp = HashSet::new();

@@ -16,16 +16,16 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(15));
 
-    let nsources = 1000000;
-    let ntargets = 1000000;
-    let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-    let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+    let n_sources = 1000000;
+    let n_targets = 1000000;
+    let sources = points_fixture::<f32>(n_sources, None, None, Some(0));
+    let targets = points_fixture::<f32>(n_targets, None, None, Some(1));
 
     // 3 Digits
     {
         let nvecs = 5;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         // BLAS based M2L for a vector of charges
@@ -70,8 +70,8 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         let nvecs = 10;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         // BLAS based M2L for a vector of charges
@@ -119,8 +119,8 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     // 4 Digits
     {
         let nvecs = 5;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         // BLAS based M2L for a vector of charges
@@ -165,8 +165,8 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         let nvecs = 10;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         // BLAS based M2L for a vector of charges

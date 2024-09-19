@@ -23,10 +23,10 @@
 //! use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 //!
 //! // Setup random sources and targets
-//! let nsources = 1000;
-//! let ntargets = 2000;
-//! let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-//! let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+//! let n_sources = 1000;
+//! let n_targets = 2000;
+//! let sources = points_fixture::<f32>(n_sources, None, None, Some(0));
+//! let targets = points_fixture::<f32>(n_targets, None, None, Some(1));
 //!
 //! // FMM parameters
 //! let n_crit = Some(150); // Threshold for number of particles in a leaf box
@@ -37,8 +37,8 @@
 //! // FFT based Field Translation
 //! {
 //!     let nvecs = 1;
-//!     let tmp = vec![1.0; nsources * nvecs];
-//!     let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+//!     let tmp = vec![1.0; n_sources * nvecs];
+//!     let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
 //!     charges.data_mut().copy_from_slice(&tmp);
 //!
 //!     // Build FMM object, with a given kernel and field translation
@@ -61,8 +61,8 @@
 //!
 //!     // Optionally clear, to re-evaluate with new charges
 //!     let nvecs = 1;
-//!     let tmp = vec![1.0; nsources * nvecs];
-//!     let mut new_charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+//!     let tmp = vec![1.0; n_sources * nvecs];
+//!     let mut new_charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
 //!     new_charges.data_mut().copy_from_slice(&tmp);
 //!     fmm_fft.clear(charges.data());
 //! }

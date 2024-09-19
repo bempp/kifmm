@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::traits::fmm::{HomogenousKernel, MultiFmm, SourceTranslation, TargetTranslation};
-use crate::traits::parallel::GhostExchange;
+use crate::traits::general::multi_node::GhostExchange;
 use crate::traits::tree::{MultiFmmTree, MultiTree};
 use crate::traits::types::{FmmOperatorTime, FmmOperatorType};
 use crate::traits::{

@@ -16,15 +16,15 @@ use kifmm::traits::fmm::Fmm;
 fn main() {
     // Generate some random source/target/charge data
     let dim = 3;
-    let nsources = 1000000;
-    let ntargets = 2000000;
+    let n_sources = 1000000;
+    let n_targets = 2000000;
 
     // The number of vectors of source densities, FMM is configured from data
     let n = 1;
     let mut rng = thread_rng();
-    let mut sources = vec![0f32; nsources * dim * n];
-    let mut targets = vec![0f32; ntargets * dim * n];
-    let mut charges = vec![0f32; nsources * n];
+    let mut sources = vec![0f32; n_sources * dim * n];
+    let mut targets = vec![0f32; n_targets * dim * n];
+    let mut charges = vec![0f32; n_sources * n];
 
     sources.iter_mut().for_each(|s| *s = rng.gen());
     targets.iter_mut().for_each(|t| *t = rng.gen());

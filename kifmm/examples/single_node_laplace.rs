@@ -6,10 +6,10 @@ use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 fn main() {
     // Setup random sources and targets
-    let nsources = 1000;
-    let ntargets = 2000;
-    let sources = points_fixture::<f32>(nsources, None, None, Some(0));
-    let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
+    let n_sources = 1000;
+    let n_targets = 2000;
+    let sources = points_fixture::<f32>(n_sources, None, None, Some(0));
+    let targets = points_fixture::<f32>(n_targets, None, None, Some(1));
 
     // FMM parameters
     let n_crit = Some(150);
@@ -20,8 +20,8 @@ fn main() {
     // FFT based M2L for a vector of charges
     {
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         let mut fmm_fft = SingleNodeBuilder::new()
@@ -44,10 +44,10 @@ fn main() {
     {
         // Vector of charges
         let nvecs = 1;
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges
             .data_mut()
-            .chunks_exact_mut(nsources)
+            .chunks_exact_mut(n_sources)
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
@@ -75,10 +75,10 @@ fn main() {
 
         // Matrix of charges
         let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(f32, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges
             .data_mut()
-            .chunks_exact_mut(nsources)
+            .chunks_exact_mut(n_sources)
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 

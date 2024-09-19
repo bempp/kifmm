@@ -49,7 +49,7 @@ where
         let m2l_operator_index = self.m2l_operator_index(level);
         let c2e_operator_index = self.c2e_operator_index(level);
         let displacement_index = self.displacement_index(level);
-        let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
 
         let sentinel = sources.len();
 
@@ -85,8 +85,8 @@ where
             .collect_vec();
 
         // Number of sources at this level
-        let nsources = sources.len();
-        let ntargets = targets.len();
+        let n_sources = sources.len();
+        let n_targets = targets.len();
 
         // Lookup multipole data from source tree
         let multipoles = self.multipoles(level).unwrap();
@@ -94,19 +94,19 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let multipoles =
-                    rlst_array_from_slice2!(multipoles, [ncoeffs_equivalent_surface, nsources]);
+                    rlst_array_from_slice2!(multipoles, [n_coeffs_equivalent_surface, n_sources]);
 
                 // Allocate buffer to store compressed check potentials
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     Scalar,
                     [
                         self.source_to_target.cutoff_rank[m2l_operator_index],
-                        ntargets
+                        n_targets
                     ]
                 );
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
-                for i in 0..ntargets {
+                for i in 0..n_targets {
                     let raw = unsafe {
                         compressed_check_potentials
                             .data()
@@ -220,7 +220,7 @@ where
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
-                        std::slice::from_raw_parts_mut(ptr, ntargets * ncoeffs_equivalent_surface)
+                        std::slice::from_raw_parts_mut(ptr, n_targets * n_coeffs_equivalent_surface)
                     };
                     all_locals
                         .iter_mut()
@@ -230,27 +230,27 @@ where
 
                 return Ok(());
             }
-            FmmEvalType::Matrix(nmatvecs) => {
+            FmmEvalType::Matrix(n_matvecs) => {
                 let multipoles = rlst_array_from_slice2!(
                     multipoles,
-                    [ncoeffs_equivalent_surface, nsources * nmatvecs]
+                    [n_coeffs_equivalent_surface, n_sources * n_matvecs]
                 );
 
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     Scalar,
                     [
                         self.source_to_target.cutoff_rank[m2l_operator_index],
-                        ntargets * nmatvecs
+                        n_targets * n_matvecs
                     ]
                 );
 
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
-                for i in 0..ntargets {
+                for i in 0..n_targets {
                     let key_displacement =
-                        i * self.source_to_target.cutoff_rank[m2l_operator_index] * nmatvecs;
+                        i * self.source_to_target.cutoff_rank[m2l_operator_index] * n_matvecs;
                     let mut tmp = Vec::new();
-                    for charge_vec_idx in 0..nmatvecs {
+                    for charge_vec_idx in 0..n_matvecs {
                         let charge_vec_displacement =
                             charge_vec_idx * self.source_to_target.cutoff_rank[m2l_operator_index];
 
@@ -304,7 +304,7 @@ where
                                 Scalar,
                                 [
                                     self.source_to_target.cutoff_rank[m2l_operator_index],
-                                    multipole_idxs.len() * nmatvecs
+                                    multipole_idxs.len() * n_matvecs
                                 ]
                             );
 
@@ -313,13 +313,13 @@ where
                             {
                                 let key_displacement_global = global_multipole_idx
                                     * self.source_to_target.cutoff_rank[m2l_operator_index]
-                                    * nmatvecs;
+                                    * n_matvecs;
 
                                 let key_displacement_local = local_multipole_idx
                                     * self.source_to_target.cutoff_rank[m2l_operator_index]
-                                    * nmatvecs;
+                                    * n_matvecs;
 
-                                for charge_vec_idx in 0..nmatvecs {
+                                for charge_vec_idx in 0..n_matvecs {
                                     let charge_vec_displacement = charge_vec_idx
                                         * self.source_to_target.cutoff_rank[m2l_operator_index];
 
@@ -357,7 +357,7 @@ where
                                     .lock()
                                     .unwrap();
 
-                                for charge_vec_idx in 0..nmatvecs {
+                                for charge_vec_idx in 0..n_matvecs {
                                     let check_potential_ptr =
                                         check_potential_lock[charge_vec_idx].raw;
                                     let check_potential = unsafe {
@@ -369,7 +369,7 @@ where
 
                                     let key_displacement = local_multipole_idx
                                         * self.source_to_target.cutoff_rank[m2l_operator_index]
-                                        * nmatvecs;
+                                        * n_matvecs;
                                     let charge_vec_displacement = charge_vec_idx
                                         * self.source_to_target.cutoff_rank[m2l_operator_index];
 
@@ -404,7 +404,7 @@ where
                     let all_locals = unsafe {
                         std::slice::from_raw_parts_mut(
                             ptr,
-                            ntargets * ncoeffs_equivalent_surface * nmatvecs,
+                            n_targets * n_coeffs_equivalent_surface * n_matvecs,
                         )
                     };
                     all_locals
@@ -456,8 +456,8 @@ where
         let m2l_operator_index = self.m2l_operator_index(level);
         let c2e_operator_index = self.c2e_operator_index(level);
         let displacement_index = self.displacement_index(level);
-        let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
-        let ncoeffs_check_surface = self.ncoeffs_check_surface(level);
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+        let n_coeffs_check_surface = self.n_coeffs_check_surface(level);
         let sentinel = sources.len();
 
         // Compute the displacements
@@ -492,8 +492,8 @@ where
             .collect_vec();
 
         // Number of sources at this level
-        let nsources = sources.len();
-        let ntargets = targets.len();
+        let n_sources = sources.len();
+        let n_targets = targets.len();
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -502,23 +502,23 @@ where
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            ncoeffs_equivalent_surface * nsources,
+                            n_coeffs_equivalent_surface * n_sources,
                         )
                     },
-                    [ncoeffs_equivalent_surface, nsources]
+                    [n_coeffs_equivalent_surface, n_sources]
                 );
 
                 // Allocate buffer to store check potentials
                 let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, ntargets]);
+                    rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets]);
                 let mut check_potentials_ptrs = Vec::new();
 
-                for i in 0..ntargets {
+                for i in 0..n_targets {
                     let raw = unsafe {
                         check_potentials
                             .data()
                             .as_ptr()
-                            .add(i * ncoeffs_check_surface) as *mut Scalar
+                            .add(i * n_coeffs_check_surface) as *mut Scalar
                     };
                     let send_ptr = SendPtrMut { raw };
                     check_potentials_ptrs.push(send_ptr);
@@ -539,20 +539,20 @@ where
 
                             let mut multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
-                                [ncoeffs_equivalent_surface, multipole_idxs.len()]
+                                [n_coeffs_equivalent_surface, multipole_idxs.len()]
                             );
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
                                 multipoles_subset.data_mut()[local_multipole_idx
-                                    * ncoeffs_equivalent_surface
-                                    ..(local_multipole_idx + 1) * ncoeffs_equivalent_surface]
+                                    * n_coeffs_equivalent_surface
+                                    ..(local_multipole_idx + 1) * n_coeffs_equivalent_surface]
                                     .copy_from_slice(
                                         &multipoles.data()[global_multipole_idx
-                                            * ncoeffs_equivalent_surface
+                                            * n_coeffs_equivalent_surface
                                             ..(global_multipole_idx + 1)
-                                                * ncoeffs_equivalent_surface],
+                                                * n_coeffs_equivalent_surface],
                                     );
                             }
 
@@ -567,8 +567,8 @@ where
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let tmp = &check_potential.data()[multipole_idx
-                                    * ncoeffs_check_surface
-                                    ..(multipole_idx + 1) * ncoeffs_check_surface];
+                                    * n_coeffs_check_surface
+                                    ..(multipole_idx + 1) * n_coeffs_check_surface];
 
                                 let check_potential_lock =
                                     level_check_potentials[local_idx].lock().unwrap();
@@ -576,7 +576,7 @@ where
                                 let global_check_potential = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         check_potential_ptr,
-                                        ncoeffs_check_surface,
+                                        n_coeffs_check_surface,
                                     )
                                 };
 
@@ -600,7 +600,7 @@ where
 
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
-                        std::slice::from_raw_parts_mut(ptr, ntargets * ncoeffs_equivalent_surface)
+                        std::slice::from_raw_parts_mut(ptr, n_targets * n_coeffs_equivalent_surface)
                     };
                     all_locals
                         .iter_mut()
@@ -610,28 +610,28 @@ where
 
                 return Ok(());
             }
-            FmmEvalType::Matrix(nmatvecs) => {
+            FmmEvalType::Matrix(n_matvecs) => {
                 // Lookup multipole data from source tree
                 let multipoles = rlst_array_from_slice2!(
                     unsafe {
                         std::slice::from_raw_parts(
                             self.level_multipoles[level as usize][0][0].raw,
-                            ncoeffs_equivalent_surface * nsources * nmatvecs,
+                            n_coeffs_equivalent_surface * n_sources * n_matvecs,
                         )
                     },
-                    [ncoeffs_equivalent_surface, nsources * nmatvecs]
+                    [n_coeffs_equivalent_surface, n_sources * n_matvecs]
                 );
 
                 let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [ncoeffs_check_surface, nsources * nmatvecs]);
+                    rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_sources * n_matvecs]);
 
                 let mut check_potentials_ptrs = Vec::new();
 
-                for i in 0..ntargets {
-                    let key_displacement = i * ncoeffs_check_surface * nmatvecs;
+                for i in 0..n_targets {
+                    let key_displacement = i * n_coeffs_check_surface * n_matvecs;
                     let mut tmp = Vec::new();
-                    for charge_vec_idx in 0..nmatvecs {
-                        let charge_vec_displacement = charge_vec_idx * ncoeffs_check_surface;
+                    for charge_vec_idx in 0..n_matvecs {
+                        let charge_vec_displacement = charge_vec_idx * n_coeffs_check_surface;
 
                         let raw = unsafe {
                             check_potentials
@@ -661,33 +661,36 @@ where
 
                             let mut multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
-                                [ncoeffs_equivalent_surface, multipole_idxs.len() * nmatvecs]
+                                [
+                                    n_coeffs_equivalent_surface,
+                                    multipole_idxs.len() * n_matvecs
+                                ]
                             );
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
                                 let key_displacement_global =
-                                    global_multipole_idx * ncoeffs_equivalent_surface * nmatvecs;
+                                    global_multipole_idx * n_coeffs_equivalent_surface * n_matvecs;
 
                                 let key_displacement_local =
-                                    local_multipole_idx * ncoeffs_equivalent_surface * nmatvecs;
+                                    local_multipole_idx * n_coeffs_equivalent_surface * n_matvecs;
 
-                                for charge_vec_idx in 0..nmatvecs {
+                                for charge_vec_idx in 0..n_matvecs {
                                     let charge_vec_displacement =
-                                        charge_vec_idx * ncoeffs_equivalent_surface;
+                                        charge_vec_idx * n_coeffs_equivalent_surface;
 
                                     multipoles_subset.data_mut()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
-                                            + ncoeffs_equivalent_surface]
+                                            + n_coeffs_equivalent_surface]
                                         .copy_from_slice(
                                             &multipoles.data()[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
-                                                    + ncoeffs_equivalent_surface],
+                                                    + n_coeffs_equivalent_surface],
                                         );
                                 }
                             }
@@ -707,24 +710,24 @@ where
                                 let check_potential_lock =
                                     level_check_potentials[global_local_idx].lock().unwrap();
 
-                                for charge_vec_idx in 0..nmatvecs {
+                                for charge_vec_idx in 0..n_matvecs {
                                     let key_displacement =
-                                        local_multipole_idx * ncoeffs_check_surface * nmatvecs;
+                                        local_multipole_idx * n_coeffs_check_surface * n_matvecs;
                                     let charge_vec_displacement =
-                                        charge_vec_idx * ncoeffs_check_surface;
+                                        charge_vec_idx * n_coeffs_check_surface;
 
                                     let tmp = &check_potential.data()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement
-                                            + ncoeffs_check_surface];
+                                            + n_coeffs_check_surface];
 
                                     let check_potential_ptr =
                                         check_potential_lock[charge_vec_idx].raw;
                                     let check_potential = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             check_potential_ptr,
-                                            ncoeffs_check_surface,
+                                            n_coeffs_check_surface,
                                         )
                                     };
 
@@ -751,7 +754,7 @@ where
                     let all_locals = unsafe {
                         std::slice::from_raw_parts_mut(
                             ptr,
-                            ntargets * ncoeffs_equivalent_surface * nmatvecs,
+                            n_targets * n_coeffs_equivalent_surface * n_matvecs,
                         )
                     };
                     all_locals

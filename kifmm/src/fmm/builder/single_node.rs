@@ -16,7 +16,7 @@ use crate::{
             SourceToTargetTranslationMetadata,
         },
         fmm::{FmmMetadata, HomogenousKernel},
-        general::Epsilon,
+        general::single_node::Epsilon,
         tree::{SingleFmmTree, SingleTree},
     },
     tree::{types::Domain, SingleNodeTree},
@@ -44,8 +44,8 @@ where
             equivalent_surface_order: None,
             check_surface_order: None,
             variable_expansion_order: None,
-            ncoeffs_equivalent_surface: None,
-            ncoeffs_check_surface: None,
+            n_coeffs_equivalent_surface: None,
+            n_coeffs_check_surface: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
             depth_set: None,
@@ -68,8 +68,8 @@ where
         prune_empty: bool,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
-        let nsources = sources.len() / dim;
-        let ntargets = targets.len() / dim;
+        let n_sources = sources.len() / dim;
+        let n_targets = targets.len() / dim;
 
         let dims = sources.len() % dim;
         let dimt = targets.len() % dim;
@@ -79,7 +79,7 @@ where
                 std::io::ErrorKind::InvalidData,
                 "Only 3D FMM supported",
             ))
-        } else if nsources == 0 || ntargets == 0 {
+        } else if n_sources == 0 || n_targets == 0 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Must have a positive number of source or target particles",
@@ -102,10 +102,14 @@ where
                 self.depth_set = Some(true);
             } else if depth.is_none() && n_crit.is_some() {
                 // Estimate depth based on a uniform distribution
-                source_depth =
-                    SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit.unwrap());
-                target_depth =
-                    SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit.unwrap());
+                source_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
+                    n_sources as u64,
+                    n_crit.unwrap(),
+                );
+                target_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
+                    n_targets as u64,
+                    n_crit.unwrap(),
+                );
                 self.depth_set = Some(false);
             } else {
                 return Err(std::io::Error::new(
@@ -170,12 +174,12 @@ where
                 .source_tree()
                 .n_coordinates_tot()
                 .unwrap();
-            let nmatvecs = charges.len() / ncharges;
+            let n_matvecs = charges.len() / ncharges;
 
-            self.charges = Some(map_charges(global_indices, charges, nmatvecs));
+            self.charges = Some(map_charges(global_indices, charges, n_matvecs));
 
-            if nmatvecs > 1 {
-                self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))
+            if n_matvecs > 1 {
+                self.fmm_eval_type = Some(FmmEvalType::Matrix(n_matvecs))
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
@@ -209,14 +213,14 @@ where
                 expansion_order.to_vec()
             };
 
-            self.ncoeffs_equivalent_surface = Some(
+            self.n_coeffs_equivalent_surface = Some(
                 expansion_order
                     .iter()
                     .map(|&e| ncoeffs_kifmm(e))
                     .collect_vec(),
             );
 
-            self.ncoeffs_check_surface = Some(
+            self.n_coeffs_check_surface = Some(
                 check_surface_order
                     .iter()
                     .map(|&c| ncoeffs_kifmm(c))
@@ -252,8 +256,8 @@ where
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
                 variable_expansion_order: self.variable_expansion_order.unwrap(),
-                ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
-                ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
+                n_coeffs_equivalent_surface: self.n_coeffs_equivalent_surface.unwrap(),
+                n_coeffs_check_surface: self.n_coeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),

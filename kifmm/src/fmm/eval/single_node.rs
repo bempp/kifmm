@@ -51,12 +51,12 @@ where
         self.check_surface_order[self.expansion_index(level)]
     }
 
-    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize {
-        self.ncoeffs_equivalent_surface[self.expansion_index(level)]
+    fn n_coeffs_equivalent_surface(&self, level: u64) -> usize {
+        self.n_coeffs_equivalent_surface[self.expansion_index(level)]
     }
 
-    fn ncoeffs_check_surface(&self, level: u64) -> usize {
-        self.ncoeffs_check_surface[self.expansion_index(level)]
+    fn n_coeffs_check_surface(&self, level: u64) -> usize {
+        self.n_coeffs_check_surface[self.expansion_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -78,11 +78,11 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()),
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
-                    FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
+                    FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()) * nmatvecs,
+                        self.n_coeffs_equivalent_surface(key.level()) * n_matvecs,
                     )),
                 }
             }
@@ -93,16 +93,16 @@ where
 
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
         let multipole_ptr = &self.level_multipoles[level as usize][0][0];
-        let nsources = self.tree.source_tree.n_keys(level).unwrap();
+        let n_sources = self.tree.source_tree.n_keys(level).unwrap();
         unsafe {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                     multipole_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * nsources,
+                    self.n_coeffs_equivalent_surface(level) * n_sources,
                 )),
-                FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
+                FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
                     multipole_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * nsources * nmatvecs,
+                    self.n_coeffs_equivalent_surface(level) * n_sources * n_matvecs,
                 )),
             }
         }
@@ -119,11 +119,11 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()),
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
-                    FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
+                    FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()) * nmatvecs,
+                        self.n_coeffs_equivalent_surface(key.level()) * n_matvecs,
                     )),
                 }
             }
@@ -134,16 +134,16 @@ where
 
     fn locals(&self, level: u64) -> Option<&[Self::Scalar]> {
         let local_ptr = &self.level_locals[level as usize][0][0];
-        let ntargets = self.tree.target_tree.n_keys(level).unwrap();
+        let n_targets = self.tree.target_tree.n_keys(level).unwrap();
         unsafe {
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                     local_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * ntargets,
+                    self.n_coeffs_equivalent_surface(level) * n_targets,
                 )),
-                FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
+                FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
                     local_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * ntargets * nmatvecs,
+                    self.n_coeffs_equivalent_surface(level) * n_targets * n_matvecs,
                 )),
             }
         }
@@ -155,22 +155,22 @@ where
     ) -> Option<Vec<&[Self::Scalar]>> {
         if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
             let (l, r) = self.charge_index_pointer_targets[leaf_idx];
-            let ntargets = r - l;
+            let n_targets = r - l;
 
             match self.fmm_eval_type {
                 FmmEvalType::Vector => Some(vec![
                     &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
                 ]),
-                FmmEvalType::Matrix(nmatvecs) => {
+                FmmEvalType::Matrix(n_matvecs) => {
                     let n_leaves = self.tree.target_tree().n_leaves().unwrap();
                     let mut slices = Vec::new();
-                    for eval_idx in 0..nmatvecs {
+                    for eval_idx in 0..n_matvecs {
                         let potentials_pointer =
                             self.potentials_send_pointers[eval_idx * n_leaves + leaf_idx].raw;
                         slices.push(unsafe {
                             std::slice::from_raw_parts(
                                 potentials_pointer,
-                                ntargets * self.kernel_eval_size,
+                                n_targets * self.kernel_eval_size,
                             )
                         });
                     }
@@ -282,28 +282,28 @@ where
 
         let leaf_multipoles = leaf_expansion_pointers_single_node(
             self.tree().source_tree(),
-            &self.ncoeffs_equivalent_surface,
+            &self.n_coeffs_equivalent_surface,
             n_matvecs,
             &self.multipoles,
         );
 
         let level_multipoles = level_expansion_pointers_single_node(
             self.tree().source_tree(),
-            &self.ncoeffs_equivalent_surface,
+            &self.n_coeffs_equivalent_surface,
             n_matvecs,
             &self.multipoles,
         );
 
         let level_locals = level_expansion_pointers_single_node(
             self.tree().target_tree(),
-            &self.ncoeffs_equivalent_surface,
+            &self.n_coeffs_equivalent_surface,
             n_matvecs,
             &self.locals,
         );
 
         let leaf_locals = leaf_expansion_pointers_single_node(
             self.tree().target_tree(),
-            &self.ncoeffs_equivalent_surface,
+            &self.n_coeffs_equivalent_surface,
             n_matvecs,
             &self.locals,
         );
@@ -372,14 +372,14 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
+        let n_targets = leaf_targets.len() / fmm.dim();
 
-        let [nsources, nmatvecs] = charges.shape();
+        let [n_sources, n_matvecs] = charges.shape();
 
-        for i in 0..nmatvecs {
+        for i in 0..n_matvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
-            let mut direct_i = vec![T::Real::zero(); ntargets * eval_size];
+            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let mut direct_i = vec![T::Real::zero(); n_targets * eval_size];
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
@@ -425,14 +425,14 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
+        let n_targets = leaf_targets.len() / fmm.dim();
 
-        let [nsources, nmatvecs] = charges.shape();
+        let [n_sources, n_matvecs] = charges.shape();
 
-        for i in 0..nmatvecs {
+        for i in 0..n_matvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
-            let mut direct_i = vec![T::zero(); ntargets * eval_size];
+            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let mut direct_i = vec![T::zero(); n_targets * eval_size];
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
@@ -479,8 +479,8 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
-        let mut direct = vec![T::zero(); ntargets * eval_size];
+        let n_targets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::zero(); n_targets * eval_size];
 
         fmm.kernel().evaluate_st(
             eval_type,
@@ -530,8 +530,8 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
-        let mut direct = vec![T::Real::zero(); ntargets * eval_size];
+        let n_targets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::Real::zero(); n_targets * eval_size];
 
         fmm.kernel().evaluate_st(
             eval_type,
@@ -572,16 +572,16 @@ mod test {
             T::from(ALPHA_INNER).unwrap().re(),
         );
 
-        let ncoeffs = fmm.ncoeffs_equivalent_surface(0);
+        let ncoeffs = fmm.n_coeffs_equivalent_surface(0);
 
         let test_point = vec![T::real(100000.), T::Real::zero(), T::Real::zero()];
         let mut expected = vec![T::Real::zero()];
         let mut found = vec![T::Real::zero()];
 
-        let [nsources, nvecs] = charges.shape();
+        let [n_sources, nvecs] = charges.shape();
 
         for i in 0..nvecs {
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
+            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
             let multipole_i = &multipoles[ncoeffs * i..(i + 1) * ncoeffs];
 
             println!(
@@ -673,10 +673,10 @@ mod test {
     #[test]
     fn test_upward_pass_vector_laplace() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -692,7 +692,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm_fft = SingleNodeBuilder::new()
@@ -739,10 +739,10 @@ mod test {
     #[test]
     fn test_upward_pass_matrix_laplace() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         // let n_crit = Some(100);
@@ -758,7 +758,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
@@ -788,13 +788,13 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -806,7 +806,7 @@ mod test {
         // Set charge data and evaluate an FMM
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
@@ -845,13 +845,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector_variable_expansion_order() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -867,7 +867,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // FFT based field translation
@@ -989,13 +989,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = Some(150);
@@ -1010,7 +1010,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
@@ -1079,13 +1079,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_matrix_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = Some(150);
@@ -1099,7 +1099,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
@@ -1139,13 +1139,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector_variable_surfaces_variable_expansion_order() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -1160,7 +1160,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
@@ -1229,10 +1229,10 @@ mod test {
     #[test]
     fn test_upward_pass_vector_helmholtz() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         // let n_crit = Some(100);
@@ -1247,7 +1247,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let wavenumber = 2.5;
@@ -1274,10 +1274,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
 
@@ -1292,7 +1292,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1399,10 +1399,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector_variable_expansion_order() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
 
@@ -1417,7 +1417,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1524,10 +1524,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
 
@@ -1543,7 +1543,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1601,10 +1601,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_matrix_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
 
         // FMM parameters
@@ -1619,7 +1619,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1652,13 +1652,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_matrix() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -1673,10 +1673,10 @@ mod test {
         // Charge data
         let nvecs = 5;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges
             .data_mut()
-            .chunks_exact_mut(nsources)
+            .chunks_exact_mut(n_sources)
             .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
 
         // fmm with blas based field translation
@@ -1741,13 +1741,13 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_matrix() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -1763,10 +1763,10 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges
             .data_mut()
-            .chunks_exact_mut(nsources)
+            .chunks_exact_mut(n_sources)
             .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
 
         // fmm with blas based field translation

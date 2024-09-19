@@ -21,7 +21,7 @@ use crate::{
     traits::{
         fftw::Dft,
         fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
-        general::{AsComplex, Hadamard8x8},
+        general::single_node::{AsComplex, Hadamard8x8},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
@@ -67,11 +67,11 @@ where
                 let fft_map_index = self.fft_map_index(level);
                 let c2e_operator_index = self.c2e_operator_index(level);
                 let displacement_index = self.displacement_index(level);
-                let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
+                let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
 
                 // Number of target and source boxes at this level
-                let ntargets = targets.len();
-                let nsources = sources.len();
+                let n_targets = targets.len();
+                let n_sources = sources.len();
 
                 // Find parents of targets
                 let targets_parents: HashSet<MortonKey<_>> =
@@ -100,7 +100,7 @@ where
                 // Buffer to store FFT of multipole data in frequency order
                 let nzeros = 8; // pad amount
                 let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> =
-                    AlignedVec::new(size_out * (nsources + nzeros));
+                    AlignedVec::new(size_out * (n_sources + nzeros));
 
                 // A thread safe mutable pointer for saving to this vector
                 let signals_hat_f_ptr = SendPtrMut {
@@ -133,11 +133,11 @@ where
                     &self.source_to_target.metadata[m2l_operator_index].kernel_data_f;
 
                 // Allocate buffer to store the check potentials in frequency order
-                let mut check_potentials_hat_f = AlignedVec::new(size_out * ntargets);
+                let mut check_potentials_hat_f = AlignedVec::new(size_out * n_targets);
 
                 // Allocate buffer to store the check potentials in box order
-                let mut check_potential_hat_c = AlignedVec::new(size_out * ntargets);
-                let mut check_potential = AlignedVec::new(size_in * ntargets);
+                let mut check_potential_hat_c = AlignedVec::new(size_out * n_targets);
+                let mut check_potential = AlignedVec::new(size_in * n_targets);
 
                 // 1. Compute FFT of all multipoles in source boxes at this level
                 {
@@ -147,7 +147,7 @@ where
 
                     multipoles
                         .par_chunks_exact(
-                            ncoeffs_equivalent_surface * NSIBLINGS * chunk_size_pre_proc,
+                            n_coeffs_equivalent_surface * NSIBLINGS * chunk_size_pre_proc,
                         )
                         .enumerate()
                         .for_each(|(i, multipole_chunk)| {
@@ -156,8 +156,8 @@ where
                                 AlignedVec::new(size_in * NSIBLINGS * chunk_size_pre_proc);
 
                             for i in 0..NSIBLINGS * chunk_size_pre_proc {
-                                let multipole = &multipole_chunk[i * ncoeffs_equivalent_surface
-                                    ..(i + 1) * ncoeffs_equivalent_surface];
+                                let multipole = &multipole_chunk[i * n_coeffs_equivalent_surface
+                                    ..(i + 1) * n_coeffs_equivalent_surface];
                                 let signal = &mut signal_chunk[i * size_in..(i + 1) * size_in];
                                 for (surf_idx, &conv_idx) in self.source_to_target.surf_to_conv_map
                                     [fft_map_index]
@@ -210,7 +210,7 @@ where
                                 let ptr = signals_hat_f_ptr;
 
                                 for i in 0..size_out {
-                                    let frequency_offset = i * (nsources + nzeros);
+                                    let frequency_offset = i * (n_sources + nzeros);
 
                                     // Head of buffer for each frequency
                                     let head = ptr.raw.add(frequency_offset).add(sibling_offset);
@@ -238,8 +238,8 @@ where
                 {
                     (0..size_out)
                         .into_par_iter()
-                        .zip(signals_hat_f.par_chunks_exact(nsources + nzeros))
-                        .zip(check_potentials_hat_f.par_chunks_exact_mut(ntargets))
+                        .zip(signals_hat_f.par_chunks_exact(n_sources + nzeros))
+                        .zip(check_potentials_hat_f.par_chunks_exact_mut(n_targets))
                         .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
                             (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
                                 |chunk_start| {
@@ -306,7 +306,7 @@ where
                             // Lookup all frequencies for this target box
                             for j in 0..size_out {
                                 check_potential_hat_chunk[j] =
-                                    check_potentials_hat_f[j * ntargets + i]
+                                    check_potentials_hat_f[j * n_targets + i]
                             }
                         });
 
@@ -329,7 +329,7 @@ where
                             // Map to surface grid
                             let mut potential_chunk = rlst_dynamic_array2!(
                                 Scalar,
-                                [ncoeffs_equivalent_surface, NSIBLINGS]
+                                [n_coeffs_equivalent_surface, NSIBLINGS]
                             );
 
                             for i in 0..NSIBLINGS {
@@ -354,13 +354,13 @@ where
 
                             local_chunk
                                 .data()
-                                .chunks_exact(ncoeffs_equivalent_surface)
+                                .chunks_exact(n_coeffs_equivalent_surface)
                                 .zip(local_ptrs)
                                 .for_each(|(result, local)| {
                                     let local = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             local[0].raw,
-                                            ncoeffs_equivalent_surface,
+                                            n_coeffs_equivalent_surface,
                                         )
                                     };
                                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);

@@ -293,9 +293,9 @@ pub mod constructors {
     /// - `nexpansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -315,9 +315,9 @@ pub mod constructors {
         nexpansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -332,8 +332,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
 
         let expansion_order =
@@ -393,9 +393,9 @@ pub mod constructors {
     /// - `nexpansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -415,9 +415,9 @@ pub mod constructors {
         nexpansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -432,8 +432,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
 
         let expansion_order =
@@ -493,9 +493,9 @@ pub mod constructors {
     /// - `nexpansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -517,9 +517,9 @@ pub mod constructors {
         nexpansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -536,8 +536,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
 
         let expansion_order =
@@ -609,9 +609,9 @@ pub mod constructors {
     /// - `nexpansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -633,9 +633,9 @@ pub mod constructors {
         nexpansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -652,8 +652,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
 
         let expansion_order =
@@ -724,9 +724,9 @@ pub mod constructors {
     /// - `nexpansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -745,9 +745,9 @@ pub mod constructors {
         nexpansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -761,8 +761,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
 
         let expansion_order =
@@ -812,9 +812,9 @@ pub mod constructors {
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `nexpansion_order`: The number of expansion orders.
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -833,9 +833,9 @@ pub mod constructors {
         nexpansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -849,8 +849,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
 
         let expansion_order =
@@ -903,9 +903,9 @@ pub mod constructors {
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -926,9 +926,9 @@ pub mod constructors {
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -943,8 +943,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
 
         let expansion_order =
@@ -1001,9 +1001,9 @@ pub mod constructors {
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -1024,9 +1024,9 @@ pub mod constructors {
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -1041,8 +1041,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
 
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
 
@@ -1099,9 +1099,9 @@ pub mod constructors {
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -1121,9 +1121,9 @@ pub mod constructors {
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -1137,8 +1137,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
 
         let expansion_order =
@@ -1190,9 +1190,9 @@ pub mod constructors {
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -1212,9 +1212,9 @@ pub mod constructors {
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         prune_empty: bool,
@@ -1228,8 +1228,8 @@ pub mod constructors {
             EvalType::ValueDeriv
         };
 
-        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
-        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
 
         let expansion_order =
@@ -3339,9 +3339,9 @@ pub mod api {
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
-    /// - `nsources`: The length of the source points buffer
+    /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
-    /// - `ntargets`: The length of the target points buffer.
+    /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
     /// - `ncharges`: The length of the charges buffer.
     /// - `result`: A pointer to the results associated with the target points.
@@ -3356,9 +3356,9 @@ pub mod api {
         fmm: *mut FmmEvaluator,
         eval_type: bool,
         sources: *const c_void,
-        nsources: usize,
+        n_sources: usize,
         targets: *const c_void,
-        ntargets: usize,
+        n_targets: usize,
         charges: *const c_void,
         ncharges: usize,
         result: *mut c_void,
@@ -3382,9 +3382,9 @@ pub mod api {
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
                     let charges =
@@ -3402,9 +3402,9 @@ pub mod api {
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
                     let charges =
@@ -3424,9 +3424,9 @@ pub mod api {
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
                     let charges =
@@ -3444,9 +3444,9 @@ pub mod api {
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
                     let charges =
@@ -3466,9 +3466,9 @@ pub mod api {
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
                     let charges =
@@ -3486,9 +3486,9 @@ pub mod api {
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f32, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
                     let charges =
@@ -3508,9 +3508,9 @@ pub mod api {
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
                     let charges =
@@ -3528,9 +3528,9 @@ pub mod api {
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
                     let sources =
-                        unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
                     let targets =
-                        unsafe { std::slice::from_raw_parts(targets as *const f64, ntargets) };
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
                     let charges =
@@ -3576,10 +3576,10 @@ mod test {
             let targets = points_fixture::<f32>(n_points, None, None, None);
             let charges = vec![1.0; n_points];
 
-            let nsources = n_points * 3;
+            let n_sources = n_points * 3;
             let sources_p = sources.data().as_ptr() as *const c_void;
 
-            let ntargets = n_points * 3;
+            let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
             let ncharges = n_points;
@@ -3595,9 +3595,9 @@ mod test {
                     nexpansion_order,
                     true,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3616,9 +3616,9 @@ mod test {
                     nexpansion_order,
                     true,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3635,9 +3635,9 @@ mod test {
                     nexpansion_order,
                     true,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3662,10 +3662,10 @@ mod test {
             let targets = points_fixture::<f64>(n_points, None, None, None);
             let charges = vec![1.0; n_points];
 
-            let nsources = n_points * 3;
+            let n_sources = n_points * 3;
             let sources_p = sources.data().as_ptr() as *const c_void;
 
-            let ntargets = n_points * 3;
+            let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
             let ncharges = n_points;
@@ -3681,9 +3681,9 @@ mod test {
                     nexpansion_order,
                     true,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3702,9 +3702,9 @@ mod test {
                     nexpansion_order,
                     true,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3721,9 +3721,9 @@ mod test {
                     nexpansion_order,
                     true,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3753,10 +3753,10 @@ mod test {
             let charges = vec![Complex::<f32>::one(); n_points];
             let wavenumber = 10.;
 
-            let nsources = n_points * 3;
+            let n_sources = n_points * 3;
             let sources_p = sources.data().as_ptr() as *const c_void;
 
-            let ntargets = n_points * 3;
+            let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
             let ncharges = n_points;
@@ -3773,9 +3773,9 @@ mod test {
                     true,
                     wavenumber,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3793,9 +3793,9 @@ mod test {
                     true,
                     wavenumber,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3819,10 +3819,10 @@ mod test {
             let charges = vec![Complex::<f64>::one(); n_points];
             let wavenumber = 10.;
 
-            let nsources = n_points * 3;
+            let n_sources = n_points * 3;
             let sources_p = sources.data().as_ptr() as *const c_void;
 
-            let ntargets = n_points * 3;
+            let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
             let ncharges = n_points * 2;
@@ -3839,9 +3839,9 @@ mod test {
                     true,
                     wavenumber,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,
@@ -3859,9 +3859,9 @@ mod test {
                     true,
                     wavenumber,
                     sources_p,
-                    nsources,
+                    n_sources,
                     targets_p,
-                    ntargets,
+                    n_targets,
                     charges_p,
                     ncharges,
                     true,

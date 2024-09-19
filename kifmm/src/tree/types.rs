@@ -23,7 +23,7 @@ use std::{
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: RlstScalar + Float,
+    T: RlstScalar,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
     pub origin: [T; 3],

@@ -128,10 +128,10 @@ where
     fn variable_expansion_order(&self) -> bool;
 
     /// Get the number of multipole/local coefficients associated with this FMM
-    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
+    fn n_coeffs_equivalent_surface(&self, level: u64) -> usize;
 
     /// Get the number of multipole/local coefficients associated with this FMM
-    fn ncoeffs_check_surface(&self, level: u64) -> usize;
+    fn n_coeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;
@@ -214,10 +214,10 @@ where
     // fn variable_expansion_order(&self) -> bool;
 
     // /// Get the number of multipole/local coefficients associated with this FMM
-    // fn ncoeffs_equivalent_surface(&self, level: u64) -> usize;
+    // fn n_coeffs_equivalent_surface(&self, level: u64) -> usize;
 
     // /// Get the number of multipole/local coefficients associated with this FMM
-    // fn ncoeffs_check_surface(&self, level: u64) -> usize;
+    // fn n_coeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;

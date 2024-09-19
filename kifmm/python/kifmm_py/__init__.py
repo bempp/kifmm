@@ -287,8 +287,8 @@ class SingleNodeTree:
         self.targets = targets
         self.charges = charges
         self.prune_empty = prune_empty
-        self.nsources = len(sources)
-        self.ntargets = len(targets)
+        self.n_sources = len(sources)
+        self.n_targets = len(targets)
         self.ncharges = len(charges)
         self.sources_c = ffi.cast("void* ", self.sources.ctypes.data)
         self.targets_c = ffi.cast("void* ", self.targets.ctypes.data)
@@ -297,7 +297,7 @@ class SingleNodeTree:
     def new_charges(self, new_charges):
 
         try:
-            assert len(new_charges) % self.nsources == 0
+            assert len(new_charges) % self.n_sources == 0
         except:
             TypeError("Incompatible number of new_charges for sources")
 
@@ -333,7 +333,7 @@ class KiFmm:
         dim = 3
 
         try:
-            if self._tree.ncharges // (self._tree.nsources // dim) > 1:
+            if self._tree.ncharges // (self._tree.n_sources // dim) > 1:
                 assert isinstance(self._field_translation, BlasFieldTranslation)
         except:
             raise TypeError(
@@ -373,9 +373,9 @@ class KiFmm:
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -391,9 +391,9 @@ class KiFmm:
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -414,9 +414,9 @@ class KiFmm:
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -433,9 +433,9 @@ class KiFmm:
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -462,9 +462,9 @@ class KiFmm:
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -484,9 +484,9 @@ class KiFmm:
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -510,9 +510,9 @@ class KiFmm:
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -529,9 +529,9 @@ class KiFmm:
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -559,9 +559,9 @@ class KiFmm:
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -579,9 +579,9 @@ class KiFmm:
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -642,14 +642,14 @@ class KiFmm:
                 ffi,
             )
 
-            n_evals = self._tree.ncharges // (self._tree.nsources // 3)
+            n_evals = self._tree.ncharges // (self._tree.n_sources // 3)
 
             # if self.
             self.all_potentials = np.reshape(
                 all_potentials,
                 (
                     n_evals,
-                    self._tree.ntargets // dim,
+                    self._tree.n_targets // dim,
                     self._field_translation.kernel.eval_type_r.value,
                 ),
             )
@@ -772,8 +772,8 @@ class KiFmm:
         except:
             raise TypeError("result vector must match number of targets")
 
-        nsources = len(sources)
-        ntargets = len(targets)
+        n_sources = len(sources)
+        n_targets = len(targets)
         ncharges = len(charges)
         nresult = len(result)
         sources_c = ffi.cast("void* ", sources.ctypes.data)
@@ -785,9 +785,9 @@ class KiFmm:
             self._fmm,
             eval_type,
             sources_c,
-            nsources,
+            n_sources,
             targets_c,
-            ntargets,
+            n_targets,
             charges_c,
             ncharges,
             result_c,

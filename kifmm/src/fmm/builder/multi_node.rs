@@ -20,8 +20,7 @@ use crate::{
             SourceToTargetTranslationMetadata,
         },
         fmm::{FmmMetadata, HomogenousKernel},
-        general::Epsilon,
-        parallel::GhostExchange,
+        general::{multi_node::GhostExchange, single_node::Epsilon},
     },
     tree::{
         types::{Domain, SortKind},
@@ -75,8 +74,8 @@ where
         sort_kind: SortKind,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
-        let nsources = sources.len() / dim;
-        let ntargets = targets.len() / dim;
+        let n_sources = sources.len() / dim;
+        let n_targets = targets.len() / dim;
 
         let dims = sources.len() % dim;
         let dimt = targets.len() % dim;
@@ -86,7 +85,7 @@ where
                 std::io::ErrorKind::InvalidData,
                 "Only 3D FMM supported",
             ))
-        } else if nsources == 0 || ntargets == 0 {
+        } else if n_sources == 0 || n_targets == 0 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Must have a positive number of source or target particles",
@@ -197,8 +196,8 @@ where
                 equivalent_surface_order: vec![equivalent_surface_order],
                 check_surface_order: vec![check_surface_order],
                 variable_expansion_order: false,
-                ncoeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                ncoeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
+                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
                 fmm_eval_type: fmm_eval_type.clone(),
                 kernel_eval_type: kernel_eval_type.clone(),
                 kernel: kernel.clone(),

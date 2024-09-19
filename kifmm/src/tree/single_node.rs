@@ -16,6 +16,8 @@ use crate::{
     },
 };
 
+use super::domain;
+
 impl<T> SingleNodeTree<T>
 where
     T: RlstScalar + Float,
@@ -486,6 +488,85 @@ where
                 result.push(tree)
             }
         }
+
+        result
+    }
+
+    /// Construct a tree form specified key/leaf data, may not contain points. All data expected in Morton order.
+    ///
+    pub fn from_keys(
+        mut keys: Vec<MortonKey<T>>,
+        keys_set: HashSet<MortonKey<T>>,
+        leaves: Vec<MortonKey<T>>,
+        leaves_set: HashSet<MortonKey<T>>,
+        points: Option<Points<T>>,
+        domain: &Domain<T>,
+        depth: u64,
+    ) -> SingleNodeTree<T> {
+        let mut result = Self::default();
+
+        // Optionally create index maps for coordinate data
+        // TODO: add index maps for coordiante data
+
+        // Group by level to perform efficient lookup
+        keys.sort_by_key(|k| k.level());
+
+        let mut levels_to_keys = HashMap::new();
+        let mut curr = keys[0];
+        let mut curr_idx = 0;
+        for (i, key) in keys.iter().enumerate() {
+            if key.level() != curr.level() {
+                levels_to_keys.insert(curr.level(), (curr_idx, i));
+                curr_idx = i;
+                curr = *key;
+            }
+        }
+        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+        // Return tree in sorted order, by level and then by Morton key
+        for l in 0..=depth {
+            if let Some(&(l, r)) = levels_to_keys.get(&l) {
+                let subset = &mut keys[l..r];
+                subset.sort();
+            }
+        }
+
+        let mut key_to_level_index = HashMap::new();
+        // Compute key to level index
+        for l in 0..=depth {
+            if let Some(&(l, r)) = levels_to_keys.get(&l) {
+                let keys = &keys[l..r];
+                for (i, key) in keys.iter().enumerate() {
+                    key_to_level_index.insert(*key, i);
+                }
+            }
+        }
+
+        // Map between keys/leaves and their respective indices
+        let mut key_to_index = HashMap::new();
+
+        for (i, key) in keys.iter().enumerate() {
+            key_to_index.insert(*key, i);
+        }
+
+        let mut leaf_to_index = HashMap::new();
+
+        for (i, key) in leaves.iter().enumerate() {
+            leaf_to_index.insert(*key, i);
+        }
+
+        // Add data
+        result.root = MortonKey::root();
+        result.depth = depth;
+        result.domain = domain.clone();
+        result.leaves = leaves.into();
+        result.keys = keys.into();
+        result.key_to_index = key_to_index;
+        result.key_to_level_index = key_to_level_index;
+        result.leaf_to_index = leaf_to_index;
+        result.keys_set = keys_set;
+        result.leaves_set = leaves_set;
+        result.levels_to_keys = levels_to_keys;
 
         result
     }

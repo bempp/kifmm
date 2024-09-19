@@ -16,14 +16,14 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(15));
 
-    let nsources = 1000000;
-    let ntargets = 1000000;
-    let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-    let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+    let n_sources = 1000000;
+    let n_targets = 1000000;
+    let sources = points_fixture::<f64>(n_sources, None, None, Some(0));
+    let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
     let nvecs = 1;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+    let tmp = vec![1.0; n_sources * nvecs];
+    let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
     // 6 Digits

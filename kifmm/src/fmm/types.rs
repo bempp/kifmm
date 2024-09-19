@@ -9,7 +9,7 @@ use crate::{
     linalg::rsvd::Normaliser,
     traits::{
         fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
-        general::AsComplex, types::FmmOperatorTime,
+        general::single_node::AsComplex, types::FmmOperatorTime,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
 };
@@ -144,16 +144,16 @@ pub struct SendPtr<T> {
 ///    index corresponds to a child box.
 ///
 /// - `multipoles` - Buffer containing multipole data of all source boxes stored in Morton order. If `n` charge vectors are used in
-///    the FMM, their associated multipole data is displaced by `nsources * ncoeffs` in `multipole` where `ncoeffs` is the length of each
-///    sequence corresponding to a multipole expansion and there are `nsources` boxes in the source tree.
+///    the FMM, their associated multipole data is displaced by `n_sources * ncoeffs` in `multipole` where `ncoeffs` is the length of each
+///    sequence corresponding to a multipole expansion and there are `n_sources` boxes in the source tree.
 ///
 /// - `locals` - Buffer containing local data of all target boxes stored in Morton order. If `n` charge vectors are used in
-///    the FMM, their associated local data is displaced by `ntargets * ncoeffs` in `locals` where `ncoeffs` is the length of each
-///    sequence corresponding to a local expansion and there are `ntargets` boxes in the target tree.
+///    the FMM, their associated local data is displaced by `n_targets * ncoeffs` in `locals` where `ncoeffs` is the length of each
+///    sequence corresponding to a local expansion and there are `n_targets` boxes in the target tree.
 ///
 /// - `potentials` - Buffer containing evaluated potentials of all target boxes stored in Morton order. If `n` charge vectors are used in
-///    the FMM, their associated potential data is displaced by `ntargets * nparticles` in `potentials` where `nparticles` is the number of
-///    target particles and there are `ntargets` boxes in the target tree.
+///    the FMM, their associated potential data is displaced by `n_targets * nparticles` in `potentials` where `nparticles` is the number of
+///    target particles and there are `n_targets` boxes in the target tree.
 ///
 /// - `leaf_multipoles` - Thread safe pointers to beginning of buffer containing leaf multipole data, where the outer index is set by the number
 ///    of evaluations being computed by the FMM.
@@ -172,7 +172,7 @@ pub struct SendPtr<T> {
 /// - `level_index_pointer_multipoles- Index of each key in source tree at a given level within the Morton sorted keys at that level.
 ///
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
-///    If `n` charge vectors are used in the FMM, their associated pointers are displaced by `ntargets` where there are `ntargets` boxes in the target tree.
+///    If `n` charge vectors are used in the FMM, their associated pointers are displaced by `n_targets` where there are `n_targets` boxes in the target tree.
 #[allow(clippy::type_complexity)]
 pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
 where
@@ -209,10 +209,10 @@ where
     pub check_surface_order: Vec<usize>, // index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub ncoeffs_equivalent_surface: Vec<usize>, // Index corresponds to level
+    pub n_coeffs_equivalent_surface: Vec<usize>, // Index corresponds to level
 
     /// The number of coefficients, corresponding to points discretising the check surface
-    pub ncoeffs_check_surface: Vec<usize>, // Index corresponds to level
+    pub n_coeffs_check_surface: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
     pub kernel_eval_type: EvalType,
@@ -320,8 +320,8 @@ where
             kernel_eval_type: EvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
-            ncoeffs_equivalent_surface: Vec::default(),
-            ncoeffs_check_surface: Vec::default(),
+            n_coeffs_equivalent_surface: Vec::default(),
+            n_coeffs_check_surface: Vec::default(),
             uc2e_inv_1: Vec::default(),
             uc2e_inv_2: Vec::default(),
             dc2e_inv_1: Vec::default(),
@@ -416,10 +416,10 @@ pub enum FmmEvalType {
 /// use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
 ///
 /// /// Particle data
-/// let nsources = 1000;
-/// let ntargets = 2000;
-/// let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-/// let targets = points_fixture::<f64>(ntargets, None, None, Some(3));
+/// let n_sources = 1000;
+/// let n_targets = 2000;
+/// let sources = points_fixture::<f64>(n_sources, None, None, Some(0));
+/// let targets = points_fixture::<f64>(n_targets, None, None, Some(3));
 ///
 /// // FMM parameters
 /// let n_crit = Some(150); // Constructed from data, using `n_crit` parameter
@@ -429,8 +429,8 @@ pub enum FmmEvalType {
 ///
 /// /// Charge data
 /// let nvecs = 1;
-/// let tmp = vec![1.0; nsources * nvecs];
-/// let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+/// let tmp = vec![1.0; n_sources * nvecs];
+/// let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
 /// charges.data_mut().copy_from_slice(&tmp);
 ///
 /// /// Create a new builder, and attach a tree
@@ -490,10 +490,10 @@ where
     pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs_equivalent_surface: Option<Vec<usize>>,
+    pub n_coeffs_equivalent_surface: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub ncoeffs_check_surface: Option<Vec<usize>>,
+    pub n_coeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<EvalType>,

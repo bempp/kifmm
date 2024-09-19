@@ -70,9 +70,9 @@ where
 
                                 let coordinates_row_major = &coordinates
                                     [charge_index_pointer.0 * dim..charge_index_pointer.1 * dim];
-                                let nsources = coordinates_row_major.len() / dim;
+                                let n_sources = coordinates_row_major.len() / dim;
 
-                                if nsources > 0 {
+                                if n_sources > 0 {
                                     kernel.evaluate_st(
                                         EvalType::Value,
                                         coordinates_row_major,

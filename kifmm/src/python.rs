@@ -580,7 +580,7 @@ macro_rules! define_class_methods {
                 charges: PyReadonlyArrayDyn<'py, $type>,
             ) -> PyResult<Bound<'py, PyArray<$type, Dim<[usize; 2]>>>> {
                 let shape = targets.shape();
-                let ntargets = shape[0];
+                let n_targets = shape[0];
                 let mut result_arr =
                     rlst_dynamic_array2!($type, [shape[0] * self.fmm.kernel_eval_size, 1]);
 
@@ -596,7 +596,7 @@ macro_rules! define_class_methods {
                     .data()
                     .to_pyarray_bound(py)
                     .reshape_with_order(
-                        [self.fmm.kernel_eval_size, ntargets],
+                        [self.fmm.kernel_eval_size, n_targets],
                         NPY_ORDER::NPY_FORTRANORDER,
                     )
                     .unwrap();
@@ -697,10 +697,10 @@ macro_rules! define_class_methods {
             ) -> PyResult<Vec<Bound<'py, PyArray<$type, Dim<[usize; 2]>>>>> {
                 let key = self.target_key_map.get(&leaf).unwrap();
                 let potentials = self.fmm.potential(&key).unwrap();
-                let n_matvec = potentials.len();
+                let n_matvecs = potentials.len();
                 let mut result = Vec::new();
 
-                for i in 0..n_matvec {
+                for i in 0..n_matvecs {
                     let n_potentials = potentials[i].len() / self.fmm.kernel_eval_size;
                     let potentials_i = potentials[i].to_pyarray_bound(py);
 
