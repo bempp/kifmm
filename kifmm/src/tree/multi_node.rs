@@ -17,7 +17,6 @@ use mpi::{
     Count, Rank,
 };
 use num::Float;
-use pulp::Scalar;
 use rlst::RlstScalar;
 use std::collections::{HashMap, HashSet};
 

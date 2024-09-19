@@ -55,8 +55,6 @@ fn main() {
         .unwrap()
         .build()
         .unwrap();
-
-    fmm.evaluate(false).unwrap();
 }
 
 #[cfg(not(feature = "mpi"))]

@@ -3,13 +3,13 @@ use crate::traits::tree::SingleFmmTree;
 use green_kernels::{traits::Kernel, types::EvalType};
 use rlst::RlstScalar;
 
-use super::{
-    tree::{MultiTree, SingleTree},
-    types::FmmError,
-};
+use super::{tree::SingleTree, types::FmmError};
 
 #[cfg(feature = "mpi")]
 use super::tree::MultiFmmTree;
+
+#[cfg(feature = "mpi")]
+use crate::traits::tree::MultiTree;
 
 /// Interface for source field translations.
 pub trait SourceTranslation {

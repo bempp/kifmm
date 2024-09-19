@@ -56,7 +56,7 @@ use crate::{
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
-fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
+pub fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
     singular_values: &[T],
     threshold: T,
     max_rank: usize,
@@ -1411,12 +1411,11 @@ where
                         .collect_vec();
 
                     let mut transfer_vectors_map = HashMap::new();
-                    for (i, v) in transfer_vectors.iter().enumerate() {
+                    for (i, &v) in transfer_vectors.iter().enumerate() {
                         transfer_vectors_map.insert(v, i);
                     }
 
-                    let transfer_vectors_set: HashSet<_> =
-                        transfer_vectors.iter().cloned().collect();
+                    let transfer_vectors_set: HashSet<_> = transfer_vectors.into_iter().collect();
 
                     // Mark items in interaction list for scattering
                     for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
