@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
+use mpi::datatype::Partition;
 use mpi::datatype::PartitionMut;
 use mpi::topology::Communicator;
 use mpi::traits::Equivalence;
@@ -228,10 +229,10 @@ where
 
             root_process.gather_varcount_into_root(&local_roots, &mut partition);
 
-            let mut origin_rank = Vec::new();
+            let mut global_roots_ranks = Vec::new();
             for (rank, &count) in global_locals_counts.iter().enumerate() {
                 for _ in 0..(count as usize) {
-                    origin_rank.push(rank as Rank)
+                    global_roots_ranks.push(rank as Rank)
                 }
             }
 
@@ -276,6 +277,12 @@ where
                 global_leaves_set,
                 global_locals_with_ancestors,
             );
+
+            // Local roots, which need to be broadcasted back to
+            self.local_roots = global_local_roots;
+            self.local_roots_counts = global_locals_counts;
+            self.local_roots_displacements = global_locals_displacements;
+            self.local_roots_ranks = global_roots_ranks;
         } else {
             let n_root_locals = self.tree.target_tree().n_trees();
             root_process.gather_into(&n_root_locals);
@@ -295,53 +302,49 @@ where
     }
 
     fn scatter_global_fmm_from_root(&mut self) {
-        // // Have to identify locations of each local first via a gather.
-        // // should really be in the 'gather ranges' part
+        let rank = self.communicator.rank();
+        let nroots = self.tree.target_tree.trees.len();
+        let receive_buffer_size = nroots * self.n_coeffs_equivalent_surface;
+        let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
 
-        // let rank = self.communicator.rank();
+        // Nominated rank chosen to run global upward pass
+        let root_rank = 0;
+        let root_process = self.communicator.process_at_rank(root_rank);
 
-        // let nroots = self.tree.target_tree.trees.len();
-        // let receive_buffer_size = nroots * self.n_coeffs_equivalent_surface;
-        // let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
+        if rank == root_rank {
+            // Lookup local data to be sent back from global FMM
+            let send_buffer_size = self.local_roots.len() * self.n_coeffs_equivalent_surface;
+            let mut send_buffer = vec![Scalar::default(); send_buffer_size];
 
-        // // Nominated rank chosen to run global upward pass
-        // let root_rank = 0;
-        // let root_process = self.communicator.process_at_rank(root_rank);
+            let mut root_idx = 0;
+            for root in self.local_roots.iter() {
+                if let Some(local) = self.global_fmm.local(root) {
+                    send_buffer[root_idx * self.n_coeffs_equivalent_surface
+                        ..(root_idx + 1) * self.n_coeffs_equivalent_surface]
+                        .copy_from_slice(local);
+                    root_idx += 1;
+                }
+            }
 
-        // if rank == root_rank {
-        //     let send_buffer_size = self.local_roots.len() * self.n_coeffs_equivalent_surface;
-        //     let mut send_buffer = vec![Scalar::default(); send_buffer_size];
+            // Displace items to send back by number of coefficients
+            let counts = self
+                .local_roots_counts
+                .iter()
+                .map(|&c| c * (self.n_coeffs_equivalent_surface as i32))
+                .collect_vec();
 
-        //     // Lookup local data to be sent back from global FMM
-        //     let mut root_idx = 0;
-        //     for root in self.local_roots.iter() {
-        //         if let Some(local) = self.global_fmm.local(root) {
-        //             send_buffer[root_idx * self.n_coeffs_equivalent_surface
-        //                 ..(root_idx + 1) * self.n_coeffs_equivalent_surface]
-        //                 .copy_from_slice(local);
-        //             root_idx += 1;
-        //         }
-        //     }
+            let displacements = self
+                .local_roots_displacements
+                .iter()
+                .map(|&d| d * (self.n_coeffs_equivalent_surface as i32))
+                .collect_vec();
 
-        //     // Displace items to send back by ncoeffs
-        //     let counts = self
-        //         .local_roots_counts
-        //         .iter()
-        //         .map(|&c| c * (self.n_coeffs_equivalent_surfaceas i32))
-        //         .collect_vec();
+            let partition = Partition::new(&send_buffer, counts, &displacements[..]);
 
-        //     let displacements = self
-        //         .local_roots_displacements
-        //         .iter()
-        //         .map(|&d| d * (self.n_coeffs_equivalent_surfaceas i32))
-        //         .collect_vec();
-
-        //     let partition = Partition::new(&send_buffer, counts, &displacements[..]);
-
-        //     root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
-        // } else {
-        //     root_process.scatter_varcount_into(&mut receive_buffer);
-        // }
+            root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
+        } else {
+            root_process.scatter_varcount_into(&mut receive_buffer);
+        }
     }
 
     fn u_list_exchange(&mut self) {}

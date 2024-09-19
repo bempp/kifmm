@@ -250,9 +250,10 @@ where
                 potentials_send_pointers: Vec::default(),
                 // ghost_tree_u: GhostTreeU::default(),
                 // ghost_tree_v: GhostTreeV::default(),
+                local_roots: Vec::default(),
                 local_roots_counts: Vec::default(),
                 local_roots_displacements: Vec::default(),
-                local_roots: Vec::default(),
+                local_roots_ranks: Vec::default(),
             };
 
             result.source();

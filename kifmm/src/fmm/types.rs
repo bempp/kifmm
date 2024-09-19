@@ -1125,11 +1125,16 @@ where
 
     /// Store origin ranks of target trees to which I must send local expansion coeffs after global FMM has been
     /// executed on nominated node.
-    pub local_roots_counts: Vec<i32>,
-    /// Should remove and store with global FMM
-    pub local_roots_displacements: Vec<i32>,
-    /// Same as above
     pub local_roots: Vec<MortonKey<Scalar::Real>>, // Corresponding morton keys
+
+    /// Origin ranks of local roots
+    pub local_roots_ranks: Vec<Rank>,
+
+    /// Counts
+    pub local_roots_counts: Vec<Count>,
+
+    /// Displacements
+    pub local_roots_displacements: Vec<Count>,
 }
 
 /// Specified owned range (defined by roots) of each rank
