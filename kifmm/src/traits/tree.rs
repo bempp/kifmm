@@ -5,6 +5,8 @@ use rlst::RlstScalar;
 
 use num::traits::Float;
 
+use crate::tree::types::Point;
+
 /// Interface for single node trees
 pub trait SingleTree {
     /// Scalar type
@@ -51,6 +53,12 @@ pub trait SingleTree {
     /// # arguments
     /// - `leaf` - node being query.
     fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]>;
+
+    /// Gets a reference to the points contained with a leaf node.
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn points(&self, leaf: &Self::Node) -> Option<&[Point<Self::Scalar>]>;
 
     /// Query number of coordinates contained at a given leaf node
     ///
@@ -160,6 +168,15 @@ pub trait MultiTree {
         &self,
         leaf: &<Self::SingleTree as SingleTree>::Node,
     ) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]>;
+
+    /// Gets a reference to the points contained with a leaf node.
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn points(
+        &self,
+        leaf: &<Self::SingleTree as SingleTree>::Node,
+    ) -> Option<&[Point<<Self::SingleTree as SingleTree>::Scalar>]>;
 
     /// Query number of coordinates contained at a given leaf node
     ///

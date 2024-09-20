@@ -362,6 +362,17 @@ where
         }
     }
 
+    fn points(
+        &self,
+        leaf: &<Self::SingleTree as SingleTree>::Node,
+    ) -> Option<&[Point<<Self::SingleTree as SingleTree>::Scalar>]> {
+        if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
+            Some(&self.points[l..r])
+        } else {
+            None
+        }
+    }
+
     fn all_coordinates(&self) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]> {
         Some(&self.coordinates)
     }

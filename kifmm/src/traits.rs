@@ -1,7 +1,7 @@
 //! # Trait Definitions
-pub mod fftw;
+pub(crate) mod fftw;
 pub mod field;
 pub mod fmm;
-pub mod general;
+pub(crate) mod general;
 pub mod tree;
-pub mod types;
+pub(crate) mod types;

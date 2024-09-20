@@ -1019,6 +1019,9 @@ where
     /// Charges associated with each source tree
     pub charges: Vec<Scalar>,
 
+    /// Charges associated with ghost tree
+    pub ghost_charges: Vec<Scalar>,
+
     /// The expansion order used to construct check surfaces
     pub check_surface_order: usize,
 
@@ -1041,22 +1044,25 @@ where
     pub kernel_eval_size: usize,
 
     /// Index pointer for source coordinates
-    pub charge_index_pointer_sources: Vec<(usize, usize)>, // indexed by source tree
+    pub charge_index_pointer_sources: Vec<(usize, usize)>,
+
+    /// Index pointer for source coordinates of ghosts
+    pub charge_index_pointer_ghost_sources: Vec<(usize, usize)>,
 
     /// Index pointer for target coordinates
-    pub charge_index_pointer_targets: Vec<(usize, usize)>, // indexed by target tree
+    pub charge_index_pointer_targets: Vec<(usize, usize)>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_equivalent_surfaces_sources: Vec<Scalar::Real>, // indexed by source tree
+    pub leaf_upward_equivalent_surfaces_sources: Vec<Scalar::Real>,
 
     /// Upward surfaces associated with source leaves
-    pub leaf_upward_check_surfaces_sources: Vec<Scalar::Real>, // indexed by source tree
+    pub leaf_upward_check_surfaces_sources: Vec<Scalar::Real>,
 
     /// Upward surfaces associated with target leaves
-    pub leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>, // indexed by target tree
+    pub leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
 
     /// Scales of each source leaf box
-    pub leaf_scales_sources: Vec<Scalar>, // indexed by source tree
+    pub leaf_scales_sources: Vec<Scalar>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
