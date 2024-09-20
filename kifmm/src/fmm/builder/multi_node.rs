@@ -3,7 +3,7 @@ use mpi::{
     traits::Equivalence,
 };
 use num::Float;
-use rlst::{rlst_array_from_slice2, rlst_dynamic_array2, MatrixSvd, RlstScalar};
+use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
@@ -20,7 +20,7 @@ use crate::{
             SourceToTargetTranslationMetadata,
         },
         fmm::{FmmMetadata, HomogenousKernel},
-        general::{multi_node::GhostExchange, single_node::Epsilon},
+        general::single_node::Epsilon,
     },
     tree::{
         types::{Domain, SortKind},

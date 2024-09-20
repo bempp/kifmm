@@ -623,7 +623,6 @@ where
         let halo_children = halo.iter().map(|h| h.children()).collect_vec();
 
         let equivalent_surface_order = self.equivalent_surface_order;
-        let check_surface_order = self.check_surface_order;
 
         // The child boxes in the halo of the sibling set
         let mut sources = vec![];

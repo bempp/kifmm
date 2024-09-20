@@ -1,36 +1,21 @@
 //! Multipole to local field translation trait implementation using FFT.
-use std::collections::HashSet;
-
-use itertools::Itertools;
 use mpi::traits::Equivalence;
-use num::{Float, One, Zero};
+use num::Float;
 
-use rayon::prelude::*;
-use rlst::{
-    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
-};
+use rlst::RlstScalar;
 
 use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
-    fftw::array::{AlignedAllocable, AlignedVec},
-    fmm::{
-        helpers::single_node::{chunk_size, homogenous_kernel_scale, m2l_scale},
-        types::{FmmEvalType, KiFmmMulti, SendPtrMut},
-        KiFmm,
-    },
+    fftw::array::AlignedAllocable,
+    fmm::types::KiFmmMulti,
     traits::{
         fftw::Dft,
-        fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
+        fmm::{HomogenousKernel, SourceToTargetTranslation},
         general::single_node::{AsComplex, Hadamard8x8},
-        tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
-    tree::{
-        constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
-        types::MortonKey,
-    },
-    FftFieldTranslation, SingleFmm,
+    FftFieldTranslation,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -50,11 +35,11 @@ where
     <Scalar as Dft>::Plan: Sync,
     // Self: FmmOperatorData,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, _level: u64) -> Result<(), FmmError> {
         Ok(())
     }
 
-    fn p2l(&self, level: u64) -> Result<(), FmmError> {
+    fn p2l(&self, _level: u64) -> Result<(), FmmError> {
         Ok(())
     }
 }

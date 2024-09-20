@@ -25,8 +25,7 @@ use crate::traits::tree::MultiTree;
 use crate::traits::tree::SingleFmmTree;
 use crate::traits::tree::SingleTree;
 use crate::tree::types::Domain;
-use crate::tree::types::Point;
-use crate::tree::types::{MortonKey, MortonKeys};
+use crate::tree::types::MortonKey;
 use crate::tree::SingleNodeTree;
 use crate::SingleFmm;
 use crate::SingleNodeFmmTree;
@@ -35,7 +34,7 @@ use super::helpers::single_node::coordinate_index_pointer_single_node;
 use super::helpers::single_node::leaf_expansion_pointers_single_node;
 use super::helpers::single_node::level_expansion_pointers_single_node;
 use super::helpers::single_node::level_index_pointer_single_node;
-use super::types::{KiFmmMulti, Layout};
+use super::types::KiFmmMulti;
 use super::KiFmm;
 
 impl<Scalar, Kernel, SourceToTargetData> GhostExchange
@@ -455,7 +454,7 @@ where
                 .or_insert(0) += available_queries_sizes[i];
         }
 
-        let mut received_queries_charges_sizes_send_counts_ = HashMap::new(); // particle data counts
+        let mut received_queries_charges_sizes_send_counts_ = HashMap::new(); // charge data counts
         for (i, global_rank) in available_queries_charges_source_ranks.iter().enumerate() {
             *received_queries_charges_sizes_send_counts_
                 .entry(*global_rank)
@@ -595,7 +594,7 @@ where
             ghost_coordinates,
         );
 
-        // Set metadata, TODO: real charges need to be set eventually
+        // Set metadata
         let ghost_charges = sort_indices
             .iter()
             .map(|&i| ghost_charges[i].clone())

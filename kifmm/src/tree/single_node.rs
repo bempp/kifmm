@@ -448,7 +448,8 @@ where
 
     /// From a set of specified roots, create a number of single node trees of matching
     // length
-    pub fn from_roots(
+    #[allow(unused)]
+    pub(crate) fn from_roots(
         roots: &MortonKeys<T>,
         points: &mut Points<T>,
         global_domain: &Domain<T>,
@@ -492,7 +493,8 @@ where
 
     /// Construct a tree form specified key/leaf data, may not contain points. All data expected in Morton order.
     ///
-    pub fn from_keys(
+    #[allow(unused)]
+    pub(crate) fn from_keys(
         mut keys: Vec<MortonKey<T>>,
         keys_set: HashSet<MortonKey<T>>,
         leaves: Vec<MortonKey<T>>,
@@ -570,7 +572,8 @@ where
     }
 
     /// Construct a single node tree from U list ghost octants
-    pub fn from_ghost_octants_u(
+    #[cfg(feature = "mpi")]
+    pub(crate) fn from_ghost_octants_u(
         domain: &Domain<T>,
         depth: u64,
         coordinates_row_major: Vec<T>,
@@ -663,7 +666,8 @@ where
     }
 
     /// Construct a single node tree from V list ghost octants, ensure that provided keys are in Morton order and contain sibling data
-    pub fn from_ghost_octants_v(
+    #[cfg(feature = "mpi")]
+    pub(crate) fn from_ghost_octants_v(
         depth: u64,
         mut keys: Vec<MortonKey<T>>,
         keys_set: HashSet<MortonKey<T>>,
@@ -738,7 +742,7 @@ where
     /// - `n_points` - The total number of points uniformly distributed within the domain.
     ///
     /// - `n_crit` - The maximum desired number of points per leaf box.
-    pub fn minimum_depth(n_points: u64, n_crit: u64) -> u64 {
+    pub(crate) fn minimum_depth(n_points: u64, n_crit: u64) -> u64 {
         let mut tmp = n_points;
         let mut level = 0;
         while tmp > n_crit {
@@ -874,7 +878,10 @@ where
     ///
     /// - `nodes` - Morton keys discretising a spatial domain being considered.
     /// - `points` - Mutable reference to points, allowing for assignment of their encoded Morton keys, if any.
-    pub fn assign_nodes_to_points(nodes: &MortonKeys<T>, points: &mut Points<T>) -> MortonKeys<T> {
+    pub(crate) fn assign_nodes_to_points(
+        nodes: &MortonKeys<T>,
+        points: &mut Points<T>,
+    ) -> MortonKeys<T> {
         let mut map: HashMap<MortonKey<_>, bool> = HashMap::new();
         for node in nodes.iter() {
             map.insert(*node, false);
@@ -907,7 +914,7 @@ where
     }
 
     /// Also returns the indices of mapped points,
-    pub fn assign_nodes_to_points_with_index_map(
+    pub(crate) fn assign_nodes_to_points_with_index_map(
         nodes: &MortonKeys<T>,
         points: &mut Points<T>,
     ) -> (MortonKeys<T>, HashMap<MortonKey<T>, Vec<usize>>) {
@@ -969,8 +976,9 @@ where
     ///
     /// # Arguments
     ///
-    /// - `seeds` - Mutable reference to a collection of seed octants.
-    pub fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
+    /// - `seeds` - Mutable reference to a collection of seed octants.i
+    #[allow(unused)]
+    pub(crate) fn complete_block_tree(seeds: &mut MortonKeys<T>) -> MortonKeys<T> {
         let root = MortonKey::root();
 
         let ffc_root = root.finest_first_child();
@@ -1024,7 +1032,8 @@ where
     /// # Arguments
     ///
     /// - `leaves` - A reference to a collection of Morton Keys, representing leaf nodes.
-    pub fn find_seeds(leaves: &MortonKeys<T>) -> MortonKeys<T> {
+    #[allow(unused)]
+    pub(crate) fn find_seeds(leaves: &MortonKeys<T>) -> MortonKeys<T> {
         let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
 
         let mut seeds = MortonKeys::from(
@@ -1050,7 +1059,8 @@ where
     ///     Morton encoding.
     /// - `block_tree` - Initially constructed block_tree, subject to refinement through splitting.
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
-    pub fn split_blocks(
+    #[allow(unused)]
+    pub(crate) fn split_blocks(
         points: &mut Points<T>,
         mut block_tree: MortonKeys<T>,
         n_crit: usize,

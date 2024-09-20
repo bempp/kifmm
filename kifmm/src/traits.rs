@@ -1,5 +1,5 @@
 //! # Trait Definitions
-pub(crate) mod fftw;
+pub mod fftw;
 pub mod field;
 pub mod fmm;
 pub(crate) mod general;

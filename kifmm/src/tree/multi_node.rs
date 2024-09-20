@@ -304,7 +304,11 @@ where
     }
 
     fn n_keys(&self, level: u64) -> Option<usize> {
-        Some(self.keys.len())
+        if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
+            Some(r - l)
+        } else {
+            None
+        }
     }
 
     fn n_leaves(&self) -> Option<usize> {

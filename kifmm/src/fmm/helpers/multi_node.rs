@@ -1,17 +1,12 @@
 //! Helper functions for MPI setting
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use itertools::Itertools;
-use mpi::{
-    topology::SimpleCommunicator,
-    traits::{Communicator, Equivalence},
-    Count, Rank,
-};
+use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::types::{Layout, SendPtrMut},
+    fmm::types::SendPtrMut,
     traits::tree::{FmmTreeNode, MultiTree},
     tree::{types::MortonKey, MultiNodeTree},
 };

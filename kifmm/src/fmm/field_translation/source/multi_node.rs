@@ -1,6 +1,6 @@
 //! Multipole to Multipole field translation
 
-use std::{collections::HashSet, sync::Mutex};
+use std::collections::HashSet;
 
 use itertools::Itertools;
 use mpi::traits::Equivalence;
