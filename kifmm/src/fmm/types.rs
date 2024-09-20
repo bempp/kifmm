@@ -1089,6 +1089,9 @@ where
     /// Multipoles associated with locally owned data
     pub multipoles: Vec<Scalar>,
 
+    /// Multipoles associated with ghost data
+    pub ghost_multipoles: Vec<Scalar>,
+
     /// Locals associated with locally owned data
     pub locals: Vec<Scalar>,
 
@@ -1099,7 +1102,10 @@ where
     pub leaf_multipoles: Vec<SendPtrMut<Scalar>>,
 
     /// Multipole expansions at each level
-    pub level_multipoles: Vec<Vec<SendPtrMut<Scalar>>>, // outer fmms, middle level, inner pointers
+    pub level_multipoles: Vec<Vec<SendPtrMut<Scalar>>>,
+
+    /// Multipole expansions at each level for ghosts
+    pub ghost_level_multipoles: Vec<Vec<SendPtrMut<Scalar>>>,
 
     /// Local expansions at the leaf level
     pub leaf_locals: Vec<SendPtrMut<Scalar>>, // Same as leaf multipoles
@@ -1116,10 +1122,12 @@ where
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>, // outer fmm
 
-    // /// Ghost tree for U list data
-    // pub ghost_tree_u: GhostTreeU<Scalar::Real>,
-    // /// Ghost tree for V list data
-    // pub ghost_tree_v: GhostTreeV<Scalar, SourceToTargetData>,
+    /// Ghost tree for U list data
+    pub ghost_tree_u: SingleNodeTree<Scalar::Real>,
+
+    /// Ghost tree for V list data
+    pub ghost_tree_v: SingleNodeTree<Scalar::Real>,
+
     /// Object holding global FMM, to be run on nominated node
     pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetData>,
 

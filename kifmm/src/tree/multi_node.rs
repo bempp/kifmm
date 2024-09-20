@@ -59,7 +59,6 @@ where
         }
 
         // Perform parallel Morton sort over encoded points
-
         match sort_kind {
             SortKind::Hyksort { k } => hyksort(&mut points, k, comm.duplicate())?,
             SortKind::Samplesort { k } => samplesort(&mut points, &comm.duplicate(), k)?,
@@ -118,16 +117,19 @@ where
 
         // Group coordinates by leaves
         let mut leaves_to_coordinates = HashMap::new();
-        let mut curr = points[0];
-        let mut curr_idx = 0;
-        for (i, point) in points.iter().enumerate() {
-            if point.encoded_key != curr.encoded_key {
-                leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
-                curr_idx = i;
-                curr = *point;
+
+        if !points.is_empty() {
+            let mut curr = points[0];
+            let mut curr_idx = 0;
+            for (i, point) in points.iter().enumerate() {
+                if point.encoded_key != curr.encoded_key {
+                    leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, i));
+                    curr_idx = i;
+                    curr = *point;
+                }
             }
+            leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
         }
-        leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
         let leaves = MortonKeys::from(leaves);
         let mut keys = MortonKeys::from(keys);
@@ -143,31 +145,35 @@ where
         keys.sort_by_key(|a| a.level());
 
         let mut levels_to_keys = HashMap::new();
-        let mut curr = keys[0];
-        let mut curr_idx = 0;
-        for (i, key) in keys.iter().enumerate() {
-            if key.level() != curr.level() {
-                levels_to_keys.insert(curr.level(), (curr_idx, i));
-                curr_idx = i;
-                curr = *key;
+        if !keys.is_empty() {
+            let mut curr = keys[0];
+            let mut curr_idx = 0;
+            for (i, key) in keys.iter().enumerate() {
+                if key.level() != curr.level() {
+                    levels_to_keys.insert(curr.level(), (curr_idx, i));
+                    curr_idx = i;
+                    curr = *key;
+                }
             }
+            levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
         }
-        levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
         // Return tree in sorted order, by level and then by Morton key
         for l in global_depth..=total_depth {
-            let &(l, r) = levels_to_keys.get(&l).unwrap();
-            let subset = &mut keys[l..r];
-            subset.sort();
+            if let Some(&(l, r)) = levels_to_keys.get(&l) {
+                let subset = &mut keys[l..r];
+                subset.sort();
+            }
         }
 
         let mut key_to_level_index = HashMap::new();
         // Compute key to level index
         for l in global_depth..=total_depth {
-            let &(l, r) = levels_to_keys.get(&l).unwrap();
-            let keys = &keys[l..r];
-            for (i, key) in keys.iter().enumerate() {
-                key_to_level_index.insert(*key, i);
+            if let Some(&(l, r)) = levels_to_keys.get(&l) {
+                let keys = &keys[l..r];
+                for (i, key) in keys.iter().enumerate() {
+                    key_to_level_index.insert(*key, i);
+                }
             }
         }
 

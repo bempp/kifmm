@@ -580,8 +580,67 @@ where
     ) {
     }
 
-    /// Construct a single node tree from V list ghost octants
-    pub fn from_ghost_octants_v(_depth: u64, _keys: &MortonKeys<T>) {}
+    /// Construct a single node tree from V list ghost octants, ensure that provided keys are in Morton order and contain sibling data
+    pub fn from_ghost_octants_v(
+        depth: u64,
+        mut keys: Vec<MortonKey<T>>,
+        keys_set: HashSet<MortonKey<T>>,
+    ) -> SingleNodeTree<T> {
+        let mut result = SingleNodeTree::default();
+
+        // Set index pointers
+        let mut levels_to_keys = HashMap::new();
+        let mut key_to_level_index = HashMap::new();
+        let mut key_to_index = HashMap::new();
+
+        if !keys.is_empty() {
+            // Group by level to perform efficient lookup
+            keys.sort_by_key(|k| k.level());
+
+            let mut curr = keys[0];
+            let mut curr_idx = 0;
+            for (i, key) in keys.iter().enumerate() {
+                if key.level() != curr.level() {
+                    levels_to_keys.insert(curr.level(), (curr_idx, i));
+                    curr_idx = i;
+                    curr = *key;
+                }
+            }
+            levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
+
+            // Return tree in sorted order, by level and then by Morton key
+            for l in 0..=depth {
+                if let Some(&(l, r)) = levels_to_keys.get(&l) {
+                    let subset = &mut keys[l..r];
+                    subset.sort();
+                }
+            }
+
+            // Compute key to level index
+            for l in 0..=depth {
+                if let Some(&(l, r)) = levels_to_keys.get(&l) {
+                    let keys = &keys[l..r];
+                    for (i, key) in keys.iter().enumerate() {
+                        key_to_level_index.insert(*key, i);
+                    }
+                }
+            }
+
+            // Map between keys and their respective indices
+            for (i, key) in keys.iter().enumerate() {
+                key_to_index.insert(*key, i);
+            }
+        }
+
+        result.depth = depth;
+        result.keys = keys.into();
+        result.keys_set = keys_set;
+        result.levels_to_keys = levels_to_keys;
+        result.key_to_level_index = key_to_level_index;
+        result.key_to_index = key_to_index;
+
+        result
+    }
 
     /// Calculates the minimum depth of a tree required to ensure that each leaf box contains at most `n_crit` points,
     /// assuming a uniform distribution of points.
