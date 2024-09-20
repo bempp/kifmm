@@ -142,6 +142,18 @@ where
     /// Get the dimension of the data in this FMM
     fn dim(&self) -> usize;
 
+    /// Evaluate the leaf level operations for source tree
+    fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate the leaf level operations for target tree
+    fn evaluate_leaf_targets(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate the upward pass
+    fn evaluate_upward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate the downward pass
+    fn evaluate_downward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
 
@@ -218,6 +230,18 @@ where
 
     // /// Get the number of multipole/local coefficients associated with this FMM
     // fn n_coeffs_check_surface(&self, level: u64) -> usize;
+
+    /// Evaluate the leaf level operations for source tree
+    fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate the leaf level operations for target tree
+    fn evaluate_leaf_targets(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate the upward pass
+    fn evaluate_upward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+
+    /// Evaluate the downward pass
+    fn evaluate_downward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
 
     /// Get the tree associated with this FMM
     fn tree(&self) -> &Self::Tree;
