@@ -15,3 +15,5 @@ global part of the FMM
 - Then another single pass through for Ghost data
 
 - Upward pass kernels can also run completely without a loop like before, all I need to do is ensure that sibling data is contained which it should be.
+
+- Not sure about scaling in P2M, why does it need extra now?

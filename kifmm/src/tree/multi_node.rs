@@ -320,7 +320,7 @@ where
     }
 
     fn total_depth(&self) -> u64 {
-        self.global_depth + self.local_depth
+        self.global_depth() + self.local_depth()
     }
 
     fn global_depth(&self) -> u64 {
@@ -328,7 +328,7 @@ where
     }
 
     fn local_depth(&self) -> u64 {
-        self.global_depth
+        self.local_depth
     }
 
     fn keys(&self, level: u64) -> Option<&[<Self::SingleTree as SingleTree>::Node]> {
@@ -515,9 +515,11 @@ where
         };
 
         // Compute the receive counts, and mark again processes involved
-        let mut receive_counts= vec![0i32; self.source_tree().comm.size() as usize];
+        let mut receive_counts = vec![0i32; self.source_tree().comm.size() as usize];
         let mut receive_marker = vec![0i32; self.source_tree().comm.size() as usize];
-        self.source_tree.comm.all_to_all_into(&send_counts, &mut receive_counts);
+        self.source_tree
+            .comm
+            .all_to_all_into(&send_counts, &mut receive_counts);
         for (rank, &receive_count) in receive_counts.iter().enumerate() {
             if receive_count > 0 {
                 receive_marker[rank] = 1
@@ -530,7 +532,7 @@ where
             send_counts,
             send_marker,
             receive_marker,
-            receive_counts
+            receive_counts,
         };
 
         if admissible {
@@ -570,8 +572,11 @@ where
         let displacements;
 
         {
-            let mut partition =
-                PartitionMut::new(&mut all_ranges, all_ranges_counts, &all_ranges_displacements[..]);
+            let mut partition = PartitionMut::new(
+                &mut all_ranges,
+                all_ranges_counts,
+                &all_ranges_displacements[..],
+            );
             self.source_tree
                 .comm
                 .all_gather_varcount_into(&ranges, &mut partition);

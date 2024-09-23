@@ -73,6 +73,12 @@ where
         );
         let mut m2m_vec = Vec::new();
 
+        let mut m2m_global = vec![rlst_dynamic_array2!(
+            Scalar,
+            [n_coeffs_equivalent_surface, 8 * n_coeffs_equivalent_surface]
+        )];
+        let mut m2m_vec_global = vec![Vec::new()];
+
         // Compute required surfaces
         let upward_equivalent_surface =
             root.surface_grid(equivalent_surface_order, domain, alpha_inner);
@@ -131,13 +137,24 @@ where
                     .simple_mult_into_resize(uc2e_inv_2[0].view(), ce2pc.view()),
             );
 
+            let tmp1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                uc2e_inv_1[0].view(),
+                empty_array::<Scalar, 2>()
+                    .simple_mult_into_resize(uc2e_inv_2[0].view(), ce2pc.view()),
+            );
+
             let l = i * n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
             let r = l + n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
 
             m2m.data_mut()[l..r].copy_from_slice(tmp.data());
             m2m_vec.push(tmp);
+
+            m2m_global[0].data_mut()[l..r].copy_from_slice(tmp1.data());
+            m2m_vec_global[0].push(tmp1);
         }
 
+        self.global_fmm.source = m2m_global;
+        self.global_fmm.source_vec = m2m_vec_global;
         self.source = m2m;
         self.source_vec = m2m_vec;
         self.uc2e_inv_1 = uc2e_inv_1;
@@ -842,6 +859,7 @@ where
         };
 
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
         let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
         let n_source_keys = self.tree.source_tree().n_keys_tot().unwrap();
         let n_target_keys = self.tree.target_tree().n_keys_tot().unwrap();
@@ -869,8 +887,8 @@ where
         let leaf_upward_equivalent_surfaces_sources = leaf_surfaces_multi_node(
             &self.tree.source_tree,
             n_coeffs_equivalent_surface,
-            alpha_outer,
-            check_surface_order,
+            alpha_inner,
+            equivalent_surface_order,
         );
 
         let leaf_upward_check_surfaces_sources = leaf_surfaces_multi_node(
@@ -925,15 +943,17 @@ where
             coordinate_index_pointer_multi_node(&self.tree.source_tree);
 
         // Set neighbourhood communicators
-        // self.neighbourhood_communicator_v =
-        //     NeighbourhoodCommunicator::new(&self.communicator, &self.tree.v_list_query.send_marker);
+        self.neighbourhood_communicator_v = NeighbourhoodCommunicator::new(
+            &self.communicator,
+            &self.tree.v_list_query.send_marker,
+            &self.tree.v_list_query.receive_marker,
+        );
 
-
-        // Communicate whether to expect to be involved in send/receive with these ranks
-
-
-        self.neighbourhood_communicator_u =
-            NeighbourhoodCommunicator::new(&self.communicator, &self.tree.u_list_query.send_marker, &self.tree.u_list_query.receive_marker);
+        self.neighbourhood_communicator_u = NeighbourhoodCommunicator::new(
+            &self.communicator,
+            &self.tree.u_list_query.send_marker,
+            &self.tree.u_list_query.receive_marker,
+        );
 
         // Set metadata
         self.multipoles = multipoles;

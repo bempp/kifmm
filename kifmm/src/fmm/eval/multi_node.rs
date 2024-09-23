@@ -10,7 +10,7 @@ use crate::traits::{
 };
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::topology::SimpleCommunicator;
-use mpi::traits::Equivalence;
+use mpi::traits::{Communicator, Equivalence};
 use num::Float;
 use rlst::RlstScalar;
 
@@ -183,8 +183,10 @@ where
         self.gather_global_fmm_at_root();
 
         // Execute FMM on global root
-        self.global_fmm.evaluate_upward_pass(timed)?;
-        self.global_fmm.evaluate_downward_pass(timed)?;
+        if self.communicator.rank() == 0 {
+            self.global_fmm.evaluate_upward_pass(timed)?;
+            self.global_fmm.evaluate_downward_pass(timed)?;
+        }
 
         // Scatter root locals back to local tree
         self.scatter_global_fmm_from_root();

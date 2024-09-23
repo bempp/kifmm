@@ -187,26 +187,28 @@ where
             n_coeffs[0]
         };
 
-        let keys = tree.keys(level).unwrap();
-        let n_keys_level = keys.len();
+        if let Some(keys) = tree.keys(level) {
+            let n_keys_level = keys.len();
 
-        for key_idx in 0..n_keys_level {
-            let key_displacement = level_displacement + n_coeffs * n_matvecs * key_idx;
-            let mut key_multipoles = Vec::new();
-            for eval_idx in 0..n_matvecs {
-                let eval_displacement = n_coeffs * eval_idx;
-                let raw = unsafe {
-                    expansions
-                        .as_ptr()
-                        .add(key_displacement + eval_displacement) as *mut T
-                };
-                key_multipoles.push(SendPtrMut { raw });
+            for key_idx in 0..n_keys_level {
+                let key_displacement = level_displacement + n_coeffs * n_matvecs * key_idx;
+                let mut key_multipoles = Vec::new();
+                for eval_idx in 0..n_matvecs {
+                    let eval_displacement = n_coeffs * eval_idx;
+                    let raw = unsafe {
+                        expansions
+                            .as_ptr()
+                            .add(key_displacement + eval_displacement)
+                            as *mut T
+                    };
+                    key_multipoles.push(SendPtrMut { raw });
+                }
+                tmp_multipoles.push(key_multipoles)
             }
-            tmp_multipoles.push(key_multipoles)
-        }
-        result[level as usize] = tmp_multipoles;
+            result[level as usize] = tmp_multipoles;
 
-        level_displacement += n_keys_level * n_coeffs * n_matvecs;
+            level_displacement += n_keys_level * n_coeffs * n_matvecs;
+        }
     }
 
     result
@@ -235,7 +237,11 @@ where
     };
 
     let level_displacement = iterator.iter().fold(0usize, |acc, &(level, n_coeffs)| {
-        acc + tree.n_keys(level).unwrap() * n_coeffs * n_matvecs
+        if let Some(n_keys) = tree.n_keys(level) {
+            acc + n_keys * n_coeffs * n_matvecs
+        } else {
+            acc
+        }
     });
 
     let &n_coeffs_leaf = n_coeffs.last().unwrap();

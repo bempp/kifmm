@@ -55,9 +55,6 @@ fn main() {
         .unwrap()
         .build()
         .unwrap();
-
-
-
 }
 
 #[cfg(not(feature = "mpi"))]

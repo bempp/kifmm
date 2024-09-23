@@ -205,7 +205,6 @@ where
             result[i] = (index_pointer, index_pointer + n_points);
             index_pointer += n_points;
         }
-
     }
 
     result

@@ -1199,5 +1199,5 @@ pub struct Query {
     /// Receive counts for each rank in global communicator
     pub receive_counts: Vec<Count>,
     /// Each index marks a rank in the global communicator that is involved in this query
-    pub receive_marker: Vec<Rank>
+    pub receive_marker: Vec<Rank>,
 }

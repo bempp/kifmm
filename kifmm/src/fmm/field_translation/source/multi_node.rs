@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use mpi::traits::Equivalence;
+use mpi::traits::{Communicator, Equivalence};
 use num::Float;
 use rayon::prelude::*;
 use rlst::{
@@ -86,8 +86,9 @@ where
 
                     let total_depth = self.tree.source_tree().total_depth();
                     let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
+
                     let scale = if self.kernel.is_homogenous() {
-                        homogenous_kernel_scale(total_depth)
+                        homogenous_kernel_scale(total_depth + 1)
                     } else {
                         Scalar::one()
                     };
