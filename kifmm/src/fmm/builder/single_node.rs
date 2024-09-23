@@ -1,7 +1,7 @@
 //! Builder objects to construct FMMs
 use std::collections::HashSet;
 
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
 use rlst::{MatrixSvd, RlstScalar};
 
@@ -149,7 +149,7 @@ where
         charges: &[Scalar],
         expansion_order: &[usize],
         kernel: Kernel,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         source_to_target: SourceToTargetData,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {

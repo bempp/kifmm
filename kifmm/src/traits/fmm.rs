@@ -1,6 +1,6 @@
 //! FMM traits
 use crate::traits::tree::SingleFmmTree;
-use green_kernels::{traits::Kernel, types::EvalType};
+use green_kernels::{traits::Kernel, types::GreenKernelEvalType};
 use rlst::RlstScalar;
 
 use super::{tree::SingleTree, types::FmmError};
@@ -263,7 +263,7 @@ pub trait FmmMetadata {
 
     /// Compute all metadata required for FMM.
     /// TODO: Breakup into smaller pieces of functionality for clarity.
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]);
+    fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]);
 }
 
 /// Defines how metadata associated with field translations is looked up at runtime.

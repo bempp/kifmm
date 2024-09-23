@@ -28,7 +28,7 @@ use crate::{
     },
     MultiNodeFmmTree,
 };
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 impl<Scalar, Kernel, SourceToTargetData> MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
 where
@@ -160,7 +160,7 @@ where
             self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
             self.fmm_eval_type = Some(FmmEvalType::Vector);
-            self.kernel_eval_type = Some(EvalType::Value);
+            self.kernel_eval_type = Some(GreenKernelEvalType::Value);
             self.isa = Some(Isa::new());
             self.source_to_target = Some(source_to_target);
             self.equivalent_surface_order = Some(expansion_order);

@@ -132,14 +132,16 @@ where
     let iterator = (0..tree.total_depth()).zip(vec![n_coeffs; tree.total_depth() as usize]);
 
     let level_displacement = iterator.fold(0usize, |acc, (level, ncoeffs)| {
-        acc + tree.n_keys(level).unwrap() * ncoeffs
+        if let Some(n_keys) = tree.n_keys(level) {
+            acc + n_keys * ncoeffs
+        } else {
+            acc
+        }
     });
 
     for leaf_idx in 0..n_leaves {
         let key_displacement = level_displacement + (leaf_idx * n_coeffs);
-
         let raw = unsafe { expansions.as_ptr().add(key_displacement) as *mut T };
-
         result[leaf_idx] = SendPtrMut { raw };
     }
 
@@ -191,14 +193,19 @@ where
 {
     let mut index_pointer = 0;
 
-    let mut result = vec![(0usize, 0usize); tree.n_leaves().unwrap()];
+    let mut result = Vec::new();
 
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        let n_points = tree.n_coordinates(leaf).unwrap_or_default();
+    if let Some(n_leaves) = tree.n_leaves() {
+        result = vec![(0usize, 0usize); n_leaves];
 
-        // Update charge index pointer
-        result[i] = (index_pointer, index_pointer + n_points);
-        index_pointer += n_points;
+        for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
+            let n_points = tree.n_coordinates(leaf).unwrap_or_default();
+
+            // Update charge index pointer
+            result[i] = (index_pointer, index_pointer + n_points);
+            index_pointer += n_points;
+        }
+
     }
 
     result

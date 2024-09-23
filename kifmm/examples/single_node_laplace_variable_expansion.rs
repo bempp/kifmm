@@ -1,4 +1,4 @@
-use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleFmm, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
@@ -31,7 +31,7 @@ fn main() {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -60,7 +60,7 @@ fn main() {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
                     singular_value_threshold,
                     None,
@@ -89,7 +89,7 @@ fn main() {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
                     singular_value_threshold,
                     None,

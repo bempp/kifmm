@@ -11,7 +11,7 @@ use rlst::{
     RawAccessMut, RlstScalar,
 };
 
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 use crate::{
     fmm::{
@@ -74,7 +74,7 @@ where
 
                                 if n_sources > 0 {
                                     kernel.evaluate_st(
-                                        EvalType::Value,
+                                        GreenKernelEvalType::Value,
                                         coordinates_row_major,
                                         upward_check_surface,
                                         charges,

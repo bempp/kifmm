@@ -6,7 +6,7 @@ use std::{
 
 use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
-    types::EvalType,
+    types::GreenKernelEvalType,
 };
 use itertools::Itertools;
 use num::{Float, Zero};
@@ -109,7 +109,7 @@ where
             // As well as estimating their inverses using SVD
             let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &upward_check_surface[..],
                 &upward_equivalent_surface[..],
                 uc2e.data_mut(),
@@ -162,7 +162,7 @@ where
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
                     ce2pc.data_mut(),
@@ -223,7 +223,7 @@ where
             // As well as estimating their inverses using SVD
             let mut dc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &downward_check_surface[..],
                 &downward_equivalent_surface[..],
                 dc2e.data_mut(),
@@ -271,7 +271,7 @@ where
                 let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
                     pe2cc.data_mut(),
@@ -353,7 +353,7 @@ where
             // As well as estimating their inverses using SVD
             let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &upward_check_surface[..],
                 &upward_equivalent_surface[..],
                 uc2e.data_mut(),
@@ -431,7 +431,7 @@ where
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
 
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
                     ce2pc.data_mut(),
@@ -505,7 +505,7 @@ where
             // As well as estimating their inverses using SVD
             let mut dc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &downward_check_surface[..],
                 &downward_equivalent_surface[..],
                 dc2e.data_mut(),
@@ -575,7 +575,7 @@ where
                 let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
                     pe2cc.data_mut(),
@@ -745,7 +745,7 @@ where
                     let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_targets, n_sources]);
 
                     self.kernel.assemble_st(
-                        EvalType::Value,
+                        GreenKernelEvalType::Value,
                         &target_check_surface[..],
                         &source_equivalent_surface[..],
                         tmp_gram.data_mut(),
@@ -1482,7 +1482,7 @@ where
                 let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
 
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &target_check_surface[..],
                     &source_equivalent_surface[..],
                     tmp_gram.data_mut(),
@@ -1758,7 +1758,7 @@ where
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
         self.kernel.assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             convolution_grid,
             &target_pt,
             &mut kernel_evals[..],
@@ -2289,14 +2289,14 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
+    fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
         let alpha_inner = Scalar::real(ALPHA_INNER);
 
         // Check if computing potentials, or potentials and derivatives
         let kernel_eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => self.dim + 1,
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => self.dim + 1,
         };
 
         let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
@@ -2578,7 +2578,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(Some(1e-5), None, FmmSvdMode::Deterministic),
             )
             .unwrap()
@@ -2638,7 +2638,7 @@ mod test {
         let mut direct = vec![0f64; fmm.n_coeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &sources[..],
             &targets[..],
             multipole.data(),
@@ -2684,7 +2684,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(None, None),
             )
             .unwrap()
@@ -2741,7 +2741,7 @@ mod test {
         let mut direct = vec![c64::zero(); fmm.n_coeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &sources[..],
             &targets[..],
             multipole.data(),
@@ -2848,7 +2848,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -2972,7 +2972,7 @@ mod test {
         // Get direct evaluations for testing
         let mut direct = vec![0f64; fmm.n_coeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &source_equivalent_surface[..],
             &target_check_surface[..],
             multipole.data(),
@@ -3017,7 +3017,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -3148,7 +3148,7 @@ mod test {
         // Get direct evaluations for testing
         let mut direct = vec![c64::zero(); fmm.n_coeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &source_equivalent_surface[..],
             &target_check_surface[..],
             multipole.data(),

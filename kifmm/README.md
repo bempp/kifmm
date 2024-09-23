@@ -7,7 +7,7 @@ Indeed, the full API is more extensive, including features that enable for varia
 
 ```rust
 use rand::{thread_rng, Rng};
-use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder, FmmSvdMode};
 use kifmm::traits::tree::{FmmTree, Tree};
 use kifmm::traits::fmm::Fmm;
@@ -55,7 +55,7 @@ fn main() {
             &charges,
             expansion_order, // Set expansion order, by tree level or globally
             Laplace3dKernel::new(), // Choose kernel,
-            EvalType::Value, // Choose potential or potential + deriv evaluation
+            GreenKernelEvalType::Value, // Choose potential or potential + deriv evaluation
             BlasFieldTranslationSaRcmp::new(
               singular_value_threshold,
               check_surface_diff,

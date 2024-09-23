@@ -12,7 +12,7 @@ use crate::{
 };
 use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::traits::Kernel;
-use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use numpy::{
     ndarray::Dim, npyffi::NPY_ORDER, PyArray, PyArray2, PyArrayMethods, PyReadonlyArrayDyn,
     PyUntypedArrayMethods, ToPyArray,
@@ -91,9 +91,9 @@ macro_rules! laplace_fft_constructors {
                 block_size: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
-                    EvalType::Value
+                    GreenKernelEvalType::Value
                 } else if kernel_eval_type == 1 {
-                    EvalType::ValueDeriv
+                    GreenKernelEvalType::ValueDeriv
                 } else {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Invalid Kernel Evaluation Mode",
@@ -206,9 +206,9 @@ macro_rules! laplace_blas_constructors {
                 rsvd: Option<(Option<usize>, Option<usize>, Option<usize>, Option<usize>)>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
-                    EvalType::Value
+                    GreenKernelEvalType::Value
                 } else if kernel_eval_type == 1 {
-                    EvalType::ValueDeriv
+                    GreenKernelEvalType::ValueDeriv
                 } else {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Invalid Kernel Evaluation Mode",
@@ -331,9 +331,9 @@ macro_rules! helmholtz_fft_constructors {
                 block_size: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
-                    EvalType::Value
+                    GreenKernelEvalType::Value
                 } else if kernel_eval_type == 1 {
-                    EvalType::ValueDeriv
+                    GreenKernelEvalType::ValueDeriv
                 } else {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Invalid Kernel Evaluation Mode",
@@ -446,9 +446,9 @@ macro_rules! helmholtz_blas_constructors {
                 surface_diff: Option<usize>
             ) -> PyResult<Self> {
                 let kernel_eval_type = if kernel_eval_type == 0 {
-                    EvalType::Value
+                    GreenKernelEvalType::Value
                 } else if kernel_eval_type == 1 {
-                    EvalType::ValueDeriv
+                    GreenKernelEvalType::ValueDeriv
                 } else {
                     return Err(PyErr::new::<PyTypeError, _>(
                         "Invalid Kernel Evaluation Mode",

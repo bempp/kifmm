@@ -1,14 +1,23 @@
 //! Neighbourhood communicator wrapper
+use std::mem::MaybeUninit;
+
 use itertools::Itertools;
 use mpi::{
-    collective::CommunicatorCollectives,
-    raw::{AsRaw, FromRaw},
-    topology::{Communicator, SimpleCommunicator},
-    traits::{Buffer, BufferMut, PartitionedBuffer, PartitionedBufferMut},
+    collective::CommunicatorCollectives, raw::{AsRaw, FromRaw}, topology::{Communicator, SimpleCommunicator, UserGroup}, traits::{Buffer, BufferMut, PartitionedBuffer, PartitionedBufferMut}, Count, Rank
 };
 use mpi_sys;
 
 use super::types::NeighbourhoodCommunicator;
+
+unsafe fn with_uninitialized<F, U, R>(f: F) -> (R, U)
+where
+    F: FnOnce(*mut U) -> R,
+{
+    let mut uninitialized = MaybeUninit::uninit();
+    let res = f(uninitialized.as_mut_ptr());
+    (res, uninitialized.assume_init())
+}
+
 
 impl NeighbourhoodCommunicator {
     /// Number of associated ranks
@@ -58,13 +67,17 @@ impl NeighbourhoodCommunicator {
         }
     }
 
-    /// Map from local rank to the global rank
-    pub fn local_to_global_rank(&self, local_rank: i32) -> Option<i32> {
-        if local_rank < (self.neighbours.len() - 1) as i32 {
-            Some(self.neighbours[local_rank as usize])
-        } else {
-            None
+    pub fn translate_ranks(&self, global_comm: &SimpleCommunicator, ranks: &[Rank]) -> Vec<Rank>{
+
+        let n_ranks = ranks.len();
+        let mut result = vec![0 as Rank; n_ranks];
+        unsafe {
+            let global_comm_group = global_comm.group().as_raw();
+            let neighbour_comm_group = with_uninitialized(|group| mpi::ffi::MPI_Comm_group(self.raw.as_raw(), group)).1;
+            mpi::ffi::MPI_Group_translate_ranks(global_comm_group, n_ranks as Count, ranks.as_ptr(), neighbour_comm_group, result.as_mut_ptr());
         }
+
+        result
     }
 
     /// Map from the global rank to the local rank
@@ -76,24 +89,24 @@ impl NeighbourhoodCommunicator {
         }
     }
 
-    /// Constructor from locations to send to
-    pub fn new(world_comm: &SimpleCommunicator, to_send: &[i32]) -> Self {
-        let size = world_comm.size();
-        let rank: i32 = world_comm.rank();
+    /// Barrier synchronisation for all processes in neighbourhoood
+    pub fn barrier(&self) {
+        unsafe {
+            mpi::ffi::MPI_Barrier(self.raw.as_raw())
+        };
+    }
 
-        // Communicate whether to expect to be involved in send/receive with these ranks
-        let mut to_receive = vec![0i32; size as usize];
-        world_comm.all_to_all_into(to_send, &mut to_receive);
+    /// Constructor from locations to send to
+    pub fn new(world_comm: &SimpleCommunicator, send_marker: &[i32], receive_marker: &[i32]) -> Self {
+        let size = world_comm.size();
 
         // Now create neighbours, with send and receive displacements
         let mut neighbours = Vec::new();
 
         for world_rank in 0..size as usize {
             let world_rank_i32 = world_rank as i32;
-            if to_send[world_rank] != 0 || to_receive[world_rank] != 0 {
+            if send_marker[world_rank] != 0 || receive_marker[world_rank] != 0 {
                 neighbours.push(world_rank_i32);
-            } else if (world_rank as i32) == rank {
-                neighbours.push(world_rank_i32)
             }
         }
 

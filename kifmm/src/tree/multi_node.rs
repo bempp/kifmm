@@ -467,9 +467,9 @@ where
                 // Filter for those contained on foreign ranks
                 let interaction_list = interaction_list
                     .iter()
-                    .filter_map(|key| {
+                    .filter_map(|&key| {
                         // Try to get the rank from the key
-                        if let Some(&rank) = self.source_layout.rank_from_key(key) {
+                        if let Some(&rank) = self.source_layout.rank_from_key(&key) {
                             // Filter out if the rank is equal to my_rank
                             if rank != self.source_tree.rank() {
                                 return Some(key);
@@ -514,11 +514,23 @@ where
             sorted_queries_
         };
 
+        // Compute the receive counts, and mark again processes involved
+        let mut receive_counts= vec![0i32; self.source_tree().comm.size() as usize];
+        let mut receive_marker = vec![0i32; self.source_tree().comm.size() as usize];
+        self.source_tree.comm.all_to_all_into(&send_counts, &mut receive_counts);
+        for (rank, &receive_count) in receive_counts.iter().enumerate() {
+            if receive_count > 0 {
+                receive_marker[rank] = 1
+            }
+        }
+
         let query = Query {
             queries,
             ranks,
             send_counts,
             send_marker,
+            receive_marker,
+            receive_counts
         };
 
         if admissible {
@@ -532,7 +544,7 @@ where
     pub fn set_source_layout(&mut self) {
         let size = self.source_tree.comm.size();
 
-        // 1. Gather ranges on all processes, define by roots they own
+        // Gather ranges on all processes, define by roots they own
         let mut ranges = Vec::new();
         for tree_idx in 0..self.source_tree.n_trees {
             ranges.push(self.source_tree.trees[tree_idx].root());
@@ -553,13 +565,13 @@ where
 
         let total_ranges = all_ranges_counts.iter().sum::<i32>();
 
-        let mut raw = vec![MortonKey::<T>::default(); total_ranges as usize];
+        let mut all_ranges = vec![MortonKey::<T>::default(); total_ranges as usize];
         let counts;
         let displacements;
 
         {
             let mut partition =
-                PartitionMut::new(&mut raw, all_ranges_counts, &all_ranges_displacements[..]);
+                PartitionMut::new(&mut all_ranges, all_ranges_counts, &all_ranges_displacements[..]);
             self.source_tree
                 .comm
                 .all_gather_varcount_into(&ranges, &mut partition);
@@ -567,38 +579,26 @@ where
             displacements = partition.displs().to_vec();
         }
 
-        let raw_set = raw.iter().cloned().collect();
+        let raw_set = all_ranges.iter().cloned().collect();
 
-        let mut ranks = Vec::new();
+        let mut all_ranks: Vec<i32> = Vec::new();
 
-        for i in 0..raw.len() as i32 {
-            let mut rank = 0;
-
-            while rank < displacements.len() - 1 {
-                let curr_displacement = displacements[rank + 1];
-
-                if i < curr_displacement {
-                    break;
-                }
-
-                rank += 1;
-            }
-
-            ranks.push(rank as i32);
+        for (rank, &count) in counts.iter().enumerate() {
+            all_ranks.extend_from_slice(&mut vec![rank as i32; count as usize]);
         }
 
         let mut range_to_rank = HashMap::new();
 
-        for (&range, &rank) in raw.iter().zip(ranks.iter()) {
+        for (&range, &rank) in all_ranges.iter().zip(all_ranks.iter()) {
             range_to_rank.insert(range, rank);
         }
 
         self.source_layout = Layout {
-            raw,
+            raw: all_ranges,
             raw_set,
             counts,
             displacements,
-            ranks,
+            ranks: all_ranks,
             range_to_rank,
         };
     }

@@ -40,7 +40,7 @@ fn main() {
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
 
-    let mut fmm = MultiNodeBuilder::new()
+    let fmm = MultiNodeBuilder::new()
         .tree(
             &comm,
             points.data(),
@@ -55,6 +55,9 @@ fn main() {
         .unwrap()
         .build()
         .unwrap();
+
+
+
 }
 
 #[cfg(not(feature = "mpi"))]

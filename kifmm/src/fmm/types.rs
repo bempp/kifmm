@@ -1,7 +1,7 @@
 //! Data structures for kernel independent FMM
 use std::{collections::HashMap, sync::RwLock};
 
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use num::traits::Float;
 use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
 
@@ -215,7 +215,7 @@ where
     pub n_coeffs_check_surface: Vec<usize>, // Index corresponds to level
 
     /// The kernel evaluation type, either for potentials or potentials and gradients
-    pub kernel_eval_type: EvalType,
+    pub kernel_eval_type: GreenKernelEvalType,
 
     /// The FMM evaluation type, either for a vector or matrix of input charges.
     pub fmm_eval_type: FmmEvalType,
@@ -317,7 +317,7 @@ where
             equivalent_surface_order: Vec::default(),
             check_surface_order: Vec::default(),
             fmm_eval_type: FmmEvalType::Vector,
-            kernel_eval_type: EvalType::Value,
+            kernel_eval_type: GreenKernelEvalType::Value,
             kernel_eval_size: 0,
             dim: 0,
             n_coeffs_equivalent_surface: Vec::default(),
@@ -413,7 +413,7 @@ pub enum FmmEvalType {
 /// use kifmm::traits::tree::SingleFmmTree;
 /// use kifmm::tree::helpers::points_fixture;
 /// use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
-/// use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+/// use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 ///
 /// /// Particle data
 /// let n_sources = 1000;
@@ -444,7 +444,7 @@ pub enum FmmEvalType {
 ///         charges.data(),
 ///         &expansion_order,
 ///         Laplace3dKernel::new(),
-///         EvalType::Value,
+///         GreenKernelEvalType::Value,
 ///         FftFieldTranslation::new(None),
 ///     )
 ///     .unwrap()
@@ -496,7 +496,7 @@ where
     pub n_coeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
-    pub kernel_eval_type: Option<EvalType>,
+    pub kernel_eval_type: Option<GreenKernelEvalType>,
 
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
@@ -546,7 +546,7 @@ where
     pub n_coeffs_check_surface: Option<usize>,
 
     /// Kernel eval type
-    pub kernel_eval_type: Option<EvalType>,
+    pub kernel_eval_type: Option<GreenKernelEvalType>,
 
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
@@ -1035,7 +1035,7 @@ where
     pub n_coeffs_check_surface: usize,
 
     /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
-    pub kernel_eval_type: EvalType,
+    pub kernel_eval_type: GreenKernelEvalType,
 
     /// The FMM evaluation type, either for a vector or matrix of input charges.
     pub fmm_eval_type: FmmEvalType,
@@ -1196,4 +1196,8 @@ pub struct Query {
     pub send_counts: Vec<Count>,
     /// Each index marks a rank in the global communicator that is involved in this query
     pub send_marker: Vec<Rank>,
+    /// Receive counts for each rank in global communicator
+    pub receive_counts: Vec<Count>,
+    /// Each index marks a rank in the global communicator that is involved in this query
+    pub receive_marker: Vec<Rank>
 }

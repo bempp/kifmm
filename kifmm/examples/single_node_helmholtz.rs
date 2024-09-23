@@ -1,4 +1,4 @@
-use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::BlasFieldTranslationIa;
 use kifmm::{FftFieldTranslation, SingleFmm, SingleNodeBuilder};
 
@@ -36,7 +36,7 @@ fn main() {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -69,7 +69,7 @@ fn main() {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(singular_value_threshold, None),
             )
             .unwrap()
@@ -98,7 +98,7 @@ fn main() {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(singular_value_threshold, None),
             )
             .unwrap()

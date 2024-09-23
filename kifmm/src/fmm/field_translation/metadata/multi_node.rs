@@ -1,8 +1,8 @@
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::traits::Kernel as KernelTrait;
-use green_kernels::types::EvalType;
+use green_kernels::types::GreenKernelEvalType;
 use itertools::Itertools;
-use mpi::traits::Equivalence;
+use mpi::traits::{Communicator, CommunicatorCollectives, Equivalence};
 use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
@@ -87,7 +87,7 @@ where
         );
 
         self.kernel.assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &upward_check_surface,
             &upward_equivalent_surface,
             uc2e.data_mut(),
@@ -119,7 +119,7 @@ where
             );
 
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &parent_upward_check_surface,
                 &child_upward_equivalent_surface,
                 ce2pc.data_mut(),
@@ -167,7 +167,7 @@ where
             [n_coeffs_check_surface, n_coeffs_equivalent_surface]
         );
         self.kernel.assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &downward_check_surface[..],
             &downward_equivalent_surface[..],
             dc2e.data_mut(),
@@ -199,7 +199,7 @@ where
                 [n_coeffs_check_surface, n_coeffs_equivalent_surface]
             );
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &child_downward_check_surface,
                 &parent_downward_equivalent_surface,
                 pe2cc.data_mut(),
@@ -332,7 +332,7 @@ where
             );
 
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &target_check_surface,
                 &source_equivalent_surface,
                 tmp_gram.data_mut(),
@@ -828,17 +828,17 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, _charges: &[Self::Scalar]) {
+    fn metadata(&mut self, eval_type: GreenKernelEvalType, _charges: &[Self::Scalar]) {
         // Check if computing potentials, or potentials and derivatives
         match eval_type {
-            EvalType::Value => {}
-            EvalType::ValueDeriv => {
+            GreenKernelEvalType::Value => {}
+            GreenKernelEvalType::ValueDeriv => {
                 panic!("Only potential computation supported for now")
             }
         }
         let kernel_eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => 4,
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
         };
 
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -925,13 +925,15 @@ where
             coordinate_index_pointer_multi_node(&self.tree.source_tree);
 
         // Set neighbourhood communicators
-        self.neighbourhood_communicator_v =
-            NeighbourhoodCommunicator::new(&self.communicator, &self.tree.v_list_query.send_marker);
-        self.neighbourhood_communicator_u =
-            NeighbourhoodCommunicator::new(&self.communicator, &self.tree.u_list_query.send_marker);
+        // self.neighbourhood_communicator_v =
+        //     NeighbourhoodCommunicator::new(&self.communicator, &self.tree.v_list_query.send_marker);
 
-        // Can perform U list exchange now
-        self.u_list_exchange();
+
+        // Communicate whether to expect to be involved in send/receive with these ranks
+
+
+        self.neighbourhood_communicator_u =
+            NeighbourhoodCommunicator::new(&self.communicator, &self.tree.u_list_query.send_marker, &self.tree.u_list_query.receive_marker);
 
         // Set metadata
         self.multipoles = multipoles;
@@ -952,6 +954,9 @@ where
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.leaf_scales_sources = leaf_scales_sources;
         self.kernel_eval_size = kernel_eval_size;
+
+        // Can perform U list exchange now
+        self.u_list_exchange();
     }
 }
 
@@ -982,7 +987,7 @@ where
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
         self.kernel.assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             convolution_grid,
             &target_pt,
             &mut kernel_evals[..],
