@@ -10,7 +10,11 @@ fn main() {
 
     use rlst::{RawAccess, RlstScalar};
 
-    use kifmm::{traits::fmm::MultiFmm, traits::tree::SingleTree, tree::helpers::points_fixture};
+    use kifmm::{
+        traits::fmm::{FmmMetadata, FmmOperatorData, MultiFmm},
+        traits::tree::SingleTree,
+        tree::helpers::points_fixture,
+    };
 
     use mpi::{
         environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*,

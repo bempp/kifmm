@@ -40,7 +40,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel},
+        fmm::{FmmDataAccess, FmmMetadata, FmmOperatorData, HomogenousKernel},
         general::single_node::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
@@ -77,7 +77,7 @@ where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SingleFmm,
+    Self: FmmDataAccess,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -2545,8 +2545,8 @@ mod test {
     use rlst::RandomAccessMut;
 
     use crate::fmm::helpers::single_node::flip3;
+    use crate::traits::fmm::FmmDataAccess;
     use crate::tree::helpers::points_fixture;
-    use crate::SingleFmm;
     use crate::SingleNodeBuilder;
 
     use super::*;

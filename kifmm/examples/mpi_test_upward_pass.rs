@@ -5,7 +5,7 @@ fn main() {
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
-            fmm::MultiFmm,
+            fmm::{FmmDataAccess, FmmDataAccessMulti, MultiFmm},
             tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
         },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},

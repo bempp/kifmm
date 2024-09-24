@@ -1279,6 +1279,7 @@ pub mod api {
 
     use crate::{
         fmm::types::FmmEvalType,
+        traits::fmm::FmmDataAccess,
         traits::tree::{SingleFmmTree, SingleTree, TreeNode},
         tree::types::MortonKey,
         BlasFieldTranslationIa, FftFieldTranslation, SingleFmm,

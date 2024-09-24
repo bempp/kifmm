@@ -62,18 +62,60 @@ pub trait SourceToTargetTranslation {
     fn p2l(&self, level: u64) -> Result<(), FmmError>;
 }
 
-/// Interface for a Kernel-Independent Fast Multipole Method (FMM).
-///
-/// This trait abstracts the core functionalities of FMM, allowing for different underlying
-/// data structures, kernels, and precision types. It supports operations essential for
-/// executing FMM calculations, including accessing multipole and local expansions, evaluating
-/// potentials, and managing the underlying tree structure and kernel functions.
-pub trait SingleFmm
-where
-    Self::Scalar: RlstScalar,
-{
+/// Multinode FMM data access
+#[cfg(feature = "mpi")]
+pub trait FmmDataAccessMulti {
     /// Data associated with FMM, must implement RlstScalar.
     type Scalar;
+
+    /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
+    type Tree: MultiFmmTree;
+
+    /// Kernel associated with this FMMl
+    type Kernel: Kernel<T = Self::Scalar>;
+
+    /// Get the multipole expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The source node.
+    fn multipole(
+        &self,
+        key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
+    ) -> Option<&[Self::Scalar]>;
+
+    /// Get the multipole expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
+
+    /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
+    fn equivalent_surface_order(&self, level: u64) -> usize;
+
+    /// Get the expansion order associated with this FMM, used to discretise the check surface.
+    fn check_surface_order(&self, level: u64) -> usize;
+
+    /// Check whether or not expansion order is set variably
+    fn variable_expansion_order(&self) -> bool;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn n_coeffs_equivalent_surface(&self, level: u64) -> usize;
+
+    /// Get the number of multipole/local coefficients associated with this FMM
+    fn n_coeffs_check_surface(&self, level: u64) -> usize;
+
+    /// Get the tree associated with this FMM
+    fn tree(&self) -> &Self::Tree;
+
+    /// Get the kernel associated with this FMM
+    fn kernel(&self) -> &Self::Kernel;
+
+    /// Get the dimension of the data in this FMM
+    fn dim(&self) -> usize;
+}
+
+/// Access data for FMM objects
+pub trait FmmDataAccess {
+    /// Data associated with FMM, must implement RlstScalar.
+    type Scalar: RlstScalar;
 
     /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
     type Tree: SingleFmmTree;
@@ -141,7 +183,18 @@ where
 
     /// Get the dimension of the data in this FMM
     fn dim(&self) -> usize;
+}
 
+/// Interface for a Kernel-Independent Fast Multipole Method (FMM).
+///
+/// This trait abstracts the core functionalities of FMM, allowing for different underlying
+/// data structures, kernels, and precision types. It supports operations essential for
+/// executing FMM calculations, including accessing multipole and local expansions, evaluating
+/// potentials, and managing the underlying tree structure and kernel functions.
+pub trait SingleFmm
+where
+    Self: FmmDataAccess,
+{
     /// Evaluate the leaf level operations for source tree
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
 
@@ -161,76 +214,15 @@ where
     ///
     /// # Arguments
     /// * `charges` - new charge data.
-    fn clear(&mut self, charges: &[Self::Scalar]);
+    fn clear(&mut self, charges: &[<Self as FmmDataAccess>::Scalar]);
 }
 
 /// Interface for multi node FMM
 #[cfg(feature = "mpi")]
 pub trait MultiFmm
 where
-    Self::Scalar: RlstScalar,
+    Self: FmmDataAccessMulti,
 {
-    /// Data associated with FMM, must implement RlstScalar.
-    type Scalar;
-
-    /// Type of tree, must implement `FmmTree`, allowing for separate source and target trees.
-    type Tree: MultiFmmTree;
-
-    /// Kernel associated with this FMMl
-    type Kernel: Kernel<T = Self::Scalar>;
-
-    /// Get the multipole expansion data associated with a node as a slice
-    /// # Arguments
-    /// * `key` - The source node.
-    fn multipole(
-        &self,
-        key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
-    ) -> Option<&[Self::Scalar]>;
-
-    /// Get the multipole expansion data associated with a tree level as a slice
-    /// # Arguments
-    /// * `level` - The tree level.
-    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
-
-    // /// Get the local expansion data associated with a node as a slice
-    // /// # Arguments
-    // /// * `key` - The target node.
-    // fn local(
-    //     &self,
-    //     key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-    // ) -> Option<&[Self::Scalar]>;
-
-    // /// Get the local expansion data associated with a tree level as a slice
-    // /// # Arguments
-    // /// * `level` - The tree level.
-    // fn locals(&self, level: u64) -> Option<&[Self::Scalar]>;
-
-    // /// Get the potential data associated with the particles contained at a given node
-    // /// # Arguments
-    // /// * `key` - The target leaf node.
-    // fn potential(
-    //     &self,
-    //     leaf: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-    // ) -> Option<Vec<&[Self::Scalar]>>;
-
-    // /// Get all potential data at all particles, stored in order by global index
-    // fn potentials(&self) -> Option<&Vec<Self::Scalar>>;
-
-    // /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
-    // fn equivalent_surface_order(&self, level: u64) -> usize;
-
-    // /// Get the expansion order associated with this FMM, used to discretise the check surface.
-    // fn check_surface_order(&self, level: u64) -> usize;
-
-    // /// Check whether or not expansion order is set variably
-    // fn variable_expansion_order(&self) -> bool;
-
-    // /// Get the number of multipole/local coefficients associated with this FMM
-    // fn n_coeffs_equivalent_surface(&self, level: u64) -> usize;
-
-    // /// Get the number of multipole/local coefficients associated with this FMM
-    // fn n_coeffs_check_surface(&self, level: u64) -> usize;
-
     /// Evaluate the leaf level operations for source tree
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
 
@@ -242,15 +234,6 @@ where
 
     /// Evaluate the downward pass
     fn evaluate_downward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
-
-    /// Get the tree associated with this FMM
-    fn tree(&self) -> &Self::Tree;
-
-    /// Get the kernel associated with this FMM
-    fn kernel(&self) -> &Self::Kernel;
-
-    /// Get the dimension of the data in this FMM
-    fn dim(&self) -> usize;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;

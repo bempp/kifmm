@@ -2,7 +2,7 @@ use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::traits::Kernel as KernelTrait;
 use green_kernels::types::GreenKernelEvalType;
 use itertools::Itertools;
-use mpi::traits::{Communicator, CommunicatorCollectives, Equivalence};
+use mpi::traits::Equivalence;
 use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
@@ -20,9 +20,10 @@ use crate::fmm::helpers::multi_node::{
 };
 use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale};
 use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
+use crate::fmm::KiFmm;
 use crate::linalg::pinv::pinv;
 use crate::traits::fftw::{Dft, DftType};
-use crate::traits::fmm::{FmmMetadata, MultiFmm};
+use crate::traits::fmm::{FmmDataAccess, FmmDataAccessMulti, FmmMetadata, FmmOperatorData};
 use crate::traits::general::{
     multi_node::GhostExchange,
     single_node::{AsComplex, Epsilon},
@@ -44,7 +45,7 @@ use crate::{
     tree::constants::{ALPHA_INNER, ALPHA_OUTER},
     BlasFieldTranslationSaRcmp,
 };
-use crate::{FftFieldTranslation, FmmSvdMode};
+use crate::{FftFieldTranslation, FmmSvdMode, SingleNodeFmmTree};
 
 use super::single_node::find_cutoff_rank;
 
@@ -841,7 +842,7 @@ where
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: MultiFmm + GhostExchange,
+    Self: FmmDataAccessMulti + GhostExchange,
 {
     type Scalar = Scalar;
 
@@ -1108,5 +1109,44 @@ where
         }
 
         (surf_to_conv, conv_to_surf)
+    }
+}
+
+impl<Scalar, SourceToTargetData> FmmOperatorData
+    for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+where
+    Scalar: RlstScalar + Default + Equivalence + Float,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
+    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    // KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>: SourceToTargetTranslationMetadata
+    KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>: FmmDataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+        + SourceToTargetTranslationMetadata,
+{
+    fn fft_map_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn expansion_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn c2e_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn m2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn l2l_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn m2m_operator_index(&self, _level: u64) -> usize {
+        0
+    }
+
+    fn displacement_index(&self, level: u64) -> usize {
+        (level - 2) as usize
     }
 }

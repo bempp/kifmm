@@ -2,7 +2,7 @@ use crate::{
     fmm::types::KiFmmMulti,
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{HomogenousKernel, MultiFmm, TargetTranslation},
+        fmm::{HomogenousKernel, TargetTranslation},
     },
 };
 use green_kernels::traits::Kernel as KernelTrait;
@@ -17,7 +17,6 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    // KiFmmMulti<Scalar, Kernel, SourceToTargetData>: FmmDataAccess
 {
     fn l2l(&self, _level: u64) -> Result<(), crate::traits::types::FmmError> {
         Ok(())

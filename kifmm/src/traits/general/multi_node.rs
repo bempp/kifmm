@@ -7,10 +7,10 @@ use rlst::RlstScalar;
 use crate::{
     traits::{
         field::SourceToTargetTranslationMetadata,
+        fmm::FmmDataAccess,
         tree::{SingleFmmTree, SingleTree},
     },
     tree::types::Domain,
-    SingleFmm,
 };
 
 /// Interface for ghost exchange implementations
@@ -31,18 +31,20 @@ pub trait GhostExchange {
 /// Set metadata for global FMM when received in the form of Ghost data
 pub trait GlobalFmmMetadata
 where
-    Self: SingleFmm + SourceToTargetTranslationMetadata,
+    Self: FmmDataAccess + SourceToTargetTranslationMetadata,
 {
     /// Set data associated with received multipoles for global tree
     fn global_fmm_multipole_metadata(
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        keys_set: HashSet<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        leaves: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys_set: HashSet<
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+        >,
+        leaves: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         leaves_set: HashSet<
-            <<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
         multipoles: Vec<Self::Scalar>,
     );
@@ -52,11 +54,13 @@ where
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        keys_set: HashSet<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        leaves: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys_set: HashSet<
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+        >,
+        leaves: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         leaves_set: HashSet<
-            <<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
         locals: Vec<Self::Scalar>,
     );

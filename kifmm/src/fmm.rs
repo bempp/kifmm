@@ -19,5 +19,6 @@ mod eval;
 #[cfg(feature = "mpi")]
 pub mod neighbour_comm;
 
+mod data_access;
 #[cfg(feature = "mpi")]
 mod ghost_exchange;

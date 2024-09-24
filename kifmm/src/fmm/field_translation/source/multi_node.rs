@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use mpi::traits::{Communicator, Equivalence};
+use mpi::traits::Equivalence;
 use num::Float;
 use rayon::prelude::*;
 use rlst::{
@@ -21,7 +21,7 @@ use crate::{
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{HomogenousKernel, MultiFmm, SourceTranslation},
+        fmm::{FmmDataAccessMulti, HomogenousKernel, SourceTranslation},
         tree::{MultiFmmTree, MultiTree},
         types::FmmError,
     },
@@ -35,7 +35,7 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     SourceToTargetData: SourceToTargetDataTrait,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    Self: MultiFmm<Scalar = Scalar>,
+    Self: FmmDataAccessMulti<Scalar = Scalar>,
 {
     fn p2m(&self) -> Result<(), crate::traits::types::FmmError> {
         if let Some(_leaves) = self.tree.source_tree().all_leaves() {

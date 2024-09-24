@@ -19,7 +19,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, HomogenousKernel},
+        fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel},
         general::single_node::Epsilon,
     },
     tree::{
@@ -38,10 +38,12 @@ where
     SourceToTargetData: SourceToTargetDataTrait + Default,
     KiFmmMulti<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>,
+        + FmmMetadata<Scalar = Scalar>
+        + FmmOperatorData,
     KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>,
+        + FmmMetadata<Scalar = Scalar>
+        + FmmOperatorData,
 {
     /// Init
     pub fn new() -> Self {

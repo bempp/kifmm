@@ -18,12 +18,12 @@ use crate::{
         KiFmm,
     },
     traits::{
-        fmm::{FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
+        fmm::{FmmDataAccess, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationSaRcmp, SingleFmm,
+    BlasFieldTranslationSaRcmp,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -32,7 +32,7 @@ where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData,
+    Self: FmmOperatorData + FmmDataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {

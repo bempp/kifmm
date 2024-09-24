@@ -7,6 +7,7 @@ use itertools::Itertools;
 use mpi::datatype::Partition;
 use mpi::datatype::PartitionMut;
 use mpi::topology::Communicator;
+use mpi::topology::SimpleCommunicator;
 use mpi::traits::Equivalence;
 use mpi::traits::Partitioned;
 use mpi::traits::Root;
@@ -17,9 +18,9 @@ use rlst::RlstScalar;
 
 use crate::traits::field::SourceToTargetData as SourceToTargetDataTrait;
 use crate::traits::field::SourceToTargetTranslationMetadata;
+use crate::traits::fmm::FmmDataAccess;
+use crate::traits::fmm::FmmDataAccessMulti;
 use crate::traits::fmm::HomogenousKernel;
-use crate::traits::fmm::MultiFmm;
-use crate::traits::fmm::SourceToTargetTranslation;
 use crate::traits::general::multi_node::GhostExchange;
 use crate::traits::general::multi_node::GlobalFmmMetadata;
 use crate::traits::tree::MultiFmmTree;
@@ -29,7 +30,7 @@ use crate::traits::tree::SingleTree;
 use crate::tree::types::Domain;
 use crate::tree::types::MortonKey;
 use crate::tree::SingleNodeTree;
-use crate::SingleFmm;
+use crate::MultiNodeFmmTree;
 use crate::SingleNodeFmmTree;
 
 use super::helpers::single_node::coordinate_index_pointer_single_node;
@@ -46,8 +47,12 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: SourceToTargetTranslation,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SingleFmm<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+    Self: FmmDataAccessMulti<
+        Scalar = Scalar,
+        Kernel = Kernel,
+        Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>,
+    >,
+    KiFmm<Scalar, Kernel, SourceToTargetData>: FmmDataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata,
 {
     fn gather_global_fmm_at_root(&mut self) {
@@ -867,18 +872,20 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: SingleFmm<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+    Self: FmmDataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata,
 {
     fn global_fmm_multipole_metadata(
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        keys_set: HashSet<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        leaves: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys_set: HashSet<
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+        >,
+        leaves: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         leaves_set: HashSet<
-            <<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
         multipoles: Vec<Self::Scalar>,
     ) {
@@ -908,11 +915,13 @@ where
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        keys_set: HashSet<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        leaves: Vec<<<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys_set: HashSet<
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+        >,
+        leaves: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         leaves_set: HashSet<
-            <<<Self as SingleFmm>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
         locals: Vec<Self::Scalar>,
     ) {
