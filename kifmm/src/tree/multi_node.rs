@@ -27,6 +27,7 @@ where
     T: RlstScalar + Float + Equivalence + Default,
 {
     /// Construct uniform tree, pruned by default
+    #[allow(clippy::too_many_arguments)]
     pub fn uniform_tree(
         coordinates_row_major: &[T],
         &domain: &Domain<T>,
@@ -75,7 +76,7 @@ where
                     .collect_vec();
                 splitters.sort();
                 let splitters = &splitters[1..];
-                simplesort(&mut points, &comm.duplicate(), &splitters)?;
+                simplesort(&mut points, &comm.duplicate(), splitters)?;
             }
         }
 
@@ -279,7 +280,7 @@ where
         self.rank
     }
 
-    fn trees<'a>(&'a self) -> &'a [Self::SingleTree] {
+    fn trees(&self) -> &[Self::SingleTree] {
         self.trees.as_ref()
     }
 
@@ -287,7 +288,7 @@ where
         self.n_trees
     }
 
-    fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node] {
+    fn roots(&self) -> &[<Self::SingleTree as SingleTree>::Node] {
         self.roots.as_ref()
     }
 
@@ -413,11 +414,11 @@ where
         self.target_tree().n_trees()
     }
 
-    fn source_tree<'a>(&'a self) -> &'a Self::Tree {
+    fn source_tree(&self) -> &Self::Tree {
         &self.source_tree
     }
 
-    fn target_tree<'a>(&'a self) -> &'a Self::Tree {
+    fn target_tree(&self) -> &Self::Tree {
         &self.target_tree
     }
 }
@@ -428,6 +429,7 @@ where
     C: Communicator,
 {
     /// Configure queries to send from this rank for either U or V list data
+    #[allow(clippy::unnecessary_filter_map)]
     pub fn set_queries(&mut self, admissible: bool) {
         let mut queries = HashSet::new();
 
@@ -589,7 +591,7 @@ where
         let mut all_ranks: Vec<i32> = Vec::new();
 
         for (rank, &count) in counts.iter().enumerate() {
-            all_ranks.extend_from_slice(&mut vec![rank as i32; count as usize]);
+            all_ranks.extend_from_slice(&vec![rank as i32; count as usize]);
         }
 
         let mut range_to_rank = HashMap::new();

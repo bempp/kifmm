@@ -139,10 +139,10 @@ where
         }
     });
 
-    for leaf_idx in 0..n_leaves {
+    for (leaf_idx, result_i) in result.iter_mut().enumerate().take(n_leaves) {
         let key_displacement = level_displacement + (leaf_idx * n_coeffs);
         let raw = unsafe { expansions.as_ptr().add(key_displacement) as *mut T };
-        result[leaf_idx] = SendPtrMut { raw };
+        *result_i = SendPtrMut { raw };
     }
 
     result

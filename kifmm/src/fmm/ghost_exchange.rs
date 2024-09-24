@@ -593,7 +593,7 @@ where
         // Set tree
         let sort_indices;
         (self.ghost_tree_u, sort_indices) = SingleNodeTree::from_ghost_octants_u(
-            &self.tree.domain(),
+            self.tree.domain(),
             self.tree.source_tree().total_depth(),
             requested_coordinates,
         );
@@ -601,7 +601,7 @@ where
         // Set metadata
         let ghost_charges = sort_indices
             .iter()
-            .map(|&i| requested_charges[i].clone())
+            .map(|&i| requested_charges[i])
             .collect_vec();
         self.ghost_charges = ghost_charges;
         self.charge_index_pointer_ghost_sources =
@@ -636,7 +636,7 @@ where
         let total_receive_count = receive_counter as usize;
 
         // Communicate queries
-        let mut received_queries = vec![0u64; total_receive_count as usize];
+        let mut received_queries = vec![0u64; total_receive_count];
         let mut available_queries = Vec::new();
         let mut available_queries_counts = Vec::new();
         let mut available_queries_displacements = Vec::new();
@@ -808,7 +808,7 @@ where
         // Store original ordering of received data temporarily
         let ghost_keys = requested_queries
             .into_iter()
-            .map(|q| MortonKey::<Scalar::Real>::from_morton(q))
+            .map(MortonKey::<Scalar::Real>::from_morton)
             .collect_vec();
 
         // Create a mapping from keys to index as received
@@ -861,7 +861,7 @@ where
             1,
             &self.ghost_multipoles,
         );
-        self.ghost_level_multipoles = std::mem::replace(&mut tmp[0], Vec::new());
+        self.ghost_level_multipoles = std::mem::take(&mut tmp[0]);
     }
 }
 

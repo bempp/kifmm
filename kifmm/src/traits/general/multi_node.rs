@@ -34,6 +34,7 @@ where
     Self: FmmDataAccess + SourceToTargetTranslationMetadata,
 {
     /// Set data associated with received multipoles for global tree
+    #[allow(clippy::too_many_arguments)]
     fn global_fmm_multipole_metadata(
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
@@ -50,6 +51,7 @@ where
     );
 
     /// Set data associated with received locals for global tree
+    #[allow(clippy::too_many_arguments)]
     fn global_fmm_local_metadata(
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,

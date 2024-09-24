@@ -119,10 +119,10 @@ pub trait MultiTree {
     fn rank(&self) -> i32;
 
     /// Roots associated with trees at this rank
-    fn roots<'a>(&'a self) -> &'a [<Self::SingleTree as SingleTree>::Node];
+    fn roots(&self) -> &[<Self::SingleTree as SingleTree>::Node];
 
     /// All the single node trees associated with this rank
-    fn trees<'a>(&'a self) -> &'a [Self::SingleTree];
+    fn trees(&self) -> &[Self::SingleTree];
 
     /// Number of single node trees associated with this rank
     fn n_trees(&self) -> usize;

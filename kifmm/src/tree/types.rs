@@ -121,7 +121,6 @@ where
 ///
 /// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
 ///   checks and deduplication.
-#[cfg(feature = "mpi")]
 /// MPI distributed tree, consists of up to N single node trees
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T, C: Communicator>

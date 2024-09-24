@@ -65,6 +65,7 @@ where
     }
 
     /// Tree
+    #[allow(clippy::too_many_arguments)]
     pub fn tree(
         mut self,
         comm: &SimpleCommunicator,
@@ -200,8 +201,8 @@ where
                 variable_expansion_order: false,
                 n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
                 n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
-                fmm_eval_type: fmm_eval_type.clone(),
-                kernel_eval_type: kernel_eval_type.clone(),
+                fmm_eval_type,
+                kernel_eval_type,
                 kernel: kernel.clone(),
                 dim: 3,
                 ..Default::default()
@@ -217,13 +218,13 @@ where
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),
-                equivalent_surface_order: equivalent_surface_order,
-                check_surface_order: check_surface_order,
-                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface,
-                n_coeffs_check_surface: n_coeffs_check_surface,
-                source_to_target: source_to_target,
-                fmm_eval_type: fmm_eval_type,
-                kernel_eval_type: kernel_eval_type,
+                equivalent_surface_order,
+                check_surface_order,
+                n_coeffs_equivalent_surface,
+                n_coeffs_check_surface,
+                source_to_target,
+                fmm_eval_type,
+                kernel_eval_type,
                 global_fmm,
                 kernel_eval_size: 1,
                 source: tmp_arr,

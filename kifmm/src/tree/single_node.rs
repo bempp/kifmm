@@ -460,13 +460,13 @@ where
         let mut result = Vec::new();
 
         let (_unmapped, index_map) =
-            SingleNodeTree::<T>::assign_nodes_to_points_with_index_map(&roots, points);
+            SingleNodeTree::<T>::assign_nodes_to_points_with_index_map(roots, points);
 
         let depth = local_depth + global_depth;
 
         for root in roots.iter() {
             if let Some(indices) = index_map.get(root) {
-                let mut local_points = indices.into_iter().map(|&i| points[i]).collect_vec();
+                let mut local_points = indices.iter().map(|&i| points[i]).collect_vec();
                 local_points.sort();
 
                 // Create new buffer containing local coordinates on this local tree
@@ -558,7 +558,7 @@ where
         // Add data
         result.root = MortonKey::root();
         result.depth = depth;
-        result.domain = domain.clone();
+        result.domain = *domain;
         result.leaves = leaves.into();
         result.keys = keys.into();
         result.key_to_index = key_to_index;
@@ -598,8 +598,8 @@ where
                     .try_into()
                     .unwrap();
 
-                let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
-                let encoded_key = MortonKey::from_point(coord, &domain, depth);
+                let base_key = MortonKey::from_point(coord, domain, DEEPEST_LEVEL);
+                let encoded_key = MortonKey::from_point(coord, domain, depth);
                 points.push(Point {
                     coordinate: *coord,
                     base_key,
@@ -611,10 +611,7 @@ where
             // Sort points by Morton key, and return indices that sort the points
             sort_indices = (0..points.len()).collect_vec();
             sort_indices.sort_by_key(|&i| &points[i]);
-            let points = sort_indices
-                .iter()
-                .map(|&i| points[i].clone())
-                .collect_vec();
+            let points = sort_indices.iter().map(|&i| points[i]).collect_vec();
 
             // Group coordinates by leaves
             let mut curr = points[0];
@@ -791,7 +788,10 @@ where
         let coords_len = coordinates_row_major.len();
         let valid_dim = coords_len % dim == 0;
         let valid_depth = depth <= DEEPEST_LEVEL;
-        let root_specified = if let Some(_root) = root { true } else { false };
+        let root_specified = match root {
+            Some(_root) => true,
+            None => false,
+        };
 
         match (
             valid_depth,

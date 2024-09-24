@@ -16,10 +16,10 @@ impl NeighbourhoodCommunicator {
     }
 
     /// Forward send a buffer on the neighbourhood communicator
-    pub fn all_to_all_into<S: ?Sized, R: ?Sized>(&self, sendbuf: &S, recvbuf: &mut R)
+    pub fn all_to_all_into<S, R>(&self, sendbuf: &S, recvbuf: &mut R)
     where
-        S: Buffer,
-        R: BufferMut,
+        S: ?Sized + Buffer,
+        R: ?Sized + BufferMut,
     {
         let c_size = self.raw.size();
 
@@ -37,10 +37,10 @@ impl NeighbourhoodCommunicator {
     }
 
     /// Forward send a buffer on the neighbourhood communicator
-    pub fn all_to_all_varcount_into<S: ?Sized, R: ?Sized>(&self, sendbuf: &S, recvbuf: &mut R)
+    pub fn all_to_all_varcount_into<S, R>(&self, sendbuf: &S, recvbuf: &mut R)
     where
-        S: PartitionedBuffer,
-        R: PartitionedBufferMut,
+        S: ?Sized + PartitionedBuffer,
+        R: ?Sized + PartitionedBufferMut,
     {
         unsafe {
             mpi_sys::MPI_Neighbor_alltoallv(

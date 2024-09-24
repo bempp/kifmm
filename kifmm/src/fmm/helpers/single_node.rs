@@ -246,7 +246,7 @@ where
 
     let &n_coeffs_leaf = n_coeffs.last().unwrap();
 
-    for leaf_idx in 0..n_leaves {
+    for (leaf_idx, result_i) in result.iter_mut().enumerate().take(n_leaves) {
         let key_displacement = level_displacement + (leaf_idx * n_coeffs_leaf) * n_matvecs;
 
         for eval_idx in 0..n_matvecs {
@@ -257,7 +257,7 @@ where
                     .add(eval_displacement + key_displacement) as *mut T
             };
 
-            result[leaf_idx].push(SendPtrMut { raw });
+            result_i.push(SendPtrMut { raw });
         }
     }
 

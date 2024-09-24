@@ -64,7 +64,7 @@ where
     let mut count = 0;
     let mut splitter_indices = vec![(0i32, 0i32); nsplitters as usize];
 
-    for (_i, item) in arr.iter().enumerate() {
+    for item in arr.iter() {
         while splitter_index < nsplitters && item >= &splitters[splitter_index as usize] {
             if count > 0 {
                 // Record the segment from l to l + count - 1
