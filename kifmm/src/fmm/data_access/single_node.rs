@@ -4,7 +4,7 @@ use crate::{
     fmm::{types::FmmEvalType, KiFmm},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccess, FmmOperatorData, HomogenousKernel},
+        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel},
         tree::{SingleFmmTree, SingleTree},
     },
     SingleNodeFmmTree,
@@ -18,7 +18,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmOperatorData,
+    Self: FmmMetadataAccess,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;

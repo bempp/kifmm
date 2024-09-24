@@ -6,7 +6,7 @@ use crate::{
     fmm::types::{FmmEvalType, KiFmmMulti},
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccessMulti, FmmOperatorData, HomogenousKernel},
+        fmm::{FmmDataAccessMulti, FmmMetadataAccess, HomogenousKernel},
         tree::{MultiFmmTree, MultiTree},
     },
     MultiNodeFmmTree,
@@ -21,7 +21,7 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmOperatorData,
+    Self: FmmMetadataAccess,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;

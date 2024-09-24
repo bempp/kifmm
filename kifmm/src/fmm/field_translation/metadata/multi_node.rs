@@ -23,7 +23,7 @@ use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
 use crate::fmm::KiFmm;
 use crate::linalg::pinv::pinv;
 use crate::traits::fftw::{Dft, DftType};
-use crate::traits::fmm::{FmmDataAccess, FmmDataAccessMulti, FmmMetadata, FmmOperatorData};
+use crate::traits::fmm::{FmmDataAccess, FmmDataAccessMulti, FmmMetadata, FmmMetadataAccess};
 use crate::traits::general::{
     multi_node::GhostExchange,
     single_node::{AsComplex, Epsilon},
@@ -1112,7 +1112,7 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmOperatorData
+impl<Scalar, SourceToTargetData> FmmMetadataAccess
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,

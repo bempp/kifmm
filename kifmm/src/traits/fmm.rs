@@ -251,7 +251,7 @@ pub trait FmmMetadata {
 
 /// Defines how metadata associated with field translations is looked up at runtime.
 /// Defined by kernel type, as well as field translation method.
-pub trait FmmOperatorData
+pub trait FmmMetadataAccess
 where
     Self: FmmMetadata,
 {

@@ -40,7 +40,7 @@ use crate::{
             SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmDataAccess, FmmMetadata, FmmOperatorData, HomogenousKernel},
+        fmm::{FmmDataAccess, FmmMetadata, FmmMetadataAccess, HomogenousKernel},
         general::single_node::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
@@ -2176,7 +2176,7 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmOperatorData
+impl<Scalar, SourceToTargetData> FmmMetadataAccess
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
 where
     Scalar: RlstScalar + Default,
@@ -2236,7 +2236,7 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmOperatorData
+impl<Scalar, SourceToTargetData> FmmMetadataAccess
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,

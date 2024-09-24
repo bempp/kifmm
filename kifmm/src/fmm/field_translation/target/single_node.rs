@@ -14,7 +14,7 @@ use crate::{
     },
     traits::{
         field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccess, FmmOperatorData, HomogenousKernel, TargetTranslation},
+        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel, TargetTranslation},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
@@ -28,7 +28,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
     SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData + FmmDataAccess<Scalar = Scalar, Kernel = Kernel>,
+    Self: FmmMetadataAccess + FmmDataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {

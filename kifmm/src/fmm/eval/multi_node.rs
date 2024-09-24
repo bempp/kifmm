@@ -3,8 +3,7 @@ use std::time::Instant;
 use crate::fmm::KiFmm;
 use crate::traits::field::SourceAndTargetTranslationMetadata;
 use crate::traits::fmm::{
-    FmmDataAccess, FmmDataAccessMulti, HomogenousKernel, MultiFmm, SourceTranslation,
-    TargetTranslation,
+    FmmDataAccessMulti, HomogenousKernel, MultiFmm, SourceTranslation, TargetTranslation,
 };
 use crate::traits::general::multi_node::GhostExchange;
 use crate::traits::tree::{MultiFmmTree, MultiTree};
@@ -31,8 +30,7 @@ where
         + TargetTranslation
         + FmmDataAccessMulti
         + GhostExchange,
-    KiFmm<Scalar, Kernel, SourceToTargetData>:
-        FmmDataAccess + SourceAndTargetTranslationMetadata + SingleFmm,
+    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceAndTargetTranslationMetadata + SingleFmm,
 {
     #[inline(always)]
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), crate::traits::types::FmmError> {

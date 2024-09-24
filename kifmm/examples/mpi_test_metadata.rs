@@ -11,7 +11,7 @@ fn main() {
     use rlst::{RawAccess, RlstScalar};
 
     use kifmm::{
-        traits::fmm::{FmmMetadata, FmmOperatorData, MultiFmm},
+        traits::fmm::{FmmMetadata, FmmMetadataAccess, MultiFmm},
         traits::tree::SingleTree,
         tree::helpers::points_fixture,
     };
