@@ -429,7 +429,6 @@ where
     C: Communicator,
 {
     /// Configure queries to send from this rank for either U or V list data
-    #[allow(clippy::unnecessary_filter_map)]
     pub fn set_queries(&mut self, admissible: bool) {
         let mut queries = HashSet::new();
 
@@ -448,15 +447,13 @@ where
                 // Filter for those contained on foreign ranks
                 let interaction_list = interaction_list
                     .into_iter()
-                    .filter_map(|key| {
-                        // Try to get the rank from the key
-                        if let Some(&rank) = self.source_layout.rank_from_key(&key) {
-                            // Filter out if the rank is equal to this rank
-                            if rank != self.source_tree.rank() {
-                                return Some(key);
-                            }
+                    .filter(|key| {
+                        // Check if the rank is not equal to this rank
+                        if let Some(&rank) = self.source_layout.rank_from_key(key) {
+                            rank != self.source_tree.rank()
+                        } else {
+                            false
                         }
-                        None
                     })
                     .collect_vec();
 
