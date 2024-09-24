@@ -1,4 +1,5 @@
 //! Data structures for kernel independent FMM
+use pulp as _;
 use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
