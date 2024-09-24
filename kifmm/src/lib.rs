@@ -86,6 +86,8 @@ pub mod sorting;
 pub mod traits;
 pub mod tree;
 
+use bytemuck as _;
+
 // Public API
 #[doc(inline)]
 pub use fmm::types::BlasFieldTranslationIa;
