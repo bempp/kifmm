@@ -19,35 +19,49 @@ fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
     world: &SimpleCommunicator,
     tree: &MultiNodeTree<T, SimpleCommunicator>,
 ) {
-    // Communicate bounds from each process
-    let max = tree.roots.iter().max().unwrap();
-    let min = tree.roots.iter().min().unwrap();
+    use itertools::Itertools;
 
-    // Gather all bounds at root
-    let size = world.size();
-    let rank = world.rank();
+    let max = if !tree.roots.is_empty() {
+        tree.roots.iter().max().unwrap().clone()
+    } else {
+        MortonKey::from_anchor(&[1, 1, 1], 16)
+    };
 
-    let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
-    let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
+    let min = if !tree.roots.is_empty() {
+        tree.roots.iter().min().unwrap().clone()
+    } else {
+        MortonKey::from_anchor(&[1, 1, 1], 16)
+    };
 
-    let previous_process = world.process_at_rank(previous_rank);
-    let next_process = world.process_at_rank(next_rank);
+    let root_process = world.process_at_rank(0);
 
-    // Send min to partner
-    if rank > 0 {
-        previous_process.send(min);
+    if world.rank() == 0 {
+        // Gather all bounds at root
+        let size = world.size();
+
+        let mut maxs = vec![MortonKey::<T>::default(); size as usize];
+        let mut mins = vec![MortonKey::<T>::default(); size as usize];
+
+        let root_process = world.this_process();
+
+        root_process.gather_into_root(&max, &mut maxs);
+        root_process.gather_into_root(&min, &mut mins);
+
+        // Filter out sentinels received
+        let maxs = maxs.into_iter().filter(|m| m.level() != 16).collect_vec();
+        let mins = mins.into_iter().filter(|m| m.level() != 16).collect_vec();
+
+        for i in 1..maxs.len() {
+            let curr_min = mins[i];
+            let prev_max = maxs[i-1];
+            assert!(prev_max <= curr_min);
+        }
+
+    } else {
+        root_process.gather_into(&max);
+        root_process.gather_into(&min);
     }
 
-    let mut partner_min = MortonKey::default();
-
-    if rank < (size - 1) {
-        next_process.receive_into(&mut partner_min);
-    }
-
-    // Test that the partner's minimum node is greater than the process's maximum node
-    if rank < size - 1 {
-        assert!(max < &partner_min)
-    }
 }
 
 /// Test that the globally defined domain contains all the points at a given node.
@@ -103,7 +117,6 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 #[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
-
     use kifmm::{traits::tree::MultiTree, tree::types::SortKind};
 
     let universe: Universe = mpi::initialize().unwrap();
