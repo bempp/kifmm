@@ -410,7 +410,7 @@ pub enum FmmEvalType {
 /// # Example
 /// ```
 /// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
-/// use kifmm::traits::fmm::SingleFmm;
+/// use kifmm::traits::fmm::Evaluate;
 /// use kifmm::traits::tree::SingleFmmTree;
 /// use kifmm::tree::helpers::points_fixture;
 /// use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};

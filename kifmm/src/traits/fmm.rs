@@ -132,6 +132,12 @@ pub trait DataAccess {
 
     /// Get the dimension of the data in this FMM
     fn dim(&self) -> usize;
+
+    /// Clear the data buffers and add new charge data for re-evaluation.
+    ///
+    /// # Arguments
+    /// * `charges` - new charge data.
+    fn clear(&mut self, charges: &[<Self as DataAccess>::Scalar]);
 }
 
 /// Interface for a Kernel-Independent Fast Multipole Method (FMM).
@@ -158,12 +164,6 @@ where
 
     /// Evaluate the potentials, or potential gradients, for this FMM
     fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
-
-    /// Clear the data buffers and add new charge data for re-evaluation.
-    ///
-    /// # Arguments
-    /// * `charges` - new charge data.
-    fn clear(&mut self, charges: &[<Self as DataAccess>::Scalar]);
 }
 
 /// Interface for multi node FMM
