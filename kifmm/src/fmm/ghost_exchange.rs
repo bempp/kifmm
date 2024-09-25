@@ -620,8 +620,8 @@ where
         let mut receive_counter = 0;
 
         for (&send_count, &receive_count) in izip!(
-            &self.tree.u_list_query.send_counts,
-            &self.tree.u_list_query.receive_counts
+            &self.tree.v_list_query.send_counts,
+            &self.tree.v_list_query.receive_counts
         ) {
             if send_count != 0 || receive_count != 0 {
                 neighbourhood_send_counts.push(send_count);
@@ -655,7 +655,7 @@ where
             let mut partition_receive = PartitionMut::new(
                 &mut received_queries,
                 neighbourhood_receive_counts,
-                &neighbourhood_receive_displacements[..],
+                neighbourhood_receive_displacements,
             );
 
             self.neighbourhood_communicator_v

@@ -175,6 +175,7 @@ where
         let domain = self.tree.domain();
 
         let mut l2l = Vec::new();
+        let mut l2l_global = Vec::new();
 
         let downward_equivalent_surface =
             root.surface_grid(equivalent_surface_order, domain, alpha_outer);
@@ -201,6 +202,24 @@ where
         let dc2e_inv_1 =
             vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
         let dc2e_inv_2 = vec![ut];
+
+        let mut dc2e_inv_1_global = dc2e_inv_1
+            .iter()
+            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .collect_vec();
+        let mut dc2e_inv_2_global = dc2e_inv_2
+            .iter()
+            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .collect_vec();
+
+        dc2e_inv_1_global
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_1[i].data()));
+        dc2e_inv_2_global
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_2[i].data()));
 
         let parent_downward_equivalent_surface =
             root.surface_grid(equivalent_surface_order, domain, alpha_outer);
@@ -233,8 +252,16 @@ where
                 .iter_mut()
                 .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
 
+            let mut tmp2 = rlst_dynamic_array2!(Scalar, tmp.shape());
+            tmp2.data_mut().copy_from_slice(tmp.data());
+
             l2l.push(tmp);
+            l2l_global.push(tmp2);
         }
+
+        self.global_fmm.target_vec = vec![l2l_global];
+        self.global_fmm.dc2e_inv_1 = dc2e_inv_1_global;
+        self.global_fmm.dc2e_inv_2 = dc2e_inv_2_global;
 
         self.target_vec = l2l;
         self.dc2e_inv_1 = dc2e_inv_1;
@@ -531,12 +558,50 @@ where
         let directional_cutoff_ranks =
             std::mem::take(&mut *directional_cutoff_ranks.lock().unwrap());
 
+        let mut u_ = rlst_dynamic_array2!(Scalar, u.shape());
+        let mut st_ = rlst_dynamic_array2!(Scalar, st_trunc.shape());
+        let mut c_u_ = c_u
+            .iter()
+            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .collect_vec();
+        let mut c_vt_ = c_vt
+            .iter()
+            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .collect_vec();
+        u_.data_mut().copy_from_slice(u.data());
+        st_.data_mut().copy_from_slice(st_trunc.data());
+
+        c_u_.iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| x.data_mut().copy_from_slice(c_u[i].data()));
+        c_vt_
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| x.data_mut().copy_from_slice(c_vt[i].data()));
+
         let result = BlasMetadataSaRcmp {
             u,
             st: st_trunc,
             c_u,
             c_vt,
         };
+
+        let result_ = BlasMetadataSaRcmp {
+            u: u_,
+            st: st_,
+            c_u: c_u_,
+            c_vt: c_vt_,
+        };
+
+        self.global_fmm.source_to_target.metadata.push(result_);
+        self.global_fmm
+            .source_to_target
+            .cutoff_rank
+            .push(cutoff_rank.clone());
+        self.global_fmm
+            .source_to_target
+            .directional_cutoff_ranks
+            .push(directional_cutoff_ranks.clone());
 
         self.source_to_target.metadata.push(result);
         self.source_to_target.cutoff_rank.push(cutoff_rank);
@@ -825,13 +890,23 @@ where
         };
 
         // Set operator data
-        self.source_to_target.metadata.push(metadata);
+        self.source_to_target.metadata.push(metadata.clone());
 
         // Set required maps
         let (surf_to_conv_map, conv_to_surf_map) =
             Self::compute_surf_to_conv_map(equivalent_surface_order);
         self.source_to_target.surf_to_conv_map = vec![surf_to_conv_map];
         self.source_to_target.conv_to_surf_map = vec![conv_to_surf_map];
+
+        // Copy for global FMM
+        self.global_fmm
+            .source_to_target
+            .metadata
+            .push(metadata.clone());
+        self.global_fmm.source_to_target.surf_to_conv_map =
+            self.source_to_target.surf_to_conv_map.clone();
+        self.global_fmm.source_to_target.conv_to_surf_map =
+            self.source_to_target.conv_to_surf_map.clone();
     }
 }
 

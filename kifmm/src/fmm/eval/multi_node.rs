@@ -148,11 +148,11 @@ where
         }
 
         // Scatter root locals back to local tree
-        self.scatter_global_fmm_from_root();
+        // self.scatter_global_fmm_from_root();
 
-        // Perform remainder of downward pass
-        self.evaluate_downward_pass(timed)?;
-        self.evaluate_leaf_targets(timed)?;
+        // // Perform remainder of downward pass
+        // self.evaluate_downward_pass(timed)?;
+        // self.evaluate_leaf_targets(timed)?;
 
         Ok(())
     }
