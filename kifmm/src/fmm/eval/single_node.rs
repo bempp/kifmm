@@ -137,7 +137,10 @@ mod test {
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::tree::{FmmTreeNode, SingleFmmTree, SingleTree},
+        traits::{
+            fmm::DataAccess,
+            tree::{FmmTreeNode, SingleFmmTree, SingleTree},
+        },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
         BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder,
         SingleNodeFmmTree,
