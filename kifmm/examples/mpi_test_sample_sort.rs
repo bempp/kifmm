@@ -132,22 +132,20 @@ fn main() {
     )
     .unwrap();
 
-    println!("rank {:?} {:?}", uniform.rank, uniform.n_keys_tot());
+    test_no_overlaps(&comm, &uniform);
+    if world.rank() == 0 {
+        println!("\t ... test_no_overlaps passed on uniform tree");
+    }
 
-    // test_no_overlaps(&comm, &uniform);
-    // if world.rank() == 0 {
-    //     println!("\t ... test_no_overlaps passed on uniform tree");
-    // }
+    test_global_bounds::<f32>(&comm);
+    if world.rank() == 0 {
+        println!("\t ... test_global_bounds passed on uniform tree");
+    }
 
-    // test_global_bounds::<f32>(&comm);
-    // if world.rank() == 0 {
-    //     println!("\t ... test_global_bounds passed on uniform tree");
-    // }
-
-    // test_n_points(&comm, &uniform, n_points);
-    // if world.rank() == 0 {
-    //     println!("\t ... test_n_points passed on uniform tree");
-    // }
+    test_n_points(&comm, &uniform, n_points);
+    if world.rank() == 0 {
+        println!("\t ... test_n_points passed on uniform tree");
+    }
 }
 
 #[cfg(not(feature = "mpi"))]

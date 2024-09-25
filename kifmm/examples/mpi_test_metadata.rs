@@ -44,7 +44,7 @@ fn main() {
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
 
-    let fmm = MultiNodeBuilder::new()
+    let _fmm = MultiNodeBuilder::new()
         .tree(
             &comm,
             points.data(),
