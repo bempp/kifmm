@@ -23,7 +23,7 @@ use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
 use crate::fmm::KiFmm;
 use crate::linalg::pinv::pinv;
 use crate::traits::fftw::{Dft, DftType};
-use crate::traits::fmm::{FmmDataAccess, FmmDataAccessMulti, FmmMetadata, FmmMetadataAccess};
+use crate::traits::fmm::{DataAccess, DataAccessMulti, Metadata, MetadataAccess};
 use crate::traits::general::{
     multi_node::GhostExchange,
     single_node::{AsComplex, Epsilon},
@@ -37,7 +37,7 @@ use crate::{
     linalg::rsvd::MatrixRsvd,
     traits::{
         field::{
-            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
+            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
             SourceToTargetTranslationMetadata,
         },
         fmm::HomogenousKernel,
@@ -49,12 +49,12 @@ use crate::{FftFieldTranslation, FmmSvdMode, SingleNodeFmmTree};
 
 use super::single_node::find_cutoff_rank;
 
-impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> SourceAndTargetTranslationMetadata
+    for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -910,14 +910,13 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> FmmMetadata
-    for KiFmmMulti<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> Metadata for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Float + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmDataAccessMulti + GhostExchange,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    Self: DataAccessMulti + GhostExchange,
 {
     type Scalar = Scalar;
 
@@ -1187,14 +1186,13 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmMetadataAccess
-    for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> MetadataAccess
+    for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    // KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>: SourceToTargetTranslationMetadata
-    KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>: FmmDataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata,
 {
     fn fft_map_index(&self, _level: u64) -> usize {

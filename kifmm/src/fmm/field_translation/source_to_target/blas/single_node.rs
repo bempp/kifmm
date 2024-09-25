@@ -18,7 +18,8 @@ use crate::{
         KiFmm,
     },
     traits::{
-        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel, SourceToTargetTranslation},
+        field::SourceToTargetTranslation,
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
@@ -32,7 +33,7 @@ where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmMetadataAccess + FmmDataAccess<Scalar = Scalar, Kernel = Kernel>,
+    Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
@@ -429,7 +430,7 @@ where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmMetadataAccess,
+    Self: MetadataAccess,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {

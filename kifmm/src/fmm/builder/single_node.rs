@@ -12,25 +12,25 @@ use crate::{
     },
     traits::{
         field::{
-            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
+            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, HomogenousKernel},
+        fmm::{HomogenousKernel, Metadata},
         general::single_node::Epsilon,
         tree::{SingleFmmTree, SingleTree},
     },
     tree::{types::Domain, SingleNodeTree},
 };
 
-impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> SingleNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Default,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
+    FieldTranslation: FieldTranslationTrait + Default,
+    KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>,
+        + Metadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
     pub fn new() -> Self {
@@ -150,7 +150,7 @@ where
         expansion_order: &[usize],
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
-        source_to_target: SourceToTargetData,
+        source_to_target: FieldTranslation,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -239,7 +239,7 @@ where
     }
 
     /// Finalize and build the single node FMM
-    pub fn build(self) -> Result<KiFmm<Scalar, Kernel, SourceToTargetData>, std::io::Error> {
+    pub fn build(self) -> Result<KiFmm<Scalar, Kernel, FieldTranslation>, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,

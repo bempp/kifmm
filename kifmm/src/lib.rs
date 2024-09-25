@@ -107,7 +107,7 @@ pub use fmm::types::SingleNodeFmmTree;
 pub use fmm::types::MultiNodeFmmTree;
 
 #[doc(inline)]
-pub use traits::fmm::SingleFmm;
+pub use traits::fmm::Evaluate;
 #[cfg_attr(feature = "strict", deny(warnings))]
 #[warn(missing_docs)]
 pub mod bindings;

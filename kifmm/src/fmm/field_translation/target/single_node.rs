@@ -13,22 +13,21 @@ use crate::{
         constants::L2L_MAX_BLOCK_SIZE, helpers::single_node::chunk_size, types::FmmEvalType, KiFmm,
     },
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel, TargetTranslation},
+        field::{FieldTranslation as FieldTranslationTrait, TargetTranslation},
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
 };
 
-impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
-    for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> TargetTranslation for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmMetadataAccess + FmmDataAccess<Scalar = Scalar, Kernel = Kernel>,
+    Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {

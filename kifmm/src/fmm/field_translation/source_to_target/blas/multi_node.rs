@@ -9,7 +9,8 @@ use green_kernels::traits::Kernel as KernelTrait;
 use crate::{
     fmm::types::KiFmmMulti,
     traits::{
-        fmm::{FmmDataAccessMulti, HomogenousKernel, SourceToTargetTranslation},
+        field::SourceToTargetTranslation,
+        fmm::{DataAccessMulti, HomogenousKernel},
         types::FmmError,
     },
     BlasFieldTranslationSaRcmp,
@@ -21,7 +22,7 @@ where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    Self: FmmDataAccessMulti<Scalar = Scalar, Kernel = Kernel>,
+    Self: DataAccessMulti<Scalar = Scalar, Kernel = Kernel>,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let _multipoles = self.multipoles(level);

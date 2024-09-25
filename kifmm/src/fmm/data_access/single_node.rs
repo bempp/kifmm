@@ -3,8 +3,8 @@ use rlst::RlstScalar;
 use crate::{
     fmm::{types::FmmEvalType, KiFmm},
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel},
+        field::FieldTranslation as FieldTranslationTrait,
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         tree::{SingleFmmTree, SingleTree},
     },
     SingleNodeFmmTree,
@@ -12,13 +12,13 @@ use crate::{
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-impl<Scalar, Kernel, SourceToTargetData> FmmDataAccess for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> DataAccess for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
     <Scalar as RlstScalar>::Real: Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmMetadataAccess,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    Self: MetadataAccess,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;

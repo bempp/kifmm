@@ -20,7 +20,8 @@ use crate::{
     },
     traits::{
         fftw::Dft,
-        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel, SourceToTargetTranslation},
+        field::SourceToTargetTranslation,
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         general::single_node::{AsComplex, Hadamard8x8},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
@@ -44,8 +45,8 @@ where
         Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmMetadataAccess
-        + FmmDataAccess<Scalar = Scalar, Kernel = Kernel, Tree = SingleNodeFmmTree<Scalar::Real>>,
+    Self: MetadataAccess
+        + DataAccess<Scalar = Scalar, Kernel = Kernel, Tree = SingleNodeFmmTree<Scalar::Real>>,
     <Scalar as Dft>::Plan: Sync,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {

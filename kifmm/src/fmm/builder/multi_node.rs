@@ -16,10 +16,10 @@ use crate::{
     },
     traits::{
         field::{
-            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
+            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, FmmMetadataAccess, HomogenousKernel},
+        fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::single_node::Epsilon,
     },
     tree::{
@@ -30,20 +30,20 @@ use crate::{
 };
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
-impl<Scalar, Kernel, SourceToTargetData> MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> MultiNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Epsilon + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Default,
-    KiFmmMulti<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
+    FieldTranslation: FieldTranslationTrait + Default,
+    KiFmmMulti<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>
-        + FmmMetadataAccess,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
+        + Metadata<Scalar = Scalar>
+        + MetadataAccess,
+    KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
         + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>
-        + FmmMetadataAccess,
+        + Metadata<Scalar = Scalar>
+        + MetadataAccess,
 {
     /// Init
     pub fn new() -> Self {
@@ -150,7 +150,7 @@ where
         mut self,
         expansion_order: usize,
         kernel: Kernel,
-        source_to_target: SourceToTargetData,
+        source_to_target: FieldTranslation,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -173,7 +173,7 @@ where
     }
 
     /// Initialise
-    pub fn build(self) -> Result<KiFmmMulti<Scalar, Kernel, SourceToTargetData>, std::io::Error> {
+    pub fn build(self) -> Result<KiFmmMulti<Scalar, Kernel, FieldTranslation>, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -194,7 +194,7 @@ where
             let check_surface_order = self.check_surface_order.unwrap();
 
             let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
-            let global_fmm: KiFmm<Scalar, Kernel, SourceToTargetData> = KiFmm {
+            let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
                 equivalent_surface_order: vec![equivalent_surface_order],
                 check_surface_order: vec![check_surface_order],

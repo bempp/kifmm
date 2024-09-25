@@ -17,22 +17,21 @@ use crate::{
         types::{FmmEvalType, KiFmm},
     },
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccess, FmmMetadataAccess, HomogenousKernel, SourceTranslation},
+        field::{FieldTranslation as FieldTranslationTrait, SourceTranslation},
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
     tree::constants::NSIBLINGS,
 };
 
-impl<Scalar, Kernel, SourceToTargetData> SourceTranslation
-    for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> SourceTranslation for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmMetadataAccess + FmmDataAccess<Scalar = Scalar, Kernel = Kernel>,
+    Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn p2m(&self) -> Result<(), FmmError> {
         let Some(_leaves) = self.tree.source_tree.all_leaves() else {

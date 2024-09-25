@@ -2,35 +2,35 @@ use std::time::Instant;
 
 use crate::fmm::KiFmm;
 use crate::traits::field::SourceAndTargetTranslationMetadata;
-use crate::traits::fmm::{
-    FmmDataAccessMulti, HomogenousKernel, MultiFmm, SourceTranslation, TargetTranslation,
+use crate::traits::field::{
+    FieldTranslation as FieldTranslationTrait, SourceToTargetTranslation, SourceTranslation,
+    TargetTranslation,
 };
+use crate::traits::fmm::{DataAccessMulti, EvaluateMulti, HomogenousKernel};
 use crate::traits::general::multi_node::GhostExchange;
 use crate::traits::tree::{MultiFmmTree, MultiTree};
 use crate::traits::types::{FmmOperatorTime, FmmOperatorType};
-use crate::traits::{
-    field::SourceToTargetData as SourceToTargetDataTrait, fmm::SourceToTargetTranslation,
-};
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::traits::{Communicator, Equivalence};
 use num::Float;
 use rlst::RlstScalar;
 
 use crate::fmm::types::KiFmmMulti;
-use crate::SingleFmm;
+use crate::Evaluate;
 
-impl<Scalar, Kernel, SourceToTargetData> MultiFmm for KiFmmMulti<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> EvaluateMulti
+    for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: SourceToTargetTranslation
         + SourceTranslation
         + TargetTranslation
-        + FmmDataAccessMulti
+        + DataAccessMulti
         + GhostExchange,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceAndTargetTranslationMetadata + SingleFmm,
+    KiFmm<Scalar, Kernel, FieldTranslation>: SourceAndTargetTranslationMetadata + Evaluate,
 {
     #[inline(always)]
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), crate::traits::types::FmmError> {

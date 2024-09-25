@@ -3,7 +3,7 @@ fn main() {
     use green_kernels::laplace_3d::Laplace3dKernel;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
-        traits::fmm::MultiFmm,
+        traits::fmm::EvaluateMulti,
         tree::{helpers::points_fixture, types::SortKind},
         FftFieldTranslation,
     };

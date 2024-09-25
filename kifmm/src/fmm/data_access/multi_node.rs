@@ -5,8 +5,8 @@ use rlst::RlstScalar;
 use crate::{
     fmm::types::{FmmEvalType, KiFmmMulti},
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmDataAccessMulti, FmmMetadataAccess, HomogenousKernel},
+        field::FieldTranslation as FieldTranslationTrait,
+        fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
         tree::{MultiFmmTree, MultiTree},
     },
     MultiNodeFmmTree,
@@ -14,14 +14,14 @@ use crate::{
 
 use green_kernels::traits::Kernel as KernelTrait;
 
-impl<Scalar, Kernel, SourceToTargetData> FmmDataAccessMulti
-    for KiFmmMulti<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> DataAccessMulti
+    for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Float + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmMetadataAccess,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    Self: MetadataAccess,
 {
     type Scalar = Scalar;
     type Kernel = Kernel;

@@ -16,10 +16,10 @@ use mpi::Rank;
 use num::Float;
 use rlst::RlstScalar;
 
-use crate::traits::field::SourceToTargetData as SourceToTargetDataTrait;
+use crate::traits::field::FieldTranslation as FieldTranslationTrait;
 use crate::traits::field::SourceToTargetTranslationMetadata;
-use crate::traits::fmm::FmmDataAccess;
-use crate::traits::fmm::FmmDataAccessMulti;
+use crate::traits::fmm::DataAccess;
+use crate::traits::fmm::DataAccessMulti;
 use crate::traits::fmm::HomogenousKernel;
 use crate::traits::general::multi_node::GhostExchange;
 use crate::traits::general::multi_node::GlobalFmmMetadata;
@@ -40,19 +40,19 @@ use super::helpers::single_node::level_index_pointer_single_node;
 use super::types::KiFmmMulti;
 use super::KiFmm;
 
-impl<Scalar, Kernel, SourceToTargetData> GhostExchange
-    for KiFmmMulti<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> GhostExchange
+    for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmDataAccessMulti<
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    Self: DataAccessMulti<
         Scalar = Scalar,
         Kernel = Kernel,
         Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>,
     >,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: FmmDataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+    KiFmm<Scalar, Kernel, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata,
 {
     fn gather_global_fmm_at_root(&mut self) {
@@ -865,27 +865,26 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> GlobalFmmMetadata
-    for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> GlobalFmmMetadata for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
-    Self: FmmDataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    Self: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata,
 {
     fn global_fmm_multipole_metadata(
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         keys_set: HashSet<
-            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
-        leaves: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         leaves_set: HashSet<
-            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
         multipoles: Vec<Self::Scalar>,
     ) {
@@ -915,13 +914,13 @@ where
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        keys: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         keys_set: HashSet<
-            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
-        leaves: Vec<<<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         leaves_set: HashSet<
-            <<<Self as FmmDataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
         >,
         locals: Vec<Self::Scalar>,
     ) {

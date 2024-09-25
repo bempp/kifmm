@@ -11,60 +11,9 @@ use super::tree::MultiFmmTree;
 #[cfg(feature = "mpi")]
 use crate::traits::tree::MultiTree;
 
-/// Interface for source field translations.
-pub trait SourceTranslation {
-    /// Particle to multipole translations, applied at leaf level over all source boxes.
-    fn p2m(&self) -> Result<(), FmmError>;
-
-    /// Multipole to multipole translations, applied during upward pass. Defined over each level of a tree.
-    ///
-    /// # Arguments
-    /// * `level` - The child level at which this translation is being applied.
-    fn m2m(&self, level: u64) -> Result<(), FmmError>;
-}
-
-/// Interface for target field translations.
-pub trait TargetTranslation {
-    /// Local to local translations, applied during downward pass. Defined over each level of a tree.
-    ///
-    /// # Arguments
-    /// * `level` - The child level at which this translation is being applied.
-    fn l2l(&self, level: u64) -> Result<(), FmmError>;
-
-    /// Multipole to particle translations, applies to leaf boxes when a source box is within
-    /// the near field of a target box, but is small enough that a multipole expansion converges
-    /// at the target box. Defined over all leaf target boxes.
-    fn m2p(&self) -> Result<(), FmmError>;
-
-    /// Local to particle translations, applies the local expansion accumulated at each leaf box to the
-    /// target particles it contains. Defined over all leaf target boxes.
-    fn l2p(&self) -> Result<(), FmmError>;
-
-    /// Near field particle to particle (direct) potential contributions to particles in a given leaf box's
-    /// near field where the `p2l` and `m2p` do not apply. Defined over all leaf target boxes.
-    fn p2p(&self) -> Result<(), FmmError>;
-}
-
-/// Interface for the source to target (multipole to local / M2L) field translations.
-pub trait SourceToTargetTranslation {
-    /// Interface for multipole to local translation, defined over each level of a tree.
-    ///
-    /// # Arguments
-    /// * `level` - The level of the tree at which this translation is being applied.
-    fn m2l(&self, level: u64) -> Result<(), FmmError>;
-
-    /// Particle to local translations, applies to leaf boxes when a source box is within
-    /// the far field of a target box, but is too large for the multipole expansion to converge
-    /// at the target, so instead its contribution is computed directly. Defined over each level of a tree.
-    ///
-    /// # Arguments
-    /// * `level` - The level of the tree at which this translation is being applied.
-    fn p2l(&self, level: u64) -> Result<(), FmmError>;
-}
-
 /// Multinode FMM data access
 #[cfg(feature = "mpi")]
-pub trait FmmDataAccessMulti {
+pub trait DataAccessMulti {
     /// Data associated with FMM, must implement RlstScalar.
     type Scalar;
 
@@ -113,7 +62,7 @@ pub trait FmmDataAccessMulti {
 }
 
 /// Access data for FMM objects
-pub trait FmmDataAccess {
+pub trait DataAccess {
     /// Data associated with FMM, must implement RlstScalar.
     type Scalar: RlstScalar;
 
@@ -191,9 +140,9 @@ pub trait FmmDataAccess {
 /// data structures, kernels, and precision types. It supports operations essential for
 /// executing FMM calculations, including accessing multipole and local expansions, evaluating
 /// potentials, and managing the underlying tree structure and kernel functions.
-pub trait SingleFmm
+pub trait Evaluate
 where
-    Self: FmmDataAccess,
+    Self: DataAccess,
 {
     /// Evaluate the leaf level operations for source tree
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
@@ -214,14 +163,14 @@ where
     ///
     /// # Arguments
     /// * `charges` - new charge data.
-    fn clear(&mut self, charges: &[<Self as FmmDataAccess>::Scalar]);
+    fn clear(&mut self, charges: &[<Self as DataAccess>::Scalar]);
 }
 
 /// Interface for multi node FMM
 #[cfg(feature = "mpi")]
-pub trait MultiFmm
+pub trait EvaluateMulti
 where
-    Self: FmmDataAccessMulti,
+    Self: DataAccessMulti,
 {
     /// Evaluate the leaf level operations for source tree
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
@@ -240,7 +189,7 @@ where
 }
 
 /// Set all metadata required for FMMs
-pub trait FmmMetadata {
+pub trait Metadata {
     /// Associated scalar
     type Scalar: RlstScalar;
 
@@ -251,9 +200,9 @@ pub trait FmmMetadata {
 
 /// Defines how metadata associated with field translations is looked up at runtime.
 /// Defined by kernel type, as well as field translation method.
-pub trait FmmMetadataAccess
+pub trait MetadataAccess
 where
-    Self: FmmMetadata,
+    Self: Metadata,
 {
     /// Lookup convolution grid map for FFT based M2L operator
     fn fft_map_index(&self, level: u64) -> usize;

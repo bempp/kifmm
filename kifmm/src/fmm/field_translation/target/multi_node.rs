@@ -1,8 +1,8 @@
 use crate::{
     fmm::types::KiFmmMulti,
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{HomogenousKernel, TargetTranslation},
+        field::{FieldTranslation as FieldTranslationTrait, TargetTranslation},
+        fmm::HomogenousKernel,
     },
 };
 use green_kernels::traits::Kernel as KernelTrait;
@@ -10,12 +10,12 @@ use mpi::traits::Equivalence;
 use num::Float;
 use rlst::RlstScalar;
 
-impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
-    for KiFmmMulti<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> TargetTranslation
+    for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    SourceToTargetData: SourceToTargetDataTrait,
+    FieldTranslation: FieldTranslationTrait,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
 {
     fn l2l(&self, _level: u64) -> Result<(), crate::traits::types::FmmError> {

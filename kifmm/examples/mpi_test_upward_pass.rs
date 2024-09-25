@@ -5,11 +5,11 @@ fn main() {
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
-            fmm::{FmmDataAccess, FmmDataAccessMulti, MultiFmm},
+            fmm::{DataAccess, DataAccessMulti, EvaluateMulti},
             tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
         },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},
-        FftFieldTranslation, SingleFmm,
+        Evaluate, FftFieldTranslation,
     };
     use mpi::{datatype::PartitionMut, traits::*};
     use rlst::{RawAccess, RlstScalar};

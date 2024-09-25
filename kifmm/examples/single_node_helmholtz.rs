@@ -1,6 +1,6 @@
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::BlasFieldTranslationIa;
-use kifmm::{FftFieldTranslation, SingleFmm, SingleNodeBuilder};
+use kifmm::{Evaluate, FftFieldTranslation, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};

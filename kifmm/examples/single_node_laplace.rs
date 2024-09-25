@@ -1,5 +1,5 @@
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
-use kifmm::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleFmm, SingleNodeBuilder};
+use kifmm::{BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};

@@ -37,10 +37,10 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::{
-            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
+            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
             SourceToTargetTranslationMetadata,
         },
-        fmm::{FmmDataAccess, FmmMetadata, FmmMetadataAccess, HomogenousKernel},
+        fmm::{DataAccess, HomogenousKernel, Metadata, MetadataAccess},
         general::single_node::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
@@ -51,7 +51,7 @@ use crate::{
         helpers::find_corners,
         types::MortonKey,
     },
-    SingleFmm,
+    Evaluate,
 };
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
@@ -71,13 +71,13 @@ pub fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
 
     len - 1
 }
-impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> SourceAndTargetTranslationMetadata
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmDataAccess,
+    Self: DataAccess,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -301,13 +301,13 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> SourceAndTargetTranslationMetadata
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SingleFmm,
+    Self: Evaluate,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -2176,11 +2176,11 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmMetadataAccess
-    for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> MetadataAccess
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
@@ -2236,11 +2236,11 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmMetadataAccess
-    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> MetadataAccess
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
@@ -2280,11 +2280,11 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> FmmMetadata for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> Metadata for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     type Scalar = Scalar;
@@ -2445,7 +2445,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for FftFieldTranslation<Scalar>
+impl<Scalar> FieldTranslationTrait for FftFieldTranslation<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
@@ -2485,7 +2485,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationSaRcmp<Scalar>
+impl<Scalar> FieldTranslationTrait for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -2518,7 +2518,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationIa<Scalar>
+impl<Scalar> FieldTranslationTrait for BlasFieldTranslationIa<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -2545,7 +2545,7 @@ mod test {
     use rlst::RandomAccessMut;
 
     use crate::fmm::helpers::single_node::flip3;
-    use crate::traits::fmm::FmmDataAccess;
+    use crate::traits::fmm::DataAccess;
     use crate::tree::helpers::points_fixture;
     use crate::SingleNodeBuilder;
 

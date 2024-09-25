@@ -9,7 +9,7 @@ use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, Ve
 use crate::{
     linalg::rsvd::Normaliser,
     traits::{
-        fftw::Dft, field::SourceToTargetData as SourceToTargetDataTrait, fmm::HomogenousKernel,
+        fftw::Dft, field::FieldTranslation as FieldTranslationTrait, fmm::HomogenousKernel,
         general::single_node::AsComplex, types::FmmOperatorTime,
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
@@ -175,11 +175,11 @@ pub struct SendPtr<T> {
 /// - `potentials_send_pointers` - Threadsafe mutable pointers corresponding to each evaluated potential for each leaf box, stored in Morton order.
 ///    If `n` charge vectors are used in the FMM, their associated pointers are displaced by `n_targets` where there are `n_targets` boxes in the target tree.
 #[allow(clippy::type_complexity)]
-pub struct KiFmm<Scalar, Kernel, SourceToTargetData>
+pub struct KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
-    SourceToTargetData: SourceToTargetDataTrait,
+    FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Operator runtimes
@@ -259,7 +259,7 @@ where
     pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
     /// Data and metadata for field translations
-    pub source_to_target: SourceToTargetData,
+    pub source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
     pub source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
@@ -300,11 +300,11 @@ where
     /// The evaluated potentials at each target leaf box.
     pub potentials_send_pointers: Vec<SendPtrMut<Scalar>>,
 }
-impl<Scalar, Kernel, SourceToTargetData> Default for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> Default for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Default,
+    FieldTranslation: FieldTranslationTrait + Default,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn default() -> Self {
@@ -312,7 +312,7 @@ where
             times: Vec::default(),
             isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
-            source_to_target: SourceToTargetData::default(),
+            source_to_target: FieldTranslation::default(),
             kernel: Kernel::default(),
             variable_expansion_order: false,
             equivalent_surface_order: Vec::default(),
@@ -456,11 +456,11 @@ pub enum FmmEvalType {
 /// with source and target points, charge data, and specifying FMM parameters like the kernel
 /// and expansion order, before finally building the KiFMM object.
 #[derive(Default)]
-pub struct SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
+pub struct SingleNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + Clone,
-    SourceToTargetData: SourceToTargetDataTrait,
+    FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Instruction set architecture
@@ -476,7 +476,7 @@ where
     pub charges: Option<Vec<Scalar>>,
 
     /// Data and metadata for field translations
-    pub source_to_target: Option<SourceToTargetData>,
+    pub source_to_target: Option<FieldTranslation>,
 
     /// Domain
     pub domain: Option<Domain<Scalar::Real>>,
@@ -509,11 +509,11 @@ where
 /// Builder for multinode FMM
 #[derive(Default)]
 #[cfg(feature = "mpi")]
-pub struct MultiNodeBuilder<Scalar, Kernel, SourceToTargetData>
+pub struct MultiNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Equivalence,
     Kernel: KernelTrait<T = Scalar> + Clone,
-    SourceToTargetData: SourceToTargetDataTrait,
+    FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
     /// Kernel
@@ -532,7 +532,7 @@ where
     pub isa: Option<Isa>,
 
     /// Data and metadata for field translations
-    pub source_to_target: Option<SourceToTargetData>,
+    pub source_to_target: Option<FieldTranslation>,
 
     /// Equivalent surface order, variable expansion order not supported
     pub equivalent_surface_order: Option<usize>,
@@ -983,12 +983,12 @@ pub enum Isa {
 /// Data structure holding data for multinode FMM
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
-pub struct KiFmmMulti<Scalar, Kernel, SourceToTargetData>
+pub struct KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Equivalence + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
-    SourceToTargetData: SourceToTargetDataTrait,
+    FieldTranslation: FieldTranslationTrait,
 {
     /// Dimension
     pub dim: usize,
@@ -1082,7 +1082,7 @@ where
     pub dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// Data and metadata for field translations
-    pub source_to_target: SourceToTargetData,
+    pub source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
     pub source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
@@ -1136,7 +1136,7 @@ where
     pub ghost_tree_v: SingleNodeTree<Scalar::Real>,
 
     /// Object holding global FMM, to be run on nominated node
-    pub global_fmm: KiFmm<Scalar, Kernel, SourceToTargetData>,
+    pub global_fmm: KiFmm<Scalar, Kernel, FieldTranslation>,
 
     /// Store origin ranks of target trees to which I must send local expansion coeffs after global FMM has been
     /// executed on nominated node.

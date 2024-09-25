@@ -11,7 +11,8 @@ use crate::{
     fmm::types::KiFmmMulti,
     traits::{
         fftw::Dft,
-        fmm::{FmmDataAccessMulti, HomogenousKernel, SourceToTargetTranslation},
+        field::SourceToTargetTranslation,
+        fmm::{DataAccessMulti, HomogenousKernel},
         general::single_node::{AsComplex, Hadamard8x8},
         types::FmmError,
     },
@@ -33,7 +34,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     <Scalar as Dft>::Plan: Sync,
-    Self: FmmDataAccessMulti<Scalar = Scalar>,
+    Self: DataAccessMulti<Scalar = Scalar>,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let _multipoles = self.multipoles(level);
