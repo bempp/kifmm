@@ -53,15 +53,13 @@ fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
 
         for i in 1..maxs.len() {
             let curr_min = mins[i];
-            let prev_max = maxs[i-1];
+            let prev_max = maxs[i - 1];
             assert!(prev_max <= curr_min);
         }
-
     } else {
         root_process.gather_into(&max);
         root_process.gather_into(&min);
     }
-
 }
 
 /// Test that the globally defined domain contains all the points at a given node.
