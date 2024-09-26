@@ -41,10 +41,10 @@ where
             child_targets.iter().map(|source| source.parent()).collect();
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();
-        let nparents = parent_sources.len();
+        let n_parents = parent_sources.len();
         let operator_index = self.l2l_operator_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
-        let ncoeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
+        let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -59,11 +59,11 @@ where
                     parent_locals.push(parent_local);
                 }
 
-                let mut max_chunk_size = nparents;
+                let mut max_chunk_size = n_parents;
                 if max_chunk_size > L2L_MAX_BLOCK_SIZE {
                     max_chunk_size = L2L_MAX_BLOCK_SIZE
                 }
-                let chunk_size = chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(n_parents, max_chunk_size);
 
                 let child_locals = &self.level_locals[level as usize];
 
@@ -73,19 +73,19 @@ where
                     .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
                         let mut parent_locals = rlst_dynamic_array2!(
                             Scalar,
-                            [ncoeffs_equivalent_surface_parent, chunk_size]
+                            [n_coeffs_equivalent_surface_parent, chunk_size]
                         );
                         for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
                             .iter()
                             .enumerate()
                             .take(chunk_size)
                         {
-                            parent_locals.data_mut()[chunk_idx * ncoeffs_equivalent_surface_parent
-                                ..(chunk_idx + 1) * ncoeffs_equivalent_surface_parent]
+                            parent_locals.data_mut()[chunk_idx * n_coeffs_equivalent_surface_parent
+                                ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent]
                                 .copy_from_slice(unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_local_pointer.raw,
-                                        ncoeffs_equivalent_surface_parent,
+                                        n_coeffs_equivalent_surface_parent,
                                     )
                                 });
                         }
@@ -119,7 +119,7 @@ where
             }
 
             FmmEvalType::Matrix(n_matvecs) => {
-                let mut parent_locals = vec![Vec::new(); nparents];
+                let mut parent_locals = vec![Vec::new(); n_parents];
                 for (parent_idx, parent) in parent_sources.iter().enumerate() {
                     for charge_vec_idx in 0..n_matvecs {
                         let parent_index_pointer = *self.level_index_pointer_locals
@@ -139,7 +139,7 @@ where
                     .for_each(|(parent_local_pointers, child_locals_pointers)| {
                         let mut parent_locals = rlst_dynamic_array2!(
                             Scalar,
-                            [ncoeffs_equivalent_surface_parent, n_matvecs]
+                            [n_coeffs_equivalent_surface_parent, n_matvecs]
                         );
 
                         for (charge_vec_idx, parent_local_pointer) in
@@ -148,12 +148,12 @@ where
                             let tmp = unsafe {
                                 std::slice::from_raw_parts(
                                     parent_local_pointer.raw,
-                                    ncoeffs_equivalent_surface_parent,
+                                    n_coeffs_equivalent_surface_parent,
                                 )
                             };
                             parent_locals.data_mut()[charge_vec_idx
-                                * ncoeffs_equivalent_surface_parent
-                                ..(charge_vec_idx + 1) * ncoeffs_equivalent_surface_parent]
+                                * n_coeffs_equivalent_surface_parent
+                                ..(charge_vec_idx + 1) * n_coeffs_equivalent_surface_parent]
                                 .copy_from_slice(tmp);
                         }
 
