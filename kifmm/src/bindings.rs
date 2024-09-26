@@ -1272,7 +1272,9 @@ pub mod constructors {
 pub mod api {
     use std::{mem::ManuallyDrop, os::raw::c_void};
 
-    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType};
+    use green_kernels::{
+        helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType,
+    };
     use itertools::Itertools;
 
     use crate::{
