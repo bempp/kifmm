@@ -372,7 +372,7 @@ where
 
                 Ok(())
             }
-            FmmEvalType::Matrix(_nmatvecs) => Err(FmmError::Unimplemented(
+            FmmEvalType::Matrix(_) => Err(FmmError::Unimplemented(
                 "M2L unimplemented for matrix input with FFT field translations".to_string(),
             )),
         }

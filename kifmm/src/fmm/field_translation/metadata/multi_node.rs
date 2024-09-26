@@ -597,7 +597,7 @@ where
         self.global_fmm
             .source_to_target
             .cutoff_rank
-            .push(cutoff_rank.clone());
+            .push(cutoff_rank);
         self.global_fmm
             .source_to_target
             .directional_cutoff_ranks
