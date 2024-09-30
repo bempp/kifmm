@@ -170,8 +170,6 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
 {
-    fn displacements(&mut self) {}
-
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
         let equivalent_surface_order = self.equivalent_surface_order;

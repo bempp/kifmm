@@ -308,8 +308,6 @@ where
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
     }
-
-    fn displacements(&mut self) {}
 }
 
 impl<Scalar, FieldTranslation> SourceTranslationMetadata
@@ -480,8 +478,6 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: Evaluate,
 {
-    fn displacements(&mut self) {}
-
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
 
