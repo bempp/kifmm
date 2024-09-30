@@ -192,8 +192,6 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
-
-
 }
 
 criterion_group!(laplace_p_f32, laplace_potentials_f32);

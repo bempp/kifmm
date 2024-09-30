@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use crate::fmm::KiFmm;
-use crate::traits::field::SourceAndTargetTranslationMetadata;
 use crate::traits::field::{
     FieldTranslation as FieldTranslationTrait, SourceToTargetTranslation, SourceTranslation,
     TargetTranslation,
@@ -30,7 +29,7 @@ where
         + TargetTranslation
         + DataAccessMulti
         + GhostExchange,
-    KiFmm<Scalar, Kernel, FieldTranslation>: SourceAndTargetTranslationMetadata + Evaluate,
+    KiFmm<Scalar, Kernel, FieldTranslation>: Evaluate,
 {
     #[inline(always)]
     fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), crate::traits::types::FmmError> {

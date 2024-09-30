@@ -16,8 +16,8 @@ use crate::{
     },
     traits::{
         field::{
-            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
-            SourceToTargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
+            SourceTranslationMetadata, TargetTranslationMetadata,
         },
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::single_node::Epsilon,
@@ -37,11 +37,13 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default,
     KiFmmMulti<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceAndTargetTranslationMetadata
+        + SourceTranslationMetadata
+        + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>
         + MetadataAccess,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceAndTargetTranslationMetadata
+        + SourceTranslationMetadata
+        + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>
         + MetadataAccess,
 {

@@ -12,8 +12,8 @@ use crate::{
     },
     traits::{
         field::{
-            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
-            SourceToTargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
+            SourceTranslationMetadata, TargetTranslationMetadata,
         },
         fmm::{HomogenousKernel, Metadata},
         general::single_node::Epsilon,
@@ -29,7 +29,8 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceAndTargetTranslationMetadata
+        + SourceTranslationMetadata
+        + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
@@ -271,8 +272,7 @@ where
             result.target();
             result.source_to_target();
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            result.displacements();
-
+            SourceToTargetTranslationMetadata::displacements(&mut result);
             Ok(result)
         }
     }

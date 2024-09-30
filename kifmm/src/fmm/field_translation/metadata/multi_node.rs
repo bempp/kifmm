@@ -37,8 +37,8 @@ use crate::{
     linalg::rsvd::MatrixRsvd,
     traits::{
         field::{
-            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
-            SourceToTargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
+            SourceTranslationMetadata, TargetTranslationMetadata,
         },
         fmm::HomogenousKernel,
     },
@@ -49,7 +49,7 @@ use crate::{FftFieldTranslation, FmmSvdMode, SingleNodeFmmTree};
 
 use super::single_node::find_cutoff_rank;
 
-impl<Scalar, FieldTranslation> SourceAndTargetTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
@@ -161,6 +161,16 @@ where
         self.uc2e_inv_1 = uc2e_inv_1;
         self.uc2e_inv_2 = uc2e_inv_2;
     }
+}
+
+impl<Scalar, FieldTranslation> TargetTranslationMetadata
+    for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
+where
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+{
+    fn displacements(&mut self) {}
 
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();

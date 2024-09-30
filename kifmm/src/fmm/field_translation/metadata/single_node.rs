@@ -37,8 +37,8 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::{
-            FieldTranslation as FieldTranslationTrait, SourceAndTargetTranslationMetadata,
-            SourceToTargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
+            SourceTranslationMetadata, TargetTranslationMetadata,
         },
         fmm::{DataAccess, HomogenousKernel, Metadata, MetadataAccess},
         general::single_node::{AsComplex, Epsilon},
@@ -71,7 +71,7 @@ pub fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
 
     len - 1
 }
-impl<Scalar, FieldTranslation> SourceAndTargetTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
@@ -192,7 +192,16 @@ where
         self.uc2e_inv_1 = uc2e_inv_1;
         self.uc2e_inv_2 = uc2e_inv_2;
     }
+}
 
+impl<Scalar, FieldTranslation> TargetTranslationMetadata
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
+where
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+    Self: DataAccess,
+{
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
 
@@ -299,9 +308,11 @@ where
         self.dc2e_inv_1 = dc2e_inv_1;
         self.dc2e_inv_2 = dc2e_inv_2;
     }
+
+    fn displacements(&mut self) {}
 }
 
-impl<Scalar, FieldTranslation> SourceAndTargetTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
@@ -459,6 +470,17 @@ where
         self.source = source;
         self.source_vec = source_vec;
     }
+}
+
+impl<Scalar, FieldTranslation> TargetTranslationMetadata
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
+where
+    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+    Self: Evaluate,
+{
+    fn displacements(&mut self) {}
 
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();

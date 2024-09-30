@@ -14,14 +14,14 @@ pub trait FieldTranslation {
     fn surface_diff(&self) -> usize;
 }
 
-/// Set M2M and L2L metadata associated with a kernel
-pub trait SourceAndTargetTranslationMetadata {
-    /// Source field translations
-    fn source(&mut self);
+// /// Set M2M and L2L metadata associated with a kernel
+// pub trait SourceAndTargetTranslationMetadata {
+//     /// Source field translations
+//     fn source(&mut self);
 
-    /// Target field translations
-    fn target(&mut self);
-}
+//     /// Target field translations
+//     fn target(&mut self);
+// }
 
 /// Source tree translation metadata
 pub trait SourceTranslationMetadata {
@@ -33,6 +33,9 @@ pub trait SourceTranslationMetadata {
 pub trait TargetTranslationMetadata {
     /// Constructor
     fn target(&mut self);
+
+    /// Graph to process U list
+    fn displacements(&mut self);
 }
 
 /// Set M2L metadata associated with a kernel
