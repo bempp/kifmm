@@ -626,10 +626,19 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-        for level in 2..=self.tree.source_tree().depth() {
+        for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
             let n_sources = sources.len();
             let m2l_operator_index = self.m2l_operator_index(level);
@@ -836,10 +845,19 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-        for level in 2..=self.tree.source_tree().depth() {
+        for level in start_level..=self.tree.source_tree().depth() {
             let targets = self.tree.target_tree().keys(level).unwrap();
             let targets_parents: HashSet<MortonKey<_>> =
                 targets.iter().map(|target| target.parent()).collect();
@@ -1391,64 +1409,79 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
-        for level in 2..=self.tree.source_tree().depth() {
-            let sources = self.tree.source_tree().keys(level).unwrap();
-            let n_sources = sources.len();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-            let sentinel = n_sources;
-            let result = vec![vec![sentinel; n_sources]; 316];
-            let result = result.into_iter().map(RwLock::new).collect_vec();
+        for level in start_level..=self.tree.source_tree().depth() {
+            let mut result = Vec::default();
 
-            sources
-                .into_par_iter()
-                .enumerate()
-                .for_each(|(source_idx, source)| {
-                    // Find interaction list of each source, as this defines scatter locations
-                    let interaction_list = source
-                        .parent()
-                        .neighbors()
-                        .iter()
-                        .flat_map(|pn| pn.children())
-                        .filter(|pnc| {
-                            !source.is_adjacent(pnc)
-                                && self
-                                    .tree
-                                    .target_tree()
-                                    .all_keys_set()
-                                    .unwrap()
-                                    .contains(pnc)
-                        })
-                        .collect_vec();
+            if let Some(sources) = self.tree.source_tree().keys(level) {
+                let n_sources = sources.len();
+                let sentinel = n_sources;
+                let tmp = vec![vec![sentinel; n_sources]; 316];
+                result = tmp.into_iter().map(RwLock::new).collect_vec();
 
-                    let transfer_vectors = interaction_list
-                        .iter()
-                        .map(|target| source.find_transfer_vector(target).unwrap())
-                        .collect_vec();
+                sources
+                    .into_par_iter()
+                    .enumerate()
+                    .for_each(|(source_idx, source)| {
+                        // Find interaction list of each source, as this defines scatter locations
+                        let interaction_list = source
+                            .parent()
+                            .neighbors()
+                            .iter()
+                            .flat_map(|pn| pn.children())
+                            .filter(|pnc| {
+                                !source.is_adjacent(pnc)
+                                    && self
+                                        .tree
+                                        .target_tree()
+                                        .all_keys_set()
+                                        .unwrap()
+                                        .contains(pnc)
+                            })
+                            .collect_vec();
 
-                    let mut transfer_vectors_map = HashMap::new();
-                    for (i, &v) in transfer_vectors.iter().enumerate() {
-                        transfer_vectors_map.insert(v, i);
-                    }
+                        let transfer_vectors = interaction_list
+                            .iter()
+                            .map(|target| source.find_transfer_vector(target).unwrap())
+                            .collect_vec();
 
-                    let transfer_vectors_set: HashSet<_> = transfer_vectors.into_iter().collect();
-
-                    // Mark items in interaction list for scattering
-                    for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
-                        let mut result_lock = result[tv_idx].write().unwrap();
-                        if transfer_vectors_set.contains(&tv.hash) {
-                            // Look up scatter location in target tree
-                            let target =
-                                &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                            let &target_idx = self.level_index_pointer_locals[level as usize]
-                                .get(target)
-                                .unwrap();
-                            result_lock[source_idx] = target_idx;
+                        let mut transfer_vectors_map = HashMap::new();
+                        for (i, &v) in transfer_vectors.iter().enumerate() {
+                            transfer_vectors_map.insert(v, i);
                         }
-                    }
-                });
+
+                        let transfer_vectors_set: HashSet<_> =
+                            transfer_vectors.into_iter().collect();
+
+                        // Mark items in interaction list for scattering
+                        for (tv_idx, tv) in
+                            self.source_to_target.transfer_vectors.iter().enumerate()
+                        {
+                            let mut result_lock = result[tv_idx].write().unwrap();
+                            if transfer_vectors_set.contains(&tv.hash) {
+                                // Look up scatter location in target tree
+                                let target =
+                                    &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                                let &target_idx = self.level_index_pointer_locals[level as usize]
+                                    .get(target)
+                                    .unwrap();
+                                result_lock[source_idx] = target_idx;
+                            }
+                        }
+                    });
+            }
 
             displacements.push(result);
         }
@@ -1889,54 +1922,68 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
-        for level in 2..=self.tree.source_tree().depth() {
-            let targets = self.tree.target_tree().keys(level).unwrap();
-            let targets_parents: HashSet<MortonKey<_>> =
-                targets.iter().map(|target| target.parent()).collect();
-            let mut targets_parents = targets_parents.into_iter().collect_vec();
-            targets_parents.sort();
-            let ntargets_parents = targets_parents.len();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-            let sources = self.tree.source_tree().keys(level).unwrap();
+        for level in start_level..=self.tree.source_tree().depth() {
+            let mut result = Vec::default();
+            if let Some(targets) = self.tree.target_tree().keys(level) {
+                if let Some(sources) = self.tree.source_tree().keys(level) {
+                    let targets_parents: HashSet<MortonKey<_>> =
+                        targets.iter().map(|target| target.parent()).collect();
+                    let mut targets_parents = targets_parents.into_iter().collect_vec();
+                    targets_parents.sort();
+                    let ntargets_parents = targets_parents.len();
 
-            let sources_parents: HashSet<MortonKey<_>> =
-                sources.iter().map(|source| source.parent()).collect();
-            let mut sources_parents = sources_parents.into_iter().collect_vec();
-            sources_parents.sort();
-            let nsources_parents = sources_parents.len();
+                    let sources_parents: HashSet<MortonKey<_>> =
+                        sources.iter().map(|source| source.parent()).collect();
+                    let mut sources_parents = sources_parents.into_iter().collect_vec();
+                    sources_parents.sort();
+                    let nsources_parents = sources_parents.len();
 
-            let result = vec![Vec::new(); NHALO];
-            let result = result.into_iter().map(RwLock::new).collect_vec();
+                    let tmp = vec![Vec::new(); NHALO];
+                    result = tmp.into_iter().map(RwLock::new).collect_vec();
 
-            let targets_parents_neighbors = targets_parents
-                .iter()
-                .map(|parent| parent.all_neighbors())
-                .collect_vec();
+                    let targets_parents_neighbors = targets_parents
+                        .iter()
+                        .map(|parent| parent.all_neighbors())
+                        .collect_vec();
 
-            let zero_displacement = nsources_parents * NSIBLINGS;
+                    let zero_displacement = nsources_parents * NSIBLINGS;
 
-            (0..NHALO).into_par_iter().for_each(|i| {
-                let mut result_i = result[i].write().unwrap();
-                for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-                    // Check if neighbor exists in a valid tree
-                    if let Some(neighbor) = all_neighbors[i] {
-                        // If it does, check if first child exists in the source tree
-                        let first_child = neighbor.first_child();
-                        if let Some(neighbor_displacement) =
-                            self.level_index_pointer_multipoles[level as usize].get(&first_child)
+                    (0..NHALO).into_par_iter().for_each(|i| {
+                        let mut result_i = result[i].write().unwrap();
+                        for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents)
                         {
-                            result_i.push(*neighbor_displacement)
-                        } else {
-                            result_i.push(zero_displacement)
+                            // Check if neighbor exists in a valid tree
+                            if let Some(neighbor) = all_neighbors[i] {
+                                // If it does, check if first child exists in the source tree
+                                let first_child = neighbor.first_child();
+                                if let Some(neighbor_displacement) =
+                                    self.level_index_pointer_multipoles[level as usize]
+                                        .get(&first_child)
+                                {
+                                    result_i.push(*neighbor_displacement)
+                                } else {
+                                    result_i.push(zero_displacement)
+                                }
+                            } else {
+                                result_i.push(zero_displacement)
+                            }
                         }
-                    } else {
-                        result_i.push(zero_displacement)
-                    }
+                    });
                 }
-            });
+            }
 
             displacements.push(result);
         }

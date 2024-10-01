@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use rayon::prelude::*;
 use std::collections::HashSet;
 
 use crate::{
@@ -10,7 +11,7 @@ use crate::{
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, TargetTranslation},
         fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
-        tree::{MultiFmmTree, MultiTree},
+        tree::{MultiFmmTree, MultiTree, SingleTree},
         types::FmmError,
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
@@ -19,9 +20,6 @@ use crate::{
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
-use rayon::prelude::{
-    IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator, ParallelSlice,
-};
 use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAccessMut, RlstScalar};
 
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation
@@ -161,33 +159,33 @@ where
                                     ),
                                     potential_send_ptr,
                                 )| {
-                                    let target_coordinates_row_major = &coordinates
-                                        [charge_index_pointer.0 * dim
-                                            ..charge_index_pointer.1 * dim];
-                                    let ntargets = target_coordinates_row_major.len() / dim;
+                                    // let target_coordinates_row_major = &coordinates
+                                    //     [charge_index_pointer.0 * dim
+                                    //         ..charge_index_pointer.1 * dim];
+                                    // let ntargets = target_coordinates_row_major.len() / dim;
 
-                                    // Compute direct
-                                    if ntargets > 0 {
-                                        let result = unsafe {
-                                            std::slice::from_raw_parts_mut(
-                                                potential_send_ptr.raw,
-                                                ntargets * kernel_eval_size,
-                                            )
-                                        };
+                                    // // Compute direct
+                                    // if ntargets > 0 {
+                                    //     let result = unsafe {
+                                    //         std::slice::from_raw_parts_mut(
+                                    //             potential_send_ptr.raw,
+                                    //             ntargets * kernel_eval_size,
+                                    //         )
+                                    //     };
 
-                                        kernel.evaluate_st(
-                                            kernel_eval_type,
-                                            leaf_downward_equivalent_surface,
-                                            target_coordinates_row_major,
-                                            unsafe {
-                                                std::slice::from_raw_parts_mut(
-                                                    leaf_locals.raw,
-                                                    n_coeffs_equivalent_surface,
-                                                )
-                                            },
-                                            result,
-                                        );
-                                    }
+                                    //     kernel.evaluate_st(
+                                    //         kernel_eval_type,
+                                    //         leaf_downward_equivalent_surface,
+                                    //         target_coordinates_row_major,
+                                    //         unsafe {
+                                    //             std::slice::from_raw_parts_mut(
+                                    //                 leaf_locals.raw,
+                                    //                 n_coeffs_equivalent_surface,
+                                    //             )
+                                    //         },
+                                    //         result,
+                                    //     );
+                                    // }
                                 },
                             );
                     }
@@ -210,6 +208,119 @@ where
     }
 
     fn p2p(&self) -> Result<(), crate::traits::types::FmmError> {
+        if let Some(leaves) = self.tree.target_tree().all_leaves() {
+            let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
+            let all_source_coordinates = [
+                self.tree.source_tree().all_coordinates().unwrap(),
+                // self.ghost_fmm_u.tree.source_tree.all_coordinates().unwrap(),
+            ];
+
+            let dim = self.dim;
+            let source_leaf_to_index = &self.tree.source_tree().leaf_to_index;
+            let source_leaf_to_index_ghosts = &self.ghost_fmm_u.tree.source_tree.leaf_to_index;
+            let charge_index_pointer_sources = [
+                &self.charge_index_pointer_sources,
+                // &self.ghost_fmm_u.charge_index_pointer_sources,
+            ];
+            let charges = [
+                &self.charges,
+                // &self.ghost_fmm_u.charges
+                ];
+            let kernel_eval_size = self.kernel_eval_size;
+            let kernel_eval_type = self.kernel_eval_type;
+            let kernel = &self.kernel;
+
+            match self.fmm_eval_type {
+                FmmEvalType::Vector => {
+                    leaves
+                        .into_par_iter()
+                        .zip(&self.charge_index_pointer_targets)
+                        .zip(&self.potentials_send_pointers)
+                        .for_each(
+                            |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+                                let target_coordinates_row_major = &all_target_coordinates
+                                    [charge_index_pointer_targets.0 * dim
+                                        ..charge_index_pointer_targets.1 * dim];
+                                let ntargets = target_coordinates_row_major.len() / dim;
+
+                                if ntargets > 0 {
+                                    let u_list = leaf.neighbors().into_iter().collect_vec();
+
+                                    let mut all_u_list_indices = Vec::new();
+
+                                    // handle locally contained source boxes
+                                    all_u_list_indices.push(
+                                        u_list
+                                            .iter()
+                                            .filter_map(|k| source_leaf_to_index.get(k))
+                                            .collect_vec(),
+                                    );
+
+                                    // // handle ghost source boxes
+                                    // all_u_list_indices.push(
+                                    //     u_list
+                                    //         .iter()
+                                    //         .filter_map(|k| source_leaf_to_index_ghosts.get(k))
+                                    //         .collect_vec(),
+                                    // );
+
+                                    // for (i, u_list_indices) in all_u_list_indices.iter().enumerate()
+                                    // {
+                                    //     let charges = u_list_indices
+                                    //         .iter()
+                                    //         .map(|&idx| {
+                                    //             let index_pointer =
+                                    //                 &charge_index_pointer_sources[i][*idx];
+                                    //             &charges[i][index_pointer.0..index_pointer.1]
+                                    //         })
+                                    //         .collect_vec();
+
+                                    //     let sources_coordinates = u_list_indices
+                                    //         .into_iter()
+                                    //         .map(|&idx| {
+                                    //             let index_pointer =
+                                    //                 &charge_index_pointer_sources[i][*idx];
+                                    //             &all_source_coordinates[i]
+                                    //                 [index_pointer.0 * dim..index_pointer.1 * dim]
+                                    //         })
+                                    //         .collect_vec();
+
+                                    //     for (&charges, source_coordinates_row_major) in
+                                    //         charges.iter().zip(sources_coordinates)
+                                    //     {
+                                    //         let nsources = source_coordinates_row_major.len() / dim;
+
+                                    //         if nsources > 0 {
+                                    //             let result = unsafe {
+                                    //                 std::slice::from_raw_parts_mut(
+                                    //                     potential_send_pointer.raw,
+                                    //                     ntargets * kernel_eval_size,
+                                    //                 )
+                                    //             };
+
+                                    //             kernel.evaluate_st(
+                                    //                 kernel_eval_type,
+                                    //                 source_coordinates_row_major,
+                                    //                 target_coordinates_row_major,
+                                    //                 charges,
+                                    //                 result,
+                                    //             )
+                                    //         }
+                                    //     }
+                                    // }
+                                }
+                            },
+                        );
+                }
+
+                FmmEvalType::Matrix(_) => {
+                    return Err(FmmError::Unimplemented(
+                        "P2P unimplemented for matrix input in multinode".to_string(),
+                    ))
+                }
+            }
+        }
+
         Ok(())
     }
 }

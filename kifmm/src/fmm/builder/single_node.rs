@@ -272,7 +272,7 @@ where
             result.target();
             result.source_to_target();
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            SourceToTargetTranslationMetadata::displacements(&mut result);
+            SourceToTargetTranslationMetadata::displacements(&mut result, None);
             Ok(result)
         }
     }

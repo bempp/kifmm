@@ -665,7 +665,8 @@ where
     /// Construct a single node tree from V list ghost octants, ensure that provided keys are in Morton order and contain sibling data
     #[cfg(feature = "mpi")]
     pub(crate) fn from_ghost_octants_v(
-        depth: u64,
+        global_depth: u64,
+        total_depth: u64,
         mut keys: Vec<MortonKey<T>>,
         keys_set: HashSet<MortonKey<T>>,
     ) -> SingleNodeTree<T> {
@@ -692,7 +693,7 @@ where
             levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
             // Return tree in sorted order, by level and then by Morton key
-            for l in 0..=depth {
+            for l in global_depth..=total_depth {
                 if let Some(&(l, r)) = levels_to_keys.get(&l) {
                     let subset = &mut keys[l..r];
                     subset.sort();
@@ -700,7 +701,7 @@ where
             }
 
             // Compute key to level index
-            for l in 0..=depth {
+            for l in global_depth..=total_depth {
                 if let Some(&(l, r)) = levels_to_keys.get(&l) {
                     let keys = &keys[l..r];
                     for (i, key) in keys.iter().enumerate() {
@@ -715,7 +716,7 @@ where
             }
         }
 
-        result.depth = depth;
+        result.depth = total_depth;
         result.keys = keys.into();
         result.keys_set = keys_set;
         result.levels_to_keys = levels_to_keys;

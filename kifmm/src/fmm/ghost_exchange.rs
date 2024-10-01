@@ -46,7 +46,7 @@ where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti<
         Scalar = Scalar,
         Kernel = Kernel,
@@ -323,14 +323,17 @@ where
 
         // Calculate displacements required for M2L
         if rank == root_rank {
-            self.global_fmm.displacements()
+            self.global_fmm.displacements(None)
         }
     }
 
     fn scatter_global_fmm_from_root(&mut self) {
         let rank = self.communicator.rank();
-        let nroots = self.tree.target_tree.trees.len();
-        let receive_buffer_size = nroots * self.n_coeffs_equivalent_surface;
+        let n_roots = self.tree.target_tree.trees.len();
+
+        let mut expected_roots = vec![MortonKey::<Scalar::Real>::default(); n_roots];
+
+        let receive_buffer_size = n_roots * self.n_coeffs_equivalent_surface;
         let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
 
         // Nominated rank chosen to run global upward pass
@@ -348,8 +351,8 @@ where
                     send_buffer[root_idx * self.n_coeffs_equivalent_surface
                         ..(root_idx + 1) * self.n_coeffs_equivalent_surface]
                         .copy_from_slice(local);
-                    root_idx += 1;
                 }
+                root_idx += 1;
             }
 
             // Displace items to send back by number of coefficients
@@ -365,11 +368,29 @@ where
                 .map(|&d| d * (self.n_coeffs_equivalent_surface as i32))
                 .collect_vec();
 
+            // Send back coefficient data
             let partition = Partition::new(&send_buffer, counts, &displacements[..]);
-
             root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
+
+            // Send back associated keys
+            let partition = Partition::new(
+                &self.local_roots,
+                &self.local_roots_counts[..],
+                &self.local_roots_displacements[..],
+            );
+            root_process.scatter_varcount_into_root(&partition, &mut expected_roots);
         } else {
             root_process.scatter_varcount_into(&mut receive_buffer);
+            root_process.scatter_varcount_into(&mut expected_roots);
+        }
+
+        // Insert received local data into target tree
+        for (i, root) in expected_roots.iter().enumerate() {
+            let l = i * self.n_coeffs_equivalent_surface;
+            let r = l + self.n_coeffs_equivalent_surface;
+            self.local_mut(root)
+                .unwrap()
+                .copy_from_slice(&receive_buffer[l..r]);
         }
     }
 
@@ -590,22 +611,25 @@ where
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
-        // Set tree
+        // Set metadata
+        let mut result = KiFmm::default();
         let sort_indices;
-        (self.ghost_tree_u, sort_indices) = SingleNodeTree::from_ghost_octants_u(
+        (result.tree.source_tree, sort_indices) = SingleNodeTree::from_ghost_octants_u(
             self.tree.domain(),
             self.tree.source_tree().total_depth(),
             requested_coordinates,
         );
 
-        // Set metadata
         let ghost_charges = sort_indices
             .iter()
             .map(|&i| requested_charges[i])
             .collect_vec();
-        self.ghost_charges = ghost_charges;
-        self.charge_index_pointer_ghost_sources =
-            coordinate_index_pointer_single_node(&self.ghost_tree_u);
+
+        result.charges = ghost_charges;
+        result.charge_index_pointer_sources =
+            coordinate_index_pointer_single_node(&result.tree.source_tree);
+
+        self.ghost_fmm_u = result;
     }
 
     fn v_list_exchange(&mut self) {
@@ -828,21 +852,11 @@ where
         // Create ghost keys
         let ghost_keys = ghost_keys_set.iter().cloned().collect_vec();
 
-        // Set tree
-        self.ghost_tree_v = SingleNodeTree::from_ghost_octants_v(
-            self.tree.source_tree().total_depth(),
-            ghost_keys,
-            ghost_keys_set,
-        );
-
         // Allocate ghost multipoles including sibling data, ordering dictated by tree
-        let mut ghost_multipoles_with_siblings = vec![
-            Scalar::default();
-            self.ghost_tree_v.keys.len()
-                * self.n_coeffs_equivalent_surface
-        ];
+        let mut ghost_multipoles_with_siblings =
+            vec![Scalar::default(); ghost_keys.len() * self.n_coeffs_equivalent_surface];
 
-        for (new_idx, key) in self.ghost_tree_v.keys.iter().enumerate() {
+        for (new_idx, key) in ghost_keys.iter().enumerate() {
             if let Some(&old_idx) = key_to_index.get(key) {
                 let tmp = &requested_multipoles[old_idx * self.n_coeffs_equivalent_surface
                     ..(old_idx + 1) * self.n_coeffs_equivalent_surface];
@@ -854,14 +868,44 @@ where
         }
 
         // Set metadata
-        self.ghost_multipoles = ghost_multipoles_with_siblings;
-        let mut tmp = level_expansion_pointers_single_node(
-            &self.ghost_tree_v,
+        let mut result = KiFmm {
+            multipoles: ghost_multipoles_with_siblings,
+            ..Default::default()
+        };
+
+        result.level_multipoles = level_expansion_pointers_single_node(
+            &result.tree.source_tree,
             &[self.n_coeffs_equivalent_surface],
             1,
-            &self.ghost_multipoles,
+            &result.multipoles,
         );
-        self.ghost_level_multipoles = std::mem::take(&mut tmp[0]);
+
+        result.tree.source_tree = SingleNodeTree::from_ghost_octants_v(
+            self.tree.source_tree.global_depth(),
+            self.tree.source_tree().total_depth(),
+            ghost_keys,
+            ghost_keys_set,
+        );
+
+        result.level_index_pointer_multipoles =
+            level_index_pointer_single_node(&result.tree.source_tree);
+
+        // Required to create displacements
+        result.tree.target_tree.keys = self
+            .tree
+            .target_tree
+            .keys
+            .iter()
+            .cloned()
+            .collect_vec()
+            .into();
+
+        result.tree.target_tree.levels_to_keys = self.tree.target_tree.levels_to_keys.clone();
+
+        // TODO: this method should be more flexible to avoid copy above
+        KiFmm::displacements(&mut result, Some(self.tree.source_tree.global_depth()));
+
+        self.ghost_fmm_v = result;
     }
 }
 

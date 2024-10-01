@@ -31,10 +31,39 @@ pub trait DataAccessMulti {
         key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
     ) -> Option<&[Self::Scalar]>;
 
+    /// Get the multipole expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The source node.
+    fn multipole_mut(
+        &self,
+        key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
+    ) -> Option<&mut [Self::Scalar]>;
+
+    /// Get the local expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The source node.
+    fn local(
+        &self,
+        key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
+    ) -> Option<&[Self::Scalar]>;
+
+    /// Get the local expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The source node.
+    fn local_mut(
+        &self,
+        key: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
+    ) -> Option<&mut [Self::Scalar]>;
+
     /// Get the multipole expansion data associated with a tree level as a slice
     /// # Arguments
     /// * `level` - The tree level.
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
+
+    /// Get the local expansion data associated with a tree level as a slice
+    /// # Arguments
+    /// * `level` - The tree level.
+    fn locals(&self, level: u64) -> Option<&[Self::Scalar]>;
 
     /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
     fn equivalent_surface_order(&self, level: u64) -> usize;

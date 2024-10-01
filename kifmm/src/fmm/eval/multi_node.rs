@@ -75,9 +75,10 @@ where
     ) -> Result<(), crate::traits::types::FmmError> {
         let global_depth = self.tree.source_tree().global_depth();
         let total_depth = self.tree.source_tree().total_depth();
+        let start_level = std::cmp::max(2, global_depth);
 
         if timed {
-            for level in global_depth..=total_depth {
+            for level in start_level..=total_depth {
                 if level > 2 {
                     let s = Instant::now();
                     self.l2l(level)?;
@@ -95,7 +96,7 @@ where
                 ));
             }
         } else {
-            for level in global_depth..=total_depth {
+            for level in start_level..=total_depth {
                 if level > 2 {
                     self.l2l(level)?;
                 }
@@ -147,11 +148,11 @@ where
         }
 
         // Scatter root locals back to local tree
-        // self.scatter_global_fmm_from_root();
+        self.scatter_global_fmm_from_root();
 
-        // // Perform remainder of downward pass
-        // self.evaluate_downward_pass(timed)?;
-        // self.evaluate_leaf_targets(timed)?;
+        // Perform remainder of downward pass
+        self.evaluate_downward_pass(timed)?;
+        self.evaluate_leaf_targets(timed)?;
 
         Ok(())
     }

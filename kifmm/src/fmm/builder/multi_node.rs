@@ -24,7 +24,7 @@ use crate::{
     },
     tree::{
         types::{Domain, SortKind},
-        MultiNodeTree, SingleNodeTree,
+        MultiNodeTree,
     },
     MultiNodeFmmTree,
 };
@@ -210,6 +210,34 @@ where
                 ..Default::default()
             };
 
+            let ghost_fmm_v: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
+                isa: self.isa.unwrap(),
+                equivalent_surface_order: vec![equivalent_surface_order],
+                check_surface_order: vec![check_surface_order],
+                variable_expansion_order: false,
+                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
+                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                fmm_eval_type,
+                kernel_eval_type,
+                kernel: kernel.clone(),
+                dim: 3,
+                ..Default::default()
+            };
+
+            let ghost_fmm_u: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
+                isa: self.isa.unwrap(),
+                equivalent_surface_order: vec![equivalent_surface_order],
+                check_surface_order: vec![check_surface_order],
+                variable_expansion_order: false,
+                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
+                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                fmm_eval_type,
+                kernel_eval_type,
+                kernel: kernel.clone(),
+                dim: 3,
+                ..Default::default()
+            };
+
             let mut result = KiFmmMulti {
                 dim: 3,
                 times: Vec::default(),
@@ -228,10 +256,11 @@ where
                 fmm_eval_type,
                 kernel_eval_type,
                 global_fmm,
+                ghost_fmm_v,
+                ghost_fmm_u,
                 kernel_eval_size: 1,
                 source: tmp_arr,
                 charges: Vec::default(),
-                ghost_charges: Vec::default(),
                 charge_index_pointer_sources: Vec::default(),
                 charge_index_pointer_targets: Vec::default(),
                 charge_index_pointer_ghost_sources: Vec::default(),
@@ -246,19 +275,15 @@ where
                 source_vec: Vec::default(),
                 target_vec: Vec::default(),
                 multipoles: Vec::default(),
-                ghost_multipoles: Vec::default(),
                 locals: Vec::default(),
                 potentials: Vec::default(),
                 leaf_multipoles: Vec::default(),
                 level_multipoles: Vec::default(),
-                ghost_level_multipoles: Vec::default(),
                 leaf_locals: Vec::default(),
                 level_locals: Vec::default(),
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                ghost_tree_u: SingleNodeTree::default(),
-                ghost_tree_v: SingleNodeTree::default(),
                 local_roots: Vec::default(),
                 local_roots_counts: Vec::default(),
                 local_roots_displacements: Vec::default(),
@@ -270,8 +295,8 @@ where
             result.source_to_target();
 
             // pass dummy charges for now.
-            result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]); // Everything required for the local upward passes
-                                                                                   // result.displacements();
+            result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]);
+            result.displacements(None);
 
             Ok(result)
         }

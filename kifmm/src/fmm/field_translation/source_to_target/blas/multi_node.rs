@@ -48,7 +48,6 @@ where
                     // Metadata
                     let m2l_operator_index = self.m2l_operator_index(level);
                     let c2e_operator_index = self.c2e_operator_index(level);
-                    let displacement_index = self.displacement_index(level);
                     let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
 
                     // Parameters
@@ -58,6 +57,7 @@ where
                     let mut all_n_sources = Vec::new();
                     let mut all_multipoles = Vec::new();
                     let mut all_displacements = Vec::new();
+                    let displacement_index = self.displacement_index(level);
 
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().target_tree().keys(level) {
@@ -77,13 +77,15 @@ where
                         all_sentinels.push(sentinel);
                     }
 
-                    if let Some(sources) = self.ghost_tree_v.keys(level) {
+                    // Handle ghost sources
+                    if let Some(sources) = self.ghost_fmm_v.tree.source_tree.keys(level) {
                         n_translations += 1;
                         let sentinel = sources.len();
 
                         // TODO: Change here and in FFT method to real displacements
-                        all_displacements
-                            .push(&self.source_to_target.displacements[displacement_index]);
+                        all_displacements.push(
+                            &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
+                        );
 
                         // Number of sources at this level
                         let n_sources = sources.len();

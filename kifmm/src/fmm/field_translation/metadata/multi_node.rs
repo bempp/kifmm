@@ -283,10 +283,13 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
-        for level in 2..=self.tree.source_tree().total_depth() {
+        let start_level =
+            start_level.unwrap_or_else(|| std::cmp::max(2, self.tree.source_tree().global_depth()));
+
+        for level in start_level..=self.tree.source_tree().total_depth() {
             let sources = self.tree.source_tree().keys(level).unwrap_or_default();
             let n_sources = sources.len();
 
@@ -630,10 +633,12 @@ where
         + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
+        let start_level =
+            start_level.unwrap_or_else(|| std::cmp::max(2, self.tree.source_tree().global_depth()));
 
-        for level in 2..=self.tree.source_tree.total_depth() {
+        for level in start_level..=self.tree.source_tree.total_depth() {
             let targets = self.tree.target_tree().keys(level).unwrap_or_default();
             let targets_parents: HashSet<MortonKey<_>> =
                 targets.iter().map(|target| target.parent()).collect();
@@ -1199,7 +1204,7 @@ impl<Scalar, FieldTranslation> MetadataAccess
 where
     Scalar: RlstScalar + Default + Equivalence + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
-    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata,
 {
@@ -1228,6 +1233,7 @@ where
     }
 
     fn displacement_index(&self, level: u64) -> usize {
-        (level - 2) as usize
+        let start_level = std::cmp::max(2, self.tree.source_tree.global_depth);
+        (level - start_level) as usize
     }
 }
