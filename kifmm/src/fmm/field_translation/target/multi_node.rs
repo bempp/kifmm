@@ -144,13 +144,17 @@ where
                 let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(total_depth);
                 let equivalent_surface_size = n_coeffs_equivalent_surface * dim;
 
+                if self.rank == 0 {
+                    println!("HERE {:?}, coordinates {:?}", self.charge_index_pointer_targets, coordinates.len() / dim)
+                }
+
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => {
                         self.leaf_downward_equivalent_surfaces_targets
                             .par_chunks_exact(equivalent_surface_size)
                             .zip(self.leaf_locals.par_iter())
-                            .zip(&self.charge_index_pointer_targets)
-                            .zip(&self.potentials_send_pointers)
+                            .zip(self.charge_index_pointer_targets.par_iter())
+                            .zip(self.potentials_send_pointers.par_iter())
                             .for_each(
                                 |(
                                     (
@@ -162,29 +166,38 @@ where
                                     let target_coordinates_row_major = &coordinates
                                         [charge_index_pointer.0 * dim
                                             ..charge_index_pointer.1 * dim];
-                                    let ntargets = target_coordinates_row_major.len() / dim;
+                                    let n_targets = target_coordinates_row_major.len() / dim;
 
                                     // Compute direct
-                                    if ntargets > 0 {
-                                        let result = unsafe {
-                                            std::slice::from_raw_parts_mut(
-                                                potential_send_ptr.raw,
-                                                ntargets * kernel_eval_size,
-                                            )
-                                        };
+                                    if n_targets > 0 {
+                                        let mut tmp = vec![Scalar::default(); n_targets * kernel_eval_size];
+
+                                        let locals = unsafe {
+                                                std::slice::from_raw_parts(
+                                                    leaf_locals.raw,
+                                                    n_coeffs_equivalent_surface,
+                                                )
+                                            };
+
+                                        assert!(leaf_locals.raw.is_null() == false);
+                                        assert!(potential_send_ptr.raw.is_null() == false);
 
                                         kernel.evaluate_st(
                                             kernel_eval_type,
                                             leaf_downward_equivalent_surface,
                                             target_coordinates_row_major,
-                                            unsafe {
-                                                std::slice::from_raw_parts_mut(
-                                                    leaf_locals.raw,
-                                                    n_coeffs_equivalent_surface,
-                                                )
-                                            },
-                                            result,
+                                            locals,
+                                            &mut tmp,
                                         );
+
+                                        let result = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                potential_send_ptr.raw,
+                                                n_targets * kernel_eval_size,
+                                            )
+                                        };
+
+                                        result.iter_mut().zip(tmp.iter()).for_each(|(a, b)| *a += *b);
                                     }
                                 },
                             );
@@ -242,8 +255,9 @@ where
                                 let target_coordinates_row_major = &all_target_coordinates
                                     [charge_index_pointer_targets.0 * dim
                                         ..charge_index_pointer_targets.1 * dim];
+
                                 let n_targets = target_coordinates_row_major.len() / dim;
-//
+
                                 if n_targets > 0 {
                                     let u_list = leaf.neighbors().into_iter().collect_vec();
 
