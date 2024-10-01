@@ -612,9 +612,8 @@ where
         }
 
         // Set metadata
-        let mut result = KiFmm::default();
         let sort_indices;
-        (result.tree.source_tree, sort_indices) = SingleNodeTree::from_ghost_octants_u(
+        (self.ghost_fmm_u.tree.source_tree, sort_indices) = SingleNodeTree::from_ghost_octants_u(
             self.tree.domain(),
             self.tree.source_tree().total_depth(),
             requested_coordinates,
@@ -625,11 +624,9 @@ where
             .map(|&i| requested_charges[i])
             .collect_vec();
 
-        result.charges = ghost_charges;
-        result.charge_index_pointer_sources =
-            coordinate_index_pointer_single_node(&result.tree.source_tree);
-
-        self.ghost_fmm_u = result;
+        self.ghost_fmm_u.charges = ghost_charges;
+        self.ghost_fmm_u.charge_index_pointer_sources =
+            coordinate_index_pointer_single_node(&self.ghost_fmm_u.tree.source_tree);
     }
 
     fn v_list_exchange(&mut self) {

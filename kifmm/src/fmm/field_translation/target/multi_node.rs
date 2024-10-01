@@ -212,7 +212,7 @@ where
             let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
             let all_source_coordinates = [
                 self.tree.source_tree().all_coordinates().unwrap(),
-                // self.ghost_fmm_u.tree.source_tree.all_coordinates().unwrap(),
+                self.ghost_fmm_u.tree.source_tree.all_coordinates().unwrap(),
             ];
 
             let dim = 3;
@@ -220,11 +220,11 @@ where
             let source_leaf_to_index_ghosts = &self.ghost_fmm_u.tree.source_tree.leaf_to_index;
             let charge_index_pointer_sources = [
                 &self.charge_index_pointer_sources,
-                // &self.ghost_fmm_u.charge_index_pointer_sources,
+                &self.ghost_fmm_u.charge_index_pointer_sources,
             ];
-            let charges = [
+            let all_charges = [
                 &self.charges,
-                // &self.ghost_fmm_u.charges
+                &self.ghost_fmm_u.charges
             ];
             let kernel_eval_size = self.kernel_eval_size;
             let kernel_eval_type = self.kernel_eval_type;
@@ -238,12 +238,13 @@ where
                         .zip(&self.potentials_send_pointers)
                         .for_each(
                             |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+
                                 let target_coordinates_row_major = &all_target_coordinates
                                     [charge_index_pointer_targets.0 * dim
                                         ..charge_index_pointer_targets.1 * dim];
-                                let ntargets = target_coordinates_row_major.len() / dim;
-
-                                if ntargets > 0 {
+                                let n_targets = target_coordinates_row_major.len() / dim;
+//
+                                if n_targets > 0 {
                                     let u_list = leaf.neighbors().into_iter().collect_vec();
 
                                     let mut all_u_list_indices = Vec::new();
@@ -256,58 +257,59 @@ where
                                             .collect_vec(),
                                     );
 
-                                    // // handle ghost source boxes
-                                    // all_u_list_indices.push(
-                                    //     u_list
-                                    //         .iter()
-                                    //         .filter_map(|k| source_leaf_to_index_ghosts.get(k))
-                                    //         .collect_vec(),
-                                    // );
+                                    // handle ghost source boxes
+                                    all_u_list_indices.push(
+                                        u_list
+                                            .iter()
+                                            .filter_map(|k| source_leaf_to_index_ghosts.get(k))
+                                            .collect_vec(),
+                                    );
 
-                                    // for (i, u_list_indices) in all_u_list_indices.iter().enumerate()
-                                    // {
-                                    //     let charges = u_list_indices
-                                    //         .iter()
-                                    //         .map(|&idx| {
-                                    //             let index_pointer =
-                                    //                 &charge_index_pointer_sources[i][*idx];
-                                    //             &charges[i][index_pointer.0..index_pointer.1]
-                                    //         })
-                                    //         .collect_vec();
+                                    for (i, u_list_indices) in all_u_list_indices.iter().enumerate()
+                                    {
 
-                                    //     let sources_coordinates = u_list_indices
-                                    //         .into_iter()
-                                    //         .map(|&idx| {
-                                    //             let index_pointer =
-                                    //                 &charge_index_pointer_sources[i][*idx];
-                                    //             &all_source_coordinates[i]
-                                    //                 [index_pointer.0 * dim..index_pointer.1 * dim]
-                                    //         })
-                                    //         .collect_vec();
+                                        let charges = u_list_indices
+                                            .iter()
+                                            .map(|&idx| {
+                                                let index_pointer =
+                                                    &charge_index_pointer_sources[i][*idx];
+                                                &all_charges[i][index_pointer.0..index_pointer.1]
+                                            })
+                                            .collect_vec();
 
-                                    //     for (&charges, source_coordinates_row_major) in
-                                    //         charges.iter().zip(sources_coordinates)
-                                    //     {
-                                    //         let nsources = source_coordinates_row_major.len() / dim;
+                                        let sources_coordinates = u_list_indices
+                                            .into_iter()
+                                            .map(|&idx| {
+                                                let index_pointer =
+                                                    &charge_index_pointer_sources[i][*idx];
+                                                &all_source_coordinates[i]
+                                                    [index_pointer.0 * dim..index_pointer.1 * dim]
+                                            })
+                                            .collect_vec();
 
-                                    //         if nsources > 0 {
-                                    //             let result = unsafe {
-                                    //                 std::slice::from_raw_parts_mut(
-                                    //                     potential_send_pointer.raw,
-                                    //                     ntargets * kernel_eval_size,
-                                    //                 )
-                                    //             };
+                                        for (&charges, source_coordinates_row_major) in
+                                            charges.iter().zip(sources_coordinates)
+                                        {
+                                            let n_sources = source_coordinates_row_major.len() / dim;
 
-                                    //             kernel.evaluate_st(
-                                    //                 kernel_eval_type,
-                                    //                 source_coordinates_row_major,
-                                    //                 target_coordinates_row_major,
-                                    //                 charges,
-                                    //                 result,
-                                    //             )
-                                    //         }
-                                    //     }
-                                    // }
+                                            if n_sources > 0 {
+                                                let result = unsafe {
+                                                    std::slice::from_raw_parts_mut(
+                                                        potential_send_pointer.raw,
+                                                        n_targets * kernel_eval_size,
+                                                    )
+                                                };
+
+                                                kernel.evaluate_st(
+                                                    kernel_eval_type,
+                                                    source_coordinates_row_major,
+                                                    target_coordinates_row_major,
+                                                    charges,
+                                                    result,
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             },
                         );

@@ -123,8 +123,8 @@ where
                 .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
         } else {
             // Leaf level computations
-            self.p2p()?;
-            self.l2p()?;
+            // self.p2p()?;
+            // self.l2p()?;
         }
 
         Ok(())
@@ -152,7 +152,7 @@ where
 
         // Perform remainder of downward pass
         self.evaluate_downward_pass(timed)?;
-        // self.evaluate_leaf_targets(timed)?;
+        self.evaluate_leaf_targets(timed)?;
 
         Ok(())
     }
