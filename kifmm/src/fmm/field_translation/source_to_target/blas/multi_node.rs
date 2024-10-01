@@ -17,15 +17,16 @@ use crate::{
     fmm::{
         helpers::single_node::{homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, KiFmmMulti, SendPtrMut},
+        KiFmm,
     },
     traits::{
-        field::SourceToTargetTranslation,
+        field::{FieldTranslation, SourceToTargetTranslation},
         fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
         tree::{MultiFmmTree, MultiTree, SingleTree},
         types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationSaRcmp, MultiNodeFmmTree,
+    BlasFieldTranslationSaRcmp, DataAccess, MultiNodeFmmTree,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -40,6 +41,8 @@ where
             Kernel = Kernel,
             Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>,
         >,
+    KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>:
+        DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
@@ -91,7 +94,7 @@ where
                         let n_sources = sources.len();
 
                         // Lookup multipole data from source tree
-                        let multipoles = self.multipoles(level).unwrap();
+                        let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
 
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
@@ -132,6 +135,7 @@ where
 
                         let n_sources = all_n_sources[i];
                         let multipoles = &all_multipoles[i];
+
                         let multipoles = rlst_array_from_slice2!(
                             multipoles,
                             [n_coeffs_equivalent_surface, n_sources]

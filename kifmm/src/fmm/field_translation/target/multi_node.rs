@@ -225,7 +225,7 @@ where
             let charges = [
                 &self.charges,
                 // &self.ghost_fmm_u.charges
-                ];
+            ];
             let kernel_eval_size = self.kernel_eval_size;
             let kernel_eval_type = self.kernel_eval_type;
             let kernel = &self.kernel;

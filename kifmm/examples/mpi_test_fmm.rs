@@ -29,9 +29,9 @@ fn main() {
     // Fmm Parameters
     let expansion_order = 4;
     let kernel = Laplace3dKernel::<f32>::new();
-    let source_to_target = FftFieldTranslation::<f32>::new(None);
-    // let source_to_target =
-    //     BlasFieldTranslationSaRcmp::<f32>::new(None, None, kifmm::FmmSvdMode::Deterministic);
+    // let source_to_target = FftFieldTranslation::<f32>::new(None);
+    let source_to_target =
+        BlasFieldTranslationSaRcmp::<f32>::new(None, None, kifmm::FmmSvdMode::Deterministic);
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);

@@ -130,15 +130,11 @@ where
 
                     // Allocate buffer to store the check potentials in frequency order
                     let mut check_potentials_hat_f =
-                        AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
-                            size_out * n_targets,
-                        );
+                        AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * n_targets);
 
                     // Allocate buffer to store the check potentials in box order
                     let mut check_potential_hat_c =
-                        AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
-                            size_out * n_targets,
-                        );
+                        AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * n_targets);
                     let mut check_potential = AlignedVec::<Scalar>::new(size_in * n_targets);
                     let chunk_size_kernel = chunk_size(n_targets_parents, max_chunk_size);
 
@@ -195,8 +191,6 @@ where
                         // Lookup multipole data from source tree
                         let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
 
-                        println!("nsources {:?} = multipoles {:?}", n_sources, multipoles.len() / 56);
-
                         // Buffer to store FFT of multipole data in frequency order
                         let n_zeros = 8; // pad amount
                         let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> =
@@ -222,8 +216,6 @@ where
                         all_chunk_size_pre_proc.push(chunk_size_pre_proc);
                     }
 
-                    // println!("Rank {:?} calling M2L at {:?}", self.rank, level);
-
                     for i in 0..n_translations {
                         let mut in_ = AlignedVec::new(size_in);
                         let mut out = AlignedVec::new(size_out);
@@ -237,18 +229,6 @@ where
                         let signals_hat_f = &all_signals_hat_f[i];
                         let all_displacements = all_displacements[i];
 
-                        // println!(
-                        //     "Rank {:?} ghost {:?} level {:?} nmult {:?} {:?} {:?} {:?}",
-                        //     self.rank,
-                        //     i,
-                        //     level,
-                        //     multipoles.len(),
-                        //     n_coeffs_equivalent_surface,
-                        //     chunk_size_pre_proc,
-                        //     size_in
-                        //     // surf_to_conv_map.len()
-                        // );
-
                         // 1. Compute FFT of all multipoles in source boxes at this level
                         {
                             multipoles
@@ -258,8 +238,9 @@ where
                                 .enumerate()
                                 .for_each(|(i, multipole_chunk)| {
                                     // Place Signal on convolution grid
-                                    let mut signal_chunk =
-                                        AlignedVec::<Scalar>::new(size_in * NSIBLINGS * chunk_size_pre_proc);
+                                    let mut signal_chunk = AlignedVec::<Scalar>::new(
+                                        size_in * NSIBLINGS * chunk_size_pre_proc,
+                                    );
 
                                     for i in 0..NSIBLINGS * chunk_size_pre_proc {
                                         let multipole = &multipole_chunk[i

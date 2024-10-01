@@ -896,10 +896,14 @@ where
             .collect_vec()
             .into();
 
-        self.ghost_fmm_v.tree.target_tree.levels_to_keys = self.tree.target_tree.levels_to_keys.clone();
+        self.ghost_fmm_v.tree.target_tree.levels_to_keys =
+            self.tree.target_tree.levels_to_keys.clone();
 
         // TODO: this method should be more flexible to avoid copy above
-        KiFmm::displacements(&mut self.ghost_fmm_v, Some(self.tree.source_tree.global_depth()));
+        KiFmm::displacements(
+            &mut self.ghost_fmm_v,
+            Some(self.tree.source_tree.global_depth()),
+        );
     }
 }
 
