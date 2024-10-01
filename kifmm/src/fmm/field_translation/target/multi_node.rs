@@ -136,7 +136,7 @@ where
     fn l2p(&self) -> Result<(), crate::traits::types::FmmError> {
         if let Some(_leaves) = self.tree.target_tree().all_leaves() {
             if let Some(coordinates) = self.tree.target_tree().all_coordinates() {
-                let dim = self.dim;
+                let dim = 3;
                 let kernel = &self.kernel;
                 let kernel_eval_size = self.kernel_eval_size;
                 let kernel_eval_type = self.kernel_eval_type;
@@ -159,33 +159,33 @@ where
                                     ),
                                     potential_send_ptr,
                                 )| {
-                                    // let target_coordinates_row_major = &coordinates
-                                    //     [charge_index_pointer.0 * dim
-                                    //         ..charge_index_pointer.1 * dim];
-                                    // let ntargets = target_coordinates_row_major.len() / dim;
+                                    let target_coordinates_row_major = &coordinates
+                                        [charge_index_pointer.0 * dim
+                                            ..charge_index_pointer.1 * dim];
+                                    let ntargets = target_coordinates_row_major.len() / dim;
 
-                                    // // Compute direct
-                                    // if ntargets > 0 {
-                                    //     let result = unsafe {
-                                    //         std::slice::from_raw_parts_mut(
-                                    //             potential_send_ptr.raw,
-                                    //             ntargets * kernel_eval_size,
-                                    //         )
-                                    //     };
+                                    // Compute direct
+                                    if ntargets > 0 {
+                                        let result = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                potential_send_ptr.raw,
+                                                ntargets * kernel_eval_size,
+                                            )
+                                        };
 
-                                    //     kernel.evaluate_st(
-                                    //         kernel_eval_type,
-                                    //         leaf_downward_equivalent_surface,
-                                    //         target_coordinates_row_major,
-                                    //         unsafe {
-                                    //             std::slice::from_raw_parts_mut(
-                                    //                 leaf_locals.raw,
-                                    //                 n_coeffs_equivalent_surface,
-                                    //             )
-                                    //         },
-                                    //         result,
-                                    //     );
-                                    // }
+                                        kernel.evaluate_st(
+                                            kernel_eval_type,
+                                            leaf_downward_equivalent_surface,
+                                            target_coordinates_row_major,
+                                            unsafe {
+                                                std::slice::from_raw_parts_mut(
+                                                    leaf_locals.raw,
+                                                    n_coeffs_equivalent_surface,
+                                                )
+                                            },
+                                            result,
+                                        );
+                                    }
                                 },
                             );
                     }
@@ -215,7 +215,7 @@ where
                 // self.ghost_fmm_u.tree.source_tree.all_coordinates().unwrap(),
             ];
 
-            let dim = self.dim;
+            let dim = 3;
             let source_leaf_to_index = &self.tree.source_tree().leaf_to_index;
             let source_leaf_to_index_ghosts = &self.ghost_fmm_u.tree.source_tree.leaf_to_index;
             let charge_index_pointer_sources = [

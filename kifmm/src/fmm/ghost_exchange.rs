@@ -868,30 +868,26 @@ where
         }
 
         // Set metadata
-        let mut result = KiFmm {
-            multipoles: ghost_multipoles_with_siblings,
-            ..Default::default()
-        };
-
-        result.level_multipoles = level_expansion_pointers_single_node(
-            &result.tree.source_tree,
-            &[self.n_coeffs_equivalent_surface],
-            1,
-            &result.multipoles,
-        );
-
-        result.tree.source_tree = SingleNodeTree::from_ghost_octants_v(
+        self.ghost_fmm_v.multipoles = ghost_multipoles_with_siblings;
+        self.ghost_fmm_v.tree.source_tree = SingleNodeTree::from_ghost_octants_v(
             self.tree.source_tree.global_depth(),
             self.tree.source_tree().total_depth(),
             ghost_keys,
             ghost_keys_set,
         );
 
-        result.level_index_pointer_multipoles =
-            level_index_pointer_single_node(&result.tree.source_tree);
+        self.ghost_fmm_v.level_multipoles = level_expansion_pointers_single_node(
+            &self.ghost_fmm_v.tree.source_tree, // relies on above method call
+            &[self.n_coeffs_equivalent_surface],
+            1,
+            &self.ghost_fmm_v.multipoles,
+        );
+
+        self.ghost_fmm_v.level_index_pointer_multipoles = // relies on above method call
+            level_index_pointer_single_node(&self.ghost_fmm_v.tree.source_tree);
 
         // Required to create displacements
-        result.tree.target_tree.keys = self
+        self.ghost_fmm_v.tree.target_tree.keys = self
             .tree
             .target_tree
             .keys
@@ -900,12 +896,10 @@ where
             .collect_vec()
             .into();
 
-        result.tree.target_tree.levels_to_keys = self.tree.target_tree.levels_to_keys.clone();
+        self.ghost_fmm_v.tree.target_tree.levels_to_keys = self.tree.target_tree.levels_to_keys.clone();
 
         // TODO: this method should be more flexible to avoid copy above
-        KiFmm::displacements(&mut result, Some(self.tree.source_tree.global_depth()));
-
-        self.ghost_fmm_v = result;
+        KiFmm::displacements(&mut self.ghost_fmm_v, Some(self.tree.source_tree.global_depth()));
     }
 }
 

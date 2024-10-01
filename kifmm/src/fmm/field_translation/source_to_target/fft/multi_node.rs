@@ -73,7 +73,7 @@ where
                         targets.iter().map(|target| target.parent()).collect();
 
                     let targets_parents = targets_parents.into_iter().collect_vec();
-                    let ntargets_parents = targets_parents.len();
+                    let n_targets_parents = targets_parents.len();
 
                     // Size of input FFT sequence
                     let shape_in = <Scalar as Dft>::shape_in(self.equivalent_surface_order(level));
@@ -126,12 +126,21 @@ where
                     let mut all_signals_hat_f = Vec::new();
                     let mut all_signals_hat_f_ptr = Vec::new();
                     let mut all_chunk_size_pre_proc = Vec::new();
-                    let mut all_chunk_size_kernel = Vec::new();
-                    // let mut all_kernel_data_ft = Vec::new();
-                    let mut all_check_potentials_hat_f = Vec::new();
-                    let mut all_check_potentials_hat_c = Vec::new();
-                    let mut all_check_potentials = Vec::new();
                     let mut n_translations = 0;
+
+                    // Allocate buffer to store the check potentials in frequency order
+                    let mut check_potentials_hat_f =
+                        AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
+                            size_out * n_targets,
+                        );
+
+                    // Allocate buffer to store the check potentials in box order
+                    let mut check_potential_hat_c =
+                        AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
+                            size_out * n_targets,
+                        );
+                    let mut check_potential = AlignedVec::<Scalar>::new(size_in * n_targets);
+                    let chunk_size_kernel = chunk_size(n_targets_parents, max_chunk_size);
 
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().source_tree().keys(level) {
@@ -158,20 +167,6 @@ where
                         };
 
                         let chunk_size_pre_proc = chunk_size(n_sources_parents, max_chunk_size);
-                        let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
-
-                        // Allocate buffer to store the check potentials in frequency order
-                        let check_potentials_hat_f =
-                            AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
-                                size_out * n_targets,
-                            );
-
-                        // Allocate buffer to store the check potentials in box order
-                        let check_potential_hat_c =
-                            AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
-                                size_out * n_targets,
-                            );
-                        let check_potential = AlignedVec::<Scalar>::new(size_in * n_targets);
 
                         all_sources.push(sources);
                         all_n_sources.push(n_sources);
@@ -183,16 +178,12 @@ where
                         all_signals_hat_f.push(signals_hat_f);
                         all_signals_hat_f_ptr.push(signals_hat_f_ptr);
                         all_chunk_size_pre_proc.push(chunk_size_pre_proc);
-                        all_chunk_size_kernel.push(chunk_size_kernel);
-                        // all_kernel_data_ft.push(kernel_data_ft);
-                        all_check_potentials_hat_f.push(check_potentials_hat_f);
-                        all_check_potentials_hat_c.push(check_potential_hat_c);
-                        all_check_potentials.push(check_potential);
                     }
 
                     // Handle ghost sources
                     if let Some(sources) = self.ghost_fmm_v.tree.source_tree.keys(level) {
-                        //     n_translations += 1;
+                        n_translations += 1;
+
                         let n_sources = sources.len();
                         let sources_parents: HashSet<MortonKey<_>> =
                             sources.iter().map(|source| source.parent()).collect();
@@ -202,56 +193,36 @@ where
                         let displacement_index = self.displacement_index(level);
 
                         // Lookup multipole data from source tree
-                        println!("HERE {:?} {:?}", self.level_multipoles.len(), self.level_multipoles[0].len());
-                        // let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
+                        let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
 
-                        // // Buffer to store FFT of multipole data in frequency order
-                        // let n_zeros = 8; // pad amount
-                        // let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> =
-                        //     AlignedVec::new(size_out * (n_sources + n_zeros));
+                        println!("nsources {:?} = multipoles {:?}", n_sources, multipoles.len() / 56);
 
-                        // // A thread safe mutable pointer for saving to this vector
-                        // let signals_hat_f_ptr = SendPtrMut {
-                        //     raw: signals_hat_f.as_mut_ptr(),
-                        // };
+                        // Buffer to store FFT of multipole data in frequency order
+                        let n_zeros = 8; // pad amount
+                        let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> =
+                            AlignedVec::new(size_out * (n_sources + n_zeros));
 
-                        // let chunk_size_pre_proc = chunk_size(n_sources_parents, max_chunk_size);
-                        // let chunk_size_kernel = chunk_size(ntargets_parents, max_chunk_size);
+                        // A thread safe mutable pointer for saving to this vector
+                        let signals_hat_f_ptr = SendPtrMut {
+                            raw: signals_hat_f.as_mut_ptr(),
+                        };
 
-                        // // Lookup all of the precomputed Green's function evaluations' FFT sequences
+                        let chunk_size_pre_proc = chunk_size(n_sources_parents, max_chunk_size);
 
-                        // // Allocate buffer to store the check potentials in frequency order
-                        // let check_potentials_hat_f =
-                        //     AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
-                        //         size_out * n_targets,
-                        //     );
-
-                        // // Allocate buffer to store the check potentials in box order
-                        // let check_potential_hat_c =
-                        //     AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(
-                        //         size_out * n_targets,
-                        //     );
-                        // let check_potential = AlignedVec::<Scalar>::new(size_in * n_targets);
-
-                        //     all_sources.push(sources);
-                        //     all_n_sources.push(n_sources);
-                        //     all_sources_parents.push(sources_parents);
-                        //     all_n_sources_parents.push(n_sources_parents);
-                        //     all_multipoles.push(multipoles);
-                        //     all_displacements.push(
-                        //         &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
-                        //     );
-                        //     all_signals_hat_f.push(signals_hat_f);
-                        //     all_signals_hat_f_ptr.push(signals_hat_f_ptr);
-                        //     all_chunk_size_pre_proc.push(chunk_size_pre_proc);
-                        //     all_chunk_size_kernel.push(chunk_size_kernel);
-                        //     // all_kernel_data_ft.push(kernel_data_ft);
-                        //     all_check_potentials_hat_f.push(check_potentials_hat_f);
-                        //     all_check_potentials_hat_c.push(check_potential_hat_c);
-                        //     all_check_potentials.push(check_potential);
+                        all_sources.push(sources);
+                        all_n_sources.push(n_sources);
+                        all_sources_parents.push(sources_parents);
+                        all_n_sources_parents.push(n_sources_parents);
+                        all_multipoles.push(multipoles);
+                        all_displacements.push(
+                            &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
+                        );
+                        all_signals_hat_f.push(signals_hat_f);
+                        all_signals_hat_f_ptr.push(signals_hat_f_ptr);
+                        all_chunk_size_pre_proc.push(chunk_size_pre_proc);
                     }
 
-                    println!("Rank {:?} calling M2L at {:?}", self.rank, level);
+                    // println!("Rank {:?} calling M2L at {:?}", self.rank, level);
 
                     for i in 0..n_translations {
                         let mut in_ = AlignedVec::new(size_in);
@@ -259,22 +230,23 @@ where
                         let plan =
                             Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
 
-                        let chunk_size_kernel = all_chunk_size_kernel[i];
-                        let chunk_size_pre_proc = all_chunk_size_pre_proc[i];
-                        let multipoles = &all_multipoles[i];
+                        let chunk_size_pre_proc = 1;
+                        let multipoles = *&all_multipoles[i];
                         let signals_hat_f_ptr = &all_signals_hat_f_ptr[i];
                         let n_sources = all_n_sources[i];
                         let signals_hat_f = &all_signals_hat_f[i];
                         let all_displacements = all_displacements[i];
-                        let check_potentials_hat_f = &mut all_check_potentials_hat_f[i];
-                        let check_potential_hat_c = &mut all_check_potentials_hat_c[i];
-                        let check_potential = &mut all_check_potentials[i];
 
                         // println!(
-                        //     "Rank {:?} level {:?} nmult {:?}",
+                        //     "Rank {:?} ghost {:?} level {:?} nmult {:?} {:?} {:?} {:?}",
                         //     self.rank,
+                        //     i,
                         //     level,
-                        //     multipoles.len()
+                        //     multipoles.len(),
+                        //     n_coeffs_equivalent_surface,
+                        //     chunk_size_pre_proc,
+                        //     size_in
+                        //     // surf_to_conv_map.len()
                         // );
 
                         // 1. Compute FFT of all multipoles in source boxes at this level
@@ -287,7 +259,7 @@ where
                                 .for_each(|(i, multipole_chunk)| {
                                     // Place Signal on convolution grid
                                     let mut signal_chunk =
-                                        AlignedVec::new(size_in * NSIBLINGS * chunk_size_pre_proc);
+                                        AlignedVec::<Scalar>::new(size_in * NSIBLINGS * chunk_size_pre_proc);
 
                                     for i in 0..NSIBLINGS * chunk_size_pre_proc {
                                         let multipole = &multipole_chunk[i
@@ -378,11 +350,11 @@ where
                             .zip(signals_hat_f.par_chunks_exact(n_sources + n_zeros))
                             .zip(check_potentials_hat_f.par_chunks_exact_mut(n_targets))
                             .for_each(|((freq, signal_hat_f), check_potential_hat_f)| {
-                                (0..ntargets_parents).step_by(chunk_size_kernel).for_each(
+                                (0..n_targets_parents).step_by(chunk_size_kernel).for_each(
                                     |chunk_start| {
                                         let chunk_end = std::cmp::min(
                                             chunk_start + chunk_size_kernel,
-                                            ntargets_parents,
+                                            n_targets_parents,
                                         );
 
                                         let save_locations = &mut check_potential_hat_f
@@ -390,7 +362,7 @@ where
 
                                         for i in 0..NHALO {
                                             let frequency_offset = freq * NHALO;
-                                            let k_f = &kernel_data_ft[i + frequency_offset];
+                                            let k_f: &_ = &kernel_data_ft[i + frequency_offset];
 
                                             let k_f_slice = unsafe {
                                                 &*(k_f.as_slice().as_ptr()
@@ -454,8 +426,8 @@ where
                                 Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
 
                             let _ = Scalar::backward_dft_batch_par(
-                                check_potential_hat_c,
-                                check_potential,
+                                &mut check_potential_hat_c[..],
+                                &mut check_potential[..],
                                 &shape_in,
                                 &plan,
                             );

@@ -152,7 +152,7 @@ where
 
         // Perform remainder of downward pass
         self.evaluate_downward_pass(timed)?;
-        self.evaluate_leaf_targets(timed)?;
+        // self.evaluate_leaf_targets(timed)?;
 
         Ok(())
     }
