@@ -134,7 +134,7 @@ where
     }
 
     fn l2p(&self) -> Result<(), crate::traits::types::FmmError> {
-        if let Some(_leaves) = self.tree.target_tree().all_leaves() {
+        if let Some(leaves) = self.tree.target_tree().all_leaves() {
             if let Some(coordinates) = self.tree.target_tree().all_coordinates() {
                 let dim = 3;
                 let kernel = &self.kernel;
@@ -144,9 +144,9 @@ where
                 let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(total_depth);
                 let equivalent_surface_size = n_coeffs_equivalent_surface * dim;
 
-                if self.rank == 0 {
-                    println!("HERE {:?}, coordinates {:?}", self.charge_index_pointer_targets, coordinates.len() / dim)
-                }
+                // if self.rank == 0 {
+                //     println!("HERE {:?}, coordinates {:?} potentials {:?} == {:?}", self.charge_index_pointer_targets, coordinates.len() / dim, self.potentials_send_pointers.len(), leaves.len())
+                // }
 
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => {
@@ -170,7 +170,12 @@ where
 
                                     // Compute direct
                                     if n_targets > 0 {
-                                        let mut tmp = vec![Scalar::default(); n_targets * kernel_eval_size];
+                                        let result = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                potential_send_ptr.raw,
+                                                n_targets * kernel_eval_size,
+                                            )
+                                        };
 
                                         let locals = unsafe {
                                                 std::slice::from_raw_parts(
@@ -179,25 +184,13 @@ where
                                                 )
                                             };
 
-                                        assert!(leaf_locals.raw.is_null() == false);
-                                        assert!(potential_send_ptr.raw.is_null() == false);
-
                                         kernel.evaluate_st(
                                             kernel_eval_type,
                                             leaf_downward_equivalent_surface,
                                             target_coordinates_row_major,
                                             locals,
-                                            &mut tmp,
+                                            result
                                         );
-
-                                        let result = unsafe {
-                                            std::slice::from_raw_parts_mut(
-                                                potential_send_ptr.raw,
-                                                n_targets * kernel_eval_size,
-                                            )
-                                        };
-
-                                        result.iter_mut().zip(tmp.iter()).for_each(|(a, b)| *a += *b);
                                     }
                                 },
                             );

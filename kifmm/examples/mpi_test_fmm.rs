@@ -14,7 +14,7 @@ fn main() {
     use rlst::RawAccess;
 
     let (universe, _threading) =
-        mpi::initialize_with_threading(mpi::Threading::Serialized).unwrap();
+        mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
     // let universe = mpi::initialize().unwrap();
     let world = universe.world();
     let comm = world.duplicate();

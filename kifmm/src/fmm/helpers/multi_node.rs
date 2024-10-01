@@ -158,11 +158,10 @@ where
     T: RlstScalar + Equivalence + Float,
     <T as RlstScalar>::Real: RlstScalar + Equivalence + Float,
 {
-    let n_points = tree.n_coordinates_tot().unwrap();
     let n_leaves = tree.n_leaves().unwrap();
     let mut result = vec![SendPtrMut::default(); n_leaves];
 
-    let mut raw_pointer = unsafe { potentials.as_ptr().add(n_points * kernel_eval_size) as *mut T };
+    let mut raw_pointer = potentials.as_ptr() as *mut T;
 
     for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
         let n_evals;
