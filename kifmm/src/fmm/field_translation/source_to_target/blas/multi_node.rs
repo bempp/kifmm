@@ -20,7 +20,7 @@ use crate::{
         KiFmm,
     },
     traits::{
-        field::{FieldTranslation, SourceToTargetTranslation},
+        field::SourceToTargetTranslation,
         fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
         tree::{MultiFmmTree, MultiTree, SingleTree},
         types::FmmError,
@@ -63,12 +63,13 @@ where
                     let displacement_index = self.displacement_index(level);
 
                     // Handle locally contained source boxes
-                    if let Some(sources) = self.tree().target_tree().keys(level) {
+                    if let Some(sources) = self.tree().source_tree().keys(level) {
                         n_translations += 1;
                         let sentinel = sources.len();
 
                         all_displacements
                             .push(&self.source_to_target.displacements[displacement_index]);
+
                         // Number of sources at this level
                         let n_sources = sources.len();
 
@@ -85,7 +86,6 @@ where
                         n_translations += 1;
                         let sentinel = sources.len();
 
-                        // TODO: Change here and in FFT method to real displacements
                         all_displacements.push(
                             &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
                         );
@@ -101,6 +101,34 @@ where
                         all_sentinels.push(sentinel);
                     }
 
+                    // Allocate buffer to store compressed check potentials
+                    let compressed_check_potentials = rlst_dynamic_array2!(
+                        Scalar,
+                        [
+                            self.source_to_target.cutoff_rank[m2l_operator_index],
+                            n_targets
+                        ]
+                    );
+                    let mut compressed_check_potentials_ptrs = Vec::new();
+
+                    for i in 0..n_targets {
+                        let raw = unsafe {
+                            compressed_check_potentials
+                                .data()
+                                .as_ptr()
+                                .add(i * self.source_to_target.cutoff_rank[m2l_operator_index])
+                                as *mut Scalar
+                        };
+                        let send_ptr = SendPtrMut { raw };
+                        compressed_check_potentials_ptrs.push(send_ptr);
+                    }
+
+                    let compressed_level_check_potentials = compressed_check_potentials_ptrs
+                        .iter()
+                        .map(Mutex::new)
+                        .collect_vec();
+
+                    // Compute translations
                     for i in 0..n_translations {
                         let all_displacements = all_displacements[i];
                         let sentinel = all_sentinels[i];
@@ -140,32 +168,6 @@ where
                             multipoles,
                             [n_coeffs_equivalent_surface, n_sources]
                         );
-
-                        // Allocate buffer to store compressed check potentials
-                        let compressed_check_potentials = rlst_dynamic_array2!(
-                            Scalar,
-                            [
-                                self.source_to_target.cutoff_rank[m2l_operator_index],
-                                n_targets
-                            ]
-                        );
-                        let mut compressed_check_potentials_ptrs = Vec::new();
-
-                        for i in 0..n_targets {
-                            let raw =
-                                unsafe {
-                                    compressed_check_potentials.data().as_ptr().add(
-                                        i * self.source_to_target.cutoff_rank[m2l_operator_index],
-                                    ) as *mut Scalar
-                                };
-                            let send_ptr = SendPtrMut { raw };
-                            compressed_check_potentials_ptrs.push(send_ptr);
-                        }
-
-                        let compressed_level_check_potentials = compressed_check_potentials_ptrs
-                            .iter()
-                            .map(Mutex::new)
-                            .collect_vec();
 
                         // 1. Compute the SVD compressed multipole expansions at this level
                         let mut compressed_multipoles;
@@ -248,32 +250,32 @@ where
                                     }
                                 });
                         }
+                    }
 
-                        // 3. Compute local expansions from compressed check potentials
-                        {
-                            let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_1[c2e_operator_index].view(),
+                    // 3. Compute local expansions from compressed check potentials
+                    {
+                        let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            self.dc2e_inv_1[c2e_operator_index].view(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.dc2e_inv_2[c2e_operator_index].view(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.dc2e_inv_2[c2e_operator_index].view(),
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        self.source_to_target.metadata[m2l_operator_index].u.view(),
-                                        compressed_check_potentials,
-                                    ),
+                                    self.source_to_target.metadata[m2l_operator_index].u.view(),
+                                    compressed_check_potentials.view(),
                                 ),
-                            );
+                            ),
+                        );
 
-                            let ptr = self.level_locals[level as usize][0].raw;
-                            let all_locals = unsafe {
-                                std::slice::from_raw_parts_mut(
-                                    ptr,
-                                    n_targets * n_coeffs_equivalent_surface,
-                                )
-                            };
-                            all_locals
-                                .iter_mut()
-                                .zip(locals.data().iter())
-                                .for_each(|(l, r)| *l += *r);
-                        }
+                        let ptr = self.level_locals[level as usize][0].raw;
+                        let all_locals = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                ptr,
+                                n_targets * n_coeffs_equivalent_surface,
+                            )
+                        };
+                        all_locals
+                            .iter_mut()
+                            .zip(locals.data().iter())
+                            .for_each(|(l, r)| *l += *r);
                     }
                 }
 

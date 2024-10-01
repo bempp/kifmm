@@ -334,7 +334,11 @@ where
 
     fn keys(&self, level: u64) -> Option<&[<Self::SingleTree as SingleTree>::Node]> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
-            Some(&self.keys[l..r])
+            if r - l > 0 {
+                Some(&self.keys[l..r])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -361,7 +365,11 @@ where
         leaf: &<Self::SingleTree as SingleTree>::Node,
     ) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.coordinates[l * 3..r * 3])
+            if r - l > 0 {
+                Some(&self.coordinates[l * 3..r * 3])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -372,7 +380,11 @@ where
         leaf: &<Self::SingleTree as SingleTree>::Node,
     ) -> Option<&[Point<<Self::SingleTree as SingleTree>::Scalar>]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.points[l..r])
+            if r - l > 0 {
+                Some(&self.points[l..r])
+            } else {
+                None
+            }
         } else {
             None
         }

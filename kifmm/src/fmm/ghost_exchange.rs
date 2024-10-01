@@ -345,14 +345,12 @@ where
             let send_buffer_size = self.local_roots.len() * self.n_coeffs_equivalent_surface;
             let mut send_buffer = vec![Scalar::default(); send_buffer_size];
 
-            let mut root_idx = 0;
-            for root in self.local_roots.iter() {
+            for (root_idx, root) in self.local_roots.iter().enumerate() {
                 if let Some(local) = self.global_fmm.local(root) {
                     send_buffer[root_idx * self.n_coeffs_equivalent_surface
                         ..(root_idx + 1) * self.n_coeffs_equivalent_surface]
                         .copy_from_slice(local);
                 }
-                root_idx += 1;
             }
 
             // Displace items to send back by number of coefficients

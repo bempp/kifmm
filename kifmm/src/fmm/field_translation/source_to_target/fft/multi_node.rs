@@ -24,7 +24,7 @@ use crate::{
     },
     traits::{
         fftw::Dft,
-        field::{FieldTranslation, SourceToTargetTranslation},
+        field::SourceToTargetTranslation,
         fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
         general::single_node::{AsComplex, Hadamard8x8},
         tree::{MultiFmmTree, MultiTree, SingleTree},
@@ -223,7 +223,7 @@ where
                             Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
 
                         let chunk_size_pre_proc = 1;
-                        let multipoles = *&all_multipoles[i];
+                        let multipoles = all_multipoles[i];
                         let signals_hat_f_ptr = &all_signals_hat_f_ptr[i];
                         let n_sources = all_n_sources[i];
                         let signals_hat_f = &all_signals_hat_f[i];

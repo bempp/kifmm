@@ -1178,7 +1178,11 @@ where
 
     fn keys(&self, level: u64) -> Option<&[Self::Node]> {
         if let Some(&(l, r)) = self.levels_to_keys.get(&level) {
-            Some(&self.keys[l..r])
+            if r - l > 0 {
+                Some(&self.keys[l..r])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -1202,7 +1206,11 @@ where
 
     fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.coordinates[l * 3..r * 3])
+            if r - l > 0 {
+                Some(&self.coordinates[l * 3..r * 3])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -1210,7 +1218,11 @@ where
 
     fn points(&self, leaf: &Self::Node) -> Option<&[Point<Self::Scalar>]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.points[l..r])
+            if r - l > 0 {
+                Some(&self.points[l..r])
+            } else {
+                None
+            }
         } else {
             None
         }
@@ -1222,7 +1234,11 @@ where
 
     fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
-            Some(&self.global_indices[l..r])
+            if r - l > 0 {
+                Some(&self.global_indices[l..r])
+            } else {
+                None
+            }
         } else {
             None
         }

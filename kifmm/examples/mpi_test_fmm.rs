@@ -5,7 +5,8 @@ fn main() {
         fmm::types::MultiNodeBuilder,
         traits::fmm::EvaluateMulti,
         tree::{helpers::points_fixture, types::SortKind},
-        BlasFieldTranslationSaRcmp, FftFieldTranslation,
+        // BlasFieldTranslationSaRcmp,
+        FftFieldTranslation,
     };
 
     use rayon::ThreadPoolBuilder;
@@ -13,8 +14,7 @@ fn main() {
     use mpi::traits::*;
     use rlst::RawAccess;
 
-    let (universe, _threading) =
-        mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
+    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
     // let universe = mpi::initialize().unwrap();
     let world = universe.world();
     let comm = world.duplicate();

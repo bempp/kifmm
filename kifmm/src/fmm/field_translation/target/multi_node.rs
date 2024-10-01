@@ -134,7 +134,7 @@ where
     }
 
     fn l2p(&self) -> Result<(), crate::traits::types::FmmError> {
-        if let Some(leaves) = self.tree.target_tree().all_leaves() {
+        if let Some(_leaves) = self.tree.target_tree().all_leaves() {
             if let Some(coordinates) = self.tree.target_tree().all_coordinates() {
                 let dim = 3;
                 let kernel = &self.kernel;
@@ -143,10 +143,6 @@ where
                 let total_depth = self.tree.target_tree().total_depth();
                 let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(total_depth);
                 let equivalent_surface_size = n_coeffs_equivalent_surface * dim;
-
-                // if self.rank == 0 {
-                //     println!("HERE {:?}, coordinates {:?} potentials {:?} == {:?}", self.charge_index_pointer_targets, coordinates.len() / dim, self.potentials_send_pointers.len(), leaves.len())
-                // }
 
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => {
@@ -178,18 +174,18 @@ where
                                         };
 
                                         let locals = unsafe {
-                                                std::slice::from_raw_parts(
-                                                    leaf_locals.raw,
-                                                    n_coeffs_equivalent_surface,
-                                                )
-                                            };
+                                            std::slice::from_raw_parts(
+                                                leaf_locals.raw,
+                                                n_coeffs_equivalent_surface,
+                                            )
+                                        };
 
                                         kernel.evaluate_st(
                                             kernel_eval_type,
                                             leaf_downward_equivalent_surface,
                                             target_coordinates_row_major,
                                             locals,
-                                            result
+                                            result,
                                         );
                                     }
                                 },
@@ -228,10 +224,7 @@ where
                 &self.charge_index_pointer_sources,
                 &self.ghost_fmm_u.charge_index_pointer_sources,
             ];
-            let all_charges = [
-                &self.charges,
-                &self.ghost_fmm_u.charges
-            ];
+            let all_charges = [&self.charges, &self.ghost_fmm_u.charges];
             let kernel_eval_size = self.kernel_eval_size;
             let kernel_eval_type = self.kernel_eval_type;
             let kernel = &self.kernel;
@@ -244,7 +237,6 @@ where
                         .zip(&self.potentials_send_pointers)
                         .for_each(
                             |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
-
                                 let target_coordinates_row_major = &all_target_coordinates
                                     [charge_index_pointer_targets.0 * dim
                                         ..charge_index_pointer_targets.1 * dim];
@@ -274,7 +266,6 @@ where
 
                                     for (i, u_list_indices) in all_u_list_indices.iter().enumerate()
                                     {
-
                                         let charges = u_list_indices
                                             .iter()
                                             .map(|&idx| {
@@ -285,7 +276,7 @@ where
                                             .collect_vec();
 
                                         let sources_coordinates = u_list_indices
-                                            .into_iter()
+                                            .iter()
                                             .map(|&idx| {
                                                 let index_pointer =
                                                     &charge_index_pointer_sources[i][*idx];
@@ -297,7 +288,8 @@ where
                                         for (&charges, source_coordinates_row_major) in
                                             charges.iter().zip(sources_coordinates)
                                         {
-                                            let n_sources = source_coordinates_row_major.len() / dim;
+                                            let n_sources =
+                                                source_coordinates_row_major.len() / dim;
 
                                             if n_sources > 0 {
                                                 let result = unsafe {
