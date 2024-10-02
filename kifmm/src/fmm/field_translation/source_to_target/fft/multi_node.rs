@@ -136,7 +136,8 @@ where
                     let mut check_potential_hat_c =
                         AlignedVec::<<Scalar as AsComplex>::ComplexType>::new(size_out * n_targets);
                     let mut check_potential = AlignedVec::<Scalar>::new(size_in * n_targets);
-                    let chunk_size_kernel = chunk_size(n_targets_parents, max_chunk_size);
+                    // let chunk_size_kernel = chunk_size(n_targets_parents, max_chunk_size);
+                    let chunk_size_kernel = 1;
 
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().source_tree().keys(level) {
@@ -326,6 +327,10 @@ where
 
                         // 2. Compute Hadamard Product
                         {
+                            // let tmp = check_potentials_hat_f.len();
+                            // println!("HERE {:?} {:?} {:?}, {:?}", level, n_targets_parents, n_targets, tmp);
+                            // // assert!(false);
+
                             (0..size_out)
                             .into_par_iter()
                             .zip(signals_hat_f.par_chunks_exact(n_sources + n_zeros))

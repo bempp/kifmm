@@ -78,15 +78,13 @@ where
         let start_level = std::cmp::max(2, global_depth);
 
         if timed {
-            for level in start_level..=total_depth {
-                if level > 2 {
-                    let s = Instant::now();
-                    self.l2l(level)?;
-                    self.times.push(FmmOperatorTime::from_instant(
-                        FmmOperatorType::L2L(level),
-                        s,
-                    ));
-                }
+            for level in (start_level + 1)..=total_depth {
+                let s = Instant::now();
+                self.l2l(level)?;
+                self.times.push(FmmOperatorTime::from_instant(
+                    FmmOperatorType::L2L(level),
+                    s,
+                ));
 
                 let s = Instant::now();
                 self.m2l(level)?;
@@ -96,11 +94,8 @@ where
                 ));
             }
         } else {
-            for level in start_level..=total_depth {
-                if level > 2 {
-                    self.l2l(level)?;
-                }
-
+            for level in (start_level + 1)..=total_depth {
+                self.l2l(level)?;
                 self.m2l(level)?;
             }
         }
