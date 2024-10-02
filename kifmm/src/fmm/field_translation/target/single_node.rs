@@ -9,25 +9,25 @@ use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAcces
 use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
-    fmm::{constants::L2L_MAX_BLOCK_SIZE, helpers::chunk_size, types::FmmEvalType, KiFmm},
+    fmm::{
+        constants::L2L_MAX_BLOCK_SIZE, helpers::single_node::chunk_size, types::FmmEvalType, KiFmm,
+    },
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{FmmOperatorData, HomogenousKernel, TargetTranslation},
-        tree::{FmmTree, Tree},
+        field::{FieldTranslation as FieldTranslationTrait, TargetTranslation},
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
+        tree::{SingleFmmTree, SingleTree},
         types::FmmError,
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
-    Fmm,
 };
 
-impl<Scalar, Kernel, SourceToTargetData> TargetTranslation
-    for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> TargetTranslation for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: FmmOperatorData + Fmm<Scalar = Scalar>,
+    Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
@@ -41,10 +41,10 @@ where
             child_targets.iter().map(|source| source.parent()).collect();
         let mut parent_sources = parent_sources.into_iter().collect_vec();
         parent_sources.sort();
-        let nparents = parent_sources.len();
+        let n_parents = parent_sources.len();
         let operator_index = self.l2l_operator_index(level);
-        let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(level);
-        let ncoeffs_equivalent_surface_parent = self.ncoeffs_equivalent_surface(level - 1);
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+        let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -59,11 +59,11 @@ where
                     parent_locals.push(parent_local);
                 }
 
-                let mut max_chunk_size = nparents;
+                let mut max_chunk_size = n_parents;
                 if max_chunk_size > L2L_MAX_BLOCK_SIZE {
                     max_chunk_size = L2L_MAX_BLOCK_SIZE
                 }
-                let chunk_size = chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(n_parents, max_chunk_size);
 
                 let child_locals = &self.level_locals[level as usize];
 
@@ -73,19 +73,19 @@ where
                     .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
                         let mut parent_locals = rlst_dynamic_array2!(
                             Scalar,
-                            [ncoeffs_equivalent_surface_parent, chunk_size]
+                            [n_coeffs_equivalent_surface_parent, chunk_size]
                         );
                         for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
                             .iter()
                             .enumerate()
                             .take(chunk_size)
                         {
-                            parent_locals.data_mut()[chunk_idx * ncoeffs_equivalent_surface_parent
-                                ..(chunk_idx + 1) * ncoeffs_equivalent_surface_parent]
+                            parent_locals.data_mut()[chunk_idx * n_coeffs_equivalent_surface_parent
+                                ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent]
                                 .copy_from_slice(unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_local_pointer.raw,
-                                        ncoeffs_equivalent_surface_parent,
+                                        n_coeffs_equivalent_surface_parent,
                                     )
                                 });
                         }
@@ -102,14 +102,14 @@ where
                                 let child_local = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         child_local_pointers_chunk[child_displacement][0].raw,
-                                        ncoeffs_equivalent_surface,
+                                        n_coeffs_equivalent_surface,
                                     )
                                 };
                                 child_local
                                     .iter_mut()
                                     .zip(
-                                        &tmp.data()[j * ncoeffs_equivalent_surface
-                                            ..(j + 1) * ncoeffs_equivalent_surface],
+                                        &tmp.data()[j * n_coeffs_equivalent_surface
+                                            ..(j + 1) * n_coeffs_equivalent_surface],
                                     )
                                     .for_each(|(l, t)| *l += *t);
                             }
@@ -118,10 +118,10 @@ where
                 Ok(())
             }
 
-            FmmEvalType::Matrix(nmatvecs) => {
-                let mut parent_locals = vec![Vec::new(); nparents];
+            FmmEvalType::Matrix(n_matvecs) => {
+                let mut parent_locals = vec![Vec::new(); n_parents];
                 for (parent_idx, parent) in parent_sources.iter().enumerate() {
-                    for charge_vec_idx in 0..nmatvecs {
+                    for charge_vec_idx in 0..n_matvecs {
                         let parent_index_pointer = *self.level_index_pointer_locals
                             [(level - 1) as usize]
                             .get(parent)
@@ -139,21 +139,21 @@ where
                     .for_each(|(parent_local_pointers, child_locals_pointers)| {
                         let mut parent_locals = rlst_dynamic_array2!(
                             Scalar,
-                            [ncoeffs_equivalent_surface_parent, nmatvecs]
+                            [n_coeffs_equivalent_surface_parent, n_matvecs]
                         );
 
                         for (charge_vec_idx, parent_local_pointer) in
-                            parent_local_pointers.iter().enumerate().take(nmatvecs)
+                            parent_local_pointers.iter().enumerate().take(n_matvecs)
                         {
                             let tmp = unsafe {
                                 std::slice::from_raw_parts(
                                     parent_local_pointer.raw,
-                                    ncoeffs_equivalent_surface_parent,
+                                    n_coeffs_equivalent_surface_parent,
                                 )
                             };
                             parent_locals.data_mut()[charge_vec_idx
-                                * ncoeffs_equivalent_surface_parent
-                                ..(charge_vec_idx + 1) * ncoeffs_equivalent_surface_parent]
+                                * n_coeffs_equivalent_surface_parent
+                                ..(charge_vec_idx + 1) * n_coeffs_equivalent_surface_parent]
                                 .copy_from_slice(tmp);
                         }
 
@@ -166,16 +166,16 @@ where
                             );
 
                             for (j, child_locals_ij) in
-                                child_locals_i.iter().enumerate().take(nmatvecs)
+                                child_locals_i.iter().enumerate().take(n_matvecs)
                             {
                                 let child_locals_ij = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         child_locals_ij.raw,
-                                        ncoeffs_equivalent_surface,
+                                        n_coeffs_equivalent_surface,
                                     )
                                 };
-                                let result_ij = &result_i.data()[j * ncoeffs_equivalent_surface
-                                    ..(j + 1) * ncoeffs_equivalent_surface];
+                                let result_ij = &result_i.data()[j * n_coeffs_equivalent_surface
+                                    ..(j + 1) * n_coeffs_equivalent_surface];
                                 child_locals_ij
                                     .iter_mut()
                                     .zip(result_ij.iter())
@@ -198,8 +198,8 @@ where
 
         let coordinates = self.tree.target_tree().all_coordinates().unwrap();
         let depth = self.tree.target_tree().depth();
-        let ncoeffs_equivalent_surface = self.ncoeffs_equivalent_surface(depth);
-        let equivalent_surface_size = ncoeffs_equivalent_surface * self.dim;
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(depth);
+        let equivalent_surface_size = n_coeffs_equivalent_surface * self.dim;
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -234,7 +234,7 @@ where
                                     unsafe {
                                         std::slice::from_raw_parts_mut(
                                             leaf_locals[0].raw,
-                                            ncoeffs_equivalent_surface,
+                                            n_coeffs_equivalent_surface,
                                         )
                                     },
                                     result,
@@ -246,9 +246,9 @@ where
                 Ok(())
             }
 
-            FmmEvalType::Matrix(nmatvec) => {
+            FmmEvalType::Matrix(n_matvecs) => {
                 let n_leaves = self.tree.target_tree().n_leaves().unwrap();
-                for i in 0..nmatvec {
+                for i in 0..n_matvecs {
                     self.leaf_downward_equivalent_surfaces_targets
                         .par_chunks_exact(equivalent_surface_size)
                         .zip(&self.leaf_locals)
@@ -272,7 +272,7 @@ where
                                     let local_expansion = unsafe {
                                         std::slice::from_raw_parts(
                                             local_expansion_ptr,
-                                            ncoeffs_equivalent_surface,
+                                            n_coeffs_equivalent_surface,
                                         )
                                     };
 
@@ -378,10 +378,10 @@ where
                 Ok(())
             }
 
-            FmmEvalType::Matrix(nmatvec) => {
+            FmmEvalType::Matrix(n_matvecs) => {
                 let n_leaves = self.tree.target_tree().n_leaves().unwrap();
 
-                for i in 0..nmatvec {
+                for i in 0..n_matvecs {
                     leaves
                         .par_iter()
                         .zip(&self.charge_index_pointer_targets)

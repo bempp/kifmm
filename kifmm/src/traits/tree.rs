@@ -5,8 +5,10 @@ use rlst::RlstScalar;
 
 use num::traits::Float;
 
-/// Interface for single and multi-node trees
-pub trait Tree {
+use crate::tree::types::Point;
+
+/// Interface for single node trees
+pub trait SingleTree {
     /// Scalar type
     type Scalar: RlstScalar + Float;
 
@@ -15,6 +17,9 @@ pub trait Tree {
 
     /// A tree node.
     type Node: TreeNode<Scalar = Self::Scalar, Domain = Self::Domain> + Clone + Copy;
+
+    /// Root node
+    fn root(&self) -> Self::Node;
 
     /// Number of leaves
     fn n_leaves(&self) -> Option<usize>;
@@ -49,6 +54,12 @@ pub trait Tree {
     /// - `leaf` - node being query.
     fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]>;
 
+    /// Gets a reference to the points contained with a leaf node.
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn points(&self, leaf: &Self::Node) -> Option<&[Point<Self::Scalar>]>;
+
     /// Query number of coordinates contained at a given leaf node
     ///
     /// # arguments
@@ -61,13 +72,13 @@ pub trait Tree {
     /// Total number of coordinates (local in a multi node setting)
     fn n_coordinates_tot(&self) -> Option<usize>;
 
-    /// Gets global indices at a leaf node (local in multi node setting)
+    /// gets global indices at a leaf node (local in multi node setting)
     ///
-    /// # Arguments
-    /// - `leaf` - Node being query.
+    /// # arguments
+    /// - `leaf` - node being query.
     fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]>;
 
-    /// Gets all global indices (local in mult inode setting)
+    /// gets all global indices (local in mult inode setting)
     fn all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points, gets global domain in multi node setting.
@@ -98,13 +109,119 @@ pub trait Tree {
     fn node(&self, idx: usize) -> Option<&Self::Node>;
 }
 
+/// Interface for multinode trees
+#[cfg(feature = "mpi")]
+pub trait MultiTree {
+    /// Associated single node trees
+    type SingleTree: SingleTree;
+
+    /// Associated MPI rank
+    fn rank(&self) -> i32;
+
+    /// Roots associated with trees at this rank
+    fn roots(&self) -> &[<Self::SingleTree as SingleTree>::Node];
+
+    /// All the single node trees associated with this rank
+    fn trees(&self) -> &[Self::SingleTree];
+
+    /// Number of single node trees associated with this rank
+    fn n_trees(&self) -> usize;
+
+    /// Number of leaves
+    fn n_leaves(&self) -> Option<usize>;
+
+    /// Total number of keys associated with this MPI rank
+    fn n_keys_tot(&self) -> Option<usize>;
+
+    /// Number of keys at a given tree level
+    fn n_keys(&self, level: u64) -> Option<usize>;
+
+    /// Total depth of tree
+    fn total_depth(&self) -> u64;
+
+    /// Depth of local trees
+    fn local_depth(&self) -> u64;
+
+    /// Depth of global tree
+    fn global_depth(&self) -> u64;
+
+    /// Get a reference to all leaves, gets local keys in multi-node setting.
+    fn all_leaves(&self) -> Option<&[<Self::SingleTree as SingleTree>::Node]>;
+
+    /// Get a reference to keys at a given level, gets local keys in a multi-node setting.
+    fn keys(&self, level: u64) -> Option<&[<Self::SingleTree as SingleTree>::Node]>;
+
+    /// Get a reference to all keys, gets local keys in a multi-node setting.
+    fn all_keys(&self) -> Option<&[<Self::SingleTree as SingleTree>::Node]>;
+
+    /// Get a reference to all keys as a set, gets local keys in a multi-node setting.
+    fn all_keys_set(&self) -> Option<&'_ HashSet<<Self::SingleTree as SingleTree>::Node>>;
+
+    /// Get a reference to all leaves as a set, gets local keys in a multi-node setting.
+    fn all_leaves_set(&self) -> Option<&'_ HashSet<<Self::SingleTree as SingleTree>::Node>>;
+
+    /// Gets a reference to the coordinates contained with a leaf node.
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn coordinates(
+        &self,
+        leaf: &<Self::SingleTree as SingleTree>::Node,
+    ) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]>;
+
+    /// Gets a reference to the points contained with a leaf node.
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn points(
+        &self,
+        leaf: &<Self::SingleTree as SingleTree>::Node,
+    ) -> Option<&[Point<<Self::SingleTree as SingleTree>::Scalar>]>;
+
+    /// Query number of coordinates contained at a given leaf node
+    ///
+    /// # arguments
+    /// - `leaf` - node being query.
+    fn n_coordinates(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<usize>;
+
+    /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
+    fn all_coordinates(&self) -> Option<&[<Self::SingleTree as SingleTree>::Scalar]>;
+
+    /// Total number of coordinates (local in a multi node setting)
+    fn n_coordinates_tot(&self) -> Option<usize>;
+
+    /// Map from the key to index position in sorted keys
+    ///
+    /// # Arguments
+    /// - `key` - Node being query.
+    fn index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
+
+    /// Map from the key to index position in sorted keys at a given level
+    ///
+    /// # Arguments
+    /// - `key` - Node being query.
+    fn level_index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
+
+    /// Map from the leaf to its index position in sorted leaves
+    ///
+    /// # Arguments
+    /// - `leaf` - Node being query.
+    fn leaf_index(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
+
+    /// Map from an index position to a node
+    ///
+    /// # Arguments
+    /// - `idx` - Index being query.
+    fn node(&self, idx: usize) -> Option<&<Self::SingleTree as SingleTree>::Node>;
+
+    /// Get domain defined by the points, gets global domain in multi node setting.
+    fn domain(&self) -> &<Self::SingleTree as SingleTree>::Domain;
+}
+
 /// Interface for trees required by the FMM, which requires separate trees for the source and target particle data
-pub trait FmmTree
-where
-    Self::Tree: Tree,
-{
+pub trait SingleFmmTree {
     /// Tree associated with this FMM tree
-    type Tree: Tree;
+    type Tree: SingleTree;
 
     /// Get the source tree
     fn source_tree(&self) -> &Self::Tree;
@@ -113,13 +230,36 @@ where
     fn target_tree(&self) -> &Self::Tree;
 
     /// Get the domain
-    fn domain(&self) -> &<Self::Tree as Tree>::Domain;
+    fn domain(&self) -> &<Self::Tree as SingleTree>::Domain;
 
     /// Get the near field of a leaf node
     fn near_field(
         &self,
-        leaf: &<Self::Tree as Tree>::Node,
-    ) -> Option<Vec<<Self::Tree as Tree>::Node>>;
+        leaf: &<Self::Tree as SingleTree>::Node,
+    ) -> Option<Vec<<Self::Tree as SingleTree>::Node>>;
+}
+
+/// Interface for trees required by multinde FMM, which require separate trees for source and target data.
+/// Now however, each MPI rank can contain multiple single node source and target trees.
+#[cfg(feature = "mpi")]
+pub trait MultiFmmTree {
+    /// Tree associated with FMM tree
+    type Tree: MultiTree;
+
+    /// Global domain
+    fn domain(&self) -> &<<Self::Tree as MultiTree>::SingleTree as SingleTree>::Domain;
+
+    /// The source tree, defined by a number of single node trees
+    fn source_tree(&self) -> &Self::Tree;
+
+    /// The target tree, defined by a number of single node trees
+    fn target_tree(&self) -> &Self::Tree;
+
+    /// Number of single node trees associated with the source tree
+    fn n_source_trees(&self) -> usize;
+
+    /// Number of single trees associated with target tree
+    fn n_target_trees(&self) -> usize;
 }
 
 /// Interface for tree nodes

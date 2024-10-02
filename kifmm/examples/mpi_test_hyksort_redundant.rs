@@ -1,6 +1,6 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 #[cfg(feature = "mpi")]
-use kifmm::hyksort::hyksort;
+use kifmm::sorting::hyksort;
 #[cfg(feature = "mpi")]
 use mpi::traits::{Communicator, Destination, Source};
 #[cfg(feature = "mpi")]

@@ -5,7 +5,7 @@ use rand::distributions::uniform::SampleUniform;
 
 use rlst::{RawAccess, RlstScalar};
 
-use kifmm::{traits::tree::Tree, tree::helpers::points_fixture};
+use kifmm::{traits::tree::SingleTree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
 use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};
@@ -19,34 +19,46 @@ fn test_no_overlaps<T: RlstScalar + Equivalence + Float + Default>(
     world: &SimpleCommunicator,
     tree: &MultiNodeTree<T, SimpleCommunicator>,
 ) {
-    // Communicate bounds from each process
-    let max = tree.all_leaves_set().unwrap().iter().max().unwrap();
-    let min = tree.all_leaves_set().unwrap().iter().min().unwrap();
+    use itertools::Itertools;
 
-    // Gather all bounds at root
-    let size = world.size();
-    let rank = world.rank();
+    let max = if !tree.roots.is_empty() {
+        tree.roots.iter().max().unwrap().clone()
+    } else {
+        MortonKey::from_anchor(&[1, 1, 1], 16)
+    };
 
-    let next_rank = if rank + 1 < size { rank + 1 } else { 0 };
-    let previous_rank = if rank > 0 { rank - 1 } else { size - 1 };
+    let min = if !tree.roots.is_empty() {
+        tree.roots.iter().min().unwrap().clone()
+    } else {
+        MortonKey::from_anchor(&[1, 1, 1], 16)
+    };
 
-    let previous_process = world.process_at_rank(previous_rank);
-    let next_process = world.process_at_rank(next_rank);
+    let root_process = world.process_at_rank(0);
 
-    // Send min to partner
-    if rank > 0 {
-        previous_process.send(min);
-    }
+    if world.rank() == 0 {
+        // Gather all bounds at root
+        let size = world.size();
 
-    let mut partner_min = MortonKey::default();
+        let mut maxs = vec![MortonKey::<T>::default(); size as usize];
+        let mut mins = vec![MortonKey::<T>::default(); size as usize];
 
-    if rank < (size - 1) {
-        next_process.receive_into(&mut partner_min);
-    }
+        let root_process = world.this_process();
 
-    // Test that the partner's minimum node is greater than the process's maximum node
-    if rank < size - 1 {
-        assert!(max < &partner_min)
+        root_process.gather_into_root(&max, &mut maxs);
+        root_process.gather_into_root(&min, &mut mins);
+
+        // Filter out sentinels received
+        let maxs = maxs.into_iter().filter(|m| m.level() != 16).collect_vec();
+        let mins = mins.into_iter().filter(|m| m.level() != 16).collect_vec();
+
+        for i in 1..maxs.len() {
+            let curr_min = mins[i];
+            let prev_max = maxs[i - 1];
+            assert!(prev_max <= curr_min);
+        }
+    } else {
+        root_process.gather_into(&max);
+        root_process.gather_into(&min);
     }
 }
 
@@ -76,33 +88,16 @@ fn test_global_bounds<T: RlstScalar + Equivalence + Float + SampleUniform>(
 
 /// Test that all leaves are mapped
 #[cfg(feature = "mpi")]
-fn test_n_leaves<T: RlstScalar + Equivalence + Float + SampleUniform>(
-    world: &SimpleCommunicator,
-    tree: &MultiNodeTree<T, SimpleCommunicator>,
-) {
-    let n_leaves = tree.n_leaves().unwrap();
-
-    let size = world.size() as usize;
-    let mut counts = vec![0usize; size];
-
-    world.all_gather_into(&n_leaves, &mut counts[..]);
-
-    let n_leaves_tot = counts.iter().sum::<usize>() as i32;
-    let expected = 8i32.pow(tree.depth() as u32);
-
-    if world.rank() == 0 {
-        assert_eq!(n_leaves_tot, expected)
-    }
-}
-
-/// Test that all leaves are mapped
-#[cfg(feature = "mpi")]
 fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
     world: &SimpleCommunicator,
     tree: &MultiNodeTree<T, SimpleCommunicator>,
     points_per_proc: usize,
 ) {
-    let n_points = tree.n_coordinates_tot().unwrap();
+    let mut n_points = 0;
+
+    for t in tree.trees.iter() {
+        n_points += t.n_coordinates_tot().unwrap();
+    }
 
     let size = world.size() as usize;
     let mut counts = vec![0usize; size];
@@ -120,6 +115,7 @@ fn test_n_points<T: RlstScalar + Equivalence + Float + SampleUniform>(
 #[cfg(feature = "mpi")]
 fn main() {
     // Setup an MPI environment
+    use kifmm::{traits::tree::MultiTree, tree::types::SortKind};
 
     let universe: Universe = mpi::initialize().unwrap();
     let world = universe.world();
@@ -127,14 +123,25 @@ fn main() {
 
     // Setup tree parameters
     let prune_empty = false;
-    let depth = 5;
     let n_points = 10000;
+    let local_depth = 3;
+    let global_depth = 1;
+    let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
 
     // Create a uniform tree
-    let uniform = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
+    let uniform = MultiNodeTree::new(
+        &comm,
+        points.data(),
+        local_depth,
+        global_depth,
+        None,
+        sort_kind,
+        prune_empty,
+    )
+    .unwrap();
 
     test_no_overlaps(&comm, &uniform);
     if world.rank() == 0 {
@@ -146,32 +153,9 @@ fn main() {
         println!("\t ... test_global_bounds passed on uniform tree");
     }
 
-    test_n_leaves(&comm, &uniform);
-    if world.rank() == 0 {
-        println!("\t ... test_n_leaves passed on uniform tree");
-    }
-
     test_n_points(&comm, &uniform, n_points);
     if world.rank() == 0 {
         println!("\t ... test_n_points passed on uniform tree");
-    }
-
-    let prune_empty = true;
-    let sparse = MultiNodeTree::new(points.data(), depth, prune_empty, None, &comm).unwrap();
-
-    test_no_overlaps(&comm, &sparse);
-    if world.rank() == 0 {
-        println!("\t ... test_no_overlaps passed on sparse tree");
-    }
-
-    test_global_bounds::<f32>(&comm);
-    if world.rank() == 0 {
-        println!("\t ... test_global_bounds passed on sparse tree");
-    }
-
-    test_n_points(&comm, &sparse, n_points);
-    if world.rank() == 0 {
-        println!("\t ... test_n_points passed on sparse tree");
     }
 }
 

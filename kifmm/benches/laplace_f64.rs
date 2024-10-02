@@ -1,11 +1,12 @@
 use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
-use kifmm::traits::fmm::{Fmm, SourceToTargetTranslation, TargetTranslation};
-use kifmm::traits::tree::{FmmTree, Tree};
+use kifmm::traits::field::{SourceToTargetTranslation, TargetTranslation};
+use kifmm::traits::fmm::{DataAccess, Evaluate};
+use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::points_fixture;
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
@@ -16,14 +17,14 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         .sample_size(10)
         .measurement_time(Duration::from_secs(15));
 
-    let nsources = 1000000;
-    let ntargets = 1000000;
-    let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-    let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+    let n_sources = 1000000;
+    let n_targets = 1000000;
+    let sources = points_fixture::<f64>(n_sources, None, None, Some(0));
+    let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
     let nvecs = 1;
-    let tmp = vec![1.0; nsources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+    let tmp = vec![1.0; n_sources * nvecs];
+    let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
     charges.data_mut().copy_from_slice(&tmp);
 
     // 6 Digits
@@ -44,7 +45,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(block_size),
             )
             .unwrap()
@@ -85,7 +86,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
             )
             .unwrap()
@@ -127,7 +128,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(block_size),
             )
             .unwrap()
@@ -168,7 +169,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
             )
             .unwrap()
@@ -210,7 +211,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(block_size),
             )
             .unwrap()
@@ -250,7 +251,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
             )
             .unwrap()

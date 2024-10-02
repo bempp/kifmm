@@ -6,7 +6,7 @@ use std::{
 
 use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
-    types::EvalType,
+    types::GreenKernelEvalType,
 };
 use itertools::Itertools;
 use num::{Float, Zero};
@@ -21,10 +21,11 @@ use crate::{
     fmm::{
         constants::DEFAULT_M2L_FFT_BLOCK_SIZE,
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
-        helpers::{
-            coordinate_index_pointer, flip3, homogenous_kernel_scale, leaf_expansion_pointers,
-            leaf_scales, leaf_surfaces, level_expansion_pointers, level_index_pointer,
-            ncoeffs_kifmm, potential_pointers,
+        helpers::single_node::{
+            coordinate_index_pointer_single_node, flip3, homogenous_kernel_scale,
+            leaf_expansion_pointers_single_node, leaf_scales_single_node,
+            leaf_surfaces_single_node, level_expansion_pointers_single_node,
+            level_index_pointer_single_node, ncoeffs_kifmm, potential_pointers_single_node,
         },
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
@@ -36,12 +37,12 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::{
-            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
-            SourceToTargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
+            SourceTranslationMetadata, TargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, FmmOperatorData, HomogenousKernel, SourceToTargetTranslation},
-        general::{AsComplex, Epsilon},
-        tree::{Domain as DomainTrait, FmmTree, FmmTreeNode, Tree},
+        fmm::{DataAccess, HomogenousKernel, Metadata, MetadataAccess},
+        general::single_node::{AsComplex, Epsilon},
+        tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
     tree::{
         constants::{
@@ -50,12 +51,12 @@ use crate::{
         helpers::find_corners,
         types::MortonKey,
     },
-    Fmm,
+    Evaluate,
 };
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
-fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
+pub fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
     singular_values: &[T],
     threshold: T,
     max_rank: usize,
@@ -70,13 +71,13 @@ fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
 
     len - 1
 }
-impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> SourceTranslationMetadata
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation,
+    Self: DataAccess,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -108,7 +109,7 @@ where
             // As well as estimating their inverses using SVD
             let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &upward_check_surface[..],
                 &upward_equivalent_surface[..],
                 uc2e.data_mut(),
@@ -161,7 +162,7 @@ where
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
                     ce2pc.data_mut(),
@@ -191,7 +192,16 @@ where
         self.uc2e_inv_1 = uc2e_inv_1;
         self.uc2e_inv_2 = uc2e_inv_2;
     }
+}
 
+impl<Scalar, FieldTranslation> TargetTranslationMetadata
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
+where
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+    Self: DataAccess,
+{
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
 
@@ -222,7 +232,7 @@ where
             // As well as estimating their inverses using SVD
             let mut dc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &downward_check_surface[..],
                 &downward_equivalent_surface[..],
                 dc2e.data_mut(),
@@ -270,7 +280,7 @@ where
                 let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
                     pe2cc.data_mut(),
@@ -300,13 +310,13 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> SourceAndTargetTranslationMetadata
-    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> SourceTranslationMetadata
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation,
+    Self: Evaluate,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -352,7 +362,7 @@ where
             // As well as estimating their inverses using SVD
             let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &upward_check_surface[..],
                 &upward_equivalent_surface[..],
                 uc2e.data_mut(),
@@ -430,7 +440,7 @@ where
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
 
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
                     ce2pc.data_mut(),
@@ -458,7 +468,16 @@ where
         self.source = source;
         self.source_vec = source_vec;
     }
+}
 
+impl<Scalar, FieldTranslation> TargetTranslationMetadata
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
+where
+    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    <Scalar as RlstScalar>::Real: Default,
+    Self: Evaluate,
+{
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
 
@@ -504,7 +523,7 @@ where
             // As well as estimating their inverses using SVD
             let mut dc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
             self.kernel.assemble_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &downward_check_surface[..],
                 &downward_equivalent_surface[..],
                 dc2e.data_mut(),
@@ -574,7 +593,7 @@ where
                 let mut pe2cc =
                     rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
                     pe2cc.data_mut(),
@@ -607,16 +626,25 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-        for level in 2..=self.tree.source_tree().depth() {
+        for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
-            let nsources = sources.len();
+            let n_sources = sources.len();
             let m2l_operator_index = self.m2l_operator_index(level);
-            let sentinel = nsources;
+            let sentinel = n_sources;
 
-            let result = vec![vec![sentinel; nsources]; 316];
+            let result = vec![vec![sentinel; n_sources]; 316];
             let result = result.into_iter().map(RwLock::new).collect_vec();
 
             sources
@@ -732,19 +760,19 @@ where
                         self.tree.source_tree().domain(),
                         alpha,
                     );
-                    let nsources = ncoeffs_kifmm(equivalent_surface_order);
+                    let n_sources = ncoeffs_kifmm(equivalent_surface_order);
 
                     let target_check_surface = t.target.surface_grid(
                         check_surface_order,
                         self.tree.source_tree().domain(),
                         alpha,
                     );
-                    let ntargets = ncoeffs_kifmm(check_surface_order);
+                    let n_targets = ncoeffs_kifmm(check_surface_order);
 
-                    let mut tmp_gram = rlst_dynamic_array2!(Scalar, [ntargets, nsources]);
+                    let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_targets, n_sources]);
 
                     self.kernel.assemble_st(
-                        EvalType::Value,
+                        GreenKernelEvalType::Value,
                         &target_check_surface[..],
                         &source_equivalent_surface[..],
                         tmp_gram.data_mut(),
@@ -779,7 +807,7 @@ where
                         .simple_mult_into_resize(sigma_mat.view(), vt.view());
 
                     let cutoff_rank =
-                        find_cutoff_rank(&sigma, self.source_to_target.threshold, nsources);
+                        find_cutoff_rank(&sigma, self.source_to_target.threshold, n_sources);
 
                     let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
                     let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
@@ -817,10 +845,19 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-        for level in 2..=self.tree.source_tree().depth() {
+        for level in start_level..=self.tree.source_tree().depth() {
             let targets = self.tree.target_tree().keys(level).unwrap();
             let targets_parents: HashSet<MortonKey<_>> =
                 targets.iter().map(|target| target.parent()).collect();
@@ -1372,65 +1409,79 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
-        for level in 2..=self.tree.source_tree().depth() {
-            let sources = self.tree.source_tree().keys(level).unwrap();
-            let nsources = sources.len();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-            let sentinel = nsources;
-            let result = vec![vec![sentinel; nsources]; 316];
-            let result = result.into_iter().map(RwLock::new).collect_vec();
+        for level in start_level..=self.tree.source_tree().depth() {
+            let mut result = Vec::default();
 
-            sources
-                .into_par_iter()
-                .enumerate()
-                .for_each(|(source_idx, source)| {
-                    // Find interaction list of each source, as this defines scatter locations
-                    let interaction_list = source
-                        .parent()
-                        .neighbors()
-                        .iter()
-                        .flat_map(|pn| pn.children())
-                        .filter(|pnc| {
-                            !source.is_adjacent(pnc)
-                                && self
-                                    .tree
-                                    .target_tree()
-                                    .all_keys_set()
-                                    .unwrap()
-                                    .contains(pnc)
-                        })
-                        .collect_vec();
+            if let Some(sources) = self.tree.source_tree().keys(level) {
+                let n_sources = sources.len();
+                let sentinel = n_sources;
+                let tmp = vec![vec![sentinel; n_sources]; 316];
+                result = tmp.into_iter().map(RwLock::new).collect_vec();
 
-                    let transfer_vectors = interaction_list
-                        .iter()
-                        .map(|target| source.find_transfer_vector(target).unwrap())
-                        .collect_vec();
+                sources
+                    .into_par_iter()
+                    .enumerate()
+                    .for_each(|(source_idx, source)| {
+                        // Find interaction list of each source, as this defines scatter locations
+                        let interaction_list = source
+                            .parent()
+                            .neighbors()
+                            .iter()
+                            .flat_map(|pn| pn.children())
+                            .filter(|pnc| {
+                                !source.is_adjacent(pnc)
+                                    && self
+                                        .tree
+                                        .target_tree()
+                                        .all_keys_set()
+                                        .unwrap()
+                                        .contains(pnc)
+                            })
+                            .collect_vec();
 
-                    let mut transfer_vectors_map = HashMap::new();
-                    for (i, v) in transfer_vectors.iter().enumerate() {
-                        transfer_vectors_map.insert(v, i);
-                    }
+                        let transfer_vectors = interaction_list
+                            .iter()
+                            .map(|target| source.find_transfer_vector(target).unwrap())
+                            .collect_vec();
 
-                    let transfer_vectors_set: HashSet<_> =
-                        transfer_vectors.iter().cloned().collect();
-
-                    // Mark items in interaction list for scattering
-                    for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
-                        let mut result_lock = result[tv_idx].write().unwrap();
-                        if transfer_vectors_set.contains(&tv.hash) {
-                            // Look up scatter location in target tree
-                            let target =
-                                &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
-                            let &target_idx = self.level_index_pointer_locals[level as usize]
-                                .get(target)
-                                .unwrap();
-                            result_lock[source_idx] = target_idx;
+                        let mut transfer_vectors_map = HashMap::new();
+                        for (i, &v) in transfer_vectors.iter().enumerate() {
+                            transfer_vectors_map.insert(v, i);
                         }
-                    }
-                });
+
+                        let transfer_vectors_set: HashSet<_> =
+                            transfer_vectors.into_iter().collect();
+
+                        // Mark items in interaction list for scattering
+                        for (tv_idx, tv) in
+                            self.source_to_target.transfer_vectors.iter().enumerate()
+                        {
+                            let mut result_lock = result[tv_idx].write().unwrap();
+                            if transfer_vectors_set.contains(&tv.hash) {
+                                // Look up scatter location in target tree
+                                let target =
+                                    &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                                let &target_idx = self.level_index_pointer_locals[level as usize]
+                                    .get(target)
+                                    .unwrap();
+                                result_lock[source_idx] = target_idx;
+                            }
+                        }
+                    });
+            }
 
             displacements.push(result);
         }
@@ -1482,7 +1533,7 @@ where
                 let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
 
                 self.kernel.assemble_st(
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     &target_check_surface[..],
                     &source_equivalent_surface[..],
                     tmp_gram.data_mut(),
@@ -1522,9 +1573,9 @@ where
                         target_rank = n_components
                     } else {
                         let max_equivalent_surface_ncoeffs =
-                            self.ncoeffs_equivalent_surface.iter().max().unwrap();
+                            self.n_coeffs_equivalent_surface.iter().max().unwrap();
                         let max_check_surface_ncoeffs =
-                            self.ncoeffs_check_surface.iter().max().unwrap();
+                            self.n_coeffs_check_surface.iter().max().unwrap();
                         target_rank =
                             max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
                     }
@@ -1595,9 +1646,9 @@ where
                         } else {
                             // Estimate target rank
                             let max_equivalent_surface_ncoeffs =
-                                self.ncoeffs_equivalent_surface.iter().max().unwrap();
+                                self.n_coeffs_equivalent_surface.iter().max().unwrap();
                             let max_check_surface_ncoeffs =
-                                self.ncoeffs_check_surface.iter().max().unwrap();
+                                self.n_coeffs_check_surface.iter().max().unwrap();
                             target_rank =
                                 max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
                         }
@@ -1758,7 +1809,7 @@ where
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
         self.kernel.assemble_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             convolution_grid,
             &target_pt,
             &mut kernel_evals[..],
@@ -1871,54 +1922,68 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
-        for level in 2..=self.tree.source_tree().depth() {
-            let targets = self.tree.target_tree().keys(level).unwrap();
-            let targets_parents: HashSet<MortonKey<_>> =
-                targets.iter().map(|target| target.parent()).collect();
-            let mut targets_parents = targets_parents.into_iter().collect_vec();
-            targets_parents.sort();
-            let ntargets_parents = targets_parents.len();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
 
-            let sources = self.tree.source_tree().keys(level).unwrap();
+        for level in start_level..=self.tree.source_tree().depth() {
+            let mut result = Vec::default();
+            if let Some(targets) = self.tree.target_tree().keys(level) {
+                if let Some(sources) = self.tree.source_tree().keys(level) {
+                    let targets_parents: HashSet<MortonKey<_>> =
+                        targets.iter().map(|target| target.parent()).collect();
+                    let mut targets_parents = targets_parents.into_iter().collect_vec();
+                    targets_parents.sort();
+                    let ntargets_parents = targets_parents.len();
 
-            let sources_parents: HashSet<MortonKey<_>> =
-                sources.iter().map(|source| source.parent()).collect();
-            let mut sources_parents = sources_parents.into_iter().collect_vec();
-            sources_parents.sort();
-            let nsources_parents = sources_parents.len();
+                    let sources_parents: HashSet<MortonKey<_>> =
+                        sources.iter().map(|source| source.parent()).collect();
+                    let mut sources_parents = sources_parents.into_iter().collect_vec();
+                    sources_parents.sort();
+                    let nsources_parents = sources_parents.len();
 
-            let result = vec![Vec::new(); NHALO];
-            let result = result.into_iter().map(RwLock::new).collect_vec();
+                    let tmp = vec![Vec::new(); NHALO];
+                    result = tmp.into_iter().map(RwLock::new).collect_vec();
 
-            let targets_parents_neighbors = targets_parents
-                .iter()
-                .map(|parent| parent.all_neighbors())
-                .collect_vec();
+                    let targets_parents_neighbors = targets_parents
+                        .iter()
+                        .map(|parent| parent.all_neighbors())
+                        .collect_vec();
 
-            let zero_displacement = nsources_parents * NSIBLINGS;
+                    let zero_displacement = nsources_parents * NSIBLINGS;
 
-            (0..NHALO).into_par_iter().for_each(|i| {
-                let mut result_i = result[i].write().unwrap();
-                for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents) {
-                    // Check if neighbor exists in a valid tree
-                    if let Some(neighbor) = all_neighbors[i] {
-                        // If it does, check if first child exists in the source tree
-                        let first_child = neighbor.first_child();
-                        if let Some(neighbor_displacement) =
-                            self.level_index_pointer_multipoles[level as usize].get(&first_child)
+                    (0..NHALO).into_par_iter().for_each(|i| {
+                        let mut result_i = result[i].write().unwrap();
+                        for all_neighbors in targets_parents_neighbors.iter().take(ntargets_parents)
                         {
-                            result_i.push(*neighbor_displacement)
-                        } else {
-                            result_i.push(zero_displacement)
+                            // Check if neighbor exists in a valid tree
+                            if let Some(neighbor) = all_neighbors[i] {
+                                // If it does, check if first child exists in the source tree
+                                let first_child = neighbor.first_child();
+                                if let Some(neighbor_displacement) =
+                                    self.level_index_pointer_multipoles[level as usize]
+                                        .get(&first_child)
+                                {
+                                    result_i.push(*neighbor_displacement)
+                                } else {
+                                    result_i.push(zero_displacement)
+                                }
+                            } else {
+                                result_i.push(zero_displacement)
+                            }
                         }
-                    } else {
-                        result_i.push(zero_displacement)
-                    }
+                    });
                 }
-            });
+            }
 
             displacements.push(result);
         }
@@ -2176,11 +2241,11 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmOperatorData
-    for KiFmm<Scalar, Laplace3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> MetadataAccess
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
@@ -2236,11 +2301,11 @@ where
     }
 }
 
-impl<Scalar, SourceToTargetData> FmmOperatorData
-    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, SourceToTargetData>
+impl<Scalar, FieldTranslation> MetadataAccess
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
@@ -2280,143 +2345,139 @@ where
     }
 }
 
-impl<Scalar, Kernel, SourceToTargetData> FmmMetadata for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> Metadata for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: EvalType, charges: &[Self::Scalar]) {
+    fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]) {
         let alpha_outer = Scalar::real(ALPHA_OUTER);
         let alpha_inner = Scalar::real(ALPHA_INNER);
 
         // Check if computing potentials, or potentials and derivatives
-        let eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => self.dim + 1,
+        let kernel_eval_size = match eval_type {
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => self.dim + 1,
         };
 
-        let ntarget_points = self.tree.target_tree.all_coordinates().unwrap().len() / self.dim;
-        let nsource_points = self.tree.source_tree.all_coordinates().unwrap().len() / self.dim;
-        let nmatvecs = charges.len() / nsource_points;
-        let nsource_keys = self.tree.source_tree.n_keys_tot().unwrap();
-        let ntarget_keys = self.tree.target_tree.n_keys_tot().unwrap();
-        let ntarget_leaves = self.tree.target_tree.n_leaves().unwrap();
-        let nsource_leaves = self.tree.source_tree.n_leaves().unwrap();
+        let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
+        let n_source_points = self.tree.source_tree.n_coordinates_tot().unwrap();
+        let n_matvecs = charges.len() / n_source_points;
+        let n_source_keys = self.tree.source_tree.n_keys_tot().unwrap();
+        let n_target_keys = self.tree.target_tree.n_keys_tot().unwrap();
 
         // Buffers to store all multipole and local data
-        let nmultipole_coeffs;
-        let nlocal_coeffs;
+        let n_multipole_coeffs;
+        let n_local_coeffs;
         if self.equivalent_surface_order.len() > 1 {
-            nmultipole_coeffs = (0..=self.tree.source_tree().depth())
-                .zip(self.ncoeffs_equivalent_surface.iter())
+            n_multipole_coeffs = (0..=self.tree.source_tree().depth())
+                .zip(self.n_coeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
                     acc + self.tree.source_tree().n_keys(level).unwrap() * ncoeffs
                 });
 
-            nlocal_coeffs = (0..=self.tree.target_tree().depth())
-                .zip(self.ncoeffs_equivalent_surface.iter())
+            n_local_coeffs = (0..=self.tree.target_tree().depth())
+                .zip(self.n_coeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
                     acc + self.tree.target_tree().n_keys(level).unwrap() * ncoeffs
                 })
         } else {
-            nmultipole_coeffs = nsource_keys * self.ncoeffs_equivalent_surface.last().unwrap();
-            nlocal_coeffs = ntarget_keys * self.ncoeffs_equivalent_surface.last().unwrap();
+            n_multipole_coeffs = n_source_keys * self.n_coeffs_equivalent_surface.last().unwrap();
+            n_local_coeffs = n_target_keys * self.n_coeffs_equivalent_surface.last().unwrap();
         }
 
-        let multipoles = vec![Scalar::default(); nmultipole_coeffs * nmatvecs];
-        let locals = vec![Scalar::default(); nlocal_coeffs * nmatvecs];
+        let multipoles = vec![Scalar::default(); n_multipole_coeffs * n_matvecs];
+        let locals = vec![Scalar::default(); n_local_coeffs * n_matvecs];
 
         // Index pointers of multipole and local data, indexed by level
-        let level_index_pointer_multipoles = level_index_pointer(&self.tree.source_tree);
-        let level_index_pointer_locals = level_index_pointer(&self.tree.target_tree);
+        let level_index_pointer_multipoles =
+            level_index_pointer_single_node(&self.tree.source_tree);
+        let level_index_pointer_locals = level_index_pointer_single_node(&self.tree.target_tree);
 
         // Buffer to store evaluated potentials and/or gradients at target points
-        let potentials = vec![Scalar::default(); ntarget_points * eval_size * nmatvecs];
+        let potentials = vec![Scalar::default(); n_target_points * kernel_eval_size * n_matvecs];
 
         // Kernel scale at each target and source leaf
-        let source_leaf_scales = leaf_scales::<Scalar>(
+        let leaf_scales_sources = leaf_scales_single_node::<Scalar>(
             &self.tree.source_tree,
-            self.kernel.is_homogenous(),
-            *self.ncoeffs_check_surface.last().unwrap(),
+            *self.n_coeffs_check_surface.last().unwrap(),
         );
 
         // Pre compute check surfaces
-        let leaf_upward_equivalent_surfaces_sources = leaf_surfaces(
+        let leaf_upward_equivalent_surfaces_sources = leaf_surfaces_single_node(
             &self.tree.source_tree,
-            *self.ncoeffs_equivalent_surface.last().unwrap(),
+            *self.n_coeffs_equivalent_surface.last().unwrap(),
             alpha_inner,
             *self.equivalent_surface_order.last().unwrap(),
         );
 
-        let leaf_upward_check_surfaces_sources = leaf_surfaces(
+        let leaf_upward_check_surfaces_sources = leaf_surfaces_single_node(
             &self.tree.source_tree,
-            *self.ncoeffs_check_surface.last().unwrap(),
+            *self.n_coeffs_check_surface.last().unwrap(),
             alpha_outer,
             *self.check_surface_order.last().unwrap(),
         );
 
-        let leaf_downward_equivalent_surfaces_targets = leaf_surfaces(
+        let leaf_downward_equivalent_surfaces_targets = leaf_surfaces_single_node(
             &self.tree.target_tree,
-            *self.ncoeffs_equivalent_surface.last().unwrap(),
+            *self.n_coeffs_equivalent_surface.last().unwrap(),
             alpha_outer,
             *self.equivalent_surface_order.last().unwrap(),
         );
 
         // Mutable pointers to multipole and local data, indexed by level
-        let level_multipoles = level_expansion_pointers(
+        let level_multipoles = level_expansion_pointers_single_node(
             &self.tree.source_tree,
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
+            &self.n_coeffs_equivalent_surface,
+            n_matvecs,
             &multipoles,
         );
 
-        let level_locals = level_expansion_pointers(
-            &self.tree.target_tree,
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
+        let level_locals = level_expansion_pointers_single_node(
+            &self.tree.source_tree,
+            &self.n_coeffs_equivalent_surface,
+            n_matvecs,
             &locals,
         );
 
         // Mutable pointers to multipole and local data only at leaf level
-        let leaf_multipoles = leaf_expansion_pointers(
+        let leaf_multipoles = leaf_expansion_pointers_single_node(
             &self.tree.source_tree,
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
-            nsource_leaves,
+            &self.n_coeffs_equivalent_surface,
+            n_matvecs,
             &multipoles,
         );
 
-        let leaf_locals = leaf_expansion_pointers(
+        let leaf_locals = leaf_expansion_pointers_single_node(
             &self.tree.target_tree,
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
-            ntarget_leaves,
+            &self.n_coeffs_equivalent_surface,
+            n_matvecs,
             &locals,
         );
 
         // Mutable pointers to potential data at each target leaf
-        let potentials_send_pointers = potential_pointers(
+        let potentials_send_pointers = potential_pointers_single_node(
             &self.tree.target_tree,
-            nmatvecs,
-            ntarget_leaves,
-            ntarget_points,
-            eval_size,
+            n_matvecs,
+            kernel_eval_size,
             &potentials,
         );
 
         // Index pointer of charge data at each target leaf
-        let charge_index_pointer_targets = coordinate_index_pointer(&self.tree.target_tree);
-        let charge_index_pointer_sources = coordinate_index_pointer(&self.tree.source_tree);
+        let charge_index_pointer_targets =
+            coordinate_index_pointer_single_node(&self.tree.target_tree);
+        let charge_index_pointer_sources =
+            coordinate_index_pointer_single_node(&self.tree.source_tree);
 
         // Set data
         self.multipoles = multipoles;
-        self.locals = locals;
         self.leaf_multipoles = leaf_multipoles;
         self.level_multipoles = level_multipoles;
+        self.locals = locals;
         self.leaf_locals = leaf_locals;
         self.level_locals = level_locals;
         self.level_index_pointer_locals = level_index_pointer_locals;
@@ -2429,8 +2490,8 @@ where
         self.charges = charges.to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
-        self.leaf_scales_sources = source_leaf_scales;
-        self.kernel_eval_size = eval_size;
+        self.leaf_scales_sources = leaf_scales_sources;
+        self.kernel_eval_size = kernel_eval_size;
     }
 }
 
@@ -2449,7 +2510,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for FftFieldTranslation<Scalar>
+impl<Scalar> FieldTranslationTrait for FftFieldTranslation<Scalar>
 where
     Scalar: RlstScalar + AsComplex + Default + Dft,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
@@ -2489,7 +2550,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationSaRcmp<Scalar>
+impl<Scalar> FieldTranslationTrait for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -2522,7 +2583,7 @@ where
     }
 }
 
-impl<Scalar> SourceToTargetDataTrait for BlasFieldTranslationIa<Scalar>
+impl<Scalar> FieldTranslationTrait for BlasFieldTranslationIa<Scalar>
 where
     Scalar: RlstScalar,
 {
@@ -2548,9 +2609,9 @@ mod test {
     use rlst::RandomAccessByRef;
     use rlst::RandomAccessMut;
 
-    use crate::fmm::helpers::flip3;
+    use crate::fmm::helpers::single_node::flip3;
+    use crate::traits::fmm::DataAccess;
     use crate::tree::helpers::points_fixture;
-    use crate::Fmm;
     use crate::SingleNodeBuilder;
 
     use super::*;
@@ -2558,10 +2619,10 @@ mod test {
     #[test]
     fn test_blas_field_translation_laplace() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -2572,7 +2633,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
@@ -2582,7 +2643,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(Some(1e-5), None, FmmSvdMode::Deterministic),
             )
             .unwrap()
@@ -2605,8 +2666,8 @@ mod test {
         let c_u = &fmm.source_to_target.metadata[0].c_u[c_idx];
         let c_vt = &fmm.source_to_target.metadata[0].c_vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs_equivalent_surface(level), 1]);
-        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2639,10 +2700,10 @@ mod test {
             alpha,
         );
 
-        let mut direct = vec![0f64; fmm.ncoeffs_check_surface(level)];
+        let mut direct = vec![0f64; fmm.n_coeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &sources[..],
             &targets[..],
             multipole.data(),
@@ -2663,10 +2724,10 @@ mod test {
     #[test]
     fn test_blas_field_translation_helmholtz() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -2678,7 +2739,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
@@ -2688,7 +2749,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(None, None),
             )
             .unwrap()
@@ -2726,8 +2787,8 @@ mod test {
         let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
         let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs_equivalent_surface(level), 1]);
-        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -2742,10 +2803,10 @@ mod test {
             source.surface_grid(fmm.equivalent_surface_order(level), &fmm.tree.domain, alpha);
         let targets = target.surface_grid(fmm.check_surface_order(level), &fmm.tree.domain, alpha);
 
-        let mut direct = vec![c64::zero(); fmm.ncoeffs_check_surface(level)];
+        let mut direct = vec![c64::zero(); fmm.n_coeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &sources[..],
             &targets[..],
             multipole.data(),
@@ -2828,10 +2889,10 @@ mod test {
     #[test]
     fn test_fft_field_translation_laplace() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -2842,7 +2903,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
@@ -2852,7 +2913,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -2862,9 +2923,9 @@ mod test {
         let level = 3;
         let coeff_idx = fmm.c2e_operator_index(level);
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.ncoeffs_equivalent_surface(level), 1]);
+        let mut multipole = rlst_dynamic_array2!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
-        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
+        for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
 
@@ -2898,7 +2959,7 @@ mod test {
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
-        let ntargets = target_check_surface.len() / 3;
+        let n_targets = target_check_surface.len() / 3;
 
         // Compute conv grid
         let conv_point_corner_index = 7;
@@ -2965,7 +3026,7 @@ mod test {
             &plan,
         );
 
-        let mut result = vec![0f64; ntargets];
+        let mut result = vec![0f64; n_targets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_idx]
             .iter()
             .enumerate()
@@ -2974,9 +3035,9 @@ mod test {
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![0f64; fmm.ncoeffs_check_surface(level)];
+        let mut direct = vec![0f64; fmm.n_coeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &source_equivalent_surface[..],
             &target_check_surface[..],
             multipole.data(),
@@ -2996,10 +3057,10 @@ mod test {
     #[test]
     fn test_fft_field_translation_helmholtz() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -3011,7 +3072,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new()
@@ -3021,7 +3082,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -3030,9 +3091,9 @@ mod test {
 
         let level = 2;
         let coeff_index = fmm.expansion_index(level);
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.ncoeffs_equivalent_surface(level), 1]);
+        let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
-        for i in 0..fmm.ncoeffs_equivalent_surface(level) {
+        for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
 
@@ -3074,7 +3135,7 @@ mod test {
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
-        let ntargets = target_check_surface.len() / 3;
+        let n_targets = target_check_surface.len() / 3;
 
         // Compute conv grid
         let conv_point_corner_index = 7;
@@ -3141,7 +3202,7 @@ mod test {
             &plan,
         );
 
-        let mut result = vec![c64::zero(); ntargets];
+        let mut result = vec![c64::zero(); n_targets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_index]
             .iter()
             .enumerate()
@@ -3150,9 +3211,9 @@ mod test {
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![c64::zero(); fmm.ncoeffs_check_surface(level)];
+        let mut direct = vec![c64::zero(); fmm.n_coeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &source_equivalent_surface[..],
             &target_check_surface[..],
             multipole.data(),

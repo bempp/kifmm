@@ -1,5 +1,5 @@
 //! Implementations of constructors and transformation methods for Morton keys, as well as traits for sorting, and handling containers of Morton keys.
-use crate::fmm::helpers::ncoeffs_kifmm;
+use crate::fmm::helpers::single_node::ncoeffs_kifmm;
 use crate::traits::tree::{FmmTreeNode, TreeNode};
 use crate::tree::{
     constants::{
@@ -646,6 +646,22 @@ where
         ancestors.insert(current);
 
         while current.level() > 0 {
+            current = current.parent();
+            ancestors.insert(current);
+        }
+
+        ancestors
+    }
+
+    /// Return set of all ancestors of this Morton Key up to a specified level
+    pub fn ancestors_to_level(&self, level: u64) -> HashSet<MortonKey<T>> {
+        let mut ancestors = HashSet::<MortonKey<_>>::new();
+
+        let mut current = *self;
+
+        ancestors.insert(current);
+
+        while current.level() > level {
             current = current.parent();
             ancestors.insert(current);
         }

@@ -225,9 +225,9 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * - `nexpansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -246,9 +246,9 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
                                                 uintptr_t nexpansion_order,
                                                 bool eval_type,
                                                 const void *sources,
-                                                uintptr_t nsources,
+                                                uintptr_t n_sources,
                                                 const void *targets,
-                                                uintptr_t ntargets,
+                                                uintptr_t n_targets,
                                                 const void *charges,
                                                 uintptr_t ncharges,
                                                 bool prune_empty,
@@ -272,9 +272,9 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  * - `nexpansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -293,9 +293,9 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
                                                 uintptr_t nexpansion_order,
                                                 bool eval_type,
                                                 const void *sources,
-                                                uintptr_t nsources,
+                                                uintptr_t n_sources,
                                                 const void *targets,
-                                                uintptr_t ntargets,
+                                                uintptr_t n_targets,
                                                 const void *charges,
                                                 uintptr_t ncharges,
                                                 bool prune_empty,
@@ -319,9 +319,9 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  * - `nexpansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -342,9 +342,9 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
                                                  uintptr_t nexpansion_order,
                                                  bool eval_type,
                                                  const void *sources,
-                                                 uintptr_t nsources,
+                                                 uintptr_t n_sources,
                                                  const void *targets,
-                                                 uintptr_t ntargets,
+                                                 uintptr_t n_targets,
                                                  const void *charges,
                                                  uintptr_t ncharges,
                                                  bool prune_empty,
@@ -370,9 +370,9 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  * - `nexpansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -393,9 +393,9 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
                                                  uintptr_t nexpansion_order,
                                                  bool eval_type,
                                                  const void *sources,
-                                                 uintptr_t nsources,
+                                                 uintptr_t n_sources,
                                                  const void *targets,
-                                                 uintptr_t ntargets,
+                                                 uintptr_t n_targets,
                                                  const void *charges,
                                                  uintptr_t ncharges,
                                                  bool prune_empty,
@@ -420,9 +420,9 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  * - `nexpansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -440,9 +440,9 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
                                            bool eval_type,
                                            const void *sources,
-                                           uintptr_t nsources,
+                                           uintptr_t n_sources,
                                            const void *targets,
-                                           uintptr_t ntargets,
+                                           uintptr_t n_targets,
                                            const void *charges,
                                            uintptr_t ncharges,
                                            bool prune_empty,
@@ -463,9 +463,9 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `nexpansion_order`: The number of expansion orders.
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -483,9 +483,9 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
                                            uintptr_t nexpansion_order,
                                            bool eval_type,
                                            const void *sources,
-                                           uintptr_t nsources,
+                                           uintptr_t n_sources,
                                            const void *targets,
-                                           uintptr_t ntargets,
+                                           uintptr_t n_targets,
                                            const void *charges,
                                            uintptr_t ncharges,
                                            bool prune_empty,
@@ -509,9 +509,9 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -531,9 +531,9 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
                                                   bool eval_type,
                                                   float wavenumber,
                                                   const void *sources,
-                                                  uintptr_t nsources,
+                                                  uintptr_t n_sources,
                                                   const void *targets,
-                                                  uintptr_t ntargets,
+                                                  uintptr_t n_targets,
                                                   const void *charges,
                                                   uintptr_t ncharges,
                                                   bool prune_empty,
@@ -558,9 +558,9 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -580,9 +580,9 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
                                                   bool eval_type,
                                                   double wavenumber,
                                                   const void *sources,
-                                                  uintptr_t nsources,
+                                                  uintptr_t n_sources,
                                                   const void *targets,
-                                                  uintptr_t ntargets,
+                                                  uintptr_t n_targets,
                                                   const void *charges,
                                                   uintptr_t ncharges,
                                                   bool prune_empty,
@@ -606,9 +606,9 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -627,9 +627,9 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
                                              bool eval_type,
                                              float wavenumber,
                                              const void *sources,
-                                             uintptr_t nsources,
+                                             uintptr_t n_sources,
                                              const void *targets,
-                                             uintptr_t ntargets,
+                                             uintptr_t n_targets,
                                              const void *charges,
                                              uintptr_t ncharges,
                                              bool prune_empty,
@@ -652,9 +652,9 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
@@ -673,9 +673,9 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              bool eval_type,
                                              double wavenumber,
                                              const void *sources,
-                                             uintptr_t nsources,
+                                             uintptr_t n_sources,
                                              const void *targets,
-                                             uintptr_t ntargets,
+                                             uintptr_t n_targets,
                                              const void *charges,
                                              uintptr_t ncharges,
                                              bool prune_empty,
@@ -837,9 +837,9 @@ struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
- * - `nsources`: The length of the source points buffer
+ * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
- * - `ntargets`: The length of the target points buffer.
+ * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
  * - `ncharges`: The length of the charges buffer.
  * - `result`: A pointer to the results associated with the target points.
@@ -853,9 +853,9 @@ struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
 void evaluate_kernel_st(struct FmmEvaluator *fmm,
                         bool eval_type,
                         const void *sources,
-                        uintptr_t nsources,
+                        uintptr_t n_sources,
                         const void *targets,
-                        uintptr_t ntargets,
+                        uintptr_t n_targets,
                         const void *charges,
                         uintptr_t ncharges,
                         void *result,
