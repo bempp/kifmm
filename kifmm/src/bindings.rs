@@ -271,7 +271,7 @@ pub unsafe extern "C" fn free_fmm_evaluator(fmm_p: *mut FmmEvaluator) {
 pub mod constructors {
     use std::ffi::c_void;
 
-    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::EvalType};
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
 
     use crate::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 
@@ -327,9 +327,9 @@ pub mod constructors {
         surface_diff: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
@@ -427,9 +427,9 @@ pub mod constructors {
         surface_diff: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
@@ -531,9 +531,9 @@ pub mod constructors {
         n_oversamples: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
@@ -647,9 +647,9 @@ pub mod constructors {
         n_oversamples: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
@@ -756,9 +756,9 @@ pub mod constructors {
         block_size: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
@@ -844,9 +844,9 @@ pub mod constructors {
         block_size: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
@@ -938,9 +938,9 @@ pub mod constructors {
         surface_diff: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
@@ -1036,9 +1036,9 @@ pub mod constructors {
         surface_diff: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
@@ -1132,9 +1132,9 @@ pub mod constructors {
         block_size: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, nsources) };
@@ -1223,9 +1223,9 @@ pub mod constructors {
         block_size: usize,
     ) -> *mut FmmEvaluator {
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, nsources) };
@@ -1272,7 +1272,9 @@ pub mod constructors {
 pub mod api {
     use std::{mem::ManuallyDrop, os::raw::c_void};
 
-    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::EvalType};
+    use green_kernels::{
+        helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType,
+    };
     use itertools::Itertools;
 
     use crate::{
@@ -3370,9 +3372,9 @@ pub mod api {
         let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
         let pointer = unsafe { (*fmm).get_pointer() };
         let eval_type = if eval_type {
-            EvalType::Value
+            GreenKernelEvalType::Value
         } else {
-            EvalType::ValueDeriv
+            GreenKernelEvalType::ValueDeriv
         };
 
         match ctype {

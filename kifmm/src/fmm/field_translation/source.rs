@@ -1,7 +1,7 @@
 //! Multipole expansion translations
 use std::collections::HashSet;
 
-use green_kernels::{traits::Kernel as KernelTrait, types::EvalType};
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
 use rayon::prelude::*;
 
@@ -78,7 +78,7 @@ where
 
                             if nsources > 0 {
                                 self.kernel.evaluate_st(
-                                    EvalType::Value,
+                                    GreenKernelEvalType::Value,
                                     coordinates_row_major,
                                     upward_check_surface,
                                     charges,
@@ -179,7 +179,7 @@ where
                                         ..(i + 1) * ncoeffs_check_surface];
 
                                     self.kernel.evaluate_st(
-                                        EvalType::Value,
+                                        GreenKernelEvalType::Value,
                                         coordinates_row_major,
                                         upward_check_surface,
                                         charges_i,

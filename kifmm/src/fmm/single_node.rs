@@ -337,7 +337,7 @@ where
 mod test {
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
-        types::EvalType,
+        types::GreenKernelEvalType,
     };
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -361,7 +361,7 @@ mod test {
                 Tree = SingleNodeFmmTree<T::Real>,
             >,
         >,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         threshold: T::Real,
@@ -369,8 +369,8 @@ mod test {
         T::Real: Default,
     {
         let eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => 4,
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
         };
 
         let leaf_idx = 0;
@@ -410,7 +410,7 @@ mod test {
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T::Real,
@@ -418,8 +418,8 @@ mod test {
         T::Real: Default,
     {
         let eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => 4,
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
         };
 
         let leaf_idx = 0;
@@ -459,7 +459,7 @@ mod test {
         fmm: Box<
             dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
         >,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
         threshold: T::Real,
@@ -467,8 +467,8 @@ mod test {
         T::Real: Default,
     {
         let eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => 4,
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
         };
 
         let leaf_idx = 0;
@@ -510,7 +510,7 @@ mod test {
                 Tree = SingleNodeFmmTree<T::Real>,
             >,
         >,
-        eval_type: EvalType,
+        eval_type: GreenKernelEvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         threshold: T::Real,
@@ -518,8 +518,8 @@ mod test {
         T::Real: Default,
     {
         let eval_size = match eval_type {
-            EvalType::Value => 1,
-            EvalType::ValueDeriv => 4,
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
         };
 
         let leaf_idx = 0;
@@ -590,7 +590,7 @@ mod test {
             );
 
             fmm.kernel().evaluate_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 sources.data(),
                 &test_point,
                 charges_i,
@@ -598,7 +598,7 @@ mod test {
             );
 
             fmm.kernel().evaluate_st(
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 &upward_equivalent_surface,
                 &test_point,
                 multipole_i,
@@ -640,7 +640,7 @@ mod test {
         let mut found = vec![T::zero()];
 
         fmm.kernel().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             sources.data(),
             &test_point,
             charges.data(),
@@ -648,7 +648,7 @@ mod test {
         );
 
         fmm.kernel().evaluate_st(
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &upward_equivalent_surface,
             &test_point,
             multipole,
@@ -696,7 +696,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -712,7 +712,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
                     svd_threshold,
                     None,
@@ -763,7 +763,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
                     svd_threshold,
                     None,
@@ -811,7 +811,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Laplace3dKernel::new(),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
             )
             .unwrap()
@@ -829,7 +829,7 @@ mod test {
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
             fmm,
-            EvalType::Value,
+            GreenKernelEvalType::Value,
             &sources,
             &charges,
             threshold_pot,
@@ -874,7 +874,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Laplace3dKernel::new(),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
@@ -899,7 +899,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Laplace3dKernel::new(),
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
@@ -921,7 +921,7 @@ mod test {
         // BLAS based field translation
         {
             // Evaluate potentials
-            let eval_type = EvalType::Value;
+            let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -950,7 +950,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
+            let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1010,7 +1010,7 @@ mod test {
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
-            let eval_type = EvalType::Value;
+            let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1040,7 +1040,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
+            let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1099,7 +1099,7 @@ mod test {
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
-            let eval_type = EvalType::Value;
+            let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1160,7 +1160,7 @@ mod test {
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
-            let eval_type = EvalType::Value;
+            let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1190,7 +1190,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
+            let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1253,7 +1253,7 @@ mod test {
                 charges.data(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
-                EvalType::Value,
+                GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
             )
             .unwrap()
@@ -1299,7 +1299,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
@@ -1321,7 +1321,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
@@ -1349,7 +1349,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
@@ -1371,7 +1371,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
@@ -1424,7 +1424,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
@@ -1446,7 +1446,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
@@ -1474,7 +1474,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
@@ -1496,7 +1496,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
@@ -1550,7 +1550,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff),
                 )
                 .unwrap()
@@ -1573,7 +1573,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::ValueDeriv,
+                    GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None),
                 )
                 .unwrap()
@@ -1626,7 +1626,7 @@ mod test {
                     charges.data(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
-                    EvalType::Value,
+                    GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff),
                 )
                 .unwrap()
@@ -1676,7 +1676,7 @@ mod test {
         // fmm with blas based field translation
         {
             // Evaluate potentials
-            let eval_type = EvalType::Value;
+            let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1702,7 +1702,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
+            let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1766,7 +1766,7 @@ mod test {
         // fmm with blas based field translation
         {
             // Evaluate potentials
-            let eval_type = EvalType::Value;
+            let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
@@ -1788,7 +1788,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let eval_type = EvalType::ValueDeriv;
+            let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new()
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
