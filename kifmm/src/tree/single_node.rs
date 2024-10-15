@@ -364,8 +364,6 @@ where
         global_indices: &[usize],
         root: MortonKey<T>,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
-
-
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
 
@@ -381,7 +379,6 @@ where
             let ancestors = base_key.ancestors();
 
             if ancestors.contains(&root) {
-
                 points.push(Point {
                     coordinate: *coord,
                     base_key,
@@ -1340,7 +1337,6 @@ mod test {
 
     #[test]
     fn test_uniform_tree_from_root() {
-
         let n_points = 1000;
         let depth = 2;
 
@@ -1350,7 +1346,9 @@ mod test {
         // Test data distributed over domain
         let points = points_fixture(n_points, Some(0.), Some(1.0), None);
         let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None).unwrap();
+        let tree =
+            SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None)
+                .unwrap();
 
         // Test that only points contained within specified root node are mapped to this tree.
         assert!(tree.all_points().unwrap().len() < n_points);
@@ -1358,11 +1356,12 @@ mod test {
         // Test data contained in first child
         let points = points_fixture(n_points, Some(0.), Some(0.5), None);
         let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None).unwrap();
+        let tree =
+            SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None)
+                .unwrap();
 
         // Test that only points contained within specified root node are mapped to this tree.
         assert_eq!(tree.all_points().unwrap().len(), n_points);
-
     }
 
     pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T>])
@@ -1430,7 +1429,6 @@ mod test {
 
     #[test]
     pub fn test_assign_nodes_to_points_with_index_map() {
-
         let root = MortonKey::<f64>::root();
 
         // Generate points in a single octant of the domain
@@ -1452,7 +1450,8 @@ mod test {
         let mut points = tmp;
 
         let keys = MortonKeys::from(root.children());
-        let (_unmapped, index_map) = SingleNodeTree::assign_nodes_to_points_with_index_map(&keys, &mut points);
+        let (_unmapped, index_map) =
+            SingleNodeTree::assign_nodes_to_points_with_index_map(&keys, &mut points);
 
         // Test that all points have been assigned a root
         let mut found = 0;
@@ -1461,7 +1460,6 @@ mod test {
         }
 
         assert_eq!(n_points, found);
-
     }
 
     #[test]
@@ -1596,7 +1594,6 @@ mod test {
 
     #[test]
     fn test_from_roots() {
-
         let n_points = 10000;
         let points = points_fixture::<f64>(n_points, None, None, None);
         let mut tmp = Points::default();
@@ -1627,7 +1624,7 @@ mod test {
             &domain,
             global_depth,
             local_depth,
-            false
+            false,
         );
 
         // Test that the number of roots matches the number expected
@@ -1644,7 +1641,6 @@ mod test {
         let total_depth = global_depth + local_depth;
 
         for tree in trees.iter() {
-
             // Test that the depth of the leaves matches the total depth
             for leaf in tree.leaves.iter() {
                 assert_eq!(leaf.level(), total_depth)
