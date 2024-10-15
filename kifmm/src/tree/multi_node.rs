@@ -446,6 +446,7 @@ where
 
         if admissible {
             // V list queries
+            // TEST: Check if these keys are indeed those of local trees, not global trees
             for key in self.target_tree.all_keys().unwrap() {
                 // Compute interaction list
                 let interaction_list = key
@@ -472,6 +473,7 @@ where
                 queries.extend(interaction_list);
             }
         } else {
+            // U list queries
             for leaf in self.target_tree.all_leaves().unwrap() {
                 let interaction_list = leaf.neighbors();
 
@@ -479,9 +481,8 @@ where
                 let interaction_list = interaction_list
                     .iter()
                     .filter_map(|&key| {
-                        // Try to get the rank from the key
+                        // Check if the rank is not equal to this rank
                         if let Some(&rank) = self.source_layout.rank_from_key(&key) {
-                            // Filter out if the rank is equal to my_rank
                             if rank != self.source_tree.rank() {
                                 return Some(key);
                             }

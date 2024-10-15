@@ -1031,12 +1031,14 @@ where
             coordinate_index_pointer_multi_node(&self.tree.source_tree);
 
         // Set neighbourhood communicators
+        // TEST: check that neighbourhood communicator setup matches the queries
         self.neighbourhood_communicator_v = NeighbourhoodCommunicator::new(
             &self.communicator,
             &self.tree.v_list_query.send_marker,
             &self.tree.v_list_query.receive_marker,
         );
 
+        // TEST: check that neighbourhood communicator setup matches the queries
         self.neighbourhood_communicator_u = NeighbourhoodCommunicator::new(
             &self.communicator,
             &self.tree.u_list_query.send_marker,

@@ -392,6 +392,7 @@ where
         }
     }
 
+    // TEST: Check logic of u list exchange
     fn u_list_exchange(&mut self) {
         // Communicate ghost queries and receive from foreign ranks
         let mut neighbourhood_send_counts = Vec::new();
@@ -627,6 +628,7 @@ where
             coordinate_index_pointer_single_node(&self.ghost_fmm_u.tree.source_tree);
     }
 
+    // TEST: Logic of v list exchange
     fn v_list_exchange(&mut self) {
         // Communicate ghost queries and receive from foreign ranks
         let mut neighbourhood_send_counts = Vec::new();

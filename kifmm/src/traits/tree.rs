@@ -69,6 +69,9 @@ pub trait SingleTree {
     /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
     fn all_coordinates(&self) -> Option<&[Self::Scalar]>;
 
+    /// Gets a reference to the points contained in across tree (local in multi node setting)
+    fn all_points(&self) -> Option<&[Point<Self::Scalar>]>;
+
     /// Total number of coordinates (local in a multi node setting)
     fn n_coordinates_tot(&self) -> Option<usize>;
 

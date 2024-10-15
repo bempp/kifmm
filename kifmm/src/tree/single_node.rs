@@ -364,6 +364,8 @@ where
         global_indices: &[usize],
         root: MortonKey<T>,
     ) -> Result<SingleNodeTree<T>, std::io::Error> {
+
+
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
 
@@ -374,14 +376,19 @@ where
                 .try_into()
                 .unwrap();
 
-            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
             let encoded_key = MortonKey::from_point(coord, &domain, depth);
-            points.push(Point {
-                coordinate: *coord,
-                base_key,
-                encoded_key,
-                global_index: global_indices[i],
-            })
+            let base_key = MortonKey::from_point(coord, &domain, DEEPEST_LEVEL);
+            let ancestors = base_key.ancestors();
+
+            if ancestors.contains(&root) {
+
+                points.push(Point {
+                    coordinate: *coord,
+                    base_key,
+                    encoded_key,
+                    global_index: global_indices[i],
+                })
+            }
         }
 
         // Morton sort over points
@@ -446,6 +453,7 @@ where
         })
     }
 
+    // TEST: Test logic of from roots construction
     /// From a set of specified roots, create a number of single node trees of matching
     // length
     #[allow(unused)]
@@ -775,6 +783,10 @@ where
     ///   used directly; otherwise, it is computed from the point data, ensuring the tree encompasses
     ///   all points.
     ///
+    /// - `root` - Optionally specify a root node for the tree, defaults to the global root node.
+    ///
+    /// - `global_indices` - Optionally specify a set of global indices to map the specified points to,
+    ///    defaults to assigning index based on ordering of input points
     pub fn new(
         coordinates_row_major: &[T],
         depth: u64,
@@ -1232,6 +1244,10 @@ where
         Some(&self.coordinates)
     }
 
+    fn all_points(&self) -> Option<&[Point<Self::Scalar>]> {
+        Some(&self.points)
+    }
+
     fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]> {
         if let Some(&(l, r)) = self.leaves_to_coordinates.get(leaf) {
             if r - l > 0 {
@@ -1322,6 +1338,33 @@ mod test {
         assert_eq!(unique_leaves.len(), expected);
     }
 
+    #[test]
+    fn test_uniform_tree_from_root() {
+
+        let n_points = 1000;
+        let depth = 2;
+
+        // Use first child of global root as root node
+        let root = MortonKey::root().children()[0];
+
+        // Test data distributed over domain
+        let points = points_fixture(n_points, Some(0.), Some(1.0), None);
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None).unwrap();
+
+        // Test that only points contained within specified root node are mapped to this tree.
+        assert!(tree.all_points().unwrap().len() < n_points);
+
+        // Test data contained in first child
+        let points = points_fixture(n_points, Some(0.), Some(0.5), None);
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None).unwrap();
+
+        // Test that only points contained within specified root node are mapped to this tree.
+        assert_eq!(tree.all_points().unwrap().len(), n_points);
+
+    }
+
     pub fn test_no_overlaps_helper<T>(nodes: &[MortonKey<T>])
     where
         T: RlstScalar + Float,
@@ -1383,6 +1426,42 @@ mod test {
                 assert!((r - l) == n_points);
             }
         }
+    }
+
+    #[test]
+    pub fn test_assign_nodes_to_points_with_index_map() {
+
+        let root = MortonKey::<f64>::root();
+
+        // Generate points in a single octant of the domain
+        let n_points = 1234;
+        let points = points_fixture::<f64>(n_points, None, None, None);
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+
+        let mut tmp = Points::default();
+        for i in 0..n_points {
+            let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
+            let key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            tmp.push(Point {
+                coordinate: point,
+                base_key: key,
+                encoded_key: key,
+                global_index: i,
+            })
+        }
+        let mut points = tmp;
+
+        let keys = MortonKeys::from(root.children());
+        let (_unmapped, index_map) = SingleNodeTree::assign_nodes_to_points_with_index_map(&keys, &mut points);
+
+        // Test that all points have been assigned a root
+        let mut found = 0;
+        for (_key, indices) in index_map.iter() {
+            found += indices.len();
+        }
+
+        assert_eq!(n_points, found);
+
     }
 
     #[test]
@@ -1512,6 +1591,78 @@ mod test {
             for i in 0..8 {
                 assert!(found[i] == keys[idx + i])
             }
+        }
+    }
+
+    #[test]
+    fn test_from_roots() {
+
+        let n_points = 10000;
+        let points = points_fixture::<f64>(n_points, None, None, None);
+        let mut tmp = Points::default();
+        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
+        let global_depth = 2;
+        let local_depth = 3;
+
+        for i in 0..n_points {
+            let point = [points[[0, i]], points[[1, i]], points[[2, i]]];
+            let base_key = MortonKey::from_point(&point, &domain, DEEPEST_LEVEL);
+            let encoded_key = MortonKey::from_point(&point, &domain, global_depth + local_depth);
+
+            tmp.push(Point {
+                coordinate: point,
+                base_key,
+                encoded_key,
+                global_index: i,
+            })
+        }
+        let mut points = tmp;
+
+        let roots = MortonKey::root().descendants(global_depth).unwrap();
+
+        let n_roots = roots.len();
+        let trees = SingleNodeTree::from_roots(
+            &roots.into(),
+            &mut points,
+            &domain,
+            global_depth,
+            local_depth,
+            false
+        );
+
+        // Test that the number of roots matches the number expected
+        assert_eq!(trees.len(), n_roots);
+
+        // Test that all the points are accounted for
+        let mut found = 0;
+        for tree in trees.iter() {
+            println!("{:?}", tree.all_points().unwrap().len());
+            found += tree.all_points().unwrap().len();
+        }
+        assert_eq!(found, n_points);
+
+        let total_depth = global_depth + local_depth;
+
+        for tree in trees.iter() {
+
+            // Test that the depth of the leaves matches the total depth
+            for leaf in tree.leaves.iter() {
+                assert_eq!(leaf.level(), total_depth)
+            }
+
+            // Test that the root level matches the global depth
+            assert_eq!(tree.root().level(), global_depth);
+
+            // Test that no keys are at a level higher than the global depth.
+            let mut min_level = tree.keys[0].level();
+
+            for key in tree.keys.iter() {
+                if key.level() < min_level {
+                    min_level = key.level()
+                }
+            }
+
+            assert_eq!(min_level, global_depth);
         }
     }
 }
