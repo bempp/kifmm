@@ -70,9 +70,11 @@ impl NeighbourhoodCommunicator {
     ) -> Self {
         let size = world_comm.size();
 
-        // Now create neighbours, with send and receive displacements
+        // Now create neighbours, with send and receive markers
         let mut neighbours = Vec::new();
 
+        // Neighbourhood consists of processes where either a send or receive communication
+        // is expected from this process
         for world_rank in 0..size as usize {
             let world_rank_i32 = world_rank as i32;
             if send_marker[world_rank] != 0 || receive_marker[world_rank] != 0 {

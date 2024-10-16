@@ -446,7 +446,6 @@ where
 
         if admissible {
             // V list queries
-            // TEST: Check if these keys are indeed those of local trees, not global trees
             for key in self.target_tree.all_keys().unwrap() {
                 // Compute interaction list
                 let interaction_list = key
@@ -526,12 +525,17 @@ where
             sorted_queries_
         };
 
+        // Sort ranks of queries into rank order
+        ranks.sort();
+
         // Compute the receive counts, and mark again processes involved
         let mut receive_counts = vec![0i32; self.source_tree().comm.size() as usize];
         let mut receive_marker = vec![0i32; self.source_tree().comm.size() as usize];
+
         self.source_tree
             .comm
             .all_to_all_into(&send_counts, &mut receive_counts);
+
         for (rank, &receive_count) in receive_counts.iter().enumerate() {
             if receive_count > 0 {
                 receive_marker[rank] = 1
@@ -559,63 +563,67 @@ where
         let size = self.source_tree.comm.size();
 
         // Gather ranges on all processes, define by roots they own
-        let mut ranges = Vec::new();
-        for tree_idx in 0..self.source_tree.n_trees {
-            ranges.push(self.source_tree.trees[tree_idx].root());
+        let mut roots = Vec::new();
+        for i in 0..self.source_tree.n_trees {
+            roots.push(self.source_tree.trees[i].root());
         }
 
-        let n_ranges = ranges.len() as i32;
-        let mut all_ranges_counts = vec![0i32; size as usize];
+        let n_roots = roots.len() as i32;
+        let mut counts_ = vec![0i32; size as usize];
+
+        // All gather to calculate the counts of roots on each processor
         self.source_tree
             .comm
-            .all_gather_into(&n_ranges, &mut all_ranges_counts);
+            .all_gather_into(&n_roots, &mut counts_);
 
-        let mut all_ranges_displacements = Vec::new();
+        // Calculate displacements from the counts on each processor
+        let mut displacements_ = Vec::new();
         let mut displacement = 0;
-        for &count in all_ranges_counts.iter() {
-            all_ranges_displacements.push(displacement);
+        for &count in counts_.iter() {
+            displacements_.push(displacement);
             displacement += count
         }
 
-        let total_ranges = all_ranges_counts.iter().sum::<i32>();
+        let n_roots_global = counts_.iter().sum::<i32>();
 
-        let mut all_ranges = vec![MortonKey::<T>::default(); total_ranges as usize];
+        // Allocate buffer to store layouts
+        let mut raw = vec![MortonKey::<T>::default(); n_roots_global as usize];
+
+        // Store a copy of counts and displacements
         let counts;
         let displacements;
-
         {
-            let mut partition = PartitionMut::new(
-                &mut all_ranges,
-                all_ranges_counts,
-                &all_ranges_displacements[..],
-            );
+            let mut partition = PartitionMut::new(&mut raw, counts_, &displacements_[..]);
             self.source_tree
                 .comm
-                .all_gather_varcount_into(&ranges, &mut partition);
+                .all_gather_varcount_into(&roots, &mut partition);
             counts = partition.counts().to_vec();
             displacements = partition.displs().to_vec();
         }
 
-        let raw_set = all_ranges.iter().cloned().collect();
+        // Store as a set for easy lookup
+        let raw_set = raw.iter().cloned().collect();
 
-        let mut all_ranks: Vec<i32> = Vec::new();
+        // Buffer of length total count, where index is matched to the roots
+        let mut ranks: Vec<i32> = Vec::new();
 
         for (rank, &count) in counts.iter().enumerate() {
-            all_ranks.extend_from_slice(&vec![rank as i32; count as usize]);
+            ranks.extend_from_slice(&vec![rank as i32; count as usize]);
         }
 
+        // Map between a root and its associated rank
         let mut range_to_rank = HashMap::new();
 
-        for (&range, &rank) in all_ranges.iter().zip(all_ranks.iter()) {
+        for (&range, &rank) in raw.iter().zip(ranks.iter()) {
             range_to_rank.insert(range, rank);
         }
 
         self.source_layout = Layout {
-            raw: all_ranges,
+            raw,
             raw_set,
             counts,
             displacements,
-            ranks: all_ranks,
+            ranks,
             range_to_rank,
         };
     }

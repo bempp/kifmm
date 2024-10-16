@@ -1,7 +1,5 @@
 //! Should eventually store all parallel traits
 
-use std::collections::HashSet;
-
 use rlst::RlstScalar;
 
 use crate::{
@@ -39,14 +37,7 @@ where
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        keys_set: HashSet<
-            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-        >,
         leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        leaves_set: HashSet<
-            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-        >,
         multipoles: Vec<Self::Scalar>,
     );
 
@@ -56,14 +47,6 @@ where
         &mut self,
         domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
         depth: u64,
-        keys: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        keys_set: HashSet<
-            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-        >,
         leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-        leaves_set: HashSet<
-            <<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
-        >,
-        locals: Vec<Self::Scalar>,
     );
 }

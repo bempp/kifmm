@@ -450,7 +450,6 @@ where
         })
     }
 
-    // TEST: Test logic of from roots construction
     /// From a set of specified roots, create a number of single node trees of matching
     // length
     #[allow(unused)]
@@ -499,19 +498,49 @@ where
     /// Construct a tree form specified key/leaf data, may not contain points. All data expected in Morton order.
     ///
     #[allow(unused)]
-    pub(crate) fn from_keys(
-        mut keys: Vec<MortonKey<T>>,
-        keys_set: HashSet<MortonKey<T>>,
+    pub(crate) fn from_leaves(
         leaves: Vec<MortonKey<T>>,
-        leaves_set: HashSet<MortonKey<T>>,
-        _points: Option<Points<T>>,
         domain: &Domain<T>,
         depth: u64,
     ) -> SingleNodeTree<T> {
         let mut result = Self::default();
 
+        // First step is to find all keys
+
+        // Need to insert sibling and their ancestors data if its missing in multipole data received
+        // also need to ensure that siblings of ancestors are included
+        let mut leaves_set: HashSet<_> = leaves.iter().cloned().collect();
+
+        let mut keys_set = HashSet::new();
+
+        for leaf in leaves.iter() {
+            let siblings = leaf.siblings();
+            let ancestors_siblings = leaf
+                .ancestors()
+                .iter()
+                .flat_map(|a| {
+                    if a.level() != 0 {
+                        a.siblings()
+                    } else {
+                        vec![*a]
+                    }
+                })
+                .collect_vec();
+
+            for &key in siblings.iter() {
+                keys_set.insert(key);
+                leaves_set.insert(key);
+            }
+
+            for &key in ancestors_siblings.iter() {
+                keys_set.insert(key);
+            }
+        }
+
+        let mut keys = keys_set.iter().cloned().collect_vec();
+
         // Optionally create index maps for coordinate data
-        // TODO: add index maps for coordiante data
+        // TODO: add index maps for coordinate data
 
         // Group by level to perform efficient lookup
         keys.sort_by_key(|k| k.level());
@@ -576,7 +605,8 @@ where
         result
     }
 
-    /// Construct a single node tree from U list ghost octants
+    /// Construct a single node tree from U list ghost octants, specified by their coordinates
+    /// TODO: To deprecate with cleaner interface
     #[cfg(feature = "mpi")]
     pub(crate) fn from_ghost_octants_u(
         domain: &Domain<T>,
@@ -632,13 +662,13 @@ where
             leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
             // Ensure that final leaf set contains siblings of all encoded keys
-            let tmp: HashSet<MortonKey<_>> = leaves_to_coordinates
-                .keys()
-                .flat_map(|k| k.siblings())
-                .collect();
+            // let tmp: HashSet<MortonKey<_>> = leaves_to_coordinates
+            //     .keys()
+            //     .flat_map(|k| k.siblings())
+            //     .collect();
 
             // Sort leaves before returning
-            leaves = MortonKeys::from(tmp);
+            // leaves = MortonKeys::from(tmp);
             leaves.sort();
 
             // Collect global indices, in Morton sorted order
@@ -695,6 +725,7 @@ where
                     curr = *key;
                 }
             }
+
             levels_to_keys.insert(curr.level(), (curr_idx, keys.len()));
 
             // Return tree in sorted order, by level and then by Morton key
