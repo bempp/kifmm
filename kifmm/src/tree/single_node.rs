@@ -392,7 +392,10 @@ where
         points.sort();
 
         // Ensure that final leaf set contains siblings of all encoded keys
-        let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
+        let leaves: HashSet<MortonKey<_>> = points
+            .iter()
+            .flat_map(|p| p.encoded_key.siblings())
+            .collect();
         let leaves = MortonKeys::from(leaves);
 
         // Find all keys in tree up to root (if specified) or level 0 otherwise
@@ -496,7 +499,8 @@ where
     }
 
     /// Construct a tree form specified key/leaf data, may not contain points. All data expected in Morton order.
-    ///
+    // Optionally create index maps for coordinate data
+    // TODO: add index maps for coordinate data
     #[allow(unused)]
     pub(crate) fn from_leaves(
         leaves: Vec<MortonKey<T>>,
@@ -538,9 +542,6 @@ where
         }
 
         let mut keys = keys_set.iter().cloned().collect_vec();
-
-        // Optionally create index maps for coordinate data
-        // TODO: add index maps for coordinate data
 
         // Group by level to perform efficient lookup
         keys.sort_by_key(|k| k.level());

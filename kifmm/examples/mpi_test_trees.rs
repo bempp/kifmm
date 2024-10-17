@@ -5,11 +5,12 @@ fn main() {
         fmm::types::MultiNodeBuilder,
         traits::{
             fmm::{DataAccessMulti, EvaluateMulti},
+            general::multi_node::GhostExchange,
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{
             helpers::points_fixture,
-            types::{Domain, SortKind},
+            types::{Domain, MortonKey, SortKind},
         },
         Evaluate, FftFieldTranslation, SingleNodeBuilder,
     };
@@ -27,7 +28,7 @@ fn main() {
     let prune_empty = false;
     let n_points = 10000;
     let local_depth = 3;
-    let global_depth = 1;
+    let global_depth = 2;
     let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Fmm Parameters
@@ -59,7 +60,7 @@ fn main() {
         .build()
         .unwrap();
 
-    fmm.evaluate(false).unwrap();
+    fmm.gather_global_fmm_at_root();
 
     // Gather all coordinates for the test
     let root_process = comm.process_at_rank(0);
@@ -93,8 +94,40 @@ fn main() {
         root_process.gather_varcount_into(local_coords);
     }
 
+    // Gather all leaves
+
+    let mut keys_counts = vec![0i32; world.size() as usize];
     if world.rank() == 0 {
-        let mut single_fmm = SingleNodeBuilder::new()
+        let n_keys = fmm.tree.source_tree.keys.len() as i32;
+
+        root_process.gather_into_root(&n_keys, &mut keys_counts);
+    } else {
+        let n_keys = fmm.tree.source_tree.keys.len() as i32;
+        root_process.gather_into(&n_keys);
+    }
+
+    let n_keys = keys_counts.iter().sum::<i32>();
+    let mut all_keys = vec![MortonKey::<f32>::default(); keys_counts.iter().sum::<i32>() as usize];
+
+    if world.rank() == 0 {
+        let mut keys_displacements = Vec::new();
+        let mut displacement = 0;
+        for count in keys_counts.iter() {
+            keys_displacements.push(displacement);
+            displacement += count;
+        }
+
+        let mut partition = PartitionMut::new(&mut all_keys, keys_counts, keys_displacements);
+
+        let keys = &fmm.tree.source_tree.keys.keys;
+        root_process.gather_varcount_into_root(&keys[..], &mut partition);
+    } else {
+        let keys = &fmm.tree.source_tree.keys.keys;
+        root_process.gather_varcount_into(&keys[..]);
+    }
+
+    if world.rank() == 0 {
+        let single_fmm = SingleNodeBuilder::new()
             .tree(
                 &all_coordinates,
                 &all_coordinates,
@@ -113,27 +146,40 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        single_fmm.evaluate(false).unwrap();
-        let mut expected = vec![0f32; &fmm.tree.target_tree.coordinates.len() / 3];
 
-        fmm.kernel.evaluate_st(
-            GreenKernelEvalType::Value,
-            &all_coordinates,
-            &fmm.tree.target_tree.coordinates,
-            &vec![1f32; n_points * world.size() as usize],
-            &mut expected,
-        );
+        let n = fmm.global_fmm.tree.source_tree.keys.len() as i32;
+        // println!("found {:?} expected {:?}", keys_counts.iter().sum::<i32>() + n, single_fmm.tree.source_tree.keys.len())
+
+        for key in all_keys.iter() {
+            assert!(single_fmm.tree.source_tree.keys_set.contains(key))
+        }
+
+        println!(
+            "found {:?} expected {:?}",
+            all_keys.len(),
+            single_fmm.tree.source_tree.keys.len()
+        )
+
+        // let mut expected = vec![0f32; &fmm.tree.target_tree.coordinates.len() / 3];
+
+        // fmm.kernel.evaluate_st(
+        //     GreenKernelEvalType::Value,
+        //     &all_coordinates,
+        //     &fmm.tree.target_tree.coordinates,
+        //     &vec![1f32; n_points * world.size() as usize],
+        //     &mut expected,
+        // );
 
         //     // println!("distributed {:?} {:?}", &fmm.tree.target_tree.keys.len(), fmm.global_fmm.tree.target_tree.keys.len());
         //     // println!("single {:?}", &single_fmm.tree.target_tree.keys.len());
 
-        println!(
-            "{:?} expected: {:?} \n found: {:?} \n found single {:?}",
-            world.rank(),
-            &expected[0..10],
-            &fmm.potentials[0..10],
-            &single_fmm.potentials[0..10]
-        );
+        // println!(
+        //     "{:?} expected: {:?} \n found: {:?} \n found single {:?}",
+        //     world.rank(),
+        //     &expected[0..10],
+        //     &fmm.potentials[0..10],
+        //     &single_fmm.potentials[0..10]
+        // );
     }
 }
 

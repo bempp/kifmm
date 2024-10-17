@@ -179,8 +179,9 @@ where
             }
 
             // Store origin ranks of each requested local
-            let n = counts.iter().sum::<i32>();
-            let mut global_roots = vec![MortonKey::<Scalar::Real>::default(); n as usize];
+            let total_receive = counts.iter().sum::<i32>();
+            let mut global_roots =
+                vec![MortonKey::<Scalar::Real>::default(); total_receive as usize];
             let mut partition =
                 PartitionMut::new(&mut global_roots, &counts[..], &displacements[..]);
 
@@ -231,6 +232,7 @@ where
 
         let mut expected_roots = vec![MortonKey::<Scalar::Real>::default(); n_roots];
 
+        // Allocate buffers to receive local data
         let receive_buffer_size = n_roots * self.n_coeffs_equivalent_surface;
         let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
 

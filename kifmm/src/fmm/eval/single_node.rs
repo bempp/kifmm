@@ -106,7 +106,7 @@ where
             self.times
                 .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
         } else {
-            self.p2p()?;
+            // self.p2p()?;
             self.l2p()?;
         }
         Ok(())

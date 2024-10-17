@@ -94,9 +94,19 @@ where
                 ));
             }
         } else {
-            for level in (start_level + 1)..=total_depth {
-                self.l2l(level)?;
-                self.m2l(level)?;
+            if global_depth >= 2 {
+                for level in (start_level + 1)..=total_depth {
+                    self.l2l(level)?;
+                    self.m2l(level)?;
+                }
+            } else {
+                for level in start_level..=total_depth {
+                    if level > 2 {
+                        self.l2l(level)?;
+                    }
+
+                    self.m2l(level)?;
+                }
             }
         }
 
@@ -118,7 +128,7 @@ where
                 .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
         } else {
             // Leaf level computations
-            self.p2p()?;
+            // self.p2p()?;
             self.l2p()?;
         }
 

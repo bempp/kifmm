@@ -141,6 +141,15 @@ where
             fmm_tree.set_queries(true);
             fmm_tree.set_queries(false);
 
+            println!(
+                "U List Query size {:?}",
+                fmm_tree.u_list_query.queries.len()
+            );
+            println!(
+                "V List Query size {:?}",
+                fmm_tree.v_list_query.queries.len()
+            );
+
             self.communicator = Some(comm.duplicate());
             self.tree = Some(fmm_tree);
             Ok(self)

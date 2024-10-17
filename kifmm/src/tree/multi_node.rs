@@ -85,6 +85,8 @@ where
         let mut leaves = MortonKeys::from(leaves);
         leaves.sort();
 
+        println!("NUMBER OF ROOTS {:?}", leaves.len());
+
         // These define all the single node trees to be constructed
         let trees = SingleNodeTree::from_roots(
             &leaves,
@@ -466,6 +468,7 @@ where
                         } else {
                             false
                         }
+                        // !self.source_tree.keys_set.contains(key)
                     })
                     .collect_vec();
 

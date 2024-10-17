@@ -21,8 +21,8 @@ fn main() {
     // Tree parameters
     let prune_empty = true;
     let n_points = 10000;
-    let local_depth = 1;
-    let global_depth = 3;
+    let local_depth = 3;
+    let global_depth = 1;
     let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Fmm Parameters
@@ -50,8 +50,8 @@ fn main() {
         .unwrap();
 
     // Perform partial upward pass on each rank
-    fmm.evaluate_leaf_sources(true).unwrap();
-    fmm.evaluate_upward_pass(true).unwrap();
+    fmm.evaluate_leaf_sources(false).unwrap();
+    fmm.evaluate_upward_pass(false).unwrap();
 
     // Test at roots of local trees for result of partial upward passes
     let roots = fmm.tree().source_tree().roots();
@@ -143,9 +143,10 @@ fn main() {
 
     // Perform upward pass on global fmm
     if world.rank() == 0 {
-        fmm.global_fmm.evaluate_upward_pass(true).unwrap();
+        fmm.global_fmm.evaluate_upward_pass(false).unwrap();
 
-        // Test root multipole
+        // Test that all multipoles are the same
+        // test root multipole
         let root = fmm.global_fmm.tree().source_tree().root();
         let multipole = fmm.global_fmm.multipole(&root).unwrap();
 
