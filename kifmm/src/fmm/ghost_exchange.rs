@@ -412,6 +412,19 @@ where
                 available_queries_counts.push(counter_rank);
                 available_queries_displacements.push(counter);
 
+                let key = MortonKey::<Scalar::Real>::from_morton(4611686018427387909);
+                if available_queries.contains(&key) {
+                    let key = MortonKey::from_morton(key.morton);
+                    let &leaf_idx = self.tree.source_tree().leaf_index(&key).unwrap();
+                    let index_pointer = &self.charge_index_pointer_sources[leaf_idx];
+                    let charges = &self.charges[index_pointer.0..index_pointer.1];
+                    let coordinates = self.tree.source_tree.coordinates(&key);
+                    println!(
+                        "THAT QUERY RECEIVED {:?} {:?} at rank {:?}",
+                        coordinates, charges, self.rank
+                    );
+                }
+
                 let available_coordinates_rank = available_coordinates_rank.concat();
                 available_coordinates.extend(available_coordinates_rank);
                 available_coordinates_counts.push(counter_coordinates_rank);
@@ -470,13 +483,56 @@ where
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
+        // Communicate expected query sizes
+        let mut requested_queries_counts =
+            vec![0 as Count; self.neighbourhood_communicator_u.neighbours.len()];
+        {
+            let send_counts_ = vec![1i32; self.neighbourhood_communicator_u.neighbours.len()];
+            let send_displacements_ = send_counts_
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let partition_send =
+                Partition::new(&available_queries_counts, send_counts_, send_displacements_);
+
+            let recv_counts_ = vec![1i32; self.neighbourhood_communicator_u.neighbours.len()];
+            let recv_displacements_ = recv_counts_
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let mut partition_receive = PartitionMut::new(
+                &mut requested_queries_counts,
+                recv_counts_,
+                recv_displacements_,
+            );
+
+            // TODO: Investigate why all to all failing, and require all to all v
+            self.neighbourhood_communicator_u
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
         // Create buffers to receive charge and coordinate data
         let total_receive_count_available_coordinates =
             requested_coordinates_counts.iter().sum::<i32>() as usize;
         let total_receive_count_available_charges = total_receive_count_available_coordinates / 3;
+        let total_receive_count_available_queries =
+            requested_queries_counts.iter().sum::<i32>() as usize;
+
         let mut requested_coordinates =
             vec![Scalar::Real::default(); total_receive_count_available_coordinates];
         let mut requested_charges = vec![Scalar::default(); total_receive_count_available_charges];
+        let mut requested_queries =
+            vec![MortonKey::<Scalar::Real>::default(); total_receive_count_available_queries];
 
         // Calculate counts for requested charges
         let mut requested_charges_counts = Vec::new();
@@ -487,12 +543,37 @@ where
         // Create displacements for coordinate and charge data from expected count
         let mut requested_coordinates_displacements = Vec::new();
         let mut requested_charges_displacements = Vec::new();
+        let mut requested_queries_displacements = Vec::new();
 
         let mut counter = 0;
         for &count in requested_coordinates_counts.iter() {
             requested_coordinates_displacements.push(counter);
             requested_charges_displacements.push(counter / 3);
             counter += count;
+        }
+
+        let mut counter = 0;
+        for &count in requested_queries_counts.iter() {
+            requested_queries_displacements.push(counter);
+            counter += count;
+        }
+
+        // Communicate ghost queries, to remove
+        {
+            let partition_send = Partition::new(
+                &available_queries,
+                &available_queries_counts[..],
+                &available_queries_displacements[..],
+            );
+
+            let mut partition_receive = PartitionMut::new(
+                &mut requested_queries,
+                &requested_queries_counts[..],
+                &requested_queries_displacements[..],
+            );
+
+            self.neighbourhood_communicator_u
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
         // Communicate ghost coordinate data
@@ -511,6 +592,18 @@ where
 
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
+        let key = MortonKey::<Scalar::Real>::from_morton(261208778387488773);
+        if requested_queries.contains(&key) {
+            // let key = MortonKey::from_morton(key.morton);
+            // let &leaf_idx = self.tree.source_tree().leaf_index(&key).unwrap();
+            // let index_pointer = &self.charge_index_pointer_sources[leaf_idx];
+            // let charges = &self.charges[index_pointer.0..index_pointer.1];
+            // let coordinates = self.tree.source_tree.coordinates(&key);
+            // println!("THAT QUERY RECEIVED {:?} {:?} at rank {:?}", coordinates, charges, self.rank);
+            println!("RANK {:?} GOT BACK DATA FROM {:?}", self.rank, key);
+            println!("ALL RECEIVED COORDIANTES {:?}", requested_coordinates.len())
         }
 
         // Communicate ghost charge data

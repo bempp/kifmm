@@ -327,10 +327,6 @@ where
 
                         // 2. Compute Hadamard Product
                         {
-                            // let tmp = check_potentials_hat_f.len();
-                            // println!("HERE {:?} {:?} {:?}, {:?}", level, n_targets_parents, n_targets, tmp);
-                            // // assert!(false);
-
                             (0..size_out)
                             .into_par_iter()
                             .zip(signals_hat_f.par_chunks_exact(n_sources + n_zeros))
@@ -391,80 +387,76 @@ where
                                 );
                             });
                         }
+                    }
 
-                        // 3. Post process to find local expansions at target boxes
-                        {
-                            check_potential_hat_c
-                                .par_chunks_exact_mut(size_out)
-                                .enumerate()
-                                .for_each(|(i, check_potential_hat_chunk)| {
-                                    // Lookup all frequencies for this target box
-                                    for j in 0..size_out {
-                                        check_potential_hat_chunk[j] =
-                                            check_potentials_hat_f[j * n_targets + i]
+                    // 3. Post process to find local expansions at target boxes
+                    {
+                        check_potential_hat_c
+                            .par_chunks_exact_mut(size_out)
+                            .enumerate()
+                            .for_each(|(i, check_potential_hat_chunk)| {
+                                // Lookup all frequencies for this target box
+                                for j in 0..size_out {
+                                    check_potential_hat_chunk[j] =
+                                        check_potentials_hat_f[j * n_targets + i]
+                                }
+                            });
+
+                        // Compute inverse FFT
+                        let mut out = AlignedVec::new(size_in);
+                        let mut in_ = AlignedVec::new(size_out);
+                        let plan =
+                            Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
+
+                        let _ = Scalar::backward_dft_batch_par(
+                            &mut check_potential_hat_c[..],
+                            &mut check_potential[..],
+                            &shape_in,
+                            &plan,
+                        );
+
+                        check_potential
+                            .par_chunks_exact(NSIBLINGS * size_in)
+                            .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
+                            .for_each(|(check_potential_chunk, local_ptrs)| {
+                                // Map to surface grid
+                                let mut potential_chunk = rlst_dynamic_array2!(
+                                    Scalar,
+                                    [n_coeffs_equivalent_surface, NSIBLINGS]
+                                );
+
+                                for i in 0..NSIBLINGS {
+                                    for (surf_idx, &conv_idx) in conv_to_surf_map.iter().enumerate()
+                                    {
+                                        *potential_chunk.get_mut([surf_idx, i]).unwrap() =
+                                            check_potential_chunk[i * size_in + conv_idx];
                                     }
-                                });
+                                }
 
-                            // Compute inverse FFT
-                            let mut out = AlignedVec::new(size_in);
-                            let mut in_ = AlignedVec::new(size_out);
-                            let plan =
-                                Scalar::plan_backward(&mut in_, &mut out, &shape_in, None).unwrap();
-
-                            let _ = Scalar::backward_dft_batch_par(
-                                &mut check_potential_hat_c[..],
-                                &mut check_potential[..],
-                                &shape_in,
-                                &plan,
-                            );
-
-                            check_potential
-                                .par_chunks_exact(NSIBLINGS * size_in)
-                                .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
-                                .for_each(|(check_potential_chunk, local_ptrs)| {
-                                    // Map to surface grid
-                                    let mut potential_chunk = rlst_dynamic_array2!(
-                                        Scalar,
-                                        [n_coeffs_equivalent_surface, NSIBLINGS]
+                                // Can now find local expansion coefficients
+                                let local_chunk = empty_array::<Scalar, 2>()
+                                    .simple_mult_into_resize(
+                                        dc2e_inv_1.view(),
+                                        empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                            dc2e_inv_2.view(),
+                                            potential_chunk,
+                                        ),
                                     );
 
-                                    for i in 0..NSIBLINGS {
-                                        for (surf_idx, &conv_idx) in
-                                            conv_to_surf_map.iter().enumerate()
-                                        {
-                                            *potential_chunk.get_mut([surf_idx, i]).unwrap() =
-                                                check_potential_chunk[i * size_in + conv_idx];
-                                        }
-                                    }
-
-                                    // Can now find local expansion coefficients
-                                    let local_chunk = empty_array::<Scalar, 2>()
-                                        .simple_mult_into_resize(
-                                            dc2e_inv_1.view(),
-                                            empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                                dc2e_inv_2.view(),
-                                                potential_chunk,
-                                            ),
-                                        );
-
-                                    local_chunk
-                                        .data()
-                                        .chunks_exact(n_coeffs_equivalent_surface)
-                                        .zip(local_ptrs)
-                                        .for_each(|(result, local)| {
-                                            let local = unsafe {
-                                                std::slice::from_raw_parts_mut(
-                                                    local.raw,
-                                                    n_coeffs_equivalent_surface,
-                                                )
-                                            };
-                                            local
-                                                .iter_mut()
-                                                .zip(result)
-                                                .for_each(|(l, r)| *l += *r);
-                                        });
-                                });
-                        }
+                                local_chunk
+                                    .data()
+                                    .chunks_exact(n_coeffs_equivalent_surface)
+                                    .zip(local_ptrs)
+                                    .for_each(|(result, local)| {
+                                        let local = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                local.raw,
+                                                n_coeffs_equivalent_surface,
+                                            )
+                                        };
+                                        local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
+                                    });
+                            });
                     }
                 }
 

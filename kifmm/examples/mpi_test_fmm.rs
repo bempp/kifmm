@@ -1,6 +1,7 @@
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
+    use itertools::Itertools;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
@@ -11,7 +12,7 @@ fn main() {
             helpers::points_fixture,
             types::{Domain, SortKind},
         },
-        Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        BlasFieldTranslationSaRcmp, DataAccess, Evaluate, FftFieldTranslation, SingleNodeBuilder,
     };
 
     use rayon::ThreadPoolBuilder;
@@ -34,6 +35,7 @@ fn main() {
     let expansion_order = 4;
     let kernel = Laplace3dKernel::<f32>::new();
     let source_to_target = FftFieldTranslation::<f32>::new(None);
+    // let source_to_target = BlasFieldTranslationSaRcmp::<f32>::new(None, None, kifmm::FmmSvdMode::Deterministic);
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
@@ -124,15 +126,23 @@ fn main() {
             &mut expected,
         );
 
+        let level = 4;
+        for key in fmm.tree.target_tree.keys(level).unwrap() {
+            let l1 = single_fmm.local(key).unwrap();
+            let l2 = fmm.local(key).unwrap();
+
+            println!("same? {:?}={:?}", &l1[0..5], &l2[0..5])
+        }
+
         //     // println!("distributed {:?} {:?}", &fmm.tree.target_tree.keys.len(), fmm.global_fmm.tree.target_tree.keys.len());
         //     // println!("single {:?}", &single_fmm.tree.target_tree.keys.len());
 
         println!(
             "{:?} expected: {:?} \n found: {:?} \n found single {:?}",
             world.rank(),
-            &expected[0..10],
-            &fmm.potentials[0..10],
-            &single_fmm.potentials[0..10]
+            &expected[15..20],
+            &fmm.potentials[15..20],
+            &single_fmm.potentials[15..20]
         );
     }
 }

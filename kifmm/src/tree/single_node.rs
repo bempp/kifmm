@@ -644,6 +644,8 @@ where
                 })
             }
 
+            println!("ALL POINTS {:?}", points.len());
+
             // Sort points by Morton key, and return indices that sort the points
             sort_indices = (0..points.len()).collect_vec();
             sort_indices.sort_by_key(|&i| &points[i]);
@@ -663,13 +665,13 @@ where
             leaves_to_coordinates.insert(curr.encoded_key, (curr_idx, points.len()));
 
             // Ensure that final leaf set contains siblings of all encoded keys
-            // let tmp: HashSet<MortonKey<_>> = leaves_to_coordinates
-            //     .keys()
-            //     .flat_map(|k| k.siblings())
-            //     .collect();
+            let tmp: HashSet<MortonKey<_>> = leaves_to_coordinates
+                .keys()
+                .flat_map(|k| k.siblings())
+                .collect();
 
             // Sort leaves before returning
-            // leaves = MortonKeys::from(tmp);
+            leaves = MortonKeys::from(tmp);
             leaves.sort();
 
             // Collect global indices, in Morton sorted order
