@@ -283,7 +283,7 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
 {
-    fn displacements(&mut self, start_level: Option<u64>) {
+    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
         let mut displacements = Vec::new();
 
         let start_level =
@@ -293,7 +293,7 @@ where
             let sources = self.tree.source_tree().keys(level).unwrap_or_default();
             let n_sources = sources.len();
 
-            let sentinel = n_sources;
+            let sentinel = -1 as i32;
             let result = vec![vec![sentinel; n_sources]; 316];
             let result = result.into_iter().map(RwLock::new).collect_vec();
 
@@ -337,7 +337,7 @@ where
                             let &target_idx = self.level_index_pointer_locals[level as usize]
                                 .get(target)
                                 .unwrap();
-                            result_lock[source_idx] = target_idx;
+                            result_lock[source_idx] = target_idx as i32;
                         }
                     }
                 });
@@ -633,7 +633,7 @@ where
         + Float,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
-    fn displacements(&mut self, start_level: Option<u64>) {
+    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
         let mut displacements = Vec::new();
         let start_level =
             start_level.unwrap_or_else(|| std::cmp::max(2, self.tree.source_tree().global_depth()));

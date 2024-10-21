@@ -28,14 +28,15 @@ fn main() {
     let prune_empty = false;
     let n_points = 10000;
     let local_depth = 3;
-    let global_depth = 2;
+    let global_depth = 1;
     let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Fmm Parameters
     let expansion_order = 4;
     let kernel = Laplace3dKernel::<f32>::new();
-    let source_to_target = FftFieldTranslation::<f32>::new(None);
-    // let source_to_target = BlasFieldTranslationSaRcmp::<f32>::new(None, None, kifmm::FmmSvdMode::Deterministic);
+    // let source_to_target = FftFieldTranslation::<f32>::new(None);
+    let source_to_target =
+        BlasFieldTranslationSaRcmp::<f32>::new(None, None, kifmm::FmmSvdMode::Deterministic);
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
@@ -150,9 +151,10 @@ fn main() {
 
         let distributed = &fmm.potentials;
 
-        distributed.iter().zip(expected.iter()).for_each(|(f, e)| {
-            assert!(((f-e).abs()/e.abs()) < 1e-3)
-        });
+        distributed
+            .iter()
+            .zip(expected.iter())
+            .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-3));
 
         // let leaf = &single_fmm.tree.target_tree.leaves[0];
         // let found_single = single_fmm.potential(&leaf);

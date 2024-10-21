@@ -695,7 +695,7 @@ where
     pub directional_cutoff_ranks: Vec<Vec<usize>>,
 
     /// The map between sources/targets in the field translation, indexed by level, then by source index.
-    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+    pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
@@ -815,7 +815,7 @@ where
 /// - `source`- The Morton key of the source box.
 ///
 /// - `target`- The Morton key of the target box.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct TransferVector<T>
 where
     T: RlstScalar + Float,

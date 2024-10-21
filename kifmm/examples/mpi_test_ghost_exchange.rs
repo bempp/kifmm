@@ -176,184 +176,184 @@ fn main() {
 
         // Test that V list exchange is correct
         // pick a box at a level
-        // let level = 3;
+        let level = 3;
 
-        // for key in fmm.tree.target_tree.keys(level).unwrap() {
-        //     let mut interaction_list = key
-        //         .parent()
-        //         .neighbors()
-        //         .iter()
-        //         .flat_map(|pn| pn.children())
-        //         .filter(|pnc| {
-        //             !key.is_adjacent(pnc) && single_fmm.tree.source_tree.keys_set.contains(pnc)
-        //         })
-        //         .collect_vec();
-
-        //     // check against interaction list found for global fmm
-        //     let mut distributed_interaction_list = key
-        //         .parent()
-        //         .neighbors()
-        //         .iter()
-        //         .flat_map(|pn| pn.children())
-        //         .filter(|pnc| !key.is_adjacent(pnc) && fmm.tree.source_tree.keys_set.contains(pnc))
-        //         .collect_vec();
-
-        //     let mut ghost_interaction_list = key
-        //         .parent()
-        //         .neighbors()
-        //         .iter()
-        //         .flat_map(|pn| pn.children())
-        //         .filter(|pnc| {
-        //             !key.is_adjacent(pnc) && fmm.ghost_fmm_v.tree.source_tree.keys_set.contains(pnc)
-        //         })
-        //         .collect_vec();
-
-        //     distributed_interaction_list.append(&mut ghost_interaction_list);
-
-        //     interaction_list.sort();
-        //     distributed_interaction_list.sort();
-
-        //     // Test that the whole of the interaction list is captured either locally, or in the data received from ghosts
-        //     for s in interaction_list.iter() {
-        //         assert!(distributed_interaction_list.contains(s))
-        //     }
-
-        //     for s in interaction_list.iter() {
-        //         let m1 = single_fmm.multipole(s).unwrap();
-
-        //         if let Some(m2) = fmm.multipole(s) {
-        //             println!("same? {:?}={:?}", &m1[0..5], &m2[0..5])
-        //         }
-
-        //         if let Some(m2) = fmm.ghost_fmm_v.multipole(s) {
-        //             println!("same? {:?}={:?}", &m1[0..5], &m2[0..5])
-        //         }
-        //     }
-        // }
-
-        // let root = fmm.global_fmm.tree().source_tree().root();
-        // let distributed_root_multipole = fmm.global_fmm.multipole(&root).unwrap();
-        // let single_root_multipole = &single_fmm.multipole(&root).unwrap();
-
-        // let threshold = 1e-3;
-        // let error = distributed_root_multipole
-        //     .iter()
-        //     .zip(single_root_multipole.iter())
-        //     .map(|(l, r)| (l - r).abs())
-        //     .collect_vec()
-        //     .iter()
-        //     .sum::<f32>();
-        // // println!("error {:?}", error)
-        // assert!(error <= threshold);
-
-        // Test that U list exchange is correct
-        for leaf in fmm.tree.target_tree.leaves.iter() {
-            let mut interaction_list = leaf
+        for key in fmm.tree.target_tree.keys(level).unwrap() {
+            let mut interaction_list = key
+                .parent()
                 .neighbors()
                 .iter()
-                .cloned()
-                .filter(|n| {
-                    single_fmm.tree.source_tree.keys_set.contains(n)
-                        && single_fmm.tree.source_tree.coordinates(n).is_some()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| {
+                    !key.is_adjacent(pnc) && single_fmm.tree.source_tree.keys_set.contains(pnc)
                 })
                 .collect_vec();
 
             // check against interaction list found for global fmm
-            let mut distributed_interaction_list = leaf
+            let mut distributed_interaction_list = key
+                .parent()
                 .neighbors()
                 .iter()
-                .cloned()
-                .filter(|n| {
-                    fmm.tree.source_tree.leaves_set.contains(n)
-                        && fmm.tree.source_tree.coordinates(n).is_some()
-                })
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| !key.is_adjacent(pnc) && fmm.tree.source_tree.keys_set.contains(pnc))
                 .collect_vec();
 
-            let mut ghost_interaction_list = leaf
+            let mut ghost_interaction_list = key
+                .parent()
                 .neighbors()
                 .iter()
-                .cloned()
-                .filter(|n| {
-                    fmm.ghost_fmm_u.tree.source_tree.leaves_set.contains(n)
-                        && fmm.ghost_fmm_u.tree.source_tree.coordinates(n).is_some()
+                .flat_map(|pn| pn.children())
+                .filter(|pnc| {
+                    !key.is_adjacent(pnc) && fmm.ghost_fmm_v.tree.source_tree.keys_set.contains(pnc)
                 })
                 .collect_vec();
 
             distributed_interaction_list.append(&mut ghost_interaction_list);
 
-            // println!("SAME: {:?}={:?}", interaction_list.len(), distributed_interaction_list.len());
-
-            let i1 = interaction_list.iter().map(|s| s.morton).collect_vec();
-            let i2 = distributed_interaction_list
-                .iter()
-                .map(|s| s.morton)
-                .collect_vec();
+            interaction_list.sort();
+            distributed_interaction_list.sort();
 
             // Test that the whole of the interaction list is captured either locally, or in the data received from ghosts
             for s in interaction_list.iter() {
-                assert!(
-                    distributed_interaction_list.contains(s),
-                    "Test failed: element {:?} is missing in distributed_interaction_list. at leaf: {:?} \n: {:?} = {:?} \n is it contained locally? {:?} or in ghost tree? {:?}",
-                    s, leaf.morton, i1, i2, fmm.tree.source_tree.keys_set.contains(s), fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(&s)
-                );
-
-                // println!("coordinates {:?}", fmm.tree.source_tree.coordinates);
-
-                // let key = MortonKey::from_morton(4611686018427387909);
-
-                // println!("CHECKING U GHOST TREE {:?}", fmm.ghost_fmm_u.tree.source_tree.leaves_to_coordinates.keys().contains(&key));
-                // assert!(
-                //     distributed_interaction_list.contains(s),
-                //     "Test failed: expected coordinates {:?}
-                //     \n found coordinates in local tree {:?} in ghost tree? {:?}
-                //     \n found key in local keys {:?} in ghost keys {:?},
-                //     \n found key in local leaves {:?} in ghost leaves {:?}",
-                //     single_fmm.tree.source_tree.coordinates(&key),
-                //     fmm.tree.source_tree.coordinates(&key),
-                //     fmm.ghost_fmm_u.tree.source_tree.coordinates(&key),
-                //     fmm.tree.source_tree.keys_set.contains(&key),
-                //     fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(&key),
-                //     fmm.tree.source_tree.leaves_set.contains(&key),
-                //     fmm.ghost_fmm_u.tree.source_tree.leaves_set.contains(&key),
-                // );
+                assert!(distributed_interaction_list.contains(s))
             }
 
             for s in interaction_list.iter() {
-                if let Some(c1) = single_fmm.tree.source_tree.coordinates(s) {
-                    // Look for coordinates
+                let m1 = single_fmm.multipole(s).unwrap();
 
-                    if fmm.tree.source_tree.keys_set.contains(s) {
-                        let c2 = fmm.tree.source_tree.coordinates(s).unwrap();
+                if let Some(m2) = fmm.multipole(s) {
+                    println!("same? {:?}={:?}", &m1[0..5], &m2[0..5])
+                }
 
-                        c1.iter()
-                            .zip(c2.iter())
-                            .for_each(|(&c1, &c2)| assert!(approx_equal(c1, c2, 1e-6)));
-                        assert!(c1.len() == c2.len());
-                    } else {
-                        let c2 = fmm.ghost_fmm_u.tree.source_tree.coordinates(s).unwrap();
-                        c1.iter()
-                            .zip(c2.iter())
-                            .for_each(|(&c1, &c2)| assert!(approx_equal(c1, c2, 1e-6)));
-                        assert!(c1.len() == c2.len());
-                    }
+                if let Some(m2) = fmm.ghost_fmm_v.multipole(s) {
+                    println!("same? {:?}={:?}", &m1[0..5], &m2[0..5])
                 }
             }
-
-            // Test that the target coordinates are the same
-            for s in fmm.tree.target_tree.leaves.iter() {
-                if let Some(c1) = fmm.tree.target_tree.coordinates(s) {
-                    let c2 = single_fmm.tree.target_tree.coordinates(s).unwrap();
-                    assert_eq!(c1.len(), c2.len());
-                }
-            }
-
-            //
-
-            // Test that the interaction list coordinates are the same?
-
-            // Need to test that the fetched coordinates are the same, as the interaction lists and the target coordinates
-            // are the same
         }
+
+        let root = fmm.global_fmm.tree().source_tree().root();
+        let distributed_root_multipole = fmm.global_fmm.multipole(&root).unwrap();
+        let single_root_multipole = &single_fmm.multipole(&root).unwrap();
+
+        let threshold = 1e-3;
+        let error = distributed_root_multipole
+            .iter()
+            .zip(single_root_multipole.iter())
+            .map(|(l, r)| (l - r).abs())
+            .collect_vec()
+            .iter()
+            .sum::<f32>();
+        // println!("error {:?}", error)
+        assert!(error <= threshold);
+
+        // // Test that U list exchange is correct
+        // for leaf in fmm.tree.target_tree.leaves.iter() {
+        //     let mut interaction_list = leaf
+        //         .neighbors()
+        //         .iter()
+        //         .cloned()
+        //         .filter(|n| {
+        //             single_fmm.tree.source_tree.keys_set.contains(n)
+        //                 && single_fmm.tree.source_tree.coordinates(n).is_some()
+        //         })
+        //         .collect_vec();
+
+        //     // check against interaction list found for global fmm
+        //     let mut distributed_interaction_list = leaf
+        //         .neighbors()
+        //         .iter()
+        //         .cloned()
+        //         .filter(|n| {
+        //             fmm.tree.source_tree.leaves_set.contains(n)
+        //                 && fmm.tree.source_tree.coordinates(n).is_some()
+        //         })
+        //         .collect_vec();
+
+        //     let mut ghost_interaction_list = leaf
+        //         .neighbors()
+        //         .iter()
+        //         .cloned()
+        //         .filter(|n| {
+        //             fmm.ghost_fmm_u.tree.source_tree.leaves_set.contains(n)
+        //                 && fmm.ghost_fmm_u.tree.source_tree.coordinates(n).is_some()
+        //         })
+        //         .collect_vec();
+
+        //     distributed_interaction_list.append(&mut ghost_interaction_list);
+
+        //     // println!("SAME: {:?}={:?}", interaction_list.len(), distributed_interaction_list.len());
+
+        //     let i1 = interaction_list.iter().map(|s| s.morton).collect_vec();
+        //     let i2 = distributed_interaction_list
+        //         .iter()
+        //         .map(|s| s.morton)
+        //         .collect_vec();
+
+        //     // Test that the whole of the interaction list is captured either locally, or in the data received from ghosts
+        //     for s in interaction_list.iter() {
+        //         assert!(
+        //             distributed_interaction_list.contains(s),
+        //             "Test failed: element {:?} is missing in distributed_interaction_list. at leaf: {:?} \n: {:?} = {:?} \n is it contained locally? {:?} or in ghost tree? {:?}",
+        //             s, leaf.morton, i1, i2, fmm.tree.source_tree.keys_set.contains(s), fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(&s)
+        //         );
+
+        //         // println!("coordinates {:?}", fmm.tree.source_tree.coordinates);
+
+        //         // let key = MortonKey::from_morton(4611686018427387909);
+
+        //         // println!("CHECKING U GHOST TREE {:?}", fmm.ghost_fmm_u.tree.source_tree.leaves_to_coordinates.keys().contains(&key));
+        //         // assert!(
+        //         //     distributed_interaction_list.contains(s),
+        //         //     "Test failed: expected coordinates {:?}
+        //         //     \n found coordinates in local tree {:?} in ghost tree? {:?}
+        //         //     \n found key in local keys {:?} in ghost keys {:?},
+        //         //     \n found key in local leaves {:?} in ghost leaves {:?}",
+        //         //     single_fmm.tree.source_tree.coordinates(&key),
+        //         //     fmm.tree.source_tree.coordinates(&key),
+        //         //     fmm.ghost_fmm_u.tree.source_tree.coordinates(&key),
+        //         //     fmm.tree.source_tree.keys_set.contains(&key),
+        //         //     fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(&key),
+        //         //     fmm.tree.source_tree.leaves_set.contains(&key),
+        //         //     fmm.ghost_fmm_u.tree.source_tree.leaves_set.contains(&key),
+        //         // );
+        //     }
+
+        //     for s in interaction_list.iter() {
+        //         if let Some(c1) = single_fmm.tree.source_tree.coordinates(s) {
+        //             // Look for coordinates
+
+        //             if fmm.tree.source_tree.keys_set.contains(s) {
+        //                 let c2 = fmm.tree.source_tree.coordinates(s).unwrap();
+
+        //                 c1.iter()
+        //                     .zip(c2.iter())
+        //                     .for_each(|(&c1, &c2)| assert!(approx_equal(c1, c2, 1e-6)));
+        //                 assert!(c1.len() == c2.len());
+        //             } else {
+        //                 let c2 = fmm.ghost_fmm_u.tree.source_tree.coordinates(s).unwrap();
+        //                 c1.iter()
+        //                     .zip(c2.iter())
+        //                     .for_each(|(&c1, &c2)| assert!(approx_equal(c1, c2, 1e-6)));
+        //                 assert!(c1.len() == c2.len());
+        //             }
+        //         }
+        //     }
+
+        //     // Test that the target coordinates are the same
+        //     for s in fmm.tree.target_tree.leaves.iter() {
+        //         if let Some(c1) = fmm.tree.target_tree.coordinates(s) {
+        //             let c2 = single_fmm.tree.target_tree.coordinates(s).unwrap();
+        //             assert_eq!(c1.len(), c2.len());
+        //         }
+        //     }
+
+        //     //
+
+        //     // Test that the interaction list coordinates are the same?
+
+        //     // Need to test that the fetched coordinates are the same, as the interaction lists and the target coordinates
+        //     // are the same
+        // }
     }
 }
 

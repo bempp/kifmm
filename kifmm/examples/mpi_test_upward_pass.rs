@@ -11,6 +11,7 @@ fn main() {
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},
         Evaluate, FftFieldTranslation,
     };
+    use kifmm::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FmmSvdMode};
     use mpi::{datatype::PartitionMut, traits::*};
     use rlst::{RawAccess, RlstScalar};
 
@@ -29,6 +30,8 @@ fn main() {
     let expansion_order = 4;
     let kernel = Laplace3dKernel::<f32>::new();
     let source_to_target = FftFieldTranslation::<f32>::new(None);
+    let source_to_target =
+        BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);

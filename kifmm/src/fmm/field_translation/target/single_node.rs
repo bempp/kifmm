@@ -324,59 +324,52 @@ where
                             let ntargets = target_coordinates_row_major.len() / self.dim;
 
                             if ntargets > 0 {
-                                if let Some(u_list) = self.tree.near_field(leaf) {
-                                    let u_list_indices = u_list
-                                        .iter()
-                                        .filter_map(|k| self.tree.source_tree().leaf_index(k));
+                                let mut u_list = leaf.neighbors().into_iter().collect_vec();
+                                u_list.push(leaf.clone());
 
-                                    let charges = u_list_indices
-                                        .clone()
-                                        .map(|&idx| {
-                                            let index_pointer =
-                                                &self.charge_index_pointer_sources[idx];
-                                            &self.charges[index_pointer.0..index_pointer.1]
-                                        })
-                                        .collect_vec();
+                                let u_list_indices = u_list
+                                    .iter()
+                                    .filter_map(|k| self.tree.source_tree.leaf_to_index.get(k))
+                                    .collect_vec();
 
-                                    let sources_coordinates = u_list_indices
-                                        .into_iter()
-                                        .map(|&idx| {
-                                            let index_pointer =
-                                                &self.charge_index_pointer_sources[idx];
-                                            &all_source_coordinates[index_pointer.0 * self.dim
-                                                ..index_pointer.1 * self.dim]
-                                        })
-                                        .collect_vec();
+                                let charges = u_list_indices
+                                    // .clone()
+                                    .iter()
+                                    .map(|&&idx| {
+                                        let index_pointer = &self.charge_index_pointer_sources[idx];
+                                        &self.charges[index_pointer.0..index_pointer.1]
+                                    })
+                                    .collect_vec();
 
-                                    for (i, (&charges, source_coordinates_row_major)) in
-                                        charges.iter().zip(sources_coordinates).enumerate()
-                                    {
-                                        let nsources =
-                                            source_coordinates_row_major.len() / self.dim;
+                                let sources_coordinates = u_list_indices
+                                    .into_iter()
+                                    .map(|&idx| {
+                                        let index_pointer = &self.charge_index_pointer_sources[idx];
+                                        &all_source_coordinates
+                                            [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
+                                    })
+                                    .collect_vec();
 
-                                        if nsources > 0 {
-                                            // if leaf.morton == 5 {
-                                            //     println!(
-                                            //         "HERE SINGLE {:?} {:?} index {:?}",
-                                            //         "inf", source_coordinates_row_major, u_list[i]
-                                            //     );
-                                            // }
+                                for (i, (&charges, source_coordinates_row_major)) in
+                                    charges.iter().zip(sources_coordinates).enumerate()
+                                {
+                                    let nsources = source_coordinates_row_major.len() / self.dim;
 
-                                            let result = unsafe {
-                                                std::slice::from_raw_parts_mut(
-                                                    potential_send_pointer.raw,
-                                                    ntargets * self.kernel_eval_size,
-                                                )
-                                            };
-
-                                            self.kernel.evaluate_st(
-                                                self.kernel_eval_type,
-                                                source_coordinates_row_major,
-                                                target_coordinates_row_major,
-                                                charges,
-                                                result,
+                                    if nsources > 0 {
+                                        let result = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                potential_send_pointer.raw,
+                                                ntargets * self.kernel_eval_size,
                                             )
-                                        }
+                                        };
+
+                                        self.kernel.evaluate_st(
+                                            self.kernel_eval_type,
+                                            source_coordinates_row_major,
+                                            target_coordinates_row_major,
+                                            charges,
+                                            result,
+                                        )
                                     }
                                 }
                             }
@@ -400,54 +393,54 @@ where
                             let ntargets = target_coordinates_row_major.len() / self.dim;
 
                             if ntargets > 0 {
-                                if let Some(u_list) = self.tree.near_field(leaf) {
-                                    let u_list_indices = u_list
-                                        .iter()
-                                        .filter_map(|k| self.tree.source_tree().leaf_index(k));
+                                let mut u_list = leaf.neighbors().into_iter().collect_vec();
+                                u_list.push(leaf.clone());
 
-                                    let charge_vec_displacement = i * n_all_source_coordinates;
-                                    let charges = u_list_indices
-                                        .clone()
-                                        .map(|&idx| {
-                                            let index_pointer =
-                                                &self.charge_index_pointer_sources[idx];
-                                            &self.charges[charge_vec_displacement + index_pointer.0
-                                                ..charge_vec_displacement + index_pointer.1]
-                                        })
-                                        .collect_vec();
+                                let u_list_indices = u_list
+                                    .iter()
+                                    .filter_map(|k| self.tree.source_tree.leaf_to_index.get(k))
+                                    .collect_vec();
 
-                                    let sources_coordinates = u_list_indices
-                                        .into_iter()
-                                        .map(|&idx| {
-                                            let index_pointer =
-                                                &self.charge_index_pointer_sources[idx];
-                                            &all_source_coordinates[index_pointer.0 * self.dim
-                                                ..index_pointer.1 * self.dim]
-                                        })
-                                        .collect_vec();
+                                let charge_vec_displacement = i * n_all_source_coordinates;
+                                let charges = u_list_indices
+                                    // .clone()
+                                    .iter()
+                                    .map(|&&idx| {
+                                        let index_pointer = &self.charge_index_pointer_sources[idx];
+                                        &self.charges[charge_vec_displacement + index_pointer.0
+                                            ..charge_vec_displacement + index_pointer.1]
+                                    })
+                                    .collect_vec();
 
-                                    for (&charges, source_coordinates_row_major) in
-                                        charges.iter().zip(sources_coordinates)
-                                    {
-                                        let nsources =
-                                            source_coordinates_row_major.len() / self.dim;
+                                let sources_coordinates = u_list_indices
+                                    .into_iter()
+                                    .map(|&idx| {
+                                        let index_pointer = &self.charge_index_pointer_sources[idx];
+                                        &all_source_coordinates
+                                            [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
+                                    })
+                                    .collect_vec();
 
-                                        if nsources > 0 {
-                                            let result = unsafe {
-                                                std::slice::from_raw_parts_mut(
-                                                    potential_send_ptr.raw,
-                                                    ntargets * self.kernel_eval_size,
-                                                )
-                                            };
+                                for (&charges, source_coordinates_row_major) in
+                                    charges.iter().zip(sources_coordinates)
+                                {
+                                    let nsources = source_coordinates_row_major.len() / self.dim;
 
-                                            self.kernel.evaluate_st(
-                                                self.kernel_eval_type,
-                                                source_coordinates_row_major,
-                                                target_coordinates_row_major,
-                                                charges,
-                                                result,
-                                            );
-                                        }
+                                    if nsources > 0 {
+                                        let result = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                potential_send_ptr.raw,
+                                                ntargets * self.kernel_eval_size,
+                                            )
+                                        };
+
+                                        self.kernel.evaluate_st(
+                                            self.kernel_eval_type,
+                                            source_coordinates_row_major,
+                                            target_coordinates_row_major,
+                                            charges,
+                                            result,
+                                        );
                                     }
                                 }
                             }

@@ -234,12 +234,6 @@ pub trait SingleFmmTree {
 
     /// Get the domain
     fn domain(&self) -> &<Self::Tree as SingleTree>::Domain;
-
-    /// Get the near field of a leaf node
-    fn near_field(
-        &self,
-        leaf: &<Self::Tree as SingleTree>::Node,
-    ) -> Option<Vec<<Self::Tree as SingleTree>::Node>>;
 }
 
 /// Interface for trees required by multinde FMM, which require separate trees for source and target data.

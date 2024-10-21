@@ -52,7 +52,8 @@ where
         let displacement_index = self.displacement_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
 
-        let sentinel = sources.len();
+        // let sentinel = sources.len();
+        let sentinel = -1i32;
 
         // Compute the displacements
         let all_displacements = &self.source_to_target.displacements[displacement_index];
@@ -66,7 +67,7 @@ where
                     .iter()
                     .enumerate()
                     .filter(|(_, &d)| d != sentinel)
-                    .map(|(i, _)| i)
+                    .map(|(i, _)| i as usize)
                     .collect_vec()
             })
             .collect_vec();
@@ -80,7 +81,7 @@ where
                     .iter()
                     .enumerate()
                     .filter(|(_, &d)| d != sentinel)
-                    .map(|(_, &j)| j)
+                    .map(|(_, &j)| j as usize)
                     .collect_vec()
             })
             .collect_vec();

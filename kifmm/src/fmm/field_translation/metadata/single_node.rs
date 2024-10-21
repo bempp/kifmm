@@ -626,7 +626,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements(&mut self, start_level: Option<u64>) {
+    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
         let mut displacements = Vec::new();
         let start_level = if let Some(start_level) = start_level {
             if start_level >= 2 {
@@ -845,7 +845,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self, start_level: Option<u64>) {
+    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
         let mut displacements = Vec::new();
         let start_level = if let Some(start_level) = start_level {
             if start_level >= 2 {
@@ -1406,10 +1406,10 @@ where
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
 where
-    Scalar: RlstScalar + Default + MatrixRsvd,
-    <Scalar as RlstScalar>::Real: Default,
+    Scalar: RlstScalar + Default + MatrixRsvd + Clone,
+    <Scalar as RlstScalar>::Real: Default + Clone,
 {
-    fn displacements(&mut self, start_level: Option<u64>) {
+    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
         let mut displacements = Vec::new();
 
         let start_level = if let Some(start_level) = start_level {
@@ -1422,12 +1422,15 @@ where
             2
         };
 
+        let all_transfer_vectors = compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap();
+
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
 
             if let Some(sources) = self.tree.source_tree().keys(level) {
                 let n_sources = sources.len();
-                let sentinel = n_sources;
+                let sentinel = -1 as i32;
+
                 let tmp = vec![vec![sentinel; n_sources]; 316];
                 result = tmp.into_iter().map(RwLock::new).collect_vec();
 
@@ -1466,9 +1469,7 @@ where
                             transfer_vectors.into_iter().collect();
 
                         // Mark items in interaction list for scattering
-                        for (tv_idx, tv) in
-                            self.source_to_target.transfer_vectors.iter().enumerate()
-                        {
+                        for (tv_idx, tv) in all_transfer_vectors.iter().enumerate() {
                             let mut result_lock = result[tv_idx].write().unwrap();
                             if transfer_vectors_set.contains(&tv.hash) {
                                 // Look up scatter location in target tree
@@ -1477,7 +1478,7 @@ where
                                 let &target_idx = self.level_index_pointer_locals[level as usize]
                                     .get(target)
                                     .unwrap();
-                                result_lock[source_idx] = target_idx;
+                                result_lock[source_idx] = target_idx as i32;
                             }
                         }
                     });
@@ -1922,7 +1923,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self, start_level: Option<u64>) {
+    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
         let mut displacements = Vec::new();
 
         let start_level = if let Some(start_level) = start_level {

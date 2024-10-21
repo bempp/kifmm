@@ -25,26 +25,6 @@ where
     fn domain(&self) -> &<Self::Tree as SingleTree>::Domain {
         &self.domain
     }
-
-    fn near_field(
-        &self,
-        leaf: &<Self::Tree as SingleTree>::Node,
-    ) -> Option<Vec<<Self::Tree as SingleTree>::Node>> {
-        // Get the all_keys_set if it exists
-        self.source_tree().all_keys_set().map(|all_keys_set| {
-            // Collect neighbors that exist in the all_keys_set and push the leaf into the vector
-            let mut u_list: Vec<_> = leaf
-                .neighbors()
-                .into_iter()
-                .filter(|neighbor| all_keys_set.contains(neighbor))
-                .collect();
-
-            // Push the leaf into the vector
-            u_list.push(*leaf);
-
-            u_list
-        })
-    }
 }
 
 unsafe impl<T: RlstScalar + Float + Default> Send for SingleNodeFmmTree<T> {}

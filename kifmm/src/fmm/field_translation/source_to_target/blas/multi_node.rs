@@ -62,13 +62,18 @@ where
                     let mut all_displacements = Vec::new();
                     let displacement_index = self.displacement_index(level);
 
+                    // println!("RANK {:?} {:?} {:?}", self.rank, displacement_index, level);
+
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().source_tree().keys(level) {
                         n_translations += 1;
-                        let sentinel = sources.len();
+                        // let sentinel = sources.len();
+                        let sentinel = -1i32;
 
                         all_displacements
                             .push(&self.source_to_target.displacements[displacement_index]);
+
+                        // println!("found some displacements {:?}", &self.source_to_target.displacements[displacement_index]);
 
                         // Number of sources at this level
                         let n_sources = sources.len();
@@ -84,11 +89,13 @@ where
                     // Handle ghost sources
                     if let Some(sources) = self.ghost_fmm_v.tree.source_tree.keys(level) {
                         n_translations += 1;
-                        let sentinel = sources.len();
+                        let sentinel = -1i32;
 
                         all_displacements.push(
                             &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
                         );
+
+                        // println!("found some ghosts {:?}", &self.ghost_fmm_v.source_to_target.displacements[displacement_index]);
 
                         // Number of sources at this level
                         let n_sources = sources.len();
@@ -142,7 +149,7 @@ where
                                     .iter()
                                     .enumerate()
                                     .filter(|(_, &d)| d != sentinel)
-                                    .map(|(i, _)| i)
+                                    .map(|(i, _)| i as usize)
                                     .collect_vec()
                             })
                             .collect_vec();
@@ -156,10 +163,14 @@ where
                                     .iter()
                                     .enumerate()
                                     .filter(|(_, &d)| d != sentinel)
-                                    .map(|(_, &j)| j)
+                                    .map(|(_, &j)| j as usize)
                                     .collect_vec()
                             })
                             .collect_vec();
+
+                        // if i == 1 {
+                        //     println!("level {:?} index {:?} idxs {:?} \n {:?} ", level, i, &local_idxs, self.level_index_pointer_locals.len());
+                        // }
 
                         let n_sources = all_n_sources[i];
                         let multipoles = &all_multipoles[i];
@@ -250,6 +261,8 @@ where
                                     }
                                 });
                         }
+
+                        // println!("level {:?} index {:?} multipoles {:?}", level, i, &compressed_check_potentials.data()[0..5]);
                     }
 
                     // 3. Compute local expansions from compressed check potentials
