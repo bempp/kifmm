@@ -29,7 +29,6 @@ use crate::{
     MultiNodeFmmTree,
 };
 
-
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 impl<Scalar, Kernel, FieldTranslation> MultiNodeBuilder<Scalar, Kernel, FieldTranslation>

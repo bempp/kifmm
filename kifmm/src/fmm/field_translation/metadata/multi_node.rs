@@ -284,7 +284,6 @@ where
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
 {
     fn displacements(&mut self, start_level: Option<u64>) {
-
         let mut displacements = Vec::new();
 
         let start_level =
@@ -635,7 +634,6 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
     fn displacements(&mut self, start_level: Option<u64>) {
-
         let mut displacements = Vec::new();
         let start_level =
             start_level.unwrap_or_else(|| std::cmp::max(2, self.tree.source_tree().global_depth()));

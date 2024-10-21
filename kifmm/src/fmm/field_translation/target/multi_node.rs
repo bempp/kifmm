@@ -322,7 +322,6 @@ where
                                                 source_coordinates_row_major.len() / dim;
 
                                             if n_sources > 0 {
-
                                                 let result = unsafe {
                                                     std::slice::from_raw_parts_mut(
                                                         potential_send_pointer.raw,
