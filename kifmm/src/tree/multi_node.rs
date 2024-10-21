@@ -22,10 +22,6 @@ use std::collections::{HashMap, HashSet};
 
 use super::types::{MultiNodeTree, SortKind};
 
-fn approx_equal<T: Float>(a: T, b: T, epsilon: T) -> bool {
-    (a - b).abs() < epsilon
-}
-
 impl<T, C: Communicator> MultiNodeTree<T, C>
 where
     T: RlstScalar + Float + Equivalence + Default,
@@ -505,18 +501,6 @@ where
         let mut ranks = Vec::new();
         let mut send_counts = vec![0 as Count; self.source_tree.comm.size() as usize];
         let mut send_marker = vec![0 as Rank; self.source_tree.comm.size() as usize];
-
-        if !admissible {
-            let key = MortonKey::from_morton(4611686018427387909);
-            if queries.contains(&key) {
-                println!(
-                    "RANK {:?} IS ASKING FOR this key in query at rank {:?}",
-                    self.source_tree.comm.rank(),
-                    self.source_layout.rank_from_key(&key)
-                );
-                // println!("RANK {:?} coords {:?}", self.source_tree.comm.rank(), self.source_tree.coordinates(&key))
-            };
-        }
 
         for query in queries.iter() {
             let rank = *self.source_layout.rank_from_key(query).unwrap();

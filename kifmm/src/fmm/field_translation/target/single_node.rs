@@ -350,8 +350,8 @@ where
                                     })
                                     .collect_vec();
 
-                                for (i, (&charges, source_coordinates_row_major)) in
-                                    charges.iter().zip(sources_coordinates).enumerate()
+                                for (&charges, source_coordinates_row_major) in
+                                    charges.iter().zip(sources_coordinates)
                                 {
                                     let nsources = source_coordinates_row_major.len() / self.dim;
 

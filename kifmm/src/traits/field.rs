@@ -32,7 +32,7 @@ pub trait SourceToTargetTranslationMetadata {
     fn source_to_target(&mut self);
 
     /// Map between source/target nodes, indexed by level.
-    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>);
+    fn displacements(&mut self, start_level: Option<u64>);
 }
 
 /// Interface for source field translations.

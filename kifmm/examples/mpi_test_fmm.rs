@@ -28,7 +28,7 @@ fn main() {
     let prune_empty = false;
     let n_points = 10000;
     let local_depth = 3;
-    let global_depth = 1;
+    let global_depth = 2;
     let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Fmm Parameters

@@ -229,8 +229,6 @@ where
             let kernel_eval_type = self.kernel_eval_type;
             let kernel = &self.kernel;
 
-            let rank = self.rank;
-
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     leaves
@@ -317,21 +315,13 @@ where
                                             })
                                             .collect_vec();
 
-                                        for (j, (&charges, source_coordinates_row_major)) in
-                                            charges.iter().zip(sources_coordinates).enumerate()
+                                        for (&charges, source_coordinates_row_major) in
+                                            charges.iter().zip(sources_coordinates)
                                         {
                                             let n_sources =
                                                 source_coordinates_row_major.len() / dim;
 
                                             if n_sources > 0 {
-                                                // if leaf.morton == 5 {
-                                                //     println!(
-                                                //         "HERE DISTR {:?} {:?} index {:?}",
-                                                //         rank,
-                                                //         source_coordinates_row_major,
-                                                //         tmp[i][j]
-                                                //     );
-                                                // }
 
                                                 let result = unsafe {
                                                     std::slice::from_raw_parts_mut(

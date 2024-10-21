@@ -222,7 +222,7 @@ where
         // TEST: Test displacements
         // Calculate displacements required for M2L
         if rank == root_rank {
-            self.global_fmm.displacements(None, None)
+            self.global_fmm.displacements(None)
         }
     }
 
@@ -907,11 +907,9 @@ where
             level_index_pointer_single_node(&self.ghost_fmm_v.tree.target_tree);
 
         // TODO: this method should be more flexible to avoid copy above
-        // println!("Creating displacements");
         KiFmm::displacements(
             &mut self.ghost_fmm_v,
             Some(self.tree.source_tree.global_depth()),
-            Some("creating displacements".to_string()),
         );
     }
 }

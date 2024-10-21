@@ -23,13 +23,12 @@ use crate::{
         general::single_node::Epsilon,
     },
     tree::{
-        types::{Domain, MortonKey, SortKind},
+        types::{Domain, SortKind},
         MultiNodeTree,
     },
     MultiNodeFmmTree,
 };
 
-use crate::traits::tree::MultiTree;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
@@ -125,16 +124,6 @@ where
                 sort_kind.clone(),
                 prune_empty,
             )?;
-
-            let key = MortonKey::from_morton(4611686018427387909);
-            if source_tree.leaves_set.contains(&key) {
-                println!("RANK {:?} contains this key", source_tree.comm.rank());
-                println!(
-                    "RANK {:?} coords {:?}",
-                    source_tree.comm.rank(),
-                    source_tree.coordinates(&key)
-                )
-            };
 
             // Create an FMM tree, and set its layout of source boxes
             let mut fmm_tree = MultiNodeFmmTree {
@@ -309,7 +298,7 @@ where
 
             // pass dummy charges for now.
             result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]);
-            result.displacements(None, None);
+            result.displacements(None);
 
             Ok(result)
         }

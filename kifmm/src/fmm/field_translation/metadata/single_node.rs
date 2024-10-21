@@ -626,7 +626,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default,
 {
-    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
         let start_level = if let Some(start_level) = start_level {
             if start_level >= 2 {
@@ -845,7 +845,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
         let start_level = if let Some(start_level) = start_level {
             if start_level >= 2 {
@@ -1409,7 +1409,7 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd + Clone,
     <Scalar as RlstScalar>::Real: Default + Clone,
 {
-    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
         let start_level = if let Some(start_level) = start_level {
@@ -1923,7 +1923,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>,
     <Scalar as RlstScalar>::Real: RlstScalar + Default,
 {
-    fn displacements(&mut self, start_level: Option<u64>, msg: Option<String>) {
+    fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
         let start_level = if let Some(start_level) = start_level {
