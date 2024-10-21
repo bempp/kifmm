@@ -293,7 +293,7 @@ where
             let sources = self.tree.source_tree().keys(level).unwrap_or_default();
             let n_sources = sources.len();
 
-            let sentinel = -1 as i32;
+            let sentinel = -1_i32;
             let result = vec![vec![sentinel; n_sources]; 316];
             let result = result.into_iter().map(RwLock::new).collect_vec();
 

@@ -143,7 +143,7 @@ where
                                     .iter()
                                     .enumerate()
                                     .filter(|(_, &d)| d != sentinel)
-                                    .map(|(i, _)| i as usize)
+                                    .map(|(i, _)| i)
                                     .collect_vec()
                             })
                             .collect_vec();

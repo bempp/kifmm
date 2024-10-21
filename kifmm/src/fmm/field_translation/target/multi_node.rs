@@ -245,7 +245,7 @@ where
 
                                 if n_targets > 0 {
                                     let mut u_list = leaf.neighbors().into_iter().collect_vec();
-                                    u_list.push(leaf.clone());
+                                    u_list.push(*leaf);
 
                                     let mut all_u_list_indices = Vec::new();
 

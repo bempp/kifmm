@@ -325,7 +325,7 @@ where
 
                             if ntargets > 0 {
                                 let mut u_list = leaf.neighbors().into_iter().collect_vec();
-                                u_list.push(leaf.clone());
+                                u_list.push(*leaf);
 
                                 let u_list_indices = u_list
                                     .iter()
@@ -394,7 +394,7 @@ where
 
                             if ntargets > 0 {
                                 let mut u_list = leaf.neighbors().into_iter().collect_vec();
-                                u_list.push(leaf.clone());
+                                u_list.push(*leaf);
 
                                 let u_list_indices = u_list
                                     .iter()

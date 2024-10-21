@@ -208,37 +208,17 @@ mod mpi_domain {
                 .cloned()
                 .collect_vec();
 
-            let max_x = xs
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let max_y = ys
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let max_z = zs
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
+            let max_x = *xs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-            let min_x = xs
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let min_y = ys
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let min_z = zs
-                .iter()
-                .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
+            let max_y = *ys.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            let max_z = *zs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            let min_x = *xs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            let min_y = *ys.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            let min_z = *zs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
             // Communicate minimum and maximum coordinates from each rank, globally
             let min = [min_x, min_y, min_z];
@@ -285,37 +265,35 @@ mod mpi_domain {
             let min_ys = buffer_min.iter().skip(1).step_by(3).cloned().collect_vec();
             let min_zs = buffer_min.iter().skip(2).step_by(3).cloned().collect_vec();
 
-            let max_x = max_xs
+            let max_x = *max_xs
                 .iter()
                 .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let max_y = max_ys
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let max_z = max_zs
-                .iter()
-                .max_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
+                .unwrap();
 
-            let min_x = min_xs
+            let max_y = *max_ys
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let max_z = *max_zs
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let min_x = *min_xs
                 .iter()
                 .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let min_y = min_ys
+                .unwrap();
+
+            let min_y = *min_ys
                 .iter()
                 .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
-            let min_z = min_zs
+                .unwrap();
+
+            let min_z = *min_zs
                 .iter()
                 .min_by(|a, b| a.partial_cmp(b).unwrap())
-                .unwrap()
-                .clone();
+                .unwrap();
 
             // Find maximum dimension, this will define the size of the boxes in the domain
             let side_length_x = Float::abs(max_x - min_x);

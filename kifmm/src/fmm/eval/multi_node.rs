@@ -93,20 +93,18 @@ where
                     s,
                 ));
             }
+        } else if global_depth >= 2 {
+            for level in (start_level + 1)..=total_depth {
+                self.l2l(level)?;
+                self.m2l(level)?;
+            }
         } else {
-            if global_depth >= 2 {
-                for level in (start_level + 1)..=total_depth {
+            for level in start_level..=total_depth {
+                if level > 2 {
                     self.l2l(level)?;
-                    self.m2l(level)?;
                 }
-            } else {
-                for level in start_level..=total_depth {
-                    if level > 2 {
-                        self.l2l(level)?;
-                    }
 
-                    self.m2l(level)?;
-                }
+                self.m2l(level)?;
             }
         }
 

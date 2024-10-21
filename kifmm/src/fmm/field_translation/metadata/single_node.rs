@@ -1429,7 +1429,7 @@ where
 
             if let Some(sources) = self.tree.source_tree().keys(level) {
                 let n_sources = sources.len();
-                let sentinel = -1 as i32;
+                let sentinel = -1_i32;
 
                 let tmp = vec![vec![sentinel; n_sources]; 316];
                 result = tmp.into_iter().map(RwLock::new).collect_vec();
