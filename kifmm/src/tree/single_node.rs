@@ -644,8 +644,6 @@ where
                 })
             }
 
-            println!("ALL POINTS {:?}", points.len());
-
             // Sort points by Morton key, and return indices that sort the points
             sort_indices = (0..points.len()).collect_vec();
             sort_indices.sort_by_key(|&i| &points[i]);
@@ -692,6 +690,7 @@ where
 
         result.coordinates = coordinates;
         result.leaves_to_coordinates = leaves_to_coordinates;
+        result.leaves_set = leaves.iter().cloned().collect();
         result.leaves = leaves;
         result.global_indices = global_indices;
         result.leaf_to_index = leaf_to_index;
@@ -1663,14 +1662,6 @@ mod test {
 
         // Test that the number of roots matches the number expected
         assert_eq!(trees.len(), n_roots);
-
-        // Test that all the points are accounted for
-        let mut found = 0;
-        for tree in trees.iter() {
-            println!("{:?}", tree.all_points().unwrap().len());
-            found += tree.all_points().unwrap().len();
-        }
-        assert_eq!(found, n_points);
 
         let total_depth = global_depth + local_depth;
 

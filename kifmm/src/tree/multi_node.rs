@@ -182,15 +182,6 @@ where
             }
         }
 
-        // for point in points.iter() {
-        //     let tst = [0.18512774, 0.15292609, 0.2774359].iter().map(|&x| T::from(x).unwrap()).collect_vec();
-        //     let c = point.coordinate;
-        //     let e = T::from(1e-4).unwrap();
-        //     if approx_equal(c[0], tst[0], e)  && approx_equal(c[1], tst[1], e)  && approx_equal(c[2], tst[2], e) {
-        //         println!("FOUND, {:?} {:?}", point.encoded_key, point.encoded_key.level())
-        //     }
-        // }
-
         // Collect coordinates in row-major order, for ease of lookup
         let coordinates = points
             .iter()
@@ -487,43 +478,11 @@ where
             }
         } else {
             // U list queries
-            let target_leaf = MortonKey::from_morton(658651445502935045);
-            let contained = self.target_tree.leaves_set.contains(&target_leaf);
 
             for leaf in self.target_tree.all_leaves().unwrap() {
                 let interaction_list = leaf.neighbors();
 
-                let key = MortonKey::from_morton(4611686018427387909);
-
-                if contained && leaf.morton == target_leaf.morton {
-                    println!(
-                        "INTERACTION LIST {:?} at rank {:?}",
-                        interaction_list.contains(&key),
-                        self.source_layout.rank_from_key(&key)
-                    )
-                }
-
-                if interaction_list.contains(&key) {
-                    println!(
-                        "RANK {:?} has this key {:?}",
-                        self.source_tree.comm.rank(),
-                        key.morton
-                    )
-                }
-
                 // Filter for those contained on foreign ranks
-                // let interaction_list = interaction_list
-                //     .iter()
-                //     .filter_map(|&key| {
-                //         // Check if the rank is not equal to this rank
-                //         if let Some(&rank) = self.source_layout.rank_from_key(&key) {
-                //             if rank != self.source_tree.rank() {
-                //                 return Some(key);
-                //             }
-                //         }
-                //         None
-                //     })
-                //     .collect_vec();
                 let interaction_list = interaction_list
                     .into_iter()
                     .filter(|key| {
@@ -533,7 +492,6 @@ where
                         } else {
                             false
                         }
-                        // !self.source_tree.keys_set.contains(key)
                     })
                     .collect_vec();
 
@@ -548,14 +506,20 @@ where
         let mut send_counts = vec![0 as Count; self.source_tree.comm.size() as usize];
         let mut send_marker = vec![0 as Rank; self.source_tree.comm.size() as usize];
 
-        let key = MortonKey::<f32>::from_morton(261208778387488773);
+        if !admissible {
+            let key = MortonKey::from_morton(4611686018427387909);
+            if queries.contains(&key) {
+                println!(
+                    "RANK {:?} IS ASKING FOR this key in query at rank {:?}",
+                    self.source_tree.comm.rank(),
+                    self.source_layout.rank_from_key(&key)
+                );
+                // println!("RANK {:?} coords {:?}", self.source_tree.comm.rank(), self.source_tree.coordinates(&key))
+            };
+        }
 
         for query in queries.iter() {
             let rank = *self.source_layout.rank_from_key(query).unwrap();
-
-            // if query.morton == key.morton {
-            //     println!("THAT QUERY IS GOING TO {:?} FROM {:?}", rank, self.source_tree.comm.rank())
-            // }
 
             ranks.push(rank);
             send_counts[rank as usize] += 1;

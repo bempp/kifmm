@@ -229,6 +229,8 @@ where
             let kernel_eval_type = self.kernel_eval_type;
             let kernel = &self.kernel;
 
+            let rank = self.rank;
+
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     leaves
@@ -244,7 +246,8 @@ where
                                 let n_targets = target_coordinates_row_major.len() / dim;
 
                                 if n_targets > 0 {
-                                    let u_list = leaf.neighbors().into_iter().collect_vec();
+                                    let mut u_list = leaf.neighbors().into_iter().collect_vec();
+                                    u_list.push(leaf.clone());
 
                                     let mut all_u_list_indices = Vec::new();
 
@@ -263,6 +266,35 @@ where
                                             .filter_map(|k| source_leaf_to_index_ghosts.get(k))
                                             .collect_vec(),
                                     );
+
+                                    // let mut tmp = Vec::new();
+                                    // // handle locally contained source boxes
+                                    // tmp.push(
+                                    //     u_list
+                                    //         .iter()
+                                    //         .filter_map(|k| {
+                                    //             if source_leaf_to_index.get(k).is_some() {
+                                    //                 Some(k) // Return the key if the element exists
+                                    //             } else {
+                                    //                 None
+                                    //             }
+                                    //         })
+                                    //         .collect_vec(),
+                                    // );
+
+                                    // // handle ghost source boxes
+                                    // tmp.push(
+                                    //     u_list
+                                    //         .iter()
+                                    //         .filter_map(|k| {
+                                    //             if source_leaf_to_index_ghosts.get(k).is_some() {
+                                    //                 Some(k) // Return the key if the element exists
+                                    //             } else {
+                                    //                 None
+                                    //             }
+                                    //         })
+                                    //         .collect_vec(),
+                                    // );
 
                                     for (i, u_list_indices) in all_u_list_indices.iter().enumerate()
                                     {
@@ -285,13 +317,22 @@ where
                                             })
                                             .collect_vec();
 
-                                        for (&charges, source_coordinates_row_major) in
-                                            charges.iter().zip(sources_coordinates)
+                                        for (j, (&charges, source_coordinates_row_major)) in
+                                            charges.iter().zip(sources_coordinates).enumerate()
                                         {
                                             let n_sources =
                                                 source_coordinates_row_major.len() / dim;
 
                                             if n_sources > 0 {
+                                                // if leaf.morton == 5 {
+                                                //     println!(
+                                                //         "HERE DISTR {:?} {:?} index {:?}",
+                                                //         rank,
+                                                //         source_coordinates_row_major,
+                                                //         tmp[i][j]
+                                                //     );
+                                                // }
+
                                                 let result = unsafe {
                                                     std::slice::from_raw_parts_mut(
                                                         potential_send_pointer.raw,

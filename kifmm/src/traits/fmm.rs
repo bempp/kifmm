@@ -23,6 +23,14 @@ pub trait DataAccessMulti {
     /// Kernel associated with this FMMl
     type Kernel: Kernel<T = Self::Scalar>;
 
+    /// Get the potential data associated with the particles contained at a given node
+    /// # Arguments
+    /// * `key` - The target leaf node.
+    fn potential(
+        &self,
+        leaf: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
+    ) -> Option<Vec<&[Self::Scalar]>>;
+
     /// Get the multipole expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The source node.

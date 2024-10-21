@@ -348,13 +348,20 @@ where
                                         })
                                         .collect_vec();
 
-                                    for (&charges, source_coordinates_row_major) in
-                                        charges.iter().zip(sources_coordinates)
+                                    for (i, (&charges, source_coordinates_row_major)) in
+                                        charges.iter().zip(sources_coordinates).enumerate()
                                     {
                                         let nsources =
                                             source_coordinates_row_major.len() / self.dim;
 
                                         if nsources > 0 {
+                                            // if leaf.morton == 5 {
+                                            //     println!(
+                                            //         "HERE SINGLE {:?} {:?} index {:?}",
+                                            //         "inf", source_coordinates_row_major, u_list[i]
+                                            //     );
+                                            // }
+
                                             let result = unsafe {
                                                 std::slice::from_raw_parts_mut(
                                                     potential_send_pointer.raw,

@@ -412,19 +412,6 @@ where
                 available_queries_counts.push(counter_rank);
                 available_queries_displacements.push(counter);
 
-                let key = MortonKey::<Scalar::Real>::from_morton(4611686018427387909);
-                if available_queries.contains(&key) {
-                    let key = MortonKey::from_morton(key.morton);
-                    let &leaf_idx = self.tree.source_tree().leaf_index(&key).unwrap();
-                    let index_pointer = &self.charge_index_pointer_sources[leaf_idx];
-                    let charges = &self.charges[index_pointer.0..index_pointer.1];
-                    let coordinates = self.tree.source_tree.coordinates(&key);
-                    println!(
-                        "THAT QUERY RECEIVED {:?} {:?} at rank {:?}",
-                        coordinates, charges, self.rank
-                    );
-                }
-
                 let available_coordinates_rank = available_coordinates_rank.concat();
                 available_coordinates.extend(available_coordinates_rank);
                 available_coordinates_counts.push(counter_coordinates_rank);
@@ -592,18 +579,6 @@ where
 
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
-        }
-
-        let key = MortonKey::<Scalar::Real>::from_morton(261208778387488773);
-        if requested_queries.contains(&key) {
-            // let key = MortonKey::from_morton(key.morton);
-            // let &leaf_idx = self.tree.source_tree().leaf_index(&key).unwrap();
-            // let index_pointer = &self.charge_index_pointer_sources[leaf_idx];
-            // let charges = &self.charges[index_pointer.0..index_pointer.1];
-            // let coordinates = self.tree.source_tree.coordinates(&key);
-            // println!("THAT QUERY RECEIVED {:?} {:?} at rank {:?}", coordinates, charges, self.rank);
-            println!("RANK {:?} GOT BACK DATA FROM {:?}", self.rank, key);
-            println!("ALL RECEIVED COORDIANTES {:?}", requested_coordinates.len())
         }
 
         // Communicate ghost charge data

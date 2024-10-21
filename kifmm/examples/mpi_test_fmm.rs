@@ -28,7 +28,7 @@ fn main() {
     let prune_empty = false;
     let n_points = 10000;
     let local_depth = 3;
-    let global_depth = 1;
+    let global_depth = 2;
     let sort_kind = SortKind::Samplesort { k: 100 };
 
     // Fmm Parameters
@@ -126,24 +126,45 @@ fn main() {
             &mut expected,
         );
 
-        let level = 4;
-        for key in fmm.tree.target_tree.keys(level).unwrap() {
-            let l1 = single_fmm.local(key).unwrap();
-            let l2 = fmm.local(key).unwrap();
+        // let level = 4;
+        // for key in fmm.tree.target_tree.keys(level).unwrap() {
+        //     let l1 = single_fmm.local(key).unwrap();
+        //     let l2 = fmm.local(key).unwrap();
 
-            println!("same? {:?}={:?}", &l1[0..5], &l2[0..5])
-        }
+        //     // println!("same? {:?}={:?}", &l1[0..5], &l2[0..5])
+        // }
 
         //     // println!("distributed {:?} {:?}", &fmm.tree.target_tree.keys.len(), fmm.global_fmm.tree.target_tree.keys.len());
         //     // println!("single {:?}", &single_fmm.tree.target_tree.keys.len());
+        let leaf = &single_fmm.tree.target_tree.leaves[0];
+        let found_single = single_fmm.potential(&leaf);
+        let found = fmm.potential(&leaf);
 
         println!(
             "{:?} expected: {:?} \n found: {:?} \n found single {:?}",
             world.rank(),
-            &expected[15..20],
-            &fmm.potentials[15..20],
-            &single_fmm.potentials[15..20]
+            &expected[0..10],
+            &fmm.potentials[0..10],
+            &single_fmm.potentials[0..10],
         );
+
+        let distributed = &fmm.potentials;
+
+        distributed.iter().zip(expected.iter()).for_each(|(f, e)| {
+            assert!(((f-e).abs()/e.abs()) < 1e-3)
+        });
+
+        // let leaf = &single_fmm.tree.target_tree.leaves[0];
+        // let found_single = single_fmm.potential(&leaf);
+        // let found = fmm.potential(&leaf);
+
+        // println!(
+        //     "{:?} expected: {:?} \n found: {:?} \n found single {:?}",
+        //     world.rank(),
+        //     leaf,
+        //     found,
+        //     found_single
+        // );
     }
 }
 

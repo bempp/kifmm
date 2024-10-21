@@ -59,6 +59,24 @@ where
         &self.tree
     }
 
+    fn potential(
+        &self,
+        leaf: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as crate::traits::tree::SingleTree>::Node,
+    ) -> Option<Vec<&[Self::Scalar]>> {
+        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
+            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
+
+            match self.fmm_eval_type {
+                FmmEvalType::Matrix(_) => None,
+                FmmEvalType::Vector => Some(vec![
+                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
+                ]),
+            }
+        } else {
+            None
+        }
+    }
+
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
         if let Some(n_sources) = self.tree().source_tree().n_keys(level) {
             let multipole_ptr = &self.level_multipoles[level as usize][0];
