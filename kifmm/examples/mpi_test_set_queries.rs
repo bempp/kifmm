@@ -21,7 +21,6 @@ fn main() {
     // let universe = mpi::initialize().unwrap();
     let world = universe.world();
     let comm = world.duplicate();
-    let rank = comm.rank();
 
     // Tree parameters
     let prune_empty = true;

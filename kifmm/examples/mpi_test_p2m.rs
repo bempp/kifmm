@@ -3,25 +3,24 @@ fn main() {
     use std::collections::HashMap;
 
     use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
-    use itertools::{izip, Itertools};
+    use itertools::Itertools;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
             field::SourceTranslation,
-            fmm::{DataAccessMulti, EvaluateMulti},
-            general::multi_node::GhostExchange,
-            tree::{MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
+            fmm::DataAccessMulti,
+            tree::{MultiFmmTree, MultiTree},
         },
         tree::{
             helpers::points_fixture,
             types::{MortonKey, SortKind},
         },
-        DataAccess, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        DataAccess, FftFieldTranslation, SingleNodeBuilder,
     };
 
     use rayon::ThreadPoolBuilder;
 
-    use mpi::{collective::SystemOperation, datatype::PartitionMut, traits::*};
+    use mpi::{datatype::PartitionMut, traits::*};
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();

@@ -1,18 +1,18 @@
 #[cfg(feature = "mpi")]
 fn main() {
-    use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
+    use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
-            fmm::{DataAccessMulti, EvaluateMulti},
+            fmm::DataAccessMulti,
             general::multi_node::GhostExchange,
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{
             helpers::points_fixture,
-            types::{Domain, MortonKey, SortKind},
+            types::{MortonKey, SortKind},
         },
-        Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        FftFieldTranslation, SingleNodeBuilder,
     };
 
     use rayon::ThreadPoolBuilder;
@@ -106,7 +106,6 @@ fn main() {
         root_process.gather_into(&n_keys);
     }
 
-    let n_keys = keys_counts.iter().sum::<i32>();
     let mut all_keys = vec![MortonKey::<f32>::default(); keys_counts.iter().sum::<i32>() as usize];
 
     if world.rank() == 0 {
@@ -147,7 +146,6 @@ fn main() {
             .build()
             .unwrap();
 
-        let n = fmm.global_fmm.tree.source_tree.keys.len() as i32;
         // println!("found {:?} expected {:?}", keys_counts.iter().sum::<i32>() + n, single_fmm.tree.source_tree.keys.len())
 
         for key in all_keys.iter() {

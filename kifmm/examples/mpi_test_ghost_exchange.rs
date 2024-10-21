@@ -1,46 +1,20 @@
-fn approx_equal(a: f32, b: f32, epsilon: f32) -> bool {
-    (a - b).abs() < epsilon
-}
-
-fn find_subvector(haystack: &[f32], needle: &[f32], epsilon: f32) -> Option<usize> {
-    // Ensure the needle is smaller or equal in length to the haystack
-    if needle.len() > haystack.len() {
-        return None;
-    }
-
-    for i in 0..=haystack.len() - needle.len() {
-        if haystack[i..i + needle.len()]
-            .iter()
-            .zip(needle.iter())
-            .all(|(&h, &n)| approx_equal(h, n, epsilon))
-        {
-            return Some(i); // Return the starting index
-        }
-    }
-    None // Return None if the subvector is not found
-}
-
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
-    use itertools::{izip, Itertools};
+    use itertools::Itertools;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
             fmm::{DataAccessMulti, EvaluateMulti},
-            general::multi_node::GhostExchange,
             tree::{MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
         },
-        tree::{
-            helpers::points_fixture,
-            types::{MortonKey, SortKind},
-        },
+        tree::{helpers::points_fixture, types::SortKind},
         DataAccess, Evaluate, FftFieldTranslation, SingleNodeBuilder,
     };
 
     use rayon::ThreadPoolBuilder;
 
-    use mpi::{collective::SystemOperation, datatype::PartitionMut, traits::*};
+    use mpi::{datatype::PartitionMut, traits::*};
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
@@ -140,16 +114,6 @@ fn main() {
         let local_coords = fmm.tree().source_tree().all_coordinates().unwrap();
         root_process.gather_varcount_into(local_coords);
     }
-
-    // Test that
-
-    // let needle = vec![0.18512774, 0.15292609, 0.2774359];
-    // let epsilon = 1e-6; // Tolerance for approximate equality
-
-    // match find_subvector(&fmm.tree().source_tree().all_coordinates().unwrap(), &needle, epsilon) {
-    //     Some(index) => println!("Subvector found starting at index {} at rank {:?}", index, rank),
-    //     None => println!("Subvector not found in rank {:?}", rank),
-    // }
 
     if world.rank() == 0 {
         let mut single_fmm = SingleNodeBuilder::new()
