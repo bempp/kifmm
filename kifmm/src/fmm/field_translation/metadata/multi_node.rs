@@ -604,6 +604,7 @@ where
             c_vt: c_vt_,
         };
 
+        // Update metadata for global, local and ghost FMM objects
         self.global_fmm.source_to_target.metadata.push(result_);
         self.global_fmm
             .source_to_target
@@ -613,12 +614,17 @@ where
             .source_to_target
             .directional_cutoff_ranks
             .push(directional_cutoff_ranks.clone());
+        self.global_fmm.source_to_target.transfer_vectors =
+            self.source_to_target.transfer_vectors.clone();
 
         self.source_to_target.metadata.push(result);
         self.source_to_target.cutoff_rank.push(cutoff_rank);
         self.source_to_target
             .directional_cutoff_ranks
             .push(directional_cutoff_ranks);
+
+        self.ghost_fmm_v.source_to_target.transfer_vectors =
+            self.source_to_target.transfer_vectors.clone();
     }
 }
 

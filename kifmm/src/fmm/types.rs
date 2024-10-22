@@ -1,10 +1,12 @@
 //! Data structures for kernel independent FMM
-use pulp as _;
 use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use num::traits::Float;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, SliceContainer, VectorContainer};
+use rlst::{
+    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
+    SliceContainer, VectorContainer,
+};
 
 use crate::{
     linalg::rsvd::Normaliser,
@@ -653,6 +655,37 @@ where
     pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
 }
 
+impl<Scalar> Clone for FftFieldTranslation<Scalar>
+where
+    Scalar: RlstScalar + AsComplex + Default + Dft,
+    Scalar::Real: Clone,
+    <Scalar as AsComplex>::ComplexType: Clone,
+    FftMetadata<<Scalar as AsComplex>::ComplexType>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+{
+    fn clone(&self) -> Self {
+        FftFieldTranslation {
+            surf_to_conv_map: self.surf_to_conv_map.clone(),
+            conv_to_surf_map: self.conv_to_surf_map.clone(),
+            block_size: self.block_size, // Copy as it's a primitive type (usize)
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<usize> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+        }
+    }
+}
+
 /// Stores data and metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Our compressions scheme is based on [[Messner et. al, 2012](https://arxiv.org/abs/1210.7292)]. We take the a SVD over
@@ -702,6 +735,39 @@ where
 
     /// Select SVD algorithm for compression, either deterministic or randomised
     pub svd_mode: FmmSvdMode,
+}
+
+impl<Scalar> Clone for BlasFieldTranslationSaRcmp<Scalar>
+where
+    Scalar: RlstScalar,
+    Scalar::Real: Clone,
+    BlasMetadataSaRcmp<Scalar>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+    FmmSvdMode: Clone,
+{
+    fn clone(&self) -> Self {
+        BlasFieldTranslationSaRcmp {
+            threshold: self.threshold,
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            cutoff_rank: self.cutoff_rank.clone(),
+            directional_cutoff_ranks: self.directional_cutoff_ranks.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<i32> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+            surface_diff: self.surface_diff,
+            svd_mode: self.svd_mode,
+        }
+    }
 }
 
 /// Variants of SVD algorithms
@@ -928,6 +994,36 @@ where
     pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
 }
 
+impl<Scalar> Clone for BlasMetadataSaRcmp<Scalar>
+where
+    Scalar: RlstScalar + Clone,
+{
+    fn clone(&self) -> Self {
+        let mut u = rlst_dynamic_array2!(Scalar, self.u.shape());
+        u.data_mut().copy_from_slice(self.u.data());
+
+        let mut st = rlst_dynamic_array2!(Scalar, self.st.shape());
+        st.data_mut().copy_from_slice(self.st.data());
+
+        let mut c_u = Vec::new();
+        let mut c_vt = Vec::new();
+
+        for item in self.c_u.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            c_u.push(tmp);
+        }
+
+        for item in self.c_vt.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            c_vt.push(tmp);
+        }
+
+        Self { u, st, c_u, c_vt }
+    }
+}
+
 /// Stores metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
@@ -944,6 +1040,30 @@ where
 
     /// Right singular vectors of compressed M2L matrix, truncated to a maximum cutoff rank
     pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+}
+
+impl<Scalar> Clone for BlasMetadataIa<Scalar>
+where
+    Scalar: RlstScalar + Clone,
+{
+    fn clone(&self) -> Self {
+        let mut u = Vec::new();
+        let mut vt = Vec::new();
+
+        for item in self.u.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            u.push(tmp);
+        }
+
+        for item in self.vt.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            vt.push(tmp);
+        }
+
+        Self { u, vt }
+    }
 }
 
 impl<T> Default for BlasMetadataSaRcmp<T>

@@ -36,7 +36,7 @@ where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Epsilon + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
-    FieldTranslation: FieldTranslationTrait + Default,
+    FieldTranslation: FieldTranslationTrait + Default + Clone,
     KiFmmMulti<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
         + SourceTranslationMetadata
         + TargetTranslationMetadata

@@ -265,35 +265,6 @@ where
                                             .collect_vec(),
                                     );
 
-                                    // let mut tmp = Vec::new();
-                                    // // handle locally contained source boxes
-                                    // tmp.push(
-                                    //     u_list
-                                    //         .iter()
-                                    //         .filter_map(|k| {
-                                    //             if source_leaf_to_index.get(k).is_some() {
-                                    //                 Some(k) // Return the key if the element exists
-                                    //             } else {
-                                    //                 None
-                                    //             }
-                                    //         })
-                                    //         .collect_vec(),
-                                    // );
-
-                                    // // handle ghost source boxes
-                                    // tmp.push(
-                                    //     u_list
-                                    //         .iter()
-                                    //         .filter_map(|k| {
-                                    //             if source_leaf_to_index_ghosts.get(k).is_some() {
-                                    //                 Some(k) // Return the key if the element exists
-                                    //             } else {
-                                    //                 None
-                                    //             }
-                                    //         })
-                                    //         .collect_vec(),
-                                    // );
-
                                     for (i, u_list_indices) in all_u_list_indices.iter().enumerate()
                                     {
                                         let charges = u_list_indices

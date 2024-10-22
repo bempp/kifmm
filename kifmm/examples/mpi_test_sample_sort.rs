@@ -8,7 +8,7 @@ use rlst::{RawAccess, RlstScalar};
 use kifmm::{traits::tree::SingleTree, tree::helpers::points_fixture};
 
 #[cfg(feature = "mpi")]
-use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::*};
+use mpi::{environment::Universe, topology::SimpleCommunicator, traits::Equivalence, traits::{Communicator, CommunicatorCollectives, Group, Root}};
 
 #[cfg(feature = "mpi")]
 use kifmm::tree::types::{Domain, MortonKey, MultiNodeTree};

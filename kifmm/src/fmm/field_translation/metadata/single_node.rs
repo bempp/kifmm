@@ -1422,8 +1422,6 @@ where
             2
         };
 
-        let all_transfer_vectors = compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap();
-
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
 
@@ -1469,7 +1467,9 @@ where
                             transfer_vectors.into_iter().collect();
 
                         // Mark items in interaction list for scattering
-                        for (tv_idx, tv) in all_transfer_vectors.iter().enumerate() {
+                        for (tv_idx, tv) in
+                            self.source_to_target.transfer_vectors.iter().enumerate()
+                        {
                             let mut result_lock = result[tv_idx].write().unwrap();
                             if transfer_vectors_set.contains(&tv.hash) {
                                 // Look up scatter location in target tree

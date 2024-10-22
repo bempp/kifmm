@@ -2,6 +2,10 @@
 
 - weak scaling script
 
+- add tests for sorting algorithms
+
+- clean up all parallel tests, and remove ones that aren't being used anymore
+
 - Need to test threading controls i.e. trade-off between threading choices on MPI and rayon threads
 
 - Need to figure out how to pin MPI processes to nodes for performance on Archer 2, NUMA aware deployment etc
