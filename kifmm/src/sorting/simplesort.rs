@@ -17,60 +17,56 @@ use mpi::{
 ///
 /// This is suitable for approximately uniform distributions, with low-numbers of MPI processes. In which case
 /// it assures a relatively uniform load balance, such that each MPI process is pinned to a given physical CPU.
+///
+/// # Arguments
+/// * `array`- Local part of distributed array to be sorted
+/// * `communicator`- Reference to underlying MPI communicator
+/// * `splitters` - The buckets used to define the sort, must match the number of MPI processes, are equivalent to the max value
+///  of the first splitters.len() - 1 buckets
 pub fn simplesort<T>(
-    arr: &mut Vec<T>,
-    comm: &SimpleCommunicator,
-    splitters: &[T],
+    array: &mut Vec<T>,
+    communicator: &SimpleCommunicator,
+    splitters: &mut [T],
 ) -> Result<(), std::io::Error>
 where
     T: Equivalence + Ord + Default + Clone + Debug,
 {
-    if splitters.len() != (comm.size() - 1).try_into().unwrap() {
+    if splitters.len() != ((communicator.size() - 1) as usize) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
             "The number of splitters must be size-1, i.e. need to explicitly define split for all MPI processes",
         ));
     }
 
-    let size = comm.size();
+    // Splitters must also be ordered
+    splitters.sort();
+
+    let size = communicator.size();
 
     // Perform local sort
-    arr.sort();
+    array.sort();
 
     // Sort local data into buckets
-    let nsplitters = size - 1;
-    let mut splitter_index: i32 = 0;
-    let mut l = 0;
-    let mut count = 0;
-    let mut splitter_indices = vec![(0i32, 0i32); nsplitters as usize];
-
-    for item in arr.iter() {
-        while splitter_index < nsplitters && item >= &splitters[splitter_index as usize] {
-            if count > 0 {
-                // Record the segment from l to l + count - 1
-                splitter_indices[splitter_index as usize] = (l, l + count - 1);
-                // Update l to the start of the next segment
-                l += count;
-            } else {
-                // If count is 0, we need to move l forward by 1 to ensure correct indexing
-                splitter_indices[splitter_index as usize] = (l, l);
-                l += 1;
+    let mut ranks = Vec::new();
+    for item in array.iter() {
+        let mut rank_index = -1i32;
+        for (i, splitter) in splitters.iter().enumerate() {
+            if item < splitter {
+                rank_index = i as i32;
+                break;
             }
-            // Reset count and move to the next splitter
-            count = 0;
-            splitter_index += 1;
+            if rank_index == -1i32 {
+                rank_index = splitters.len() as i32
+            }
         }
 
-        // If we haven't encountered a splitter that this item is larger than, increment count
-        count += 1;
+        ranks.push(rank_index);
     }
 
-    splitter_indices.push((l, l + count - 1));
-
-    let counts_snd = splitter_indices
-        .iter()
-        .map(|(l, r)| if r - l > 0 { r - l + 1 } else { 0 })
-        .collect_vec();
+    let mut counts_snd = vec![0i32; size as usize];
+    for &rank in ranks.iter() {
+        counts_snd[rank as usize] += 1
+    }
 
     let displs_snd = counts_snd
         .iter()
@@ -83,7 +79,7 @@ where
 
     let mut counts_recv = vec![0 as Count; size as usize];
 
-    comm.all_to_all_into(&counts_snd, &mut counts_recv);
+    communicator.all_to_all_into(&counts_snd, &mut counts_recv);
 
     let displs_recv = counts_recv
         .iter()
@@ -99,12 +95,12 @@ where
     let mut received = vec![T::default(); total as usize];
     let mut partition_received: PartitionMut<[T], Vec<i32>, &[i32]> =
         PartitionMut::new(&mut received[..], counts_recv, &displs_recv[..]);
-    let partition_snd = Partition::new(&arr[..], counts_snd, &displs_snd[..]);
+    let partition_snd = Partition::new(&array[..], counts_snd, &displs_snd[..]);
 
-    comm.all_to_all_varcount_into(&partition_snd, &mut partition_received);
+    communicator.all_to_all_varcount_into(&partition_snd, &mut partition_received);
     received.sort();
 
-    *arr = received;
+    *array = received;
 
     Ok(())
 }

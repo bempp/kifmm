@@ -10,87 +10,82 @@ use mpi::{
 };
 use rand::{thread_rng, Rng};
 
-/// A sample sort implementation, where 'k' is the number of samples to take from each sub-array.
-/// Will be approximately load balanced for uniform distributions.
+/// A sample sort implementation, the number of samples must be at most
+/// the size of the local array, and greater than 0.
+///
+/// # Arguments
+/// * `array`- Local part of distributed array to be sorted
+/// * `communicator`- Reference to underlying MPI communicator
+/// * `n_samples` - Number of local samples to take from each array
 pub fn samplesort<T>(
-    arr: &mut Vec<T>,
-    comm: &SimpleCommunicator,
-    k: usize,
+    array: &mut Vec<T>,
+    communicator: &SimpleCommunicator,
+    n_samples: usize,
 ) -> Result<(), std::io::Error>
 where
     T: Equivalence + Ord + Default + Clone + Debug,
 {
-    if k > arr.len() {
+    if n_samples > array.len() {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "k must be less than length of array",
+            "n_samples must be less than length of array",
         ));
-    } else if k == 0 {
+    } else if n_samples == 0 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "k must be greater than 0",
+            "n_samples must be greater than 0",
         ));
     }
 
-    let size = comm.size();
+    let size = communicator.size();
 
     // Perform local sort
-    arr.sort();
+    array.sort();
 
     // 1. Collect k samples from each process onto all other processes
-    let mut received_samples = vec![T::default(); k * (size as usize)];
+    let mut received_samples = vec![T::default(); n_samples * (size as usize)];
     let mut rng = thread_rng();
-    let sample_idxs: Vec<usize> = (0..k).map(|_| rng.gen_range(0..arr.len())).collect();
+    let sample_idxs: Vec<usize> = (0..n_samples)
+        .map(|_| rng.gen_range(0..array.len()))
+        .collect();
 
     let local_samples = sample_idxs
         .into_iter()
-        .map(|i| arr[i].clone())
+        .map(|i| array[i].clone())
         .collect_vec();
 
-    comm.all_gather_into(&local_samples[..], &mut received_samples[..]);
+    communicator.all_gather_into(&local_samples[..], &mut received_samples[..]);
 
     // Ignore first k samples to ensure size-1 splitters
     received_samples.sort();
-    received_samples = received_samples[k..].to_vec();
+    received_samples = received_samples[n_samples..].to_vec();
 
     // Every k'th sample defines a bucket
-    let splitters = received_samples.into_iter().step_by(k).collect_vec();
-    let nsplitters = size - 1;
-    // let mut counts_snd = Vec::new();
+    let splitters = received_samples
+        .into_iter()
+        .step_by(n_samples)
+        .collect_vec();
 
-    // 2. Sort local data into buckets
-    let mut splitter_index: i32 = 0;
-    let mut l = 0;
-    let mut count = 0;
-    let mut splitter_indices = vec![(0i32, 0i32); nsplitters as usize];
-
-    for item in arr.iter() {
-        while splitter_index < nsplitters && item >= &splitters[splitter_index as usize] {
-            if count > 0 {
-                // Record the segment from l to l + count - 1
-                splitter_indices[splitter_index as usize] = (l, l + count - 1);
-                // Update l to the start of the next segment
-                l += count;
-            } else {
-                // If count is 0, we need to move l forward by 1 to ensure correct indexing
-                splitter_indices[splitter_index as usize] = (l, l);
-                l += 1;
+    let mut ranks = Vec::new();
+    for item in array.iter() {
+        let mut rank_index = -1i32;
+        for (i, splitter) in splitters.iter().enumerate() {
+            if item < splitter {
+                rank_index = i as i32;
+                break;
             }
-            // Reset count and move to the next splitter
-            count = 0;
-            splitter_index += 1;
+            if rank_index == -1i32 {
+                rank_index = splitters.len() as i32
+            }
         }
 
-        // If we haven't encountered a splitter that this item is larger than, increment count
-        count += 1;
+        ranks.push(rank_index);
     }
 
-    splitter_indices.push((l, l + count - 1));
-
-    let counts_snd = splitter_indices
-        .iter()
-        .map(|(l, r)| if r - l > 0 { r - l + 1 } else { 0 })
-        .collect_vec();
+    let mut counts_snd = vec![0i32; size as usize];
+    for &rank in ranks.iter() {
+        counts_snd[rank as usize] += 1
+    }
 
     let displs_snd = counts_snd
         .iter()
@@ -103,7 +98,7 @@ where
 
     let mut counts_recv = vec![0 as Count; size as usize];
 
-    comm.all_to_all_into(&counts_snd, &mut counts_recv);
+    communicator.all_to_all_into(&counts_snd, &mut counts_recv);
 
     let displs_recv = counts_recv
         .iter()
@@ -119,11 +114,11 @@ where
     let mut received = vec![T::default(); total as usize];
     let mut partition_received =
         PartitionMut::new(&mut received[..], counts_recv, &displs_recv[..]);
-    let partition_snd = Partition::new(&arr[..], counts_snd, &displs_snd[..]);
+    let partition_snd = Partition::new(&array[..], counts_snd, &displs_snd[..]);
 
-    comm.all_to_all_varcount_into(&partition_snd, &mut partition_received);
+    communicator.all_to_all_varcount_into(&partition_snd, &mut partition_received);
     received.sort();
-    *arr = received;
+    *array = received;
 
     Ok(())
 }

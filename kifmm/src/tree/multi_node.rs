@@ -22,7 +22,7 @@ use std::collections::{HashMap, HashSet};
 
 use super::types::{MultiNodeTree, SortKind};
 
-impl<T, C: Communicator> MultiNodeTree<T, C>
+impl<T> MultiNodeTree<T, SimpleCommunicator>
 where
     T: RlstScalar + Float + Equivalence + Default,
 {
@@ -34,7 +34,7 @@ where
         local_depth: u64,
         global_depth: u64,
         global_indices: &[usize],
-        comm: &C,
+        comm: &SimpleCommunicator,
         sort_kind: SortKind,
         prune_empty: bool,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
@@ -61,8 +61,8 @@ where
 
         // Perform parallel Morton sort over encoded points
         match sort_kind {
-            SortKind::Hyksort { k } => hyksort(&mut points, k, comm.duplicate())?,
-            SortKind::Samplesort { k } => samplesort(&mut points, &comm.duplicate(), k)?,
+            SortKind::Hyksort { k } => hyksort(&mut points, k, comm)?,
+            SortKind::Samplesort { k } => samplesort(&mut points, comm, k)?,
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters
@@ -75,8 +75,8 @@ where
                     })
                     .collect_vec();
                 splitters.sort();
-                let splitters = &splitters[1..];
-                simplesort(&mut points, &comm.duplicate(), splitters)?;
+                let splitters = &mut splitters[1..];
+                simplesort(&mut points, comm, splitters)?;
             }
         }
 
@@ -228,7 +228,7 @@ where
 
     /// Constructor for multinode trees
     pub fn new(
-        comm: &C,
+        comm: &SimpleCommunicator,
         coordinates_row_major: &[T],
         local_depth: u64,
         global_depth: u64,

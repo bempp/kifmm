@@ -146,8 +146,6 @@ fn main() {
             .build()
             .unwrap();
 
-        // println!("found {:?} expected {:?}", keys_counts.iter().sum::<i32>() + n, single_fmm.tree.source_tree.keys.len())
-
         for key in all_keys.iter() {
             assert!(single_fmm.tree.source_tree.keys_set.contains(key))
         }
