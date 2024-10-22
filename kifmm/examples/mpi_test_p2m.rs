@@ -235,8 +235,14 @@ fn main() {
             .collect_vec();
 
         let threshold = 1e-5;
+
+        // Test that the leaves being considered are also the same
         assert_eq!(leaves.len(), global_leaves.len());
+
+        // Test that the multipoles found are the same globally as locally
         assert!(error.iter().sum::<f32>() <= threshold);
+
+        println!("...test_p2m passed");
     }
 }
 

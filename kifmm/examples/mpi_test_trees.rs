@@ -94,8 +94,7 @@ fn main() {
         root_process.gather_varcount_into(local_coords);
     }
 
-    // Gather all leaves
-
+    // Gather all keys
     let mut keys_counts = vec![0i32; world.size() as usize];
     if world.rank() == 0 {
         let n_keys = fmm.tree.source_tree.keys.len() as i32;
@@ -125,6 +124,37 @@ fn main() {
         root_process.gather_varcount_into(&keys[..]);
     }
 
+    // Gather all leaves
+    let mut leaves_counts = vec![0i32; world.size() as usize];
+    if world.rank() == 0 {
+        let n_leaves = fmm.tree.source_tree.leaves.len() as i32;
+
+        root_process.gather_into_root(&n_leaves, &mut leaves_counts);
+    } else {
+        let n_leaves = fmm.tree.source_tree.leaves.len() as i32;
+        root_process.gather_into(&n_leaves);
+    }
+
+    let mut all_leaves =
+        vec![MortonKey::<f32>::default(); leaves_counts.iter().sum::<i32>() as usize];
+
+    if world.rank() == 0 {
+        let mut leaves_displacements = Vec::new();
+        let mut displacement = 0;
+        for count in leaves_counts.iter() {
+            leaves_displacements.push(displacement);
+            displacement += count;
+        }
+
+        let mut partition = PartitionMut::new(&mut all_leaves, leaves_counts, leaves_displacements);
+
+        let leaves = &fmm.tree.source_tree.leaves.keys;
+        root_process.gather_varcount_into_root(&leaves[..], &mut partition);
+    } else {
+        let leaves = &fmm.tree.source_tree.leaves.keys;
+        root_process.gather_varcount_into(&leaves[..]);
+    }
+
     if world.rank() == 0 {
         let single_fmm = SingleNodeBuilder::new()
             .tree(
@@ -146,36 +176,20 @@ fn main() {
             .build()
             .unwrap();
 
+        // Test that all keys are contained
         for key in all_keys.iter() {
             assert!(single_fmm.tree.source_tree.keys_set.contains(key))
         }
+        println!("...test_keys passed");
 
-        println!(
-            "found {:?} expected {:?}",
-            all_keys.len(),
-            single_fmm.tree.source_tree.keys.len()
-        )
+        // Test that all leaves span the same domain as if constructed locally
+        assert_eq!(single_fmm.tree.source_tree.leaves.len(), all_leaves.len());
 
-        // let mut expected = vec![0f32; &fmm.tree.target_tree.coordinates.len() / 3];
+        for leaf in all_leaves.iter() {
+            assert!(single_fmm.tree.source_tree.leaves_set.contains(leaf))
+        }
 
-        // fmm.kernel.evaluate_st(
-        //     GreenKernelEvalType::Value,
-        //     &all_coordinates,
-        //     &fmm.tree.target_tree.coordinates,
-        //     &vec![1f32; n_points * world.size() as usize],
-        //     &mut expected,
-        // );
-
-        //     // println!("distributed {:?} {:?}", &fmm.tree.target_tree.keys.len(), fmm.global_fmm.tree.target_tree.keys.len());
-        //     // println!("single {:?}", &single_fmm.tree.target_tree.keys.len());
-
-        // println!(
-        //     "{:?} expected: {:?} \n found: {:?} \n found single {:?}",
-        //     world.rank(),
-        //     &expected[0..10],
-        //     &fmm.potentials[0..10],
-        //     &single_fmm.potentials[0..10]
-        // );
+        println!("...test_leaves passed");
     }
 }
 

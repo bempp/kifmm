@@ -30,7 +30,6 @@ fn main() {
     // Fmm Parameters
     let expansion_order = 4;
     let kernel = Laplace3dKernel::<f32>::new();
-    // let source_to_target = FftFieldTranslation::<f32>::new(None);
     let source_to_target =
         BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
 
@@ -196,6 +195,8 @@ fn main() {
 
         let threshold = 1e-3;
         assert!(rel_error <= threshold);
+
+        println!("...test_upward_pass passed");
     }
 }
 
