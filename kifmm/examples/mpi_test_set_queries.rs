@@ -18,7 +18,6 @@ fn main() {
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
-    // let universe = mpi::initialize().unwrap();
     let world = universe.world();
     let comm = world.duplicate();
 
@@ -27,7 +26,7 @@ fn main() {
     let n_points = 10000;
     let local_depth = 2;
     let global_depth = 2;
-    let sort_kind = SortKind::Samplesort { k: 100 };
+    let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
     // Fmm Parameters
     let expansion_order = 4;

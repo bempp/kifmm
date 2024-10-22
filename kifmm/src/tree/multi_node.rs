@@ -61,8 +61,8 @@ where
 
         // Perform parallel Morton sort over encoded points
         match sort_kind {
-            SortKind::Hyksort { k } => hyksort(&mut points, k, comm)?,
-            SortKind::Samplesort { k } => samplesort(&mut points, comm, k)?,
+            SortKind::Hyksort { subcomm_size } => hyksort(&mut points, subcomm_size, comm)?,
+            SortKind::Samplesort { n_samples } => samplesort(&mut points, comm, n_samples)?,
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters

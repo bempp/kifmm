@@ -331,13 +331,13 @@ pub enum SortKind {
     /// Hypercube communication scheme based quicksort
     Hyksort {
         /// Subcommunicator size, restricted to being a power of 2
-        k: i32,
+        subcomm_size: i32,
     },
 
     /// Sample sort, variant of bucket sort
     Samplesort {
         /// The size of each sample from each MPI process
-        k: usize,
+        n_samples: usize,
     },
 
     /// Simple sort, variant of bucket sort

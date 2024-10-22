@@ -25,7 +25,7 @@ fn main() {
     let n_points = 10000;
     let local_depth = 3;
     let global_depth = 1;
-    let sort_kind = SortKind::Samplesort { k: 100 };
+    let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
     // Fmm Parameters
     let expansion_order = 4;

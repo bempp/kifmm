@@ -116,6 +116,8 @@ pub use traits::fmm::DataAccess;
 #[warn(missing_docs)]
 pub mod bindings;
 
+use pulp as _; // To avoid lint error on CI where no simd enabled
+
 #[cfg(test)]
 mod test {
     use criterion as _; // Hack to show that criterion is used, as cargo test does not see benches
