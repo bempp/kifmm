@@ -208,3 +208,13 @@ where
 
     result
 }
+
+// /// Test weak scaling
+// pub fn weak_scaling(
+//     expansion_order: usize,
+//     n_points_per_process: usize,
+//     threads_per_process: usize
+// ) {
+
+
+// }

@@ -26,7 +26,7 @@ num = "0.4"
 rayon = "1.9"
 rand = "0.8.5"
 kifmm-fftw-sys = { path = "../fftw-sys" }
-green-kernels = { version = "0.2.0"}
+green-kernels = { version = "0.2.2"}
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
