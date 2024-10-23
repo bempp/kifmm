@@ -112,7 +112,6 @@ where
             points.extend_from_slice(tree.points.as_slice());
         }
 
-        // keys.sort();
         leaves.sort();
         points.sort();
 

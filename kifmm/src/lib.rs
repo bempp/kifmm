@@ -42,7 +42,7 @@
 //!     charges.data_mut().copy_from_slice(&tmp);
 //!
 //!     // Build FMM object, with a given kernel and field translation
-//!     let mut fmm_fft = SingleNodeBuilder::new()
+//!     let mut fmm_fft = SingleNodeBuilder::new(false)
 //!         .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 //!         .unwrap()
 //!         .parameters(
@@ -57,7 +57,7 @@
 //!         .unwrap();
 //!
 //!     // Run the FMM
-//!     fmm_fft.evaluate(false);
+//!     fmm_fft.evaluate();
 //!
 //!     // Optionally clear, to re-evaluate with new charges
 //!     let nvecs = 1;

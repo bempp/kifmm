@@ -41,7 +41,7 @@ fn main() {
         .unwrap();
 
     // Queries are set as a part of the build
-    let fmm = MultiNodeBuilder::new()
+    let fmm = MultiNodeBuilder::new(false)
         .tree(
             &comm,
             points.data(),

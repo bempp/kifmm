@@ -188,19 +188,19 @@ where
     Self: DataAccess,
 {
     /// Evaluate the leaf level operations for source tree
-    fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_leaf_sources(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the leaf level operations for target tree
-    fn evaluate_leaf_targets(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_leaf_targets(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the upward pass
-    fn evaluate_upward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_upward_pass(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the downward pass
-    fn evaluate_downward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_downward_pass(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate(&mut self) -> Result<(), FmmError>;
 }
 
 /// Interface for multi node FMM
@@ -210,19 +210,19 @@ where
     Self: DataAccessMulti,
 {
     /// Evaluate the leaf level operations for source tree
-    fn evaluate_leaf_sources(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_leaf_sources(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the leaf level operations for target tree
-    fn evaluate_leaf_targets(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_leaf_targets(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the upward pass
-    fn evaluate_upward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_upward_pass(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the downward pass
-    fn evaluate_downward_pass(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate_downward_pass(&mut self) -> Result<(), FmmError>;
 
     /// Evaluate the potentials, or potential gradients, for this FMM
-    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError>;
+    fn evaluate(&mut self) -> Result<(), FmmError>;
 }
 
 /// Set all metadata required for FMMs

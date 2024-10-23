@@ -219,7 +219,6 @@ where
             root_process.gather_varcount_into(&local_roots);
         }
 
-        // TEST: Test displacements
         // Calculate displacements required for M2L
         if rank == root_rank {
             self.global_fmm.displacements(None)

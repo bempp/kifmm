@@ -24,7 +24,7 @@ fn main() {
         let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -37,7 +37,7 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate(false).unwrap();
+        fmm_fft.evaluate().unwrap();
     }
 
     // BLAS based M2L
@@ -53,7 +53,7 @@ fn main() {
 
         let singular_value_threshold = Some(1e-5);
 
-        let mut fmm_vec = SingleNodeBuilder::new()
+        let mut fmm_vec = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -71,7 +71,7 @@ fn main() {
             .build()
             .unwrap();
 
-        fmm_vec.evaluate(false).unwrap();
+        fmm_vec.evaluate().unwrap();
 
         // Matrix of charges
         let nvecs = 5;
@@ -82,7 +82,7 @@ fn main() {
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
-        let mut fmm_mat = SingleNodeBuilder::new()
+        let mut fmm_mat = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -99,6 +99,6 @@ fn main() {
             .unwrap()
             .build()
             .unwrap();
-        fmm_mat.evaluate(false).unwrap();
+        fmm_mat.evaluate().unwrap();
     }
 }

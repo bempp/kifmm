@@ -12,7 +12,7 @@ use crate::{
 pub mod types {
     use std::ffi::c_void;
 
-    use crate::traits::types::FmmOperatorTime;
+    use crate::traits::types::{CommunicationTime, FmmOperatorTime, MetadataTime};
 
     /// Static FMM type
     #[repr(C)]
@@ -126,6 +126,18 @@ pub mod types {
     #[repr(C)]
     pub struct FmmOperatorTimes {
         pub times: *mut FmmOperatorTime,
+        pub length: usize,
+    }
+
+    #[repr(C)]
+    pub struct MetadataTimes {
+        pub times: *mut MetadataTime,
+        pub length: usize,
+    }
+
+    #[repr(C)]
+    pub struct CommunicationTimes {
+        pub times: *mut CommunicationTime,
         pub length: usize,
     }
 }
@@ -290,14 +302,14 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -311,15 +323,16 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_svd_f32_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -334,10 +347,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
         let depth = if depth > 0 { Some(depth) } else { None };
@@ -354,7 +367,7 @@ pub mod constructors {
             crate::fmm::types::FmmSvdMode::Deterministic,
         );
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -390,14 +403,14 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -411,15 +424,16 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_svd_f64_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -434,10 +448,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
         let depth = if depth > 0 { Some(depth) } else { None };
@@ -454,7 +468,7 @@ pub mod constructors {
             crate::fmm::types::FmmSvdMode::Deterministic,
         );
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -490,14 +504,14 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -513,15 +527,16 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_rsvd_f32_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -538,10 +553,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
         let depth = if depth > 0 { Some(depth) } else { None };
@@ -570,7 +585,7 @@ pub mod constructors {
             crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
         );
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -606,14 +621,14 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -629,15 +644,16 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_rsvd_f64_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -654,10 +670,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
         let depth = if depth > 0 { Some(depth) } else { None };
@@ -686,7 +702,7 @@ pub mod constructors {
             crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
         );
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -721,14 +737,14 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -741,15 +757,16 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn laplace_fft_f32_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -763,10 +780,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -775,7 +792,7 @@ pub mod constructors {
             None
         };
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -810,13 +827,13 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -829,15 +846,16 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn laplace_fft_f64_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -851,10 +869,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -863,7 +881,7 @@ pub mod constructors {
             None
         };
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -899,7 +917,7 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -907,7 +925,7 @@ pub mod constructors {
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -921,8 +939,9 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_blas_svd_f32_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
@@ -930,7 +949,7 @@ pub mod constructors {
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -945,10 +964,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
         let depth = if depth > 0 { Some(depth) } else { None };
@@ -961,7 +980,7 @@ pub mod constructors {
 
         let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -997,7 +1016,7 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1005,7 +1024,7 @@ pub mod constructors {
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -1019,8 +1038,9 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_blas_svd_f64_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
@@ -1028,7 +1048,7 @@ pub mod constructors {
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -1044,10 +1064,10 @@ pub mod constructors {
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
 
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
 
         let depth = if depth > 0 { Some(depth) } else { None };
@@ -1060,7 +1080,7 @@ pub mod constructors {
 
         let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -1095,7 +1115,7 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1103,7 +1123,7 @@ pub mod constructors {
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -1116,8 +1136,9 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_fft_f32_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
@@ -1125,7 +1146,7 @@ pub mod constructors {
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -1139,10 +1160,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -1151,7 +1172,7 @@ pub mod constructors {
             None
         };
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -1186,7 +1207,7 @@ pub mod constructors {
     /// # Parameters
     ///
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `nexpansion_order`: The number of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1194,7 +1215,7 @@ pub mod constructors {
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
     /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
     ///    reached based on a uniform particle distribution.
@@ -1207,8 +1228,9 @@ pub mod constructors {
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_fft_f64_alloc(
+        timed: bool,
         expansion_order: *const usize,
-        nexpansion_order: usize,
+        n_expansion_order: usize,
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
@@ -1216,7 +1238,7 @@ pub mod constructors {
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         prune_empty: bool,
         n_crit: u64,
         depth: u64,
@@ -1230,10 +1252,10 @@ pub mod constructors {
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
-        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
         let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, nexpansion_order) };
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -1242,7 +1264,7 @@ pub mod constructors {
             None
         };
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -1278,18 +1300,394 @@ pub mod api {
     use itertools::Itertools;
 
     use crate::{
+        bindings::MetadataTimes,
         fmm::types::FmmEvalType,
-        traits::fmm::DataAccess,
-        traits::tree::{SingleFmmTree, SingleTree, TreeNode},
+        traits::{
+            fmm::DataAccess,
+            tree::{SingleFmmTree, SingleTree, TreeNode},
+        },
         tree::types::MortonKey,
         BlasFieldTranslationIa, Evaluate, FftFieldTranslation,
     };
 
     use super::{
-        c32, c64, BlasFieldTranslationSaRcmp, Coordinates, FmmCType, FmmEvaluator,
-        FmmOperatorTimes, FmmTranslationCType, GlobalIndices, KiFmm, Laplace3dKernel, MortonKeys,
-        Potential, Potentials, ScalarType,
+        c32, c64, BlasFieldTranslationSaRcmp, CommunicationTimes, Coordinates, FmmCType,
+        FmmEvaluator, FmmOperatorTimes, FmmTranslationCType, GlobalIndices, KiFmm, Laplace3dKernel,
+        MortonKeys, Potential, Potentials, ScalarType,
     };
+
+    /// Get the metadata runtimes
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn communication_times(
+        fmm: *mut FmmEvaluator,
+    ) -> *mut CommunicationTimes {
+        assert!(!fmm.is_null());
+
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let length = unsafe { (*fmm).communication_times.len() };
+                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+
+                    let times = CommunicationTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+        }
+    }
+
+    /// Get the metadata runtimes
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn metadata_times(fmm: *mut FmmEvaluator) -> *mut MetadataTimes {
+        assert!(!fmm.is_null());
+
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let length = unsafe { (*fmm).metadata_times.len() };
+                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+
+                    let times = MetadataTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+        }
+    }
+
+    /// Get the operator runtimes
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn operator_times(fmm: *mut FmmEvaluator) -> *mut FmmOperatorTimes {
+        assert!(!fmm.is_null());
+
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+
+                    let times = FmmOperatorTimes { times, length };
+
+                    Box::into_raw(Box::new(times))
+                }
+            },
+        }
+    }
 
     /// Evaluate the Fast Multipole Method (FMM).
     ///
@@ -1303,10 +1701,7 @@ pub mod api {
     /// - Input data corresponds to valid pointers
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub unsafe extern "C" fn evaluate(
-        fmm: *mut FmmEvaluator,
-        timed: bool,
-    ) -> *mut FmmOperatorTimes {
+    pub unsafe extern "C" fn evaluate(fmm: *mut FmmEvaluator) -> *mut FmmOperatorTimes {
         assert!(!fmm.is_null());
 
         let ctype = unsafe { (*fmm).get_ctype() };
@@ -1318,10 +1713,10 @@ pub mod api {
                 FmmTranslationCType::Fft => {
                     let fmm =
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
-                    let _ = unsafe { (*fmm).evaluate(timed) };
+                    let _ = unsafe { (*fmm).evaluate() };
 
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1332,9 +1727,9 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1347,9 +1742,9 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1360,9 +1755,9 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
                     let times = FmmOperatorTimes { times, length };
 
                     Box::into_raw(Box::new(times))
@@ -1374,9 +1769,9 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1387,9 +1782,9 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1402,9 +1797,9 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1415,9 +1810,9 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let _ = unsafe { (*fmm).evaluate(timed) };
-                    let length = unsafe { (*fmm).times.len() };
-                    let times = unsafe { (*fmm).times.as_mut_ptr() };
+                    let _ = unsafe { (*fmm).evaluate() };
+                    let length = unsafe { (*fmm).operator_times.len() };
+                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
                     let times = FmmOperatorTimes { times, length };
 
@@ -1433,7 +1828,7 @@ pub mod api {
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
     /// - `charges`: A pointer to the new charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -1443,7 +1838,7 @@ pub mod api {
     pub unsafe extern "C" fn clear(
         fmm: *mut FmmEvaluator,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
     ) {
         if !fmm.is_null() {
             let ctype = unsafe { (*fmm).get_ctype() };
@@ -1456,7 +1851,7 @@ pub mod api {
                         let fmm = pointer
                             as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
                         unsafe { (*fmm).clear(charges) };
                     }
 
@@ -1469,7 +1864,7 @@ pub mod api {
                             >;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
                         unsafe { (*fmm).clear(charges) };
                     }
                 },
@@ -1480,7 +1875,7 @@ pub mod api {
                             as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
                         unsafe { (*fmm).clear(charges) };
                     }
@@ -1494,7 +1889,7 @@ pub mod api {
                             >;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
                         unsafe { (*fmm).clear(charges) };
                     }
@@ -1506,7 +1901,7 @@ pub mod api {
                             as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
                         unsafe { (*fmm).clear(charges) };
                     }
@@ -1516,7 +1911,7 @@ pub mod api {
                             as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
                         unsafe { (*fmm).clear(charges) };
                     }
                 },
@@ -1527,7 +1922,7 @@ pub mod api {
                             as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
                         unsafe { (*fmm).clear(charges) };
                     }
 
@@ -1536,7 +1931,7 @@ pub mod api {
                             as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
                         let charges =
-                            unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+                            unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
                         unsafe { (*fmm).clear(charges) };
                     }
                 },
@@ -3346,9 +3741,9 @@ pub mod api {
     /// - `targets`: A pointer to the target points.
     /// - `n_targets`: The length of the target points buffer.
     /// - `charges`: A pointer to the charges associated with the source points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     /// - `result`: A pointer to the results associated with the target points.
-    /// - `ncharges`: The length of the charges buffer.
+    /// - `n_charges`: The length of the charges buffer.
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -3363,7 +3758,7 @@ pub mod api {
         targets: *const c_void,
         n_targets: usize,
         charges: *const c_void,
-        ncharges: usize,
+        n_charges: usize,
         result: *mut c_void,
         nresult: usize,
     ) {
@@ -3391,7 +3786,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3411,7 +3806,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const f32, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3433,7 +3828,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3453,7 +3848,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const f64, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3475,7 +3870,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3495,7 +3890,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const c32, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3517,7 +3912,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3537,7 +3932,7 @@ pub mod api {
                     let result =
                         unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
                     let charges =
-                        unsafe { std::slice::from_raw_parts(charges as *const c64, ncharges) };
+                        unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
                     unsafe {
                         (*fmm)
@@ -3574,6 +3969,7 @@ mod test {
     fn test_raw_laplace_constructors() {
         // f32
         {
+            let timed = false;
             let n_points = 1000;
             let sources = points_fixture::<f32>(n_points, None, None, None);
             let targets = points_fixture::<f32>(n_points, None, None, None);
@@ -3585,24 +3981,25 @@ mod test {
             let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
-            let ncharges = n_points;
+            let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
 
             let expansion_order = [6usize];
             let expansion_order_p = expansion_order.as_ptr();
-            let nexpansion_order = 1;
+            let n_expansion_order = 1;
 
             let laplace_blas_rsvd_f32 = unsafe {
                 laplace_blas_rsvd_f32_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     sources_p,
                     n_sources,
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3615,15 +4012,16 @@ mod test {
 
             let laplace_blas_svd_f32 = unsafe {
                 laplace_blas_svd_f32_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     sources_p,
                     n_sources,
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3634,15 +4032,16 @@ mod test {
 
             let laplace_fft_f32 = unsafe {
                 laplace_fft_f32_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     sources_p,
                     n_sources,
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3650,9 +4049,9 @@ mod test {
                 )
             };
 
-            unsafe { evaluate(laplace_blas_rsvd_f32, false) };
-            unsafe { evaluate(laplace_blas_svd_f32, false) };
-            unsafe { evaluate(laplace_fft_f32, false) };
+            unsafe { evaluate(laplace_blas_rsvd_f32) };
+            unsafe { evaluate(laplace_blas_svd_f32) };
+            unsafe { evaluate(laplace_fft_f32) };
             unsafe { free_fmm_evaluator(laplace_blas_rsvd_f32) };
             unsafe { free_fmm_evaluator(laplace_blas_svd_f32) };
             unsafe { free_fmm_evaluator(laplace_fft_f32) };
@@ -3660,6 +4059,7 @@ mod test {
 
         // f64
         {
+            let timed = false;
             let n_points = 1000;
             let sources = points_fixture::<f64>(n_points, None, None, None);
             let targets = points_fixture::<f64>(n_points, None, None, None);
@@ -3671,24 +4071,25 @@ mod test {
             let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
-            let ncharges = n_points;
+            let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
 
             let expansion_order = [6usize];
             let expansion_order_p = expansion_order.as_ptr();
-            let nexpansion_order = 1;
+            let n_expansion_order = 1;
 
             let laplace_blas_rsvd_f64 = unsafe {
                 laplace_blas_rsvd_f64_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     sources_p,
                     n_sources,
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3701,15 +4102,16 @@ mod test {
 
             let laplace_blas_svd_f64 = unsafe {
                 laplace_blas_svd_f64_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     sources_p,
                     n_sources,
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3720,15 +4122,16 @@ mod test {
 
             let laplace_fft_f64 = unsafe {
                 laplace_fft_f64_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     sources_p,
                     n_sources,
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3736,9 +4139,9 @@ mod test {
                 )
             };
 
-            unsafe { evaluate(laplace_blas_rsvd_f64, false) };
-            unsafe { evaluate(laplace_blas_svd_f64, false) };
-            unsafe { evaluate(laplace_fft_f64, false) };
+            unsafe { evaluate(laplace_blas_rsvd_f64) };
+            unsafe { evaluate(laplace_blas_svd_f64) };
+            unsafe { evaluate(laplace_fft_f64) };
 
             unsafe { free_fmm_evaluator(laplace_blas_rsvd_f64) };
             unsafe { free_fmm_evaluator(laplace_blas_svd_f64) };
@@ -3750,6 +4153,7 @@ mod test {
     fn test_raw_helmholtz_constructors() {
         // f32
         {
+            let timed = false;
             let n_points = 1000;
             let sources = points_fixture::<f32>(n_points, None, None, None);
             let targets = points_fixture::<f32>(n_points, None, None, None);
@@ -3762,17 +4166,18 @@ mod test {
             let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
-            let ncharges = n_points;
+            let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
 
             let expansion_order = [6usize];
             let expansion_order_p = expansion_order.as_ptr();
-            let nexpansion_order = 1;
+            let n_expansion_order = 1;
 
             let helmholtz_blas_svd_f32 = unsafe {
                 helmholtz_blas_svd_f32_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     wavenumber,
                     sources_p,
@@ -3780,7 +4185,7 @@ mod test {
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3791,8 +4196,9 @@ mod test {
 
             let helmholtz_fft_f32 = unsafe {
                 helmholtz_fft_f32_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     wavenumber,
                     sources_p,
@@ -3800,7 +4206,7 @@ mod test {
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3808,14 +4214,15 @@ mod test {
                 )
             };
 
-            unsafe { evaluate(helmholtz_blas_svd_f32, false) };
-            unsafe { evaluate(helmholtz_fft_f32, false) };
+            unsafe { evaluate(helmholtz_blas_svd_f32) };
+            unsafe { evaluate(helmholtz_fft_f32) };
             unsafe { free_fmm_evaluator(helmholtz_blas_svd_f32) };
             unsafe { free_fmm_evaluator(helmholtz_fft_f32) };
         }
 
         // f64
         {
+            let timed = false;
             let n_points = 1000;
             let sources = points_fixture::<f64>(n_points, None, None, None);
             let targets = points_fixture::<f64>(n_points, None, None, None);
@@ -3828,17 +4235,18 @@ mod test {
             let n_targets = n_points * 3;
             let targets_p = targets.data().as_ptr() as *const c_void;
 
-            let ncharges = n_points * 2;
+            let n_charges = n_points * 2;
             let charges_p = charges.as_ptr() as *const c_void;
 
             let expansion_order = [6usize];
             let expansion_order_p = expansion_order.as_ptr();
-            let nexpansion_order = 1;
+            let n_expansion_order = 1;
 
             let helmholtz_blas_svd_f64 = unsafe {
                 helmholtz_blas_svd_f64_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     wavenumber,
                     sources_p,
@@ -3846,7 +4254,7 @@ mod test {
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3857,8 +4265,9 @@ mod test {
 
             let helmholtz_fft_f64 = unsafe {
                 helmholtz_fft_f64_alloc(
+                    timed,
                     expansion_order_p,
-                    nexpansion_order,
+                    n_expansion_order,
                     true,
                     wavenumber,
                     sources_p,
@@ -3866,7 +4275,7 @@ mod test {
                     targets_p,
                     n_targets,
                     charges_p,
-                    ncharges,
+                    n_charges,
                     true,
                     150,
                     0,
@@ -3874,8 +4283,8 @@ mod test {
                 )
             };
 
-            unsafe { evaluate(helmholtz_blas_svd_f64, false) };
-            unsafe { evaluate(helmholtz_fft_f64, false) };
+            unsafe { evaluate(helmholtz_blas_svd_f64) };
+            unsafe { evaluate(helmholtz_fft_f64) };
             unsafe { free_fmm_evaluator(helmholtz_blas_svd_f64) };
             unsafe { free_fmm_evaluator(helmholtz_fft_f64) };
         }

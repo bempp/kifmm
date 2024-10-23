@@ -38,6 +38,8 @@ fn main() {
     // Choose to branches associated with empty leaves from constructed tree
     let prune_empty = true;
 
+    let timed = true; // Optionally time the operators
+
     // Set FMM Parameters
     // Can either set globally for whole tree, or level-by-level
     let expansion_order = &[6];
@@ -48,7 +50,7 @@ fn main() {
     // Create an FMM
     let svd_mode = FmmSvdMode::Deterministic; // Choose SVD compression mode, random or deterministic
 
-    let mut fmm = SingleNodeBuilder::new()
+    let mut fmm = SingleNodeBuilder::new(timed)
         .tree(&sources, &targets, n_crit, depth, prune_empty) // Create tree
         .unwrap()
         .parameters(
@@ -66,7 +68,7 @@ fn main() {
         .unwrap();
 
     // Run FMM
-    fmm.evaluate(true); // Optionally time the operators
+    fmm.evaluate();
 
     // Lookup potentials by leaf from target leaf boxes
     let leaf_idx = 0;

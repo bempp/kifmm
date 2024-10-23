@@ -48,7 +48,7 @@ fn main() {
         .unwrap();
 
     // Queries are set as a part of the build
-    let mut multi_fmm = MultiNodeBuilder::new()
+    let mut multi_fmm = MultiNodeBuilder::new(false)
         .tree(
             &comm,
             points.data(),
@@ -64,7 +64,7 @@ fn main() {
         .build()
         .unwrap();
 
-    multi_fmm.evaluate(false).unwrap();
+    multi_fmm.evaluate().unwrap();
 
     // Test neighbourhood communicator setup
     // Expect these to match the global communicator
@@ -119,7 +119,7 @@ fn main() {
     }
 
     if world.rank() == 0 {
-        let mut single_fmm = SingleNodeBuilder::new()
+        let mut single_fmm = SingleNodeBuilder::new(false)
             .tree(
                 &all_coordinates,
                 &all_coordinates,
@@ -139,7 +139,7 @@ fn main() {
             .build()
             .unwrap();
 
-        single_fmm.evaluate(false).unwrap();
+        single_fmm.evaluate().unwrap();
 
         // Test that V list exchange is correct at a given level
         let level = 3;

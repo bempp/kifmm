@@ -38,7 +38,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let prune_empty = true;
         let block_size = Some(256);
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(true)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -53,7 +53,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=FFT digits=3"), |b| {
-            b.iter(|| fmm_fft.evaluate(false))
+            b.iter(|| fmm_fft.evaluate())
         });
 
         group.bench_function(format!("M2L=FFT digits=3, M2L "), |b| {
@@ -79,7 +79,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(5), None);
         let svd_threshold = Some(1e-7);
 
-        let mut fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -94,7 +94,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=BLAS digits=3"), |b| {
-            b.iter(|| fmm_blas.evaluate(false))
+            b.iter(|| fmm_blas.evaluate())
         });
 
         group.bench_function(format!("M2L=BLAS digits=3, M2L "), |b| {
@@ -121,7 +121,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let prune_empty = true;
         let block_size = Some(128);
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -136,7 +136,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=FFT digits=4"), |b| {
-            b.iter(|| fmm_fft.evaluate(false))
+            b.iter(|| fmm_fft.evaluate())
         });
 
         group.bench_function(format!("M2L=FFT digits=4, M2L "), |b| {
@@ -162,7 +162,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(5), None);
         let svd_threshold = Some(1e-4);
 
-        let mut fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -177,7 +177,7 @@ fn laplace_potentials_f32(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=BLAS digits=4"), |b| {
-            b.iter(|| fmm_blas.evaluate(false))
+            b.iter(|| fmm_blas.evaluate())
         });
 
         group.bench_function(format!("M2L=BLAS digits=4, M2L "), |b| {

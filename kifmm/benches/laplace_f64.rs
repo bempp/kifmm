@@ -38,7 +38,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let prune_empty = true;
         let block_size = Some(32);
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -53,7 +53,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=FFT digits=6"), |b| {
-            b.iter(|| fmm_fft.evaluate(false))
+            b.iter(|| fmm_fft.evaluate())
         });
 
         group.bench_function(format!("M2L=FFT digits=6, M2L "), |b| {
@@ -79,7 +79,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
-        let mut fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -94,7 +94,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=BLAS digits=6"), |b| {
-            b.iter(|| fmm_blas.evaluate(false))
+            b.iter(|| fmm_blas.evaluate())
         });
 
         group.bench_function(format!("M2L=BLAS digits=6, M2L "), |b| {
@@ -121,7 +121,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -136,7 +136,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=FFT digits=8"), |b| {
-            b.iter(|| fmm_fft.evaluate(false))
+            b.iter(|| fmm_fft.evaluate())
         });
 
         group.bench_function(format!("M2L=FFT digits=8, M2L "), |b| {
@@ -162,7 +162,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
-        let mut fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -177,7 +177,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=BLAS digits=8"), |b| {
-            b.iter(|| fmm_blas.evaluate(false))
+            b.iter(|| fmm_blas.evaluate())
         });
 
         group.bench_function(format!("M2L=BLAS digits=8, M2L "), |b| {
@@ -204,7 +204,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -219,7 +219,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=FFT digits=10"), |b| {
-            b.iter(|| fmm_fft.evaluate(false))
+            b.iter(|| fmm_fft.evaluate())
         });
 
         group.bench_function(format!("M2L=FFT digits=10, M2L "), |b| {
@@ -244,7 +244,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
 
-        let mut fmm_blas = SingleNodeBuilder::new()
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -259,7 +259,7 @@ fn laplace_potentials_f64(c: &mut Criterion) {
             .unwrap();
 
         group.bench_function(format!("M2L=BLAS digits=10"), |b| {
-            b.iter(|| fmm_blas.evaluate(false))
+            b.iter(|| fmm_blas.evaluate())
         });
 
         group.bench_function(format!("M2L=BLAS digits=10, M2L "), |b| {

@@ -1,5 +1,8 @@
 //! Helper Functions
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
 
 use itertools::Itertools;
 use num::traits::Float;
@@ -13,6 +16,23 @@ use crate::{
     traits::tree::{FmmTreeNode, SingleTree},
     tree::types::{MortonKey, SingleNodeTree},
 };
+
+/// Optionally time a function call
+#[inline]
+pub fn optionally_time<T, F>(timed: bool, f: F) -> (T, Option<Duration>)
+where
+    F: FnOnce() -> T,
+{
+    if timed {
+        let start = Instant::now();
+        let result = f();
+        let duration = start.elapsed();
+        (result, Some(duration))
+    } else {
+        let result = f();
+        (result, None)
+    }
+}
 
 /// Number of coefficients for multipole and local expansions for the kernel independent FMM
 /// for a given expansion order. Coefficients correspond to points on the equivalent surface.

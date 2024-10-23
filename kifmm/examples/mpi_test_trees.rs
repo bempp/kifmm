@@ -44,7 +44,7 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let mut fmm = MultiNodeBuilder::new()
+    let mut fmm = MultiNodeBuilder::new(false)
         .tree(
             &comm,
             points.data(),
@@ -156,7 +156,7 @@ fn main() {
     }
 
     if world.rank() == 0 {
-        let single_fmm = SingleNodeBuilder::new()
+        let single_fmm = SingleNodeBuilder::new(false)
             .tree(
                 &all_coordinates,
                 &all_coordinates,

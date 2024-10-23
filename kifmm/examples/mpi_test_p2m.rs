@@ -48,7 +48,7 @@ fn main() {
         .unwrap();
 
     // Queries are set as a part of the build
-    let multi_fmm = MultiNodeBuilder::new()
+    let multi_fmm = MultiNodeBuilder::new(false)
         .tree(
             &comm,
             points.data(),
@@ -173,7 +173,7 @@ fn main() {
     }
 
     if world.rank() == 0 {
-        let single_fmm = SingleNodeBuilder::new()
+        let single_fmm = SingleNodeBuilder::new(false)
             .tree(
                 &all_coordinates,
                 &all_coordinates,

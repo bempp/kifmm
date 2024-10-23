@@ -43,7 +43,7 @@ fn main() {
         // Generate some random test data local to each process
         let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
 
-        let mut multi_fmm = MultiNodeBuilder::new()
+        let mut multi_fmm = MultiNodeBuilder::new(false)
             .tree(
                 &comm,
                 points.data(),
@@ -59,7 +59,7 @@ fn main() {
             .build()
             .unwrap();
 
-        multi_fmm.evaluate(false).unwrap();
+        multi_fmm.evaluate().unwrap();
 
         // Gather all coordinates for the test
         let root_process = comm.process_at_rank(0);
@@ -94,7 +94,7 @@ fn main() {
         }
 
         if world.rank() == 0 {
-            let mut single_fmm = SingleNodeBuilder::new()
+            let mut single_fmm = SingleNodeBuilder::new(false)
                 .tree(
                     &all_coordinates,
                     &all_coordinates,
@@ -113,7 +113,7 @@ fn main() {
                 .unwrap()
                 .build()
                 .unwrap();
-            single_fmm.evaluate(false).unwrap();
+            single_fmm.evaluate().unwrap();
             let mut expected = vec![0f32; &multi_fmm.tree.target_tree.coordinates.len() / 3];
 
             multi_fmm.kernel.evaluate_st(
@@ -156,7 +156,7 @@ fn main() {
         // Generate some random test data local to each process
         let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
 
-        let mut multi_fmm = MultiNodeBuilder::new()
+        let mut multi_fmm = MultiNodeBuilder::new(false)
             .tree(
                 &comm,
                 points.data(),
@@ -172,7 +172,7 @@ fn main() {
             .build()
             .unwrap();
 
-        multi_fmm.evaluate(false).unwrap();
+        multi_fmm.evaluate().unwrap();
 
         // Gather all coordinates for the test
         let root_process = comm.process_at_rank(0);
@@ -207,7 +207,7 @@ fn main() {
         }
 
         if world.rank() == 0 {
-            let mut single_fmm = SingleNodeBuilder::new()
+            let mut single_fmm = SingleNodeBuilder::new(false)
                 .tree(
                     &all_coordinates,
                     &all_coordinates,
@@ -226,7 +226,7 @@ fn main() {
                 .unwrap()
                 .build()
                 .unwrap();
-            single_fmm.evaluate(false).unwrap();
+            single_fmm.evaluate().unwrap();
             let mut expected = vec![0f32; &multi_fmm.tree.target_tree.coordinates.len() / 3];
 
             multi_fmm.kernel.evaluate_st(

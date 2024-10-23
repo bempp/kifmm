@@ -29,6 +29,7 @@ int main() {
   uint64_t depth = 0;
   double singular_value_threshold = 0.001;
   bool eval_type = true; // evaluate potentials
+  bool timed = true;
 
   uintptr_t expansion_order[] = {6};
   uintptr_t nexpansion_order = 1;
@@ -36,14 +37,15 @@ int main() {
 
   // Instantiate a Laplace evaluator
   struct FmmEvaluator *evaluator = laplace_fft_f64_alloc(
+      timed,
       expansion_order, nexpansion_order, eval_type, (const void *)sources,
       n_sources * 3, (const void *)targets, n_targets * 3, (const void *)charges,
       n_sources, prune_empty, n_crit, depth, block_size);
 
-  bool timed = true;
-  FmmOperatorTimes *times = evaluate(evaluator, timed);
+   evaluate(evaluator);
+   FmmOperatorTimes *times =operator_times(evaluator);
 
-  if (times->length > 0) {
+   if (times->length > 0) {
     MortonKeys *leaves = leaves_target_tree(evaluator);
 
     printf("\n");

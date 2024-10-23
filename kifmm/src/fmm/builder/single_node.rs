@@ -7,7 +7,7 @@ use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
-        helpers::single_node::{map_charges, ncoeffs_kifmm},
+        helpers::single_node::{map_charges, ncoeffs_kifmm, optionally_time},
         types::{FmmEvalType, Isa, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
     traits::{
@@ -18,6 +18,7 @@ use crate::{
         fmm::{HomogenousKernel, Metadata},
         general::single_node::Epsilon,
         tree::{SingleFmmTree, SingleTree},
+        types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
     },
     tree::{types::Domain, SingleNodeTree},
 };
@@ -34,8 +35,10 @@ where
         + Metadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
-    pub fn new() -> Self {
+    pub fn new(timed: bool) -> Self {
         Self {
+            timed: Some(timed),
+            communication_times: None,
             isa: None,
             tree: None,
             kernel: None,
@@ -71,6 +74,7 @@ where
         let dim = 3;
         let n_sources = sources.len() / dim;
         let n_targets = targets.len() / dim;
+        let timed = self.timed.unwrap();
 
         let dims = sources.len() % dim;
         let dimt = targets.len() % dim;
@@ -86,9 +90,26 @@ where
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            // Source and target trees calcualted over the same domain
-            let source_domain = Domain::from_local_points(sources);
-            let target_domain = Domain::from_local_points(targets);
+            let mut communication_times = Vec::new();
+
+            // Source and target trees calculated over the same domain
+            let (source_domain, d) = optionally_time(timed, || Domain::from_local_points(sources));
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::SourceDomain,
+                    d,
+                ))
+            }
+
+            let (target_domain, d) = optionally_time(timed, || Domain::from_local_points(targets));
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::TargetDomain,
+                    d,
+                ))
+            }
 
             // Calculate union of domains for source and target points, needed to define operators
             let domain = source_domain.union(&target_domain);
@@ -121,10 +142,31 @@ where
 
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree =
-                SingleNodeTree::new(sources, depth, prune_empty, self.domain, None, None)?;
-            let target_tree =
-                SingleNodeTree::new(targets, depth, prune_empty, self.domain, None, None)?;
+            let (source_tree, d) = optionally_time(timed, || {
+                SingleNodeTree::new(sources, depth, prune_empty, self.domain, None, None)
+            });
+
+            let source_tree = source_tree?;
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::SourceTree,
+                    d,
+                ))
+            }
+
+            let (target_tree, d) = optionally_time(timed, || {
+                SingleNodeTree::new(targets, depth, prune_empty, self.domain, None, None)
+            });
+
+            let target_tree = target_tree?;
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::TargetTree,
+                    d,
+                ))
+            }
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,
@@ -132,6 +174,7 @@ where
                 domain,
             };
 
+            self.communication_times = Some(communication_times);
             self.tree = Some(fmm_tree);
             Ok(self)
         }
@@ -168,14 +211,14 @@ where
                 .all_global_indices()
                 .unwrap();
 
-            let ncharges = &self
+            let n_charges = &self
                 .tree
                 .as_ref()
                 .unwrap()
                 .source_tree()
                 .n_coordinates_tot()
                 .unwrap();
-            let n_matvecs = charges.len() / ncharges;
+            let n_matvecs = charges.len() / n_charges;
 
             self.charges = Some(map_charges(global_indices, charges, n_matvecs));
 
@@ -250,8 +293,11 @@ where
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();
             let dim = kernel.space_dimension();
+            let timed = self.timed.unwrap();
+            let communication_times = self.communication_times.unwrap();
 
             let mut result = KiFmm {
+                timed,
                 isa: self.isa.unwrap(),
                 tree: self.tree.unwrap(),
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
@@ -264,13 +310,36 @@ where
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
                 kernel,
                 dim,
+                communication_times,
                 ..Default::default()
             };
 
             // Calculate required metadata
-            result.source();
-            result.target();
-            result.source_to_target();
+            let (_, duration) = optionally_time(timed, || result.source());
+
+            if let Some(d) = duration {
+                result
+                    .metadata_times
+                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+            }
+
+            let (_, duration) = optionally_time(timed, || result.target());
+
+            if let Some(d) = duration {
+                result
+                    .metadata_times
+                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+            }
+
+            let (_, duration) = optionally_time(timed, || result.source_to_target());
+
+            if let Some(d) = duration {
+                result.metadata_times.push(MetadataTime::from_duration(
+                    MetadataType::SourceToTargetData,
+                    d,
+                ))
+            }
+
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
             SourceToTargetTranslationMetadata::displacements(&mut result, None);
             Ok(result)

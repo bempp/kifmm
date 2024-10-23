@@ -11,8 +11,11 @@ use rlst::{
 use crate::{
     linalg::rsvd::Normaliser,
     traits::{
-        fftw::Dft, field::FieldTranslation as FieldTranslationTrait, fmm::HomogenousKernel,
-        general::single_node::AsComplex, types::FmmOperatorTime,
+        fftw::Dft,
+        field::FieldTranslation as FieldTranslationTrait,
+        fmm::HomogenousKernel,
+        general::single_node::AsComplex,
+        types::{CommunicationTime, FmmOperatorTime, MetadataTime},
     },
     tree::types::{Domain, MortonKey, SingleNodeTree},
 };
@@ -185,7 +188,16 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Operator runtimes
-    pub times: Vec<FmmOperatorTime>,
+    pub operator_times: Vec<FmmOperatorTime>,
+
+    /// Communication runtimes
+    pub communication_times: Vec<CommunicationTime>,
+
+    /// Metadata runtimes
+    pub metadata_times: Vec<MetadataTime>,
+
+    /// Whether the object and its methods are timed
+    pub timed: bool,
 
     /// Dimension of the FMM
     pub dim: usize,
@@ -311,7 +323,10 @@ where
 {
     fn default() -> Self {
         KiFmm {
-            times: Vec::default(),
+            timed: false,
+            operator_times: Vec::default(),
+            communication_times: Vec::default(),
+            metadata_times: Vec::default(),
             isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: FieldTranslation::default(),
@@ -437,7 +452,7 @@ pub enum FmmEvalType {
 /// charges.data_mut().copy_from_slice(&tmp);
 ///
 /// /// Create a new builder, and attach a tree
-/// let fmm = SingleNodeBuilder::new()
+/// let fmm = SingleNodeBuilder::new(false) // optionally time operators
 ///     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
 ///     .unwrap();
 ///
@@ -465,6 +480,9 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Whether construction and operators are timed
+    pub timed: Option<bool>,
+
     /// Instruction set architecture
     pub isa: Option<Isa>,
 
@@ -506,6 +524,9 @@ where
 
     /// Has depth or ncrit been set
     pub depth_set: Option<bool>,
+
+    /// Communication runtimes
+    pub communication_times: Option<Vec<CommunicationTime>>,
 }
 
 /// Builder for multinode FMM
@@ -518,6 +539,9 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default + Equivalence,
 {
+    /// Whether construction and operators are timed
+    pub timed: Option<bool>,
+
     /// Kernel
     pub kernel: Option<Kernel>,
 
@@ -556,6 +580,9 @@ where
 
     /// Charges associated with each source tree
     pub charges: Option<Vec<Vec<Scalar>>>,
+
+    /// Communication runtimes
+    pub communication_times: Option<Vec<CommunicationTime>>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -1113,8 +1140,17 @@ where
     /// Dimension
     pub dim: usize,
 
+    /// Whether the object and its methods are timed
+    pub timed: bool,
+
     /// Operator runtimes
-    pub times: Vec<FmmOperatorTime>,
+    pub operator_times: Vec<FmmOperatorTime>,
+
+    /// Communication runtimes
+    pub communication_times: Vec<CommunicationTime>,
+
+    /// Metadata runtimes
+    pub metadata_times: Vec<MetadataTime>,
 
     /// Instruction set architecture
     pub isa: Isa,

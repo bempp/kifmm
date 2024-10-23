@@ -2637,7 +2637,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -2743,7 +2743,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -2907,7 +2907,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -3076,7 +3076,7 @@ mod test {
         let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let fmm = SingleNodeBuilder::new()
+        let fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(

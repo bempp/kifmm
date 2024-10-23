@@ -4,6 +4,48 @@
 #include <stdlib.h>
 
 /**
+ * Enumeration of communication types for timing
+ */
+typedef enum CommunicationType {
+  /**
+   * Tree construction
+   */
+  CommunicationType_SourceTree,
+  /**
+   * Tree construction
+   */
+  CommunicationType_TargetTree,
+  /**
+   * Domain exchange
+   */
+  CommunicationType_TargetDomain,
+  /**
+   * Domain exchange
+   */
+  CommunicationType_SourceDomain,
+  /**
+   * Layout
+   */
+  CommunicationType_Layout,
+  /**
+   * V list ghost exchange
+   */
+  CommunicationType_GhostExchangeV,
+  /**
+   * U list ghost exchange
+   */
+  CommunicationType_GhostExchangeU,
+  /**
+   * Gather global FMM
+   */
+  CommunicationType_GatherGlobalFmm,
+  /**
+   * Scatter global FMM
+   */
+  CommunicationType_ScatterGlobalFmm,
+} CommunicationType;
+
+/**
  * Static FMM type
  */
 typedef enum FmmCType {
@@ -20,6 +62,36 @@ typedef enum FmmTranslationCType {
   FmmTranslationCType_Blas,
   FmmTranslationCType_Fft,
 } FmmTranslationCType;
+
+/**
+ * Enumeration of metadata construction for timing
+ */
+typedef enum MetadataType {
+  /**
+   * Field translation data
+   */
+  MetadataType_SourceToTargetData,
+  /**
+   * Source tree translations
+   */
+  MetadataType_SourceData,
+  /**
+   * Target tree translations
+   */
+  MetadataType_TargetData,
+  /**
+   * Global FMM
+   */
+  MetadataType_GlobalFmm,
+  /**
+   * Ghost FMM V
+   */
+  MetadataType_GhostFmmV,
+  /**
+   * Ghost FMM U
+   */
+  MetadataType_GhostFmmU,
+} MetadataType;
 
 /**
  * Scalar type
@@ -51,6 +123,44 @@ typedef struct FmmEvaluator {
   enum FmmTranslationCType ctranslation_type;
   void *data;
 } FmmEvaluator;
+
+/**
+ * C compatible struct for operator timing
+ */
+typedef struct CommunicationTime {
+  /**
+   * Operator name
+   */
+  enum CommunicationType operator_;
+  /**
+   * Time in milliseconds
+   */
+  uint64_t time;
+} CommunicationTime;
+
+typedef struct CommunicationTimes {
+  struct CommunicationTime *times;
+  uintptr_t length;
+} CommunicationTimes;
+
+/**
+ * C compatible struct for operator timing
+ */
+typedef struct MetadataTime {
+  /**
+   * Operator name
+   */
+  enum MetadataType operator_;
+  /**
+   * Time in milliseconds
+   */
+  uint64_t time;
+} MetadataTime;
+
+typedef struct MetadataTimes {
+  struct MetadataTime *times;
+  uintptr_t length;
+} MetadataTimes;
 
 /**
  * Enumeration of operator types for timing
@@ -222,14 +332,14 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -242,15 +352,16 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order,
-                                                uintptr_t nexpansion_order,
+struct FmmEvaluator *laplace_blas_svd_f32_alloc(bool timed,
+                                                const uintptr_t *expansion_order,
+                                                uintptr_t n_expansion_order,
                                                 bool eval_type,
                                                 const void *sources,
                                                 uintptr_t n_sources,
                                                 const void *targets,
                                                 uintptr_t n_targets,
                                                 const void *charges,
-                                                uintptr_t ncharges,
+                                                uintptr_t n_charges,
                                                 bool prune_empty,
                                                 uint64_t n_crit,
                                                 uint64_t depth,
@@ -269,14 +380,14 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -289,15 +400,16 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(const uintptr_t *expansion_order
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order,
-                                                uintptr_t nexpansion_order,
+struct FmmEvaluator *laplace_blas_svd_f64_alloc(bool timed,
+                                                const uintptr_t *expansion_order,
+                                                uintptr_t n_expansion_order,
                                                 bool eval_type,
                                                 const void *sources,
                                                 uintptr_t n_sources,
                                                 const void *targets,
                                                 uintptr_t n_targets,
                                                 const void *charges,
-                                                uintptr_t ncharges,
+                                                uintptr_t n_charges,
                                                 bool prune_empty,
                                                 uint64_t n_crit,
                                                 uint64_t depth,
@@ -316,14 +428,14 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -338,15 +450,16 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(const uintptr_t *expansion_order
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_order,
-                                                 uintptr_t nexpansion_order,
+struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(bool timed,
+                                                 const uintptr_t *expansion_order,
+                                                 uintptr_t n_expansion_order,
                                                  bool eval_type,
                                                  const void *sources,
                                                  uintptr_t n_sources,
                                                  const void *targets,
                                                  uintptr_t n_targets,
                                                  const void *charges,
-                                                 uintptr_t ncharges,
+                                                 uintptr_t n_charges,
                                                  bool prune_empty,
                                                  uint64_t n_crit,
                                                  uint64_t depth,
@@ -367,14 +480,14 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -389,15 +502,16 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(const uintptr_t *expansion_orde
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_order,
-                                                 uintptr_t nexpansion_order,
+struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(bool timed,
+                                                 const uintptr_t *expansion_order,
+                                                 uintptr_t n_expansion_order,
                                                  bool eval_type,
                                                  const void *sources,
                                                  uintptr_t n_sources,
                                                  const void *targets,
                                                  uintptr_t n_targets,
                                                  const void *charges,
-                                                 uintptr_t ncharges,
+                                                 uintptr_t n_charges,
                                                  bool prune_empty,
                                                  uint64_t n_crit,
                                                  uint64_t depth,
@@ -417,14 +531,14 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -436,15 +550,16 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(const uintptr_t *expansion_orde
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
-                                           uintptr_t nexpansion_order,
+struct FmmEvaluator *laplace_fft_f32_alloc(bool timed,
+                                           const uintptr_t *expansion_order,
+                                           uintptr_t n_expansion_order,
                                            bool eval_type,
                                            const void *sources,
                                            uintptr_t n_sources,
                                            const void *targets,
                                            uintptr_t n_targets,
                                            const void *charges,
-                                           uintptr_t ncharges,
+                                           uintptr_t n_charges,
                                            bool prune_empty,
                                            uint64_t n_crit,
                                            uint64_t depth,
@@ -461,13 +576,13 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -479,15 +594,16 @@ struct FmmEvaluator *laplace_fft_f32_alloc(const uintptr_t *expansion_order,
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
-                                           uintptr_t nexpansion_order,
+struct FmmEvaluator *laplace_fft_f64_alloc(bool timed,
+                                           const uintptr_t *expansion_order,
+                                           uintptr_t n_expansion_order,
                                            bool eval_type,
                                            const void *sources,
                                            uintptr_t n_sources,
                                            const void *targets,
                                            uintptr_t n_targets,
                                            const void *charges,
-                                           uintptr_t ncharges,
+                                           uintptr_t n_charges,
                                            bool prune_empty,
                                            uint64_t n_crit,
                                            uint64_t depth,
@@ -505,7 +621,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -513,7 +629,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -526,8 +642,9 @@ struct FmmEvaluator *laplace_fft_f64_alloc(const uintptr_t *expansion_order,
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_order,
-                                                  uintptr_t nexpansion_order,
+struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(bool timed,
+                                                  const uintptr_t *expansion_order,
+                                                  uintptr_t n_expansion_order,
                                                   bool eval_type,
                                                   float wavenumber,
                                                   const void *sources,
@@ -535,7 +652,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
                                                   const void *targets,
                                                   uintptr_t n_targets,
                                                   const void *charges,
-                                                  uintptr_t ncharges,
+                                                  uintptr_t n_charges,
                                                   bool prune_empty,
                                                   uint64_t n_crit,
                                                   uint64_t depth,
@@ -554,7 +671,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -562,7 +679,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -575,8 +692,9 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(const uintptr_t *expansion_ord
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_order,
-                                                  uintptr_t nexpansion_order,
+struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(bool timed,
+                                                  const uintptr_t *expansion_order,
+                                                  uintptr_t n_expansion_order,
                                                   bool eval_type,
                                                   double wavenumber,
                                                   const void *sources,
@@ -584,7 +702,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
                                                   const void *targets,
                                                   uintptr_t n_targets,
                                                   const void *charges,
-                                                  uintptr_t ncharges,
+                                                  uintptr_t n_charges,
                                                   bool prune_empty,
                                                   uint64_t n_crit,
                                                   uint64_t depth,
@@ -602,7 +720,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -610,7 +728,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -622,8 +740,9 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(const uintptr_t *expansion_ord
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
-                                             uintptr_t nexpansion_order,
+struct FmmEvaluator *helmholtz_fft_f32_alloc(bool timed,
+                                             const uintptr_t *expansion_order,
+                                             uintptr_t n_expansion_order,
                                              bool eval_type,
                                              float wavenumber,
                                              const void *sources,
@@ -631,7 +750,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
                                              const void *targets,
                                              uintptr_t n_targets,
                                              const void *charges,
-                                             uintptr_t ncharges,
+                                             uintptr_t n_charges,
                                              bool prune_empty,
                                              uint64_t n_crit,
                                              uint64_t depth,
@@ -648,7 +767,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  * # Parameters
  *
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `nexpansion_order`: The number of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -656,7 +775,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
  * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
  *    reached based on a uniform particle distribution.
@@ -668,8 +787,9 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(const uintptr_t *expansion_order,
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
-                                             uintptr_t nexpansion_order,
+struct FmmEvaluator *helmholtz_fft_f64_alloc(bool timed,
+                                             const uintptr_t *expansion_order,
+                                             uintptr_t n_expansion_order,
                                              bool eval_type,
                                              double wavenumber,
                                              const void *sources,
@@ -677,11 +797,53 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
                                              const void *targets,
                                              uintptr_t n_targets,
                                              const void *charges,
-                                             uintptr_t ncharges,
+                                             uintptr_t n_charges,
                                              bool prune_empty,
                                              uint64_t n_crit,
                                              uint64_t depth,
                                              uintptr_t block_size);
+
+/**
+ * Get the metadata runtimes
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct CommunicationTimes *communication_times(struct FmmEvaluator *fmm);
+
+/**
+ * Get the metadata runtimes
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct MetadataTimes *metadata_times(struct FmmEvaluator *fmm);
+
+/**
+ * Get the operator runtimes
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmOperatorTimes *operator_times(struct FmmEvaluator *fmm);
 
 /**
  * Evaluate the Fast Multipole Method (FMM).
@@ -696,7 +858,7 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(const uintptr_t *expansion_order,
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-struct FmmOperatorTimes *evaluate(struct FmmEvaluator *fmm, bool timed);
+struct FmmOperatorTimes *evaluate(struct FmmEvaluator *fmm);
 
 /**
  * Clear charges and attach new charges.
@@ -705,14 +867,14 @@ struct FmmOperatorTimes *evaluate(struct FmmEvaluator *fmm, bool timed);
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
  * - `charges`: A pointer to the new charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t ncharges);
+void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t n_charges);
 
 /**
  * Query for all evaluated potentials, returned in order of global index.
@@ -841,9 +1003,9 @@ struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
  * - `targets`: A pointer to the target points.
  * - `n_targets`: The length of the target points buffer.
  * - `charges`: A pointer to the charges associated with the source points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  * - `result`: A pointer to the results associated with the target points.
- * - `ncharges`: The length of the charges buffer.
+ * - `n_charges`: The length of the charges buffer.
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
@@ -857,6 +1019,6 @@ void evaluate_kernel_st(struct FmmEvaluator *fmm,
                         const void *targets,
                         uintptr_t n_targets,
                         const void *charges,
-                        uintptr_t ncharges,
+                        uintptr_t n_charges,
                         void *result,
                         uintptr_t nresult);

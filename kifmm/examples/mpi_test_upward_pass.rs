@@ -36,7 +36,7 @@ fn main() {
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
 
-    let mut fmm = MultiNodeBuilder::new()
+    let mut fmm = MultiNodeBuilder::new(false)
         .tree(
             &comm,
             points.data(),
@@ -53,8 +53,8 @@ fn main() {
         .unwrap();
 
     // Perform partial upward pass on each rank
-    fmm.evaluate_leaf_sources(false).unwrap();
-    fmm.evaluate_upward_pass(false).unwrap();
+    fmm.evaluate_leaf_sources().unwrap();
+    fmm.evaluate_upward_pass().unwrap();
 
     // Test at roots of local trees for result of partial upward passes
     let roots = fmm.tree().source_tree().roots();
@@ -146,7 +146,7 @@ fn main() {
 
     // Perform upward pass on global fmm
     if world.rank() == 0 {
-        fmm.global_fmm.evaluate_upward_pass(false).unwrap();
+        fmm.global_fmm.evaluate_upward_pass().unwrap();
 
         // Test that all multipoles are the same
         // test root multipole
