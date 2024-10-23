@@ -4,4 +4,4 @@ members = [
     "kifmm",
     "fftw-src",
     "fftw-sys"
-]
+, "scripts"]
