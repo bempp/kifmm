@@ -1,334 +1,123 @@
 //! Single Node FMM
-use std::time::Instant;
-
 use green_kernels::traits::Kernel as KernelTrait;
-
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::types::{FmmEvalType, KiFmm},
+    fmm::{helpers::single_node::optionally_time, types::KiFmm},
     traits::{
-        field::SourceToTargetData as SourceToTargetDataTrait,
-        fmm::{
-            FmmOperatorData, HomogenousKernel, SourceToTargetTranslation, SourceTranslation,
-            TargetTranslation,
+        field::{
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslation,
+            SourceTranslation, TargetTranslation,
         },
-        tree::{FmmTree, Tree},
+        fmm::{DataAccess, HomogenousKernel},
+        tree::{SingleFmmTree, SingleTree},
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    Fmm, SingleNodeFmmTree,
+    Evaluate, SingleNodeFmmTree,
 };
 
-use super::helpers::{
-    leaf_expansion_pointers, level_expansion_pointers, map_charges, potential_pointers,
-};
-
-impl<Scalar, Kernel, SourceToTargetData> Fmm for KiFmm<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> Evaluate for KiFmm<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    SourceToTargetData: SourceToTargetDataTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: SourceToTargetTranslation + FmmOperatorData,
+    Self: DataAccess<Scalar = Scalar, Kernel = Kernel, Tree = SingleNodeFmmTree<Scalar::Real>>
+        + SourceTranslation
+        + TargetTranslation
+        + SourceToTargetTranslation,
 {
-    type Scalar = Scalar;
-    type Kernel = Kernel;
-    type Tree = SingleNodeFmmTree<Scalar::Real>;
+    #[inline(always)]
+    fn evaluate_leaf_sources(&mut self) -> Result<(), FmmError> {
+        let (result, duration) = optionally_time(self.timed, || self.p2m());
 
-    fn dim(&self) -> usize {
-        self.dim
-    }
+        result?;
 
-    fn variable_expansion_order(&self) -> bool {
-        self.variable_expansion_order
-    }
-
-    fn equivalent_surface_order(&self, level: u64) -> usize {
-        self.equivalent_surface_order[self.expansion_index(level)]
-    }
-
-    fn check_surface_order(&self, level: u64) -> usize {
-        self.check_surface_order[self.expansion_index(level)]
-    }
-
-    fn ncoeffs_equivalent_surface(&self, level: u64) -> usize {
-        self.ncoeffs_equivalent_surface[self.expansion_index(level)]
-    }
-
-    fn ncoeffs_check_surface(&self, level: u64) -> usize {
-        self.ncoeffs_check_surface[self.expansion_index(level)]
-    }
-
-    fn kernel(&self) -> &Self::Kernel {
-        &self.kernel
-    }
-
-    fn tree(&self) -> &Self::Tree {
-        &self.tree
-    }
-
-    fn multipole(
-        &self,
-        key: &<<Self::Tree as crate::traits::tree::FmmTree>::Tree as crate::traits::tree::Tree>::Node,
-    ) -> Option<&[Self::Scalar]> {
-        if let Some(&key_idx) = self.tree().source_tree().level_index(key) {
-            let multipole_ptr = &self.level_multipoles[key.level() as usize][key_idx][0];
-
-            unsafe {
-                match self.fmm_eval_type {
-                    FmmEvalType::Vector => Some(std::slice::from_raw_parts(
-                        multipole_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()),
-                    )),
-                    FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
-                        multipole_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()) * nmatvecs,
-                    )),
-                }
-            }
-        } else {
-            None
+        if let Some(d) = duration {
+            self.operator_times
+                .push(FmmOperatorTime::from_duration(FmmOperatorType::P2M, d));
         }
+
+        Ok(())
     }
 
-    fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
-        let multipole_ptr = &self.level_multipoles[level as usize][0][0];
-        let nsources = self.tree.source_tree.n_keys(level).unwrap();
-        unsafe {
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => Some(std::slice::from_raw_parts(
-                    multipole_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * nsources,
-                )),
-                FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
-                    multipole_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * nsources * nmatvecs,
-                )),
+    #[inline(always)]
+    fn evaluate_upward_pass(&mut self) -> Result<(), FmmError> {
+        for level in (1..=self.tree().source_tree().depth()).rev() {
+            let (result, duration) = optionally_time(self.timed, || self.m2m(level));
+
+            result?;
+
+            if let Some(d) = duration {
+                self.operator_times.push(FmmOperatorTime::from_duration(
+                    FmmOperatorType::M2M(level),
+                    d,
+                ));
             }
         }
+
+        Ok(())
     }
 
-    fn local(
-        &self,
-        key: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
-    ) -> Option<&[Self::Scalar]> {
-        if let Some(&key_idx) = self.tree().target_tree().level_index(key) {
-            let local_ptr = &self.level_locals[key.level() as usize][key_idx][0];
+    #[inline(always)]
+    fn evaluate_downward_pass(&mut self) -> Result<(), FmmError> {
+        for level in 2..=self.tree().target_tree().depth() {
+            if level > 2 {
+                let (result, duration) = optionally_time(self.timed, || self.l2l(level));
 
-            unsafe {
-                match self.fmm_eval_type {
-                    FmmEvalType::Vector => Some(std::slice::from_raw_parts(
-                        local_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()),
-                    )),
-                    FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
-                        local_ptr.raw,
-                        self.ncoeffs_equivalent_surface(key.level()) * nmatvecs,
-                    )),
-                }
-            }
-        } else {
-            None
-        }
-    }
+                result?;
 
-    fn locals(&self, level: u64) -> Option<&[Self::Scalar]> {
-        let local_ptr = &self.level_locals[level as usize][0][0];
-        let ntargets = self.tree.target_tree.n_keys(level).unwrap();
-        unsafe {
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => Some(std::slice::from_raw_parts(
-                    local_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * ntargets,
-                )),
-                FmmEvalType::Matrix(nmatvecs) => Some(std::slice::from_raw_parts(
-                    local_ptr.raw,
-                    self.ncoeffs_equivalent_surface(level) * ntargets * nmatvecs,
-                )),
-            }
-        }
-    }
-
-    fn potential(
-        &self,
-        leaf: &<<Self::Tree as FmmTree>::Tree as Tree>::Node,
-    ) -> Option<Vec<&[Self::Scalar]>> {
-        if let Some(&leaf_idx) = self.tree.target_tree().leaf_index(leaf) {
-            let (l, r) = self.charge_index_pointer_targets[leaf_idx];
-            let ntargets = r - l;
-
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => Some(vec![
-                    &self.potentials[l * self.kernel_eval_size..r * self.kernel_eval_size],
-                ]),
-                FmmEvalType::Matrix(nmatvecs) => {
-                    let n_leaves = self.tree.target_tree().n_leaves().unwrap();
-                    let mut slices = Vec::new();
-                    for eval_idx in 0..nmatvecs {
-                        let potentials_pointer =
-                            self.potentials_send_pointers[eval_idx * n_leaves + leaf_idx].raw;
-                        slices.push(unsafe {
-                            std::slice::from_raw_parts(
-                                potentials_pointer,
-                                ntargets * self.kernel_eval_size,
-                            )
-                        });
-                    }
-                    Some(slices)
-                }
-            }
-        } else {
-            None
-        }
-    }
-
-    fn potentials(&self) -> Option<&Vec<Self::Scalar>> {
-        Some(&self.potentials)
-    }
-
-    fn evaluate(&mut self, timed: bool) -> Result<(), FmmError> {
-        // Upward pass
-        if timed {
-            {
-                let s = Instant::now();
-                self.p2m()?;
-                self.times
-                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2M, s));
-
-                for level in (1..=self.tree().source_tree().depth()).rev() {
-                    let s = Instant::now();
-                    self.m2m(level)?;
-                    self.times.push(FmmOperatorTime::from_instant(
-                        FmmOperatorType::M2M(level),
-                        s,
+                if let Some(d) = duration {
+                    self.operator_times.push(FmmOperatorTime::from_duration(
+                        FmmOperatorType::L2L(level),
+                        d,
                     ));
                 }
             }
 
-            // Downward pass
-            {
-                for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        let s = Instant::now();
-                        self.l2l(level)?;
-                        self.times.push(FmmOperatorTime::from_instant(
-                            FmmOperatorType::L2L(level),
-                            s,
-                        ));
-                    }
-                    let s = Instant::now();
-                    self.m2l(level)?;
-                    self.times.push(FmmOperatorTime::from_instant(
-                        FmmOperatorType::M2L(level),
-                        s,
-                    ));
-                }
+            let (result, duration) = optionally_time(self.timed, || self.m2l(level));
 
-                // Leaf level computation
-                let s = Instant::now();
-                self.p2p()?;
-                self.times
-                    .push(FmmOperatorTime::from_instant(FmmOperatorType::P2P, s));
-                let s = Instant::now();
-                self.l2p()?;
-                self.times
-                    .push(FmmOperatorTime::from_instant(FmmOperatorType::L2P, s));
+            result?;
+
+            if let Some(d) = duration {
+                self.operator_times.push(FmmOperatorTime::from_duration(
+                    FmmOperatorType::M2L(level),
+                    d,
+                ));
             }
-            Ok(())
-        } else {
-            // Upward pass
-            {
-                self.p2m()?;
-
-                for level in (1..=self.tree().source_tree().depth()).rev() {
-                    self.m2m(level)?;
-                }
-            }
-
-            // // Downward pass
-            {
-                for level in 2..=self.tree().target_tree().depth() {
-                    if level > 2 {
-                        self.l2l(level)?;
-                    }
-                    self.m2l(level)?;
-                }
-
-                // Leaf level computation
-                self.p2p()?;
-                self.l2p()?;
-            }
-            Ok(())
         }
+        Ok(())
     }
 
-    fn clear(&mut self, charges: &[Self::Scalar]) {
-        let ntarget_points = self.tree().target_tree().n_coordinates_tot().unwrap();
-        let nsource_points = self.tree().source_tree().n_coordinates_tot().unwrap();
-        let nmatvecs = charges.len() / nsource_points;
-        let nsource_leaves = self.tree().source_tree().n_leaves().unwrap();
-        let ntarget_leaves = self.tree().target_tree().n_leaves().unwrap();
+    #[inline(always)]
+    fn evaluate_leaf_targets(&mut self) -> Result<(), FmmError> {
+        let (result, duration) = optionally_time(self.timed, || self.p2p());
 
-        // Clear buffers and set new buffers
-        self.multipoles = vec![Scalar::default(); self.multipoles.len()];
-        self.locals = vec![Scalar::default(); self.locals.len()];
-        self.potentials = vec![Scalar::default(); self.potentials.len()];
-        self.charges = vec![Scalar::default(); self.charges.len()];
+        result?;
 
-        // Recreate mutable pointers for new buffers
-        let potentials_send_pointers = potential_pointers(
-            self.tree.target_tree(),
-            nmatvecs,
-            ntarget_leaves,
-            ntarget_points,
-            self.kernel_eval_size,
-            &self.potentials,
-        );
+        if let Some(d) = duration {
+            self.operator_times
+                .push(FmmOperatorTime::from_duration(FmmOperatorType::P2P, d));
+        }
 
-        let leaf_multipoles = leaf_expansion_pointers(
-            self.tree().source_tree(),
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
-            nsource_leaves,
-            &self.multipoles,
-        );
+        let (result, duration) = optionally_time(self.timed, || self.l2p());
 
-        let level_multipoles = level_expansion_pointers(
-            self.tree().source_tree(),
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
-            &self.multipoles,
-        );
+        result?;
 
-        let level_locals = level_expansion_pointers(
-            self.tree().target_tree(),
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
-            &self.locals,
-        );
+        if let Some(d) = duration {
+            self.operator_times
+                .push(FmmOperatorTime::from_duration(FmmOperatorType::L2P, d));
+        }
 
-        let leaf_locals = leaf_expansion_pointers(
-            self.tree().target_tree(),
-            &self.ncoeffs_equivalent_surface,
-            nmatvecs,
-            ntarget_leaves,
-            &self.locals,
-        );
+        Ok(())
+    }
 
-        // Set mutable pointers
-        self.level_locals = level_locals;
-        self.level_multipoles = level_multipoles;
-        self.leaf_locals = leaf_locals;
-        self.leaf_multipoles = leaf_multipoles;
-        self.potentials_send_pointers = potentials_send_pointers;
-
-        // Set new charges
-        self.charges = map_charges(
-            self.tree.source_tree().all_global_indices().unwrap(),
-            charges,
-            nmatvecs,
-        )
-        .to_vec();
+    fn evaluate(&mut self) -> Result<(), FmmError> {
+        self.evaluate_leaf_sources()?;
+        self.evaluate_upward_pass()?;
+        self.evaluate_downward_pass()?;
+        self.evaluate_leaf_targets()?;
+        Ok(())
     }
 }
 
@@ -348,14 +137,18 @@ mod test {
 
     use crate::{
         fmm::types::BlasFieldTranslationIa,
-        traits::tree::{FmmTree, FmmTreeNode, Tree},
+        traits::{
+            fmm::DataAccess,
+            tree::{FmmTreeNode, SingleFmmTree, SingleTree},
+        },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslationSaRcmp, FftFieldTranslation, Fmm, SingleNodeBuilder, SingleNodeFmmTree,
+        BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        SingleNodeFmmTree,
     };
 
     fn test_single_node_laplace_fmm_matrix_helper<T: RlstScalar<Real = T> + Float + Default>(
         fmm: Box<
-            dyn Fmm<
+            dyn Evaluate<
                 Scalar = T::Real,
                 Kernel = Laplace3dKernel<T::Real>,
                 Tree = SingleNodeFmmTree<T::Real>,
@@ -378,14 +171,14 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
+        let n_targets = leaf_targets.len() / fmm.dim();
 
-        let [nsources, nmatvecs] = charges.shape();
+        let [n_sources, n_matvecs] = charges.shape();
 
-        for i in 0..nmatvecs {
+        for i in 0..n_matvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
-            let mut direct_i = vec![T::Real::zero(); ntargets * eval_size];
+            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let mut direct_i = vec![T::Real::zero(); n_targets * eval_size];
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
@@ -408,7 +201,11 @@ mod test {
 
     fn test_single_node_helmholtz_fmm_matrix_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+            dyn Evaluate<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         eval_type: GreenKernelEvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
@@ -427,14 +224,14 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
+        let n_targets = leaf_targets.len() / fmm.dim();
 
-        let [nsources, nmatvecs] = charges.shape();
+        let [n_sources, n_matvecs] = charges.shape();
 
-        for i in 0..nmatvecs {
+        for i in 0..n_matvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
-            let mut direct_i = vec![T::zero(); ntargets * eval_size];
+            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let mut direct_i = vec![T::zero(); n_targets * eval_size];
             fmm.kernel().evaluate_st(
                 eval_type,
                 sources.data(),
@@ -457,7 +254,11 @@ mod test {
 
     fn test_single_node_helmholtz_fmm_vector_helper<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+            dyn Evaluate<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         eval_type: GreenKernelEvalType,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
@@ -477,8 +278,8 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
-        let mut direct = vec![T::zero(); ntargets * eval_size];
+        let n_targets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::zero(); n_targets * eval_size];
 
         fmm.kernel().evaluate_st(
             eval_type,
@@ -504,7 +305,7 @@ mod test {
 
     fn test_single_node_laplace_fmm_vector_helper<T: RlstScalar + Float + Default>(
         fmm: Box<
-            dyn Fmm<
+            dyn Evaluate<
                 Scalar = T::Real,
                 Kernel = Laplace3dKernel<T::Real>,
                 Tree = SingleNodeFmmTree<T::Real>,
@@ -528,8 +329,8 @@ mod test {
 
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
 
-        let ntargets = leaf_targets.len() / fmm.dim();
-        let mut direct = vec![T::Real::zero(); ntargets * eval_size];
+        let n_targets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::Real::zero(); n_targets * eval_size];
 
         fmm.kernel().evaluate_st(
             eval_type,
@@ -549,7 +350,7 @@ mod test {
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
         fmm: Box<
-            dyn Fmm<
+            dyn Evaluate<
                 Scalar = T::Real,
                 Kernel = Laplace3dKernel<T::Real>,
                 Tree = SingleNodeFmmTree<T::Real>,
@@ -570,16 +371,16 @@ mod test {
             T::from(ALPHA_INNER).unwrap().re(),
         );
 
-        let ncoeffs = fmm.ncoeffs_equivalent_surface(0);
+        let ncoeffs = fmm.n_coeffs_equivalent_surface(0);
 
         let test_point = vec![T::real(100000.), T::Real::zero(), T::Real::zero()];
         let mut expected = vec![T::Real::zero()];
         let mut found = vec![T::Real::zero()];
 
-        let [nsources, nvecs] = charges.shape();
+        let [n_sources, nvecs] = charges.shape();
 
         for i in 0..nvecs {
-            let charges_i = &charges.data()[nsources * i..nsources * (i + 1)];
+            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
             let multipole_i = &multipoles[ncoeffs * i..(i + 1) * ncoeffs];
 
             println!(
@@ -618,7 +419,11 @@ mod test {
 
     fn test_root_multipole_helmholtz_single_node<T: RlstScalar<Complex = T> + Default>(
         fmm: Box<
-            dyn Fmm<Scalar = T, Kernel = Helmholtz3dKernel<T>, Tree = SingleNodeFmmTree<T::Real>>,
+            dyn Evaluate<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = SingleNodeFmmTree<T::Real>,
+            >,
         >,
         sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
         charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
@@ -667,10 +472,10 @@ mod test {
     #[test]
     fn test_upward_pass_vector_laplace() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -686,10 +491,10 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -702,10 +507,10 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_fft.evaluate(false).unwrap();
+        fmm_fft.evaluate().unwrap();
 
         let svd_threshold = Some(1e-5);
-        let mut fmm_svd = SingleNodeBuilder::new()
+        let mut fmm_svd = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -722,7 +527,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate(false).unwrap();
+        fmm_svd.evaluate().unwrap();
 
         let fmm_fft = Box::new(fmm_fft);
         let fmm_svd = Box::new(fmm_svd);
@@ -733,10 +538,10 @@ mod test {
     #[test]
     fn test_upward_pass_matrix_laplace() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         // let n_crit = Some(100);
@@ -752,11 +557,11 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
-        let mut fmm_svd = SingleNodeBuilder::new()
+        let mut fmm_svd = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -773,7 +578,7 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate(false).unwrap();
+        fmm_svd.evaluate().unwrap();
 
         let fmm_svd = Box::new(fmm_svd);
         test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
@@ -782,13 +587,13 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = Some(100);
@@ -800,11 +605,11 @@ mod test {
         // Set charge data and evaluate an FMM
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
-        let mut fmm = SingleNodeBuilder::new()
+        let mut fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -818,13 +623,13 @@ mod test {
             .build()
             .unwrap();
 
-        fmm.evaluate(false).unwrap();
+        fmm.evaluate().unwrap();
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         fmm.clear(charges.data());
-        fmm.evaluate(false).unwrap();
+        fmm.evaluate().unwrap();
 
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -839,13 +644,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector_variable_expansion_order() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -861,13 +666,13 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // FFT based field translation
         {
             // Evaluate potentials
-            let mut fmm_fft = SingleNodeBuilder::new()
+            let mut fmm_fft = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -880,7 +685,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_fft.evaluate(false).unwrap();
+            fmm_fft.evaluate().unwrap();
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -892,7 +697,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let mut fmm_fft = SingleNodeBuilder::new()
+            let mut fmm_fft = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -905,7 +710,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_fft.evaluate(false).unwrap();
+            fmm_fft.evaluate().unwrap();
 
             let eval_type = fmm_fft.kernel_eval_type;
             let fmm_fft = Box::new(fmm_fft);
@@ -922,7 +727,7 @@ mod test {
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -939,7 +744,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -951,7 +756,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -968,7 +773,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -983,13 +788,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = Some(150);
@@ -1004,14 +809,14 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1028,7 +833,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -1041,7 +846,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1058,7 +863,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -1073,13 +878,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_matrix_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = Some(150);
@@ -1093,14 +898,14 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1117,7 +922,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_matrix_helper::<f64>(
@@ -1133,13 +938,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_vector_variable_surfaces_variable_expansion_order() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -1154,14 +959,14 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1178,7 +983,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
 
             test_single_node_laplace_fmm_vector_helper::<f64>(
@@ -1191,7 +996,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1208,7 +1013,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_vector_helper::<f64>(
                 fmm_blas,
@@ -1223,10 +1028,10 @@ mod test {
     #[test]
     fn test_upward_pass_vector_helmholtz() {
         // Setup random sources and targets
-        let nsources = 10000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 10000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
         // let n_crit = Some(100);
@@ -1241,12 +1046,12 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let wavenumber = 2.5;
 
-        let mut fmm_fft = SingleNodeBuilder::new()
+        let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -1260,7 +1065,7 @@ mod test {
             .build()
             .unwrap();
 
-        fmm_fft.evaluate(false).unwrap();
+        fmm_fft.evaluate().unwrap();
         let fmm_fft = Box::new(fmm_fft);
         test_root_multipole_helmholtz_single_node(fmm_fft, &sources, &charges, 1e-5);
     }
@@ -1268,10 +1073,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
 
@@ -1286,13 +1091,13 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
         {
             // Evaluate potentials
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1305,7 +1110,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -1314,7 +1119,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1327,7 +1132,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1342,7 +1147,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1355,7 +1160,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -1364,7 +1169,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1377,7 +1182,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1393,10 +1198,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector_variable_expansion_order() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
 
@@ -1411,13 +1216,13 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
         {
             // Evaluate potentials
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1430,7 +1235,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -1439,7 +1244,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1452,7 +1257,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1467,7 +1272,7 @@ mod test {
         // FFT based field translation
         {
             // Evaluate potentials
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1480,7 +1285,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -1489,7 +1294,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1502,7 +1307,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1518,10 +1323,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_vector_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
         let threshold_deriv = 1e-3;
 
@@ -1537,13 +1342,13 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
         {
             // Evaluate potentials
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1556,7 +1361,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -1566,7 +1371,7 @@ mod test {
             );
 
             // Evaluate potentials + derivatives
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1579,7 +1384,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
             let eval_type = fmm.kernel_eval_type;
             let fmm = Box::new(fmm);
             test_single_node_helmholtz_fmm_vector_helper::<c64>(
@@ -1595,10 +1400,10 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_matrix_variable_surfaces() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(1));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let n_sources = 9000;
+        let n_targets = 10000;
+        let sources = points_fixture::<f64>(n_sources, None, None, Some(1));
+        let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
         let threshold = 1e-5;
 
         // FMM parameters
@@ -1613,13 +1418,13 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
         {
             // Evaluate potentials
-            let mut fmm = SingleNodeBuilder::new()
+            let mut fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1632,7 +1437,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm.evaluate(false).unwrap();
+            fmm.evaluate().unwrap();
 
             let fmm: Box<_> = Box::new(fmm);
             let eval_type = fmm.kernel_eval_type;
@@ -1646,13 +1451,13 @@ mod test {
     #[test]
     fn test_laplace_fmm_matrix() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -1667,17 +1472,17 @@ mod test {
         // Charge data
         let nvecs = 5;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges
             .data_mut()
-            .chunks_exact_mut(nsources)
+            .chunks_exact_mut(n_sources)
             .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
 
         // fmm with blas based field translation
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1694,7 +1499,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
 
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
@@ -1703,7 +1508,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1720,7 +1525,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_laplace_fmm_matrix_helper::<f64>(
                 fmm_blas,
@@ -1735,13 +1540,13 @@ mod test {
     #[test]
     fn test_helmholtz_fmm_matrix() {
         // Setup random sources and targets
-        let nsources = 9000;
-        let ntargets = 10000;
+        let n_sources = 9000;
+        let n_targets = 10000;
 
         let min = None;
         let max = None;
-        let sources = points_fixture::<f64>(nsources, min, max, Some(0));
-        let targets = points_fixture::<f64>(ntargets, min, max, Some(1));
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
 
         // FMM parameters
         let n_crit = None;
@@ -1757,17 +1562,17 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [nsources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
         charges
             .data_mut()
-            .chunks_exact_mut(nsources)
+            .chunks_exact_mut(n_sources)
             .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
 
         // fmm with blas based field translation
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1780,7 +1585,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
 
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
@@ -1789,7 +1594,7 @@ mod test {
 
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
-            let mut fmm_blas = SingleNodeBuilder::new()
+            let mut fmm_blas = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -1802,7 +1607,7 @@ mod test {
                 .unwrap()
                 .build()
                 .unwrap();
-            fmm_blas.evaluate(false).unwrap();
+            fmm_blas.evaluate().unwrap();
             let fmm_blas = Box::new(fmm_blas);
             test_single_node_helmholtz_fmm_matrix_helper::<c64>(
                 fmm_blas,

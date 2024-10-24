@@ -23,7 +23,7 @@ use std::{
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
 where
-    T: RlstScalar + Float,
+    T: RlstScalar,
 {
     /// The lower left corner of the domain, minimum of x, y, z values.
     pub origin: [T; 3],
@@ -121,55 +121,74 @@ where
 ///
 /// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
 ///   checks and deduplication.
+/// MPI distributed tree, consists of up to N single node trees
 #[cfg(feature = "mpi")]
 pub struct MultiNodeTree<T, C: Communicator>
 where
     T: RlstScalar + Float + Equivalence,
 {
-    /// Global communicator for this Tree
-    pub world: C,
-
-    /// Range of leaf keys at this processor, and their current rank [rank, min, max]
-    pub range: [u64; 3],
-
-    /// Depth of the tree
-    pub depth: u64,
-
-    /// Domain spanned by the points.
+    /// Get domain defined by the points, gets global domain in multi node setting.
     pub domain: Domain<T>,
 
-    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
-    pub coordinates: Vec<T>,
+    /// Communicator associated with this tree
+    pub comm: C,
 
-    /// All global indices
-    pub global_indices: Vec<usize>,
+    /// MPI Rank
+    pub rank: i32,
 
-    /// The leaves that span the tree.
-    pub leaves: MortonKeys<T>,
+    /// Depth of the global tree
+    pub global_depth: u64,
 
-    /// All nodes in tree.
+    /// Depth of each local tree
+    pub local_depth: u64,
+
+    /// Total depth of the tree, sum of local and global depths
+    pub total_depth: u64,
+
+    /// Single node trees at this rank
+    pub trees: Vec<SingleNodeTree<T>>,
+
+    /// Roots associated with trees at this rank
+    pub roots: Vec<MortonKey<T>>,
+
+    /// Number of single node trees at this rank
+    pub n_trees: usize,
+
+    /// All associated keys
     pub keys: MortonKeys<T>,
 
-    /// Associate leaves with point indices.
-    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
+    /// All associated leaves
+    pub leaves: MortonKeys<T>,
 
-    /// Associate levels with key indices.
-    pub levels_to_keys: HashMap<u64, (usize, usize)>,
+    /// All associated keys, for rapid inclusion checking
+    pub keys_set: HashSet<MortonKey<T>>,
 
-    /// Map between a key and its index
-    pub key_to_index: HashMap<MortonKey<T>, usize>,
+    /// All associated keys, for rapid inclusion checking
+    pub leaves_set: HashSet<MortonKey<T>>,
 
     /// Map between a key and its index at a level
     pub key_to_level_index: HashMap<MortonKey<T>, usize>,
 
-    /// Map between a leaf and its index
+    /// Associated global indices
+    pub global_indices: Vec<usize>,
+
+    /// Map between key and index
+    pub key_to_index: HashMap<MortonKey<T>, usize>,
+
+    /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
+    pub coordinates: Vec<T>,
+
+    /// All points coordinate with associated morton key
+    pub points: Points<T>,
+
+    /// Map between leaf key and leaf index
     pub leaf_to_index: HashMap<MortonKey<T>, usize>,
 
-    /// All leaves, returned as a set.
-    pub leaves_set: HashSet<MortonKey<T>>,
+    /// Associate leaves with coordinate indices.
+    pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
 
-    /// All keys, returned as a set.
-    pub keys_set: HashSet<MortonKey<T>>,
+    /// Associate levels with key indices.
+    pub levels_to_keys: HashMap<u64, (usize, usize)>,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -260,6 +279,9 @@ pub struct SingleNodeTree<T>
 where
     T: RlstScalar + Float,
 {
+    /// Root node of the tree
+    pub root: MortonKey<T>,
+
     /// Depth of a tree.
     pub depth: u64,
 
@@ -268,6 +290,9 @@ where
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
     pub coordinates: Vec<T>,
+
+    /// All points coordinate with associated morton key
+    pub points: Points<T>,
 
     /// All global indices
     pub global_indices: Vec<usize>,
@@ -298,4 +323,24 @@ where
 
     /// All keys, returned as a set.
     pub keys_set: HashSet<MortonKey<T>>,
+}
+
+/// Select sort kind for multinode trees
+#[cfg(feature = "mpi")]
+#[derive(Clone)]
+pub enum SortKind {
+    /// Hypercube communication scheme based quicksort
+    Hyksort {
+        /// Subcommunicator size, restricted to being a power of 2
+        subcomm_size: i32,
+    },
+
+    /// Sample sort, variant of bucket sort
+    Samplesort {
+        /// The size of each sample from each MPI process
+        n_samples: usize,
+    },
+
+    /// Simple sort, variant of bucket sort
+    Simplesort,
 }

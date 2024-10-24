@@ -7,34 +7,38 @@ use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
     fmm::{
-        helpers::{map_charges, ncoeffs_kifmm},
+        helpers::single_node::{map_charges, ncoeffs_kifmm, optionally_time},
         types::{FmmEvalType, Isa, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
     },
     traits::{
         field::{
-            SourceAndTargetTranslationMetadata, SourceToTargetData as SourceToTargetDataTrait,
-            SourceToTargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
+            SourceTranslationMetadata, TargetTranslationMetadata,
         },
-        fmm::{FmmMetadata, HomogenousKernel},
-        general::Epsilon,
-        tree::{FmmTree, Tree},
+        fmm::{HomogenousKernel, Metadata},
+        general::single_node::Epsilon,
+        tree::{SingleFmmTree, SingleTree},
+        types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
     },
     tree::{types::Domain, SingleNodeTree},
 };
 
-impl<Scalar, Kernel, SourceToTargetData> SingleNodeBuilder<Scalar, Kernel, SourceToTargetData>
+impl<Scalar, Kernel, FieldTranslation> SingleNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
-    SourceToTargetData: SourceToTargetDataTrait + Default,
-    KiFmm<Scalar, Kernel, SourceToTargetData>: SourceToTargetTranslationMetadata
-        + SourceAndTargetTranslationMetadata
-        + FmmMetadata<Scalar = Scalar>,
+    FieldTranslation: FieldTranslationTrait + Default,
+    KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
+        + SourceTranslationMetadata
+        + TargetTranslationMetadata
+        + Metadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
-    pub fn new() -> Self {
+    pub fn new(timed: bool) -> Self {
         Self {
+            timed: Some(timed),
+            communication_times: None,
             isa: None,
             tree: None,
             kernel: None,
@@ -44,8 +48,8 @@ where
             equivalent_surface_order: None,
             check_surface_order: None,
             variable_expansion_order: None,
-            ncoeffs_equivalent_surface: None,
-            ncoeffs_check_surface: None,
+            n_coeffs_equivalent_surface: None,
+            n_coeffs_check_surface: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
             depth_set: None,
@@ -68,8 +72,9 @@ where
         prune_empty: bool,
     ) -> Result<Self, std::io::Error> {
         let dim = 3;
-        let nsources = sources.len() / dim;
-        let ntargets = targets.len() / dim;
+        let n_sources = sources.len() / dim;
+        let n_targets = targets.len() / dim;
+        let timed = self.timed.unwrap();
 
         let dims = sources.len() % dim;
         let dimt = targets.len() % dim;
@@ -79,15 +84,32 @@ where
                 std::io::ErrorKind::InvalidData,
                 "Only 3D FMM supported",
             ))
-        } else if nsources == 0 || ntargets == 0 {
+        } else if n_sources == 0 || n_targets == 0 {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            // Source and target trees calcualted over the same domain
-            let source_domain = Domain::from_local_points(sources);
-            let target_domain = Domain::from_local_points(targets);
+            let mut communication_times = Vec::new();
+
+            // Source and target trees calculated over the same domain
+            let (source_domain, d) = optionally_time(timed, || Domain::from_local_points(sources));
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::SourceDomain,
+                    d,
+                ))
+            }
+
+            let (target_domain, d) = optionally_time(timed, || Domain::from_local_points(targets));
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::TargetDomain,
+                    d,
+                ))
+            }
 
             // Calculate union of domains for source and target points, needed to define operators
             let domain = source_domain.union(&target_domain);
@@ -102,10 +124,14 @@ where
                 self.depth_set = Some(true);
             } else if depth.is_none() && n_crit.is_some() {
                 // Estimate depth based on a uniform distribution
-                source_depth =
-                    SingleNodeTree::<Scalar::Real>::minimum_depth(nsources as u64, n_crit.unwrap());
-                target_depth =
-                    SingleNodeTree::<Scalar::Real>::minimum_depth(ntargets as u64, n_crit.unwrap());
+                source_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
+                    n_sources as u64,
+                    n_crit.unwrap(),
+                );
+                target_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
+                    n_targets as u64,
+                    n_crit.unwrap(),
+                );
                 self.depth_set = Some(false);
             } else {
                 return Err(std::io::Error::new(
@@ -116,8 +142,31 @@ where
 
             let depth = source_depth.max(target_depth); // refine source and target trees to same depth
 
-            let source_tree = SingleNodeTree::new(sources, depth, prune_empty, self.domain)?;
-            let target_tree = SingleNodeTree::new(targets, depth, prune_empty, self.domain)?;
+            let (source_tree, d) = optionally_time(timed, || {
+                SingleNodeTree::new(sources, depth, prune_empty, self.domain, None, None)
+            });
+
+            let source_tree = source_tree?;
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::SourceTree,
+                    d,
+                ))
+            }
+
+            let (target_tree, d) = optionally_time(timed, || {
+                SingleNodeTree::new(targets, depth, prune_empty, self.domain, None, None)
+            });
+
+            let target_tree = target_tree?;
+
+            if let Some(d) = d {
+                communication_times.push(CommunicationTime::from_duration(
+                    CommunicationType::TargetTree,
+                    d,
+                ))
+            }
 
             let fmm_tree = SingleNodeFmmTree {
                 source_tree,
@@ -125,6 +174,7 @@ where
                 domain,
             };
 
+            self.communication_times = Some(communication_times);
             self.tree = Some(fmm_tree);
             Ok(self)
         }
@@ -144,7 +194,7 @@ where
         expansion_order: &[usize],
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
-        source_to_target: SourceToTargetData,
+        source_to_target: FieldTranslation,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -161,19 +211,19 @@ where
                 .all_global_indices()
                 .unwrap();
 
-            let ncharges = &self
+            let n_charges = &self
                 .tree
                 .as_ref()
                 .unwrap()
                 .source_tree()
                 .n_coordinates_tot()
                 .unwrap();
-            let nmatvecs = charges.len() / ncharges;
+            let n_matvecs = charges.len() / n_charges;
 
-            self.charges = Some(map_charges(global_indices, charges, nmatvecs));
+            self.charges = Some(map_charges(global_indices, charges, n_matvecs));
 
-            if nmatvecs > 1 {
-                self.fmm_eval_type = Some(FmmEvalType::Matrix(nmatvecs))
+            if n_matvecs > 1 {
+                self.fmm_eval_type = Some(FmmEvalType::Matrix(n_matvecs))
             } else {
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
@@ -207,14 +257,14 @@ where
                 expansion_order.to_vec()
             };
 
-            self.ncoeffs_equivalent_surface = Some(
+            self.n_coeffs_equivalent_surface = Some(
                 expansion_order
                     .iter()
                     .map(|&e| ncoeffs_kifmm(e))
                     .collect_vec(),
             );
 
-            self.ncoeffs_check_surface = Some(
+            self.n_coeffs_check_surface = Some(
                 check_surface_order
                     .iter()
                     .map(|&c| ncoeffs_kifmm(c))
@@ -233,7 +283,7 @@ where
     }
 
     /// Finalize and build the single node FMM
-    pub fn build(self) -> Result<KiFmm<Scalar, Kernel, SourceToTargetData>, std::io::Error> {
+    pub fn build(self) -> Result<KiFmm<Scalar, Kernel, FieldTranslation>, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -243,30 +293,55 @@ where
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();
             let dim = kernel.space_dimension();
+            let timed = self.timed.unwrap();
+            let communication_times = self.communication_times.unwrap();
 
             let mut result = KiFmm {
+                timed,
                 isa: self.isa.unwrap(),
                 tree: self.tree.unwrap(),
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
                 variable_expansion_order: self.variable_expansion_order.unwrap(),
-                ncoeffs_equivalent_surface: self.ncoeffs_equivalent_surface.unwrap(),
-                ncoeffs_check_surface: self.ncoeffs_check_surface.unwrap(),
+                n_coeffs_equivalent_surface: self.n_coeffs_equivalent_surface.unwrap(),
+                n_coeffs_check_surface: self.n_coeffs_check_surface.unwrap(),
                 source_to_target: self.source_to_target.unwrap(),
                 fmm_eval_type: self.fmm_eval_type.unwrap(),
                 kernel_eval_type: self.kernel_eval_type.unwrap(),
                 kernel,
                 dim,
+                communication_times,
                 ..Default::default()
             };
 
             // Calculate required metadata
-            result.source();
-            result.target();
-            result.source_to_target();
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            result.displacements();
+            let (_, duration) = optionally_time(timed, || result.source());
 
+            if let Some(d) = duration {
+                result
+                    .metadata_times
+                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+            }
+
+            let (_, duration) = optionally_time(timed, || result.target());
+
+            if let Some(d) = duration {
+                result
+                    .metadata_times
+                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+            }
+
+            let (_, duration) = optionally_time(timed, || result.source_to_target());
+
+            if let Some(d) = duration {
+                result.metadata_times.push(MetadataTime::from_duration(
+                    MetadataType::SourceToTargetData,
+                    d,
+                ))
+            }
+
+            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
+            SourceToTargetTranslationMetadata::displacements(&mut result, None);
             Ok(result)
         }
     }
