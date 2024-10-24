@@ -22,8 +22,7 @@ export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export TEST=${WORK}/grid_search_mpi
-export SCRATCH=${TEST}/grid_search_${SLURM_JOBID}
+export SCRATCH=${WORK}/grid_search_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
@@ -70,7 +69,7 @@ for i in ${!local_depth[@]}; do
         for k in ${!block_size[@]}; do
             for l in ${!n_threads[@]}; do
                 srun --ntasks=$n_tasks --cpus-per-task=16 --distribution=block:block --hint=nomultithread \
-                    ${TEST}/grid_search_mpi --n-points $n_points \
+                    ${WORK}/grid_search_mpi --n-points $n_points \
                     --expansion-order 3 \
                     --prune-empty \
                     --global-depth $global_depth \

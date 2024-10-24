@@ -202,13 +202,6 @@ fn main() {
         }
     }
 
-
-    println!("
-    runtime, p2m, m2m, l2l, m2l, p2p, \
-    source_tree, target_tree, source_domain, target_domain, layout, ghost_exchange_v, ghost_exchange_u, gather_global_fmm, scatter_global_fmm \
-    source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u
-    ");
-
     println!(
         "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
