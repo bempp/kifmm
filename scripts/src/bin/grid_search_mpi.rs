@@ -203,9 +203,12 @@ fn main() {
     }
 
     println!(
-        "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
+        "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
-         {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
+         {:?}, {:?}, {:?}, {:?}, {:?}, {:?} \
+         {:?}, {:?}, {:?}, {:?}. {:?}. {:?}, {:?},
+         ",
+        multi_fmm.rank,
         runtime,
         operator_times.get("p2m").unwrap_or(&0),
         operator_times.get("m2m").unwrap_or(&0),
@@ -227,5 +230,12 @@ fn main() {
         metadata_times.get("global_fmm").unwrap_or(&0),
         metadata_times.get("ghost_fmm_v").unwrap_or(&0),
         metadata_times.get("ghost_fmm_u").unwrap_or(&0),
+        args.expansion_order,
+        args.n_points,
+        args.local_depth,
+        args.global_depth,
+        args.block_size,
+        args.n_threads,
+        args.n_samples
     );
 }

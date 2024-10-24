@@ -57,11 +57,11 @@ export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Ray
 export OUTPUT=${SCRATCH}/grid_search_fft_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
-runtime, p2m, m2m, l2l, m2l, p2p, \
+rank, runtime, p2m, m2m, l2l, m2l, p2p, \
 source_tree, target_tree, source_domain, target_domain, layout, \
 ghost_exchange_v, ghost_exchange_u, gather_global_fmm, scatter_global_fmm, \
 source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u \
-n_points, n_tasks, global_depth, local_depth, n_samples, block_size, n_threads
+expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples
 " >> ${OUTPUT}
 
 # Perform grid search
@@ -69,8 +69,7 @@ for i in ${!local_depth[@]}; do
     for j in ${!n_samples[@]}; do
         for k in ${!block_size[@]}; do
             for l in ${!n_threads[@]}; do
-
-                runtime_output=$(srun --ntasks=$n_tasks --cpus-per-task=16 --distribution=block:block --hint=nomultithread \
+                srun --ntasks=$n_tasks --cpus-per-task=16 --distribution=block:block --hint=nomultithread \
                     ${WORK}/grid_search_mpi --n-points $n_points \
                     --expansion-order 3 \
                     --prune-empty \
@@ -78,9 +77,7 @@ for i in ${!local_depth[@]}; do
                     --local-depth ${local_depth[$i]} \
                     --n-samples ${n_samples[$j]} \
                     --block-size ${block_size[$k]} \
-                    --n-threads ${n_threads[$l]})
-
-                echo "$runtime_output, $n_points, $n_tasks, $global_depth, ${local_depth[$i]}, ${n_samples[$j]}, ${block_size[$k]}, ${n_threads[$l]}" >> ${OUTPUT}
+                    --n-threads ${n_threads[$l]} >> ${OUTPUT}
             done
         done
     done
