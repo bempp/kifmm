@@ -7,7 +7,7 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --cpus-per-task=16
 
-#SBATCH --account=e681
+#SBATCH --account=e738
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 # Development environment for KiFMM
@@ -27,10 +27,6 @@ export SCRATCH=${TEST}/grid_search_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
-. "$HOME/.cargo/env"
-
-
-# Load Cargo environment for Rust
 . "$HOME/.cargo/env"
 
 # Load BLAS
