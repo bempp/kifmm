@@ -3,5 +3,6 @@ resolver =  "2"
 members = [
     "kifmm",
     "fftw-src",
-    "fftw-sys"
-, "scripts"]
+    "fftw-sys",
+    "scripts"
+]

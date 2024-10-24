@@ -10,22 +10,37 @@
 #SBATCH --account=e681
 #SBATCH --partition=standard
 #SBATCH --qos=standard
+# Development environment for KiFMM
 
 # Restore AMD compiler env
 module load PrgEnv-aocc
 module load craype-network-ucx
 module load cray-mpich-ucx
 
-# Ensure Rust can find the Cray libraries
-export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
-export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+# Home and work directories
+export HOME="/home/e738/e738/skailasa"
+export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export WORK=/work/e738/e738/skailasa
 export TEST=${WORK}/grid_search_mpi
-
-
 export SCRATCH=${TEST}/grid_search_${SLURM_JOBID}
+
+# Load Spack
+source $HOME/spack/share/spack/setup-env.sh
+. "$HOME/.cargo/env"
+
+
+# Load Cargo environment for Rust
+. "$HOME/.cargo/env"
+
+# Load BLAS
+spack load openblas
+
+# Ensure Rust can find the Cray libraries
+# export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
+# export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+export RUSTFLAGS="-L $(spack location -i openblas)/lib"
+export LD_LIBRARY_PATH=$(spack location -i openblas)/lib:$LD_LIBRARY_PATH
 
 mkdir -p ${SCRATCH}
 cd ${SCRATCH}
