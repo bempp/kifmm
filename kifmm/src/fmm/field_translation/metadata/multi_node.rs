@@ -18,7 +18,7 @@ use crate::fmm::helpers::multi_node::{
     leaf_scales_multi_node, leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
     level_index_pointer_multi_node, potential_pointers_multi_node,
 };
-use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale};
+use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale, optionally_time};
 use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
 use crate::fmm::KiFmm;
 use crate::linalg::pinv::pinv;
@@ -29,6 +29,7 @@ use crate::traits::general::{
     single_node::{AsComplex, Epsilon},
 };
 use crate::traits::tree::{Domain, FmmTreeNode, MultiFmmTree, MultiTree};
+use crate::traits::types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType};
 use crate::tree::constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM};
 use crate::tree::helpers::find_corners;
 use crate::tree::types::MortonKey;
@@ -1070,7 +1071,13 @@ where
         self.kernel_eval_size = kernel_eval_size;
 
         // Can perform U list exchange now
-        self.u_list_exchange();
+        let (_, duration) = optionally_time(self.timed, || {
+            self.u_list_exchange();
+        });
+
+        if let Some(d) = duration {
+            self.communication_times.push(CommunicationTime::from_duration(CommunicationType::GhostExchangeU, d))
+        }
     }
 }
 

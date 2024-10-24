@@ -106,11 +106,23 @@ pub use fmm::types::SingleNodeFmmTree;
 #[doc(inline)]
 pub use fmm::types::MultiNodeFmmTree;
 
+#[cfg(feature = "mpi")]
+#[doc(inline)]
+pub use fmm::types::MultiNodeBuilder;
+
 #[doc(inline)]
 pub use traits::fmm::Evaluate;
 
 #[doc(inline)]
 pub use traits::fmm::DataAccess;
+
+#[cfg(feature = "mpi")]
+#[doc(inline)]
+pub use traits::fmm::EvaluateMulti;
+
+#[cfg(feature = "mpi")]
+#[doc(inline)]
+pub use traits::fmm::DataAccessMulti;
 
 #[cfg_attr(feature = "strict", deny(warnings))]
 #[warn(missing_docs)]

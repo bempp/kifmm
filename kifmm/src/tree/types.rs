@@ -326,6 +326,7 @@ where
 }
 
 /// Select sort kind for multinode trees
+#[cfg(feature = "mpi")]
 #[derive(Clone)]
 pub enum SortKind {
     /// Hypercube communication scheme based quicksort

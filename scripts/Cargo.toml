@@ -4,4 +4,31 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-kifmm ={ path = "../kifmm"}
+kifmm ={ path = "../kifmm", features = ["mpi"]}
+itertools = "0.13.*"
+green-kernels = { version = "0.2.2", default-features = false }
+rlst = {version = "0.2.0", default-features = false}
+rand = "0.8.5"
+num = "0.4"
+csv = "1.3.0"
+mpi = { version = "0.8.*", optional = true}
+rayon = "1.9"
+clap = { version = "4.5.4", features = ["derive"] }
+
+[features]
+mpi = ["kifmm/mpi", "dep:mpi"]
+
+[[bin]]
+name = "grid_search"
+path = "src/bin/grid_search.rs"
+required-features = []
+
+[[bin]]
+name = "grid_search_mpi"
+path = "src/bin/grid_search_mpi.rs"
+required-features = ["mpi"]
+
+[[bin]]
+name = "weak"
+path = "src/bin/weak.rs"
+required-features = ["mpi"]

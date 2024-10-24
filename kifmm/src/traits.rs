@@ -4,4 +4,4 @@ pub mod field;
 pub mod fmm;
 pub mod general;
 pub mod tree;
-pub(crate) mod types;
+pub mod types;

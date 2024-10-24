@@ -16,14 +16,14 @@ fn main() {
     use mpi::{datatype::PartitionMut, traits::*};
     use rlst::RawAccess;
 
-    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
+    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
     let comm = world.duplicate();
 
     // Tree parameters
     let prune_empty = true;
     let n_points = 10000;
-    let local_depth = 3;
+    let local_depth = 1;
     let global_depth = 2;
     let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
@@ -32,7 +32,7 @@ fn main() {
     let kernel = Laplace3dKernel::<f32>::new();
 
     ThreadPoolBuilder::new()
-        .num_threads(1)
+        .num_threads(2)
         .build_global()
         .unwrap();
 
