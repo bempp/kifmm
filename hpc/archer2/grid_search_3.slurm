@@ -1,12 +1,11 @@
 #!/bin/bash
-# Here, we perform grid search where the number of MPI processes is set equal to the number of CCX units, each of which
-# share an L3 cache, conist of 4 processors. There are 16 CCX regions per processor, and 32 per node
+# Here we perform a naive run
 
 #SBATCH --job-name=grid_search
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=32
-#SBATCH --cpus-per-task=4
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=128
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
@@ -45,14 +44,14 @@ cd ${SCRATCH}
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 # Set simulation parameters
-n_points=250000 # points per MPI process
-n_tasks=32
-cpus_per_task=4
-global_depth=2 # Number of local roots matches the number of MPI processes, therefore the number of NUMA regions
-local_depth=(4 5)
+n_points=8000000 # points per MPI process
+n_tasks=1
+cpus_per_task=128
+global_depth=1 # Number of local roots matches the number of MPI processes, therefore the number of NUMA regions
+local_depth=(5)
 n_samples=(5000)
 block_size=(128)
-n_threads=(4) # See if bandwidth saturates with different threading parameters for Rayon thread pool
+n_threads=(128) # See if bandwidth saturates with different threading parameters for Rayon thread pool
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis

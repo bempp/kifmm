@@ -57,7 +57,7 @@ export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Ray
 export OUTPUT=${SCRATCH}/grid_search_fft_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
-rank, runtime, p2m, m2m, l2l, m2l, p2p, \
+experiment_id, rank, runtime, p2m, m2m, l2l, m2l, p2p, \
 source_tree, target_tree, source_domain, target_domain, layout, \
 ghost_exchange_v, ghost_exchange_u, gather_global_fmm, scatter_global_fmm, \
 source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u \
@@ -69,8 +69,9 @@ for i in ${!local_depth[@]}; do
     for j in ${!n_samples[@]}; do
         for k in ${!block_size[@]}; do
             for l in ${!n_threads[@]}; do
+                experiment_id="${i}_${j}_${k}_${l}"
                 srun --ntasks=$n_tasks --cpus-per-task=16 --distribution=block:block --hint=nomultithread \
-                    ${WORK}/grid_search_mpi --n-points $n_points \
+                    ${WORK}/grid_search_mpi --id $experiment_id --n-points $n_points \
                     --expansion-order 3 \
                     --prune-empty \
                     --global-depth $global_depth \

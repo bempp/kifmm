@@ -14,6 +14,10 @@ use std::{collections::HashMap, time::Instant};
 /// Struct for parsing command-line arguments
 #[derive(Parser)]
 struct Args {
+
+    #[arg(long, default_value_t = String::from("x"))]
+    id: String,
+
     #[arg(long, default_value_t = 3)]
     expansion_order: usize,
 
@@ -63,6 +67,7 @@ fn main() {
     let block_size = args.block_size;
     let n_threads = args.n_threads;
     let n_samples = args.n_samples;
+    let id = args.id;
 
     assert!(n_samples > 0 && n_samples < n_points);
 
@@ -200,11 +205,12 @@ fn main() {
     }
 
     println!(
-        "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
+        "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?} \
          {:?}, {:?}, {:?}, {:?}. {:?}. {:?}, {:?},
          ",
+        id,
         multi_fmm.rank,
         runtime,
         operator_times.get("p2m").unwrap_or(&0),
