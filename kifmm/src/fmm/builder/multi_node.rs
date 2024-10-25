@@ -4,10 +4,11 @@ use mpi::{
 };
 use num::Float;
 use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
+use std::collections::HashMap;
 
 use crate::{
     fmm::{
-        helpers::single_node::{ncoeffs_kifmm, optionally_time},
+        helpers::single_node::{level_index_pointer_single_node, ncoeffs_kifmm, optionally_time},
         types::{
             FmmEvalType, Isa, KiFmmMulti, Layout, MultiNodeBuilder, NeighbourhoodCommunicator,
             Query,
@@ -20,14 +21,14 @@ use crate::{
             SourceTranslationMetadata, TargetTranslationMetadata,
         },
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
-        general::single_node::Epsilon,
+        general::{multi_node::GlobalFmmMetadata, single_node::Epsilon},
         types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
     },
     tree::{
         types::{Domain, SortKind},
         MultiNodeTree,
     },
-    MultiNodeFmmTree,
+    MultiNodeFmmTree, SingleNodeFmmTree,
 };
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
@@ -47,7 +48,8 @@ where
         + SourceTranslationMetadata
         + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>
-        + MetadataAccess,
+        + MetadataAccess
+        + GlobalFmmMetadata<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>,
 {
     /// Init
     pub fn new(timed: bool) -> Self {
@@ -346,11 +348,12 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                local_roots: Vec::default(),
-                local_roots_counts: Vec::default(),
-                local_roots_displacements: Vec::default(),
-                local_roots_ranks: Vec::default(),
                 metadata_times: Vec::default(),
+                ghost_requested_queries_key_to_index_v: HashMap::default(),
+                ghost_requested_queries_counts_v: Vec::default(),
+                ghost_received_queries_displacements_v: Vec::default(),
+                ghost_received_queries_counts_v: Vec::default(),
+                ghost_received_queries_v: Vec::default(),
             };
 
             // Calculate required metadata
@@ -377,6 +380,28 @@ where
                     MetadataType::SourceToTargetData,
                     d,
                 ))
+            }
+
+            // Metadata for global FMM and FMM
+
+            // On nominated node only
+            if result.communicator.rank() == 0 {
+                result.global_fmm.set_source_tree(
+                    &result.tree.domain,
+                    result.tree.source_tree.global_depth,
+                    result.tree.source_tree.all_roots.clone(),
+                );
+
+                result.global_fmm.set_target_tree(
+                    &result.tree.domain,
+                    result.tree.source_tree.global_depth,
+                    result.tree.source_tree.all_roots.clone(),
+                );
+
+                result.global_fmm.level_index_pointer_multipoles =
+                    level_index_pointer_single_node(&result.global_fmm.tree.source_tree);
+                result.global_fmm.global_fmm_local_metadata();
+                result.global_fmm.displacements(None);
             }
 
             // pass dummy charges for now.

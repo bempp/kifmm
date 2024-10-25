@@ -1082,6 +1082,18 @@ where
                     d,
                 ))
         }
+
+        let (_, duration) = optionally_time(self.timed, || {
+            self.v_list_exchange();
+        });
+
+        if let Some(d) = duration {
+            self.communication_times
+                .push(CommunicationTime::from_duration(
+                    CommunicationType::GhostExchangeV,
+                    d,
+                ))
+        }
     }
 }
 

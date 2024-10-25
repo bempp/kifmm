@@ -13,8 +13,13 @@ use crate::{
 
 /// Interface for ghost exchange implementations
 pub trait GhostExchange {
-    /// Exchange V list data, must be done at runtime as relies on partially completed upward pass
+    /// Exchange V List keys and metadata, which can be done during pre-computation
     fn v_list_exchange(&mut self);
+
+    /// Exchange V list data, must be done at runtime as relies on partially completed upward pass
+    /// Only the actual multipole coefficients have to be exchanged at runtime, but this isn't required
+    /// for calculating the displacements
+    fn v_list_exchange_runtime(&mut self);
 
     /// Exchange U list data, can be done during pre-computation
     fn u_list_exchange(&mut self);
@@ -31,22 +36,31 @@ pub trait GlobalFmmMetadata
 where
     Self: DataAccess + SourceToTargetTranslationMetadata,
 {
+    /// Set the source tree from some leaves
+    fn set_source_tree(
+        &mut self,
+        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
+        depth: u64,
+        leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+    );
+
+    /// Set the target tree from some leaves
+    fn set_target_tree(
+        &mut self,
+        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
+        depth: u64,
+        leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+    );
+
     /// Set data associated with received multipoles for global tree
     #[allow(clippy::too_many_arguments)]
     fn global_fmm_multipole_metadata(
         &mut self,
-        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
-        depth: u64,
         leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         multipoles: Vec<Self::Scalar>,
     );
 
     /// Set data associated with received locals for global tree
     #[allow(clippy::too_many_arguments)]
-    fn global_fmm_local_metadata(
-        &mut self,
-        domain: &Domain<<Self::Scalar as RlstScalar>::Real>,
-        depth: u64,
-        leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
-    );
+    fn global_fmm_local_metadata(&mut self);
 }

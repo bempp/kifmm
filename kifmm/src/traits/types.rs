@@ -62,6 +62,9 @@ pub enum CommunicationType {
     /// V list ghost exchange
     GhostExchangeV,
 
+    /// V list ghost exchange at runtime
+    GhostExchangeVRuntime,
+
     /// U list ghost exchange
     GhostExchangeU,
 
@@ -214,6 +217,7 @@ impl fmt::Display for CommunicationType {
             CommunicationType::Layout => write!(f, "Layout"),
             CommunicationType::GhostExchangeU => write!(f, "Ghost Exchange U"),
             CommunicationType::GhostExchangeV => write!(f, "Ghost Exchange V"),
+            CommunicationType::GhostExchangeVRuntime => write!(f, "Ghost Exchange V Runtime"),
             CommunicationType::GatherGlobalFmm => write!(f, "Gather Global FMM"),
             CommunicationType::ScatterGlobalFmm => write!(f, "Scatter Global FMM"),
         }

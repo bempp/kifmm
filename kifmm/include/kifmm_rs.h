@@ -32,6 +32,10 @@ typedef enum CommunicationType {
    */
   CommunicationType_GhostExchangeV,
   /**
+   * V list ghost exchange at runtime
+   */
+  CommunicationType_GhostExchangeVRuntime,
+  /**
    * U list ghost exchange
    */
   CommunicationType_GhostExchangeU,

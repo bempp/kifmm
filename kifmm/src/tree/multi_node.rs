@@ -11,7 +11,11 @@ use crate::{
 };
 
 use itertools::Itertools;
-use mpi::{datatype::PartitionMut, datatype::Partitioned, topology::SimpleCommunicator};
+use mpi::{
+    datatype::{PartitionMut, Partitioned},
+    topology::SimpleCommunicator,
+    traits::Root,
+};
 use mpi::{
     traits::{Communicator, CommunicatorCollectives, Equivalence},
     Count, Rank,
@@ -34,12 +38,10 @@ where
         local_depth: u64,
         global_depth: u64,
         global_indices: &[usize],
-        comm: &SimpleCommunicator,
+        communicator: &SimpleCommunicator,
         sort_kind: SortKind,
         prune_empty: bool,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
-        let rank = comm.rank();
-
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
 
@@ -61,8 +63,8 @@ where
 
         // Perform parallel Morton sort over encoded points
         match sort_kind {
-            SortKind::Hyksort { subcomm_size } => hyksort(&mut points, subcomm_size, comm)?,
-            SortKind::Samplesort { n_samples } => samplesort(&mut points, comm, n_samples)?,
+            SortKind::Hyksort { subcomm_size } => hyksort(&mut points, subcomm_size, communicator)?,
+            SortKind::Samplesort { n_samples } => samplesort(&mut points, communicator, n_samples)?,
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters
@@ -76,7 +78,7 @@ where
                     .collect_vec();
                 splitters.sort();
                 let splitters = &mut splitters[1..];
-                simplesort(&mut points, comm, splitters)?;
+                simplesort(&mut points, communicator, splitters)?;
             }
         }
 
@@ -200,9 +202,76 @@ where
             leaf_to_index.insert(*key, i);
         }
 
+        // Gather global roots at setup
+        let size = communicator.size();
+        let rank = communicator.rank();
+
+        // Nominated rank for running global upward pass
+        let root_rank = 0;
+        let root_process = communicator.process_at_rank(root_rank);
+
+        let all_roots;
+        let all_roots_displacements;
+        let all_roots_counts;
+        let all_roots_ranks;
+
+        if rank == root_rank {
+            let n_roots = n_trees as i32;
+            let mut roots = Vec::new();
+            for tree in trees.iter() {
+                roots.push(tree.root())
+            }
+
+            let mut counts = vec![0 as Count; size as usize];
+            root_process.gather_into_root(&n_roots, &mut counts);
+
+            // Calculate associated displacements from the counts
+            let mut displacements = Vec::new();
+            let mut displacement = 0;
+            for &count in counts.iter() {
+                displacements.push(displacement);
+                displacement += count;
+            }
+
+            let total_receive = counts.iter().sum::<i32>();
+
+            let mut global_roots = vec![MortonKey::<T>::default(); total_receive as usize];
+
+            let mut partition =
+                PartitionMut::new(&mut global_roots, &counts[..], &displacements[..]);
+
+            root_process.gather_varcount_into_root(&roots, &mut partition);
+
+            let mut global_roots_ranks = Vec::new();
+            for (rank, &count) in counts.iter().enumerate() {
+                for _ in 0..(count as usize) {
+                    global_roots_ranks.push(rank as Rank)
+                }
+            }
+
+            all_roots = global_roots;
+            all_roots_counts = counts;
+            all_roots_displacements = displacements;
+            all_roots_ranks = global_roots_ranks;
+        } else {
+            let n_roots = n_trees as i32;
+            let mut roots = Vec::new();
+            for tree in trees.iter() {
+                roots.push(tree.root())
+            }
+
+            root_process.gather_into(&n_roots);
+            root_process.gather_varcount_into(&roots);
+
+            all_roots = Vec::default();
+            all_roots_counts = Vec::default();
+            all_roots_displacements = Vec::default();
+            all_roots_ranks = Vec::default();
+        }
+
         Ok(MultiNodeTree {
             domain,
-            comm: comm.duplicate(),
+            communicator: communicator.duplicate(),
             rank,
             global_depth,
             local_depth,
@@ -222,6 +291,10 @@ where
             keys,
             leaves_to_coordinates,
             levels_to_keys,
+            all_roots,
+            all_roots_ranks,
+            all_roots_counts,
+            all_roots_displacements,
         })
     }
 
@@ -498,8 +571,8 @@ where
         // communication
         let queries = queries.into_iter().collect_vec();
         let mut ranks = Vec::new();
-        let mut send_counts = vec![0 as Count; self.source_tree.comm.size() as usize];
-        let mut send_marker = vec![0 as Rank; self.source_tree.comm.size() as usize];
+        let mut send_counts = vec![0 as Count; self.source_tree.communicator.size() as usize];
+        let mut send_marker = vec![0 as Rank; self.source_tree.communicator.size() as usize];
 
         for query in queries.iter() {
             let rank = *self.source_layout.rank_from_key(query).unwrap();
@@ -530,11 +603,11 @@ where
         ranks.sort();
 
         // Compute the receive counts, and mark again processes involved
-        let mut receive_counts = vec![0i32; self.source_tree().comm.size() as usize];
-        let mut receive_marker = vec![0i32; self.source_tree().comm.size() as usize];
+        let mut receive_counts = vec![0i32; self.source_tree().communicator.size() as usize];
+        let mut receive_marker = vec![0i32; self.source_tree().communicator.size() as usize];
 
         self.source_tree
-            .comm
+            .communicator
             .all_to_all_into(&send_counts, &mut receive_counts);
 
         for (rank, &receive_count) in receive_counts.iter().enumerate() {
@@ -561,7 +634,7 @@ where
 
     /// Gather source box ranges controlled by each local rank
     pub fn set_source_layout(&mut self) {
-        let size = self.source_tree.comm.size();
+        let size = self.source_tree.communicator.size();
 
         // Gather ranges on all processes, define by roots they own
         let mut roots = Vec::new();
@@ -574,7 +647,7 @@ where
 
         // All gather to calculate the counts of roots on each processor
         self.source_tree
-            .comm
+            .communicator
             .all_gather_into(&n_roots, &mut counts_);
 
         // Calculate displacements from the counts on each processor
@@ -596,7 +669,7 @@ where
         {
             let mut partition = PartitionMut::new(&mut raw, counts_, &displacements_[..]);
             self.source_tree
-                .comm
+                .communicator
                 .all_gather_varcount_into(&roots, &mut partition);
             counts = partition.counts().to_vec();
             displacements = partition.displs().to_vec();

@@ -165,6 +165,9 @@ fn main() {
             CommunicationType::GhostExchangeV => {
                 communication_times.insert("ghost_exchange_v", time.time);
             }
+            CommunicationType::GhostExchangeVRuntime => {
+                communication_times.insert("ghost_exchange_v_runtime", time.time);
+            }
             CommunicationType::GhostExchangeU => {
                 communication_times.insert("ghost_exchange_u", time.time);
             }
@@ -205,7 +208,7 @@ fn main() {
 
     println!(
         "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
-         {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
+         {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
         id,
@@ -222,6 +225,9 @@ fn main() {
         communication_times.get("target_domain").unwrap_or(&0),
         communication_times.get("layout").unwrap_or(&0),
         communication_times.get("ghost_exchange_v").unwrap_or(&0),
+        communication_times
+            .get("ghost_exchange_v_runtime")
+            .unwrap_or(&0),
         communication_times.get("ghost_exchange_u").unwrap_or(&0),
         communication_times.get("gather_global_fmm").unwrap_or(&0),
         communication_times.get("scatter_global_fmm").unwrap_or(&0),

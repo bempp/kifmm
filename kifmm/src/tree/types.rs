@@ -3,6 +3,7 @@
 #[cfg(feature = "mpi")]
 use mpi::traits::{Communicator, Equivalence};
 
+use mpi::{Count, Rank};
 use num::Float;
 use rlst::RlstScalar;
 
@@ -131,7 +132,7 @@ where
     pub domain: Domain<T>,
 
     /// Communicator associated with this tree
-    pub comm: C,
+    pub communicator: C,
 
     /// MPI Rank
     pub rank: i32,
@@ -150,6 +151,18 @@ where
 
     /// Roots associated with trees at this rank
     pub roots: Vec<MortonKey<T>>,
+
+    /// All global roots, only populated at nominated rank
+    pub all_roots: Vec<MortonKey<T>>,
+
+    /// All global roots origin ranks, only populated at nominated rank
+    pub all_roots_ranks: Vec<Rank>,
+
+    /// All global roots displacements, only populated at nominated rank
+    pub all_roots_displacements: Vec<Count>,
+
+    /// All global root origin counts, only populated at nominated rank
+    pub all_roots_counts: Vec<Count>,
 
     /// Number of single node trees at this rank
     pub n_trees: usize,

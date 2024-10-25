@@ -70,19 +70,19 @@ fn main() {
     // Expect these to match the global communicator
     assert_eq!(
         multi_fmm.tree.u_list_query.send_counts.len(),
-        multi_fmm.tree.source_tree().comm.size() as usize
+        multi_fmm.tree.source_tree().communicator.size() as usize
     );
     assert_eq!(
         multi_fmm.tree.u_list_query.receive_counts.len(),
-        multi_fmm.tree.source_tree().comm.size() as usize
+        multi_fmm.tree.source_tree().communicator.size() as usize
     );
     assert_eq!(
         multi_fmm.tree.v_list_query.send_counts.len(),
-        multi_fmm.tree.source_tree().comm.size() as usize
+        multi_fmm.tree.source_tree().communicator.size() as usize
     );
     assert_eq!(
         multi_fmm.tree.v_list_query.receive_counts.len(),
-        multi_fmm.tree.source_tree().comm.size() as usize
+        multi_fmm.tree.source_tree().communicator.size() as usize
     );
 
     // Test that the interaction lists remain the same with respect to a single node FMM

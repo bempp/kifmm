@@ -159,13 +159,13 @@ where
 
         // Exchange ghost multipole data
         let (_, d) = optionally_time(self.timed, || {
-            self.v_list_exchange();
+            self.v_list_exchange_runtime();
         });
 
         if let Some(d) = d {
             self.communication_times
                 .push(CommunicationTime::from_duration(
-                    CommunicationType::GhostExchangeV,
+                    CommunicationType::GhostExchangeVRuntime,
                     d,
                 ))
         }

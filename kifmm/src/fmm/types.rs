@@ -1285,18 +1285,20 @@ where
     /// Object holding ghost U list data
     pub ghost_fmm_u: KiFmm<Scalar, Kernel, FieldTranslation>,
 
-    /// Store origin ranks of target trees to which I must send local expansion coeffs after global FMM has been
-    /// executed on nominated node.
-    pub local_roots: Vec<MortonKey<Scalar::Real>>, // Corresponding morton keys
+    /// Buffer to store received V list queries for runtime use
+    pub ghost_received_queries_v: Vec<u64>,
 
-    /// Origin ranks of local roots
-    pub local_roots_ranks: Vec<Rank>,
+    /// Store received V list queries counts
+    pub ghost_received_queries_counts_v: Vec<Count>,
 
-    /// Counts
-    pub local_roots_counts: Vec<Count>,
+    /// Store received V list queries displacements
+    pub ghost_received_queries_displacements_v: Vec<Count>,
 
-    /// Displacements
-    pub local_roots_displacements: Vec<Count>,
+    /// Store requested V list queries counts
+    pub ghost_requested_queries_counts_v: Vec<Count>,
+
+    /// Requested V list queries index map of ghost keys from V list queries
+    pub ghost_requested_queries_key_to_index_v: HashMap<MortonKey<Scalar::Real>, usize>,
 }
 
 /// Specified owned range (defined by roots) of each rank
