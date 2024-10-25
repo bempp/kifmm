@@ -13,7 +13,10 @@ fn main() {
 
     use rayon::ThreadPoolBuilder;
 
-    use mpi::{datatype::PartitionMut, traits::*};
+    use mpi::{
+        datatype::PartitionMut,
+        traits::{Communicator, Root},
+    };
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
@@ -48,13 +51,13 @@ fn main() {
                 &comm,
                 points.data(),
                 points.data(),
-                local_depth.clone(),
-                global_depth.clone(),
+                local_depth,
+                global_depth,
                 prune_empty,
                 sort_kind.clone(),
             )
             .unwrap()
-            .parameters(expansion_order.clone(), kernel.clone(), source_to_target)
+            .parameters(expansion_order, kernel.clone(), source_to_target)
             .unwrap()
             .build()
             .unwrap();
@@ -161,13 +164,13 @@ fn main() {
                 &comm,
                 points.data(),
                 points.data(),
-                local_depth.clone(),
-                global_depth.clone(),
+                local_depth,
+                global_depth,
                 prune_empty,
                 sort_kind,
             )
             .unwrap()
-            .parameters(expansion_order.clone(), kernel, source_to_target)
+            .parameters(expansion_order, kernel, source_to_target)
             .unwrap()
             .build()
             .unwrap();

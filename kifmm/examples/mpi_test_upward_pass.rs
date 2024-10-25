@@ -13,7 +13,10 @@ fn main() {
         // FftFieldTranslation,
     };
     use kifmm::{BlasFieldTranslationSaRcmp, FmmSvdMode};
-    use mpi::{datatype::PartitionMut, traits::*};
+    use mpi::{
+        datatype::PartitionMut,
+        traits::{Communicator, Root},
+    };
     use rlst::{RawAccess, RlstScalar};
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
@@ -86,7 +89,7 @@ fn main() {
 
     fmm.kernel().evaluate_st(
         GreenKernelEvalType::Value,
-        &coords,
+        coords,
         &distant_point,
         &charges,
         &mut expected,

@@ -16,7 +16,7 @@ mod mpi {
     }
 
     fn test_sort<T: Equivalence + Ord + Default + Clone + Copy>(
-        sorted_arr: &Vec<T>,
+        sorted_arr: &[T],
         comm: &SimpleCommunicator,
         label: String,
     ) {

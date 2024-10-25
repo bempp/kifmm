@@ -19,7 +19,10 @@ fn main() {
 
     use rayon::ThreadPoolBuilder;
 
-    use mpi::{datatype::PartitionMut, traits::*};
+    use mpi::{
+        datatype::PartitionMut,
+        traits::{Communicator, Root},
+    };
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
@@ -282,7 +285,7 @@ fn main() {
                 assert!(
                     distributed_interaction_list.contains(s),
                     "Test failed: element {:?} is missing in distributed_interaction_list. at leaf: {:?} \n: {:?} = {:?} \n is it contained locally? {:?} or in ghost tree? {:?}",
-                    s, leaf.morton, i1, i2, multi_fmm.tree.source_tree.keys_set.contains(s), multi_fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(&s)
+                    s, leaf.morton, i1, i2, multi_fmm.tree.source_tree.keys_set.contains(s), multi_fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(s)
                 );
             }
 

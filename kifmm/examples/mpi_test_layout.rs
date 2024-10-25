@@ -13,7 +13,11 @@ fn main() {
 
     use rayon::ThreadPoolBuilder;
 
-    use mpi::{collective::SystemOperation, datatype::PartitionMut, traits::*};
+    use mpi::{
+        collective::SystemOperation,
+        datatype::PartitionMut,
+        traits::{Communicator, CommunicatorCollectives},
+    };
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();

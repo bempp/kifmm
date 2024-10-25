@@ -20,7 +20,10 @@ fn main() {
 
     use rayon::ThreadPoolBuilder;
 
-    use mpi::{datatype::PartitionMut, traits::*};
+    use mpi::{
+        datatype::PartitionMut,
+        traits::{Communicator, Root},
+    };
     use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
