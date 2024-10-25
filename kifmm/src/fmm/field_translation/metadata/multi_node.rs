@@ -29,7 +29,7 @@ use crate::traits::general::{
     single_node::{AsComplex, Epsilon},
 };
 use crate::traits::tree::{Domain, FmmTreeNode, MultiFmmTree, MultiTree};
-use crate::traits::types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType};
+use crate::traits::types::{CommunicationTime, CommunicationType};
 use crate::tree::constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM};
 use crate::tree::helpers::find_corners;
 use crate::tree::types::MortonKey;

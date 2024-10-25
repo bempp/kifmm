@@ -1,3 +1,4 @@
+//! Run a parametrised  distributed FMM with FFT based M2L in f32
 use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
@@ -12,7 +13,7 @@ use kifmm::{
 use mpi::traits::*;
 use rayon::ThreadPoolBuilder;
 use rlst::RawAccess;
-use std::{collections::HashMap, env, time::Instant};
+use std::{collections::HashMap, time::Instant};
 
 /// Struct for parsing command-line arguments
 #[derive(Parser)]

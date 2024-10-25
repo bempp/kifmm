@@ -19,16 +19,16 @@ clap = { version = "4.5.4", features = ["derive"] }
 mpi = ["kifmm/mpi", "dep:mpi"]
 
 [[bin]]
-name = "grid_search"
-path = "src/bin/grid_search.rs"
+name = "grid_search_single_node"
+path = "src/bin/grid_search_single_node.rs"
 required-features = []
 
 [[bin]]
-name = "grid_search_mpi"
-path = "src/bin/grid_search_mpi.rs"
+name = "fmm_m2l_fft_mpi_f32"
+path = "src/bin/fmm_m2l_fft_mpi_f32.rs"
 required-features = ["mpi"]
 
 [[bin]]
-name = "weak"
-path = "src/bin/weak.rs"
+name = "fmm_m2l_blas_mpi_f32"
+path = "src/bin/fmm_m2l_blas_mpi_f32.rs"
 required-features = ["mpi"]
