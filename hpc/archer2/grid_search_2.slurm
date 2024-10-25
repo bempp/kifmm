@@ -44,6 +44,9 @@ cd ${SCRATCH}
 # Pass variable to SRUN from SBATCH
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
+# Script being run, expected in the work directory
+script_name="fmm_m2l_blas_mpi_f32"
+
 # Set simulation parameters
 n_points=250000 # points per MPI process
 n_tasks=32
@@ -56,15 +59,14 @@ n_threads=(4) # See if bandwidth saturates with different threading parameters f
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/grid_search_fft_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/grid_search_blas_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id, rank, runtime, p2m, m2m, l2l, m2l, p2p, \
 source_tree, target_tree, source_domain, target_domain, layout, \
 ghost_exchange_v, ghost_exchange_u, gather_global_fmm, scatter_global_fmm, \
-source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u \
-expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples
-" >> ${OUTPUT}
+source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u, \
+expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples" >> ${OUTPUT}
 
 # Perform grid search
 for i in ${!local_depth[@]}; do
@@ -73,13 +75,12 @@ for i in ${!local_depth[@]}; do
             for l in ${!n_threads[@]}; do
                 experiment_id="${i}_${j}_${k}_${l}"
                 srun --ntasks=$n_tasks --cpus-per-task=$cpus_per_task --distribution=block:block --hint=nomultithread \
-                    ${WORK}/fmm_m2l_fft_mpi_f32 --id $experiment_id --n-points $n_points \
+                    "${WORK}/${script_name}" --id $experiment_id --n-points $n_points \
                     --expansion-order 3 \
                     --prune-empty \
                     --global-depth $global_depth \
                     --local-depth ${local_depth[$i]} \
                     --n-samples ${n_samples[$j]} \
-                    --block-size ${block_size[$k]} \
                     --n-threads ${n_threads[$l]} >> ${OUTPUT}
             done
         done

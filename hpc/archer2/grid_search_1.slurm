@@ -61,8 +61,7 @@ experiment_id, rank, runtime, p2m, m2m, l2l, m2l, p2p, \
 source_tree, target_tree, source_domain, target_domain, layout, \
 ghost_exchange_v, ghost_exchange_u, gather_global_fmm, scatter_global_fmm, \
 source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u \
-expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples
-" >> ${OUTPUT}
+expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples" >> ${OUTPUT}
 
 # Perform grid search
 for i in ${!local_depth[@]}; do

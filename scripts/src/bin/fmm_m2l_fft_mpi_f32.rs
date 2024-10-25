@@ -14,7 +14,6 @@ use std::{collections::HashMap, time::Instant};
 /// Struct for parsing command-line arguments
 #[derive(Parser)]
 struct Args {
-
     #[arg(long, default_value_t = String::from("x"))]
     id: String,
 
@@ -207,9 +206,8 @@ fn main() {
     println!(
         "{:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
          {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
-         {:?}, {:?}, {:?}, {:?}, {:?}, {:?} \
-         {:?}, {:?}, {:?}, {:?}. {:?}. {:?}, {:?},
-         ",
+         {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, \
+         {:?}, {:?}, {:?}, {:?}, {:?}, {:?}, {:?}",
         id,
         multi_fmm.rank,
         runtime,
