@@ -2,11 +2,7 @@
 use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
-    traits::field::FieldTranslation,
-    traits::types::{
-        CommunicationTime, CommunicationType, FmmOperatorTime, FmmOperatorType, MetadataTime,
-        MetadataType,
-    },
+    traits::types::{CommunicationType, FmmOperatorType, MetadataType},
     tree::{helpers::points_fixture, types::SortKind},
     EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
@@ -90,13 +86,13 @@ fn main() {
             &comm,
             points.data(),
             points.data(),
-            local_depth.clone(),
-            global_depth.clone(),
+            local_depth,
+            global_depth,
             prune_empty,
             sort_kind.clone(),
         )
         .unwrap()
-        .parameters(expansion_order.clone(), kernel.clone(), source_to_target)
+        .parameters(expansion_order, kernel.clone(), source_to_target)
         .unwrap()
         .build()
         .unwrap();

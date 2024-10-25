@@ -1076,7 +1076,11 @@ where
         });
 
         if let Some(d) = duration {
-            self.communication_times.push(CommunicationTime::from_duration(CommunicationType::GhostExchangeU, d))
+            self.communication_times
+                .push(CommunicationTime::from_duration(
+                    CommunicationType::GhostExchangeU,
+                    d,
+                ))
         }
     }
 }

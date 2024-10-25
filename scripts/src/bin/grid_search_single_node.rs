@@ -414,7 +414,7 @@ fn grid_search_laplace_fft<T>(
 
 fn main() {
     let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
-    let rsvd_settings_vec = vec![FmmSvdMode::new(false, None, None, None, None)];
+    let rsvd_settings_vec = [FmmSvdMode::new(false, None, None, None, None)];
 
     // Single Precision
     {

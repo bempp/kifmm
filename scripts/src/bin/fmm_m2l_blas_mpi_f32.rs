@@ -1,12 +1,10 @@
-
 //! Run a parametrised  distributed FMM with BLAS based M2L in f32
 use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
-    traits::{field::FieldTranslation, types::{
-        CommunicationTime, CommunicationType, FmmOperatorTime, FmmOperatorType, MetadataTime,
-        MetadataType,
-    }}, tree::{helpers::points_fixture, types::SortKind}, BlasFieldTranslationSaRcmp, EvaluateMulti, FftFieldTranslation, FmmSvdMode, MultiNodeBuilder
+    traits::types::{CommunicationType, FmmOperatorType, MetadataType},
+    tree::{helpers::points_fixture, types::SortKind},
+    BlasFieldTranslationSaRcmp, EvaluateMulti, FmmSvdMode, MultiNodeBuilder,
 };
 use mpi::traits::*;
 use rayon::ThreadPoolBuilder;
@@ -78,7 +76,8 @@ fn main() {
         .build_global()
         .unwrap();
 
-    let source_to_target = BlasFieldTranslationSaRcmp::<f32>::new(Some(threshold), None, FmmSvdMode::Deterministic);
+    let source_to_target =
+        BlasFieldTranslationSaRcmp::<f32>::new(Some(threshold), None, FmmSvdMode::Deterministic);
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
@@ -88,13 +87,13 @@ fn main() {
             &comm,
             points.data(),
             points.data(),
-            local_depth.clone(),
-            global_depth.clone(),
+            local_depth,
+            global_depth,
             prune_empty,
             sort_kind.clone(),
         )
         .unwrap()
-        .parameters(expansion_order.clone(), kernel.clone(), source_to_target)
+        .parameters(expansion_order, kernel.clone(), source_to_target)
         .unwrap()
         .build()
         .unwrap();
