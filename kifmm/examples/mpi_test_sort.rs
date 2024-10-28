@@ -1,6 +1,7 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
+#[allow(dead_code)]
 mod mpi {
 
     use kifmm::sorting::{hyksort, samplesort, simplesort};
