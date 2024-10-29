@@ -1,14 +1,5 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
-use crate::{
-    fmm::types::{Layout, Query},
-    sorting::{hyksort, samplesort, simplesort},
-    traits::tree::{MultiFmmTree, MultiTree, SingleTree},
-    tree::{
-        constants::DEEPEST_LEVEL,
-        types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
-    },
-    MultiNodeFmmTree,
-};
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 use mpi::{
@@ -22,15 +13,34 @@ use mpi::{
 };
 use num::Float;
 use rlst::RlstScalar;
-use std::collections::{HashMap, HashSet};
 
-use super::types::{MultiNodeTree, SortKind};
+use crate::{
+    fmm::types::{Layout, Query},
+    sorting::{hyksort, samplesort, simplesort},
+    traits::tree::{MultiFmmTree, MultiTree, SingleTree},
+    tree::{
+        constants::DEEPEST_LEVEL, Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points,
+        SingleNodeTree, SortKind,
+    },
+    MultiNodeFmmTree,
+};
 
 impl<T> MultiNodeTree<T, SimpleCommunicator>
 where
     T: RlstScalar + Float + Equivalence + Default,
 {
-    /// Construct uniform tree, pruned by default
+    /// Constructor for uniform trees on multiple nodes with MPI, refined to a user defined depth.
+    ///
+    /// # Arguments
+    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
+    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `local_depth` - The maximum depth of the local trees, defines the level of recursion.
+    /// * `global_depth` - The maximum depth of the global tree, defines the level of recursion.
+    /// * `global_indices` - A slice of indices to uniquely identify the points passed to constructor.
+    /// * `communicator` - The MPI communicator corresponding to the world group.
+    /// * `sort_kind` - The parallel sorting configuration for point data.
+    /// * `prune_empty` - Optionally prune the local trees of empty leaves and their associated branches.
     #[allow(clippy::too_many_arguments)]
     pub fn uniform_tree(
         coordinates_row_major: &[T],
@@ -298,9 +308,22 @@ where
         })
     }
 
-    /// Constructor for multinode trees
+    /// Constructor for trees on multiple nodes with MPI
+    ///
+    /// TODO: This is an experimental API, and at the moment one cannot pass global indices to coordinate data
+    /// which will be handled in a future release
+    ///
+    /// # Arguments
+    /// * `communicator` - The MPI communicator corresponding to the world group.
+    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
+    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
+    /// * `local_depth` - The maximum depth of the local trees, defines the level of recursion.
+    /// * `global_depth` - The maximum depth of the global tree, defines the level of recursion.
+    /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
+    /// * `sort_kind` - The parallel sorting configuration for point data.
+    /// * `prune_empty` - Optionally prune the local trees of empty leaves and their associated branches.
     pub fn new(
-        comm: &SimpleCommunicator,
+        communicator: &SimpleCommunicator,
         coordinates_row_major: &[T],
         local_depth: u64,
         global_depth: u64,
@@ -312,11 +335,14 @@ where
         let coords_len = coordinates_row_major.len();
 
         if !coordinates_row_major.is_empty() && coords_len & dim == 0 {
-            let domain = domain.unwrap_or(Domain::from_global_points(coordinates_row_major, comm));
+            let domain = domain.unwrap_or(Domain::from_global_points(
+                coordinates_row_major,
+                communicator,
+            ));
             let n_coords = coords_len / dim;
 
             // Assign global indices
-            let global_indices = global_indices(n_coords, comm);
+            let global_indices = global_indices(n_coords, communicator);
 
             return MultiNodeTree::uniform_tree(
                 coordinates_row_major,
@@ -324,7 +350,7 @@ where
                 local_depth,
                 global_depth,
                 &global_indices,
-                comm,
+                communicator,
                 sort_kind,
                 prune_empty,
             );

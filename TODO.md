@@ -25,3 +25,8 @@
 
 - Not sure about scaling in P2M, why does it need extra now?
 
+Pending weak scaling jobs
+             JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+           7913612  standard grid_sea skailasa PD       0:00    128 (Resources)
+           7920032  standard weak_sca skailasa PD       0:00     16 (Priority)
+           7920083  standard weak_sca skailasa PD       0:00     16 (Priority)

@@ -1,4 +1,8 @@
 //! Data structures to create distributed octrees with MPI.
+use std::{
+    collections::{HashMap, HashSet},
+    marker::PhantomData,
+};
 
 #[cfg(feature = "mpi")]
 use mpi::{
@@ -8,11 +12,6 @@ use mpi::{
 
 use num::Float;
 use rlst::RlstScalar;
-
-use std::{
-    collections::{HashMap, HashSet},
-    marker::PhantomData,
-};
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 ///
@@ -81,76 +80,87 @@ where
 /// Represents an MPI distributed tree structure equipped with spatial indexing capabilities for 3D
 /// particle data.
 ///
-/// The struct is similar to `SingleNodeTree`, however the associated data is now local to a given
-/// processor. The major difference is that each processor owns a contiguous, non-overlapping, set of
-/// leaf nodes, as well as __all__ ancestors to their owned leaf nodes. This means that ancestor nodes
-/// may be duplicated across processors, but not leaf nodes.
+/// `MultiNodeTrees` are split into 'local' and 'global' portions, where the local trees correspond
+/// to trees that are defined by roots that form the leaves of the global tree, such that that leaves
+/// of the local trees do not intersect with each other. Each rank can contain multiple local trees, the
+/// total number of local trees across all ranks is controlled with the `global_depth` parameter, as the
+/// leaves correspond to the local trees' roots.
+///
+/// The global tree, which contains common ancestor nodes of all local trees distributed across nodes,
+/// is stored on a single nominated node at rank 0 in the global communicator. Data from the global tree
+/// is shared with the local trees via collective operations.
+///
+/// This split between local and global trees allows one to achieve optimal scaling in the distributed FMM
+/// for all the ghost data exchanges.
 ///
 /// # Fields
-/// - `world` - The global MPI communicator for this tree.
+/// - `roots` - The roots associated with the local trees at this rank
 ///
-/// - `range` - The range represented as the minimum and maximum leaf key associated owned by
-/// each processor, as well as the processor's MPI rank.
+/// - `all_roots` - All the roots associated with local trees in the distributed MultiNodeTree.
 ///
-/// - `depth` - The depth of the tree.
+/// - `all_roots_ranks` - The associated ranks of `all_roots`.
 ///
-/// - `domain` - The spatial domain covered by the tree's associated point data.
+/// - `all_roots_displacements` - The displacements of all `all_roots`, for collective communications
+/// with the global tree.
+///
+/// - `all_roots_counts` - The counts of all `all_roots`, for collective communications
+/// with the global tree.
+///
+/// - `global_depth` - The depth of the global tree.
+///
+/// - `local_depth` - The depth of the local trees.
+///
+/// - `total_depth` - The local depth + the global depth
+///
+/// - `domain` - The spatial domain covered by the globally distributed associated point data.
 ///
 /// - `coordinates` - A flat vector storing the coordinates of all points managed by the tree,
 ///   in row-major format (e.g., `[x1, y1, z1, ..., xn, yn, zn]`), for efficient retrieval.
 ///
+/// - `points` - Coordinates stored as `Points`.
+///
 /// - `global_indices` - A vector of unique global indices corresponding to each point, allowing
 ///   for efficient identification and lookup of points across different parts of the system.
 ///
-/// - `leaves` - `MortonKeys` representing the leaves of the tree, each associated with specific
+/// - `leaves` - `MortonKeys` representing the leaves of all local trees, each associated with specific
 ///   point data encoded via Morton encoding, in Morton sorted order
 ///
-/// - `keys` - `MortonKeys` representing all leaves and their ancestors.
+/// - `keys` - `MortonKeys` representing all leaves at this rank from all local trees, in level then Morton order.
 ///
 /// - `leaves_to_coordinates` - A mapping from Morton-encoded leaves to their corresponding
 ///   indices in the `coordinates` vector.
 ///
-/// - `levels_to_keys` - A mapping from tree levels to indices in the `keys` vector,
-///   allowing for level-wise traversal and manipulation of the tree structure.
-///
 /// - `key_to_index` - A hash map linking each node key to its index within the
 ///   `keys` vector, enabling efficient node lookup and operations.
 ///
-/// - `leaf_to_index` - A hash map linking each leaf key (MortonKey) to its index within the
+/// - `key_to_level_index` - Maps a key to the associated index pointer of the key for level data.
+///
+/// - `leaf_to_index` - A hash map linking each leaf key (`MortonKey`) to its index within the
 ///   `leaves` vector, supporting efficient leaf operations and data retrieval.
 ///
-/// - `leaves_set` - A set of all MortonKeys representing the leaves, used for quick existence
+/// - `leaves_set` - A set of all `MortonKeys` representing the leaves, used for quick existence
 ///   checks and deduplication.
 ///
-/// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
+/// - `keys_set` - A set of all `MortonKeys` representing the nodes, used for quick existence
 ///   checks and deduplication.
-/// MPI distributed tree, consists of up to N single node trees
+///
+/// - `levels_to_keys` - A mapping from tree levels to indices in the `keys` vector,
+///   allowing for level-wise traversal and manipulation of the tree structure.
+///
+/// - `rank` - The rank of this tree.
+///
+/// - `trees` - The single node trees that are the local trees at this rank, that together
+/// constitute the MultiNodeTree at this rank.
+///
+/// - `n_trees` - The number of local trees at this rank.
+///
+/// - `communicator` - The global MPI communicator for this tree.
 #[cfg(feature = "mpi")]
+#[derive(Default, Clone)]
 pub struct MultiNodeTree<T, C: Communicator>
 where
     T: RlstScalar + Float + Equivalence,
 {
-    /// Get domain defined by the points, gets global domain in multi node setting.
-    pub domain: Domain<T>,
-
-    /// Communicator associated with this tree
-    pub communicator: C,
-
-    /// MPI Rank
-    pub rank: i32,
-
-    /// Depth of the global tree
-    pub global_depth: u64,
-
-    /// Depth of each local tree
-    pub local_depth: u64,
-
-    /// Total depth of the tree, sum of local and global depths
-    pub total_depth: u64,
-
-    /// Single node trees at this rank
-    pub trees: Vec<SingleNodeTree<T>>,
-
     /// Roots associated with trees at this rank
     pub roots: Vec<MortonKey<T>>,
 
@@ -166,29 +176,17 @@ where
     /// All global root origin counts, only populated at nominated rank
     pub all_roots_counts: Vec<Count>,
 
-    /// Number of single node trees at this rank
-    pub n_trees: usize,
+    /// Depth of the global tree
+    pub global_depth: u64,
 
-    /// All associated keys
-    pub keys: MortonKeys<T>,
+    /// Depth of each local tree
+    pub local_depth: u64,
 
-    /// All associated leaves
-    pub leaves: MortonKeys<T>,
+    /// Total depth of the tree, sum of local and global depths
+    pub total_depth: u64,
 
-    /// All associated keys, for rapid inclusion checking
-    pub keys_set: HashSet<MortonKey<T>>,
-
-    /// All associated keys, for rapid inclusion checking
-    pub leaves_set: HashSet<MortonKey<T>>,
-
-    /// Map between a key and its index at a level
-    pub key_to_level_index: HashMap<MortonKey<T>, usize>,
-
-    /// Associated global indices
-    pub global_indices: Vec<usize>,
-
-    /// Map between key and index
-    pub key_to_index: HashMap<MortonKey<T>, usize>,
+    /// Get domain defined by the points, gets global domain in multi node setting.
+    pub domain: Domain<T>,
 
     /// All points coordinates in row major format, such that [x1, y1, z1, ..., xn, yn, zn]
     pub coordinates: Vec<T>,
@@ -196,14 +194,47 @@ where
     /// All points coordinate with associated morton key
     pub points: Points<T>,
 
-    /// Map between leaf key and leaf index
-    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+    /// Associated global indices
+    pub global_indices: Vec<usize>,
+
+    /// All associated leaves
+    pub leaves: MortonKeys<T>,
+
+    /// All associated keys
+    pub keys: MortonKeys<T>,
 
     /// Associate leaves with coordinate indices.
     pub leaves_to_coordinates: HashMap<MortonKey<T>, (usize, usize)>,
 
+    /// Map between key and index
+    pub key_to_index: HashMap<MortonKey<T>, usize>,
+
+    /// Map between a key and its index at a level
+    pub key_to_level_index: HashMap<MortonKey<T>, usize>,
+
+    /// Map between leaf key and leaf index
+    pub leaf_to_index: HashMap<MortonKey<T>, usize>,
+
+    /// All associated keys, for rapid inclusion checking
+    pub leaves_set: HashSet<MortonKey<T>>,
+
+    /// All associated keys, for rapid inclusion checking
+    pub keys_set: HashSet<MortonKey<T>>,
+
     /// Associate levels with key indices.
     pub levels_to_keys: HashMap<u64, (usize, usize)>,
+
+    /// MPI Rank
+    pub rank: i32,
+
+    /// Single node trees at this rank
+    pub trees: Vec<SingleNodeTree<T>>,
+
+    /// Number of single node trees at this rank
+    pub n_trees: usize,
+
+    /// Communicator associated with this tree
+    pub communicator: C,
 }
 
 /// Represents a 3D point within an octree structure, enriched with Morton encoding information.
@@ -256,6 +287,7 @@ pub type Points<T> = Vec<Point<T>>;
 /// operations such as insertion, deletion, and querying.
 ///
 /// # Fields
+/// - `root` - The root node of the tree.
 ///
 /// - `depth` - The depth of the tree.
 ///
@@ -264,13 +296,15 @@ pub type Points<T> = Vec<Point<T>>;
 /// - `coordinates` - A flat vector storing the coordinates of all points managed by the tree,
 ///   in row-major format (e.g., `[x1, y1, z1, ..., xn, yn, zn]`), for efficient retrieval.
 ///
+/// - `points` - Coordinates stored as `Points`.
+///
 /// - `global_indices` - A vector of unique global indices corresponding to each point, allowing
 ///   for efficient identification and lookup of points across different parts of the system.
 ///
 /// - `leaves` - `MortonKeys` representing the leaves of the tree, each associated with specific
 ///   point data encoded via Morton encoding, in Morton sorted order
 ///
-/// - `keys` - `MortonKeys` representing all leaves and their ancestors.
+/// - `keys` - `MortonKeys` representing all leaves and their ancestors, in level and then Morton order.
 ///
 /// - `leaves_to_coordinates` - A mapping from Morton-encoded leaves to their corresponding
 ///   indices in the `coordinates` vector.
@@ -281,15 +315,17 @@ pub type Points<T> = Vec<Point<T>>;
 /// - `key_to_index` - A hash map linking each node key to its index within the
 ///   `keys` vector, enabling efficient node lookup and operations.
 ///
-/// - `leaf_to_index` - A hash map linking each leaf key (MortonKey) to its index within the
+/// - `key_to_level_index` - Maps a key to the associated index pointer of the key for level data.
+///
+/// - `leaf_to_index` - A hash map linking each leaf key (`MortonKey`) to its index within the
 ///   `leaves` vector, supporting efficient leaf operations and data retrieval.
 ///
-/// - `leaves_set` - A set of all MortonKeys representing the leaves, used for quick existence
+/// - `leaves_set` - A set of all `MortonKeys` representing the leaves, used for quick existence
 ///   checks and deduplication.
 ///
-/// - `keys_set` - A set of all MortonKeys representing the nodes, used for quick existence
+/// - `keys_set` - A set of all `MortonKeys` representing the nodes, used for quick existence
 ///   checks and deduplication.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SingleNodeTree<T>
 where
     T: RlstScalar + Float,
@@ -340,22 +376,23 @@ where
     pub keys_set: HashSet<MortonKey<T>>,
 }
 
-/// Select sort kind for multinode trees
+/// Parallel sort variants for constructing multi-node trees. Used to sort points
+/// by Morton index.
 #[cfg(feature = "mpi")]
 #[derive(Clone)]
 pub enum SortKind {
-    /// Hypercube communication scheme based quicksort
+    /// Hypercube communication scheme based quicksort, based on Sundar et. al. 2013.
     Hyksort {
         /// Subcommunicator size, restricted to being a power of 2
         subcomm_size: i32,
     },
 
-    /// Sample sort, variant of bucket sort
+    /// Sample sort.
     Samplesort {
         /// The size of each sample from each MPI process
         n_samples: usize,
     },
 
-    /// Simple sort, variant of bucket sort
+    /// A variant of bucket sort
     Simplesort,
 }

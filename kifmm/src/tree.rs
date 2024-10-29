@@ -19,7 +19,7 @@
 //! let depth = 3; // The depth of the tree
 //!
 //! // Create a single node tree
-//! let single_node = SingleNodeTree::<f32>::new(
+//! let single_node = SingleNodeTree::new(
 //!     points.data(),
 //!     depth,
 //!     prune_empty,
@@ -29,6 +29,8 @@
 //! )
 //! .unwrap();
 //!  ```
+//!
+//! Check out the examples folder for more complex examples, included trees distributed across MPI processes.
 
 pub mod constants;
 pub mod types;
@@ -44,8 +46,8 @@ mod multi_node;
 
 // Public API
 #[doc(inline)]
-pub use crate::tree::types::SingleNodeTree;
+pub use crate::tree::types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree};
 
 #[cfg(feature = "mpi")]
 #[doc(inline)]
-pub use crate::tree::types::MultiNodeTree;
+pub use crate::tree::types::{MultiNodeTree, SortKind};

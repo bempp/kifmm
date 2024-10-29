@@ -2,9 +2,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use num::traits::Float;
-
 use itertools::Itertools;
+use num::traits::Float;
 use rlst::RlstScalar;
 
 use crate::{
@@ -12,7 +11,7 @@ use crate::{
     tree::{
         constants::{DEEPEST_LEVEL, LEVEL_SIZE},
         morton::encode_anchor,
-        types::{Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree},
+        Domain, MortonKey, MortonKeys, Point, Points, SingleNodeTree,
     },
 };
 
@@ -349,7 +348,8 @@ where
     }
 
     /// Constructor for uniform trees on a single node refined to a user defined depth, however excludes
-    /// empty nodes which don't contain particles and their ancestors, specify roots.
+    /// empty nodes which don't contain particles and their ancestors, specify root node explicitly. This
+    /// is useful for constructing trees that begin at different levels.
     ///
     /// # Arguments
     /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
@@ -357,6 +357,7 @@ where
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
     /// * `depth` - The maximum depth of the tree, defines the level of recursion.
     /// * `global_indices` - A slice of indices to uniquely identify the points.
+    /// * `root` - The root node for this tree.
     fn uniform_tree_pruned_with_root(
         coordinates_row_major: &[T],
         &domain: &Domain<T>,
@@ -442,24 +443,30 @@ where
             domain,
             leaves,
             keys,
-            global_indices: Vec::default(),
-            leaves_to_coordinates: HashMap::default(),
-            key_to_index: HashMap::default(),
-            key_to_level_index: HashMap::default(),
-            leaf_to_index: HashMap::default(),
-            leaves_set: HashSet::default(),
-            keys_set: HashSet::default(),
-            levels_to_keys: HashMap::default(),
+            ..Default::default()
         })
     }
 
-    /// From a set of specified roots, create a number of single node trees of matching
-    // length
+    /// Construct multiple single node trees, specified by `roots` for the points specified by `points`.
+    /// This is useful for constructing 'split' trees, whereby the global octree is split into 'local' portions
+    /// - which are specified by a root that defines a subset of the global domain, and a 'global' portion which
+    /// specifies the shared ancestors shared by all roots, and the roots form the leaves of the global portion.
+    ///
+    /// # Arguments
+    /// * `roots` - The roots of the single node trees.
+    /// * `points` - The points being mapped to the trees specified by the `roots`.
+    /// * `domain` - The domain that contains all the `points`
+    /// * `local_depth` - The depth of each single node tree, specified by a root.
+    /// * `global_depth` - The difference between the level root node of all `MortonKeys` i.e. 0 and the
+    /// * local depth.
+    /// * `prune_empty` - Specifies whether to prune empty leaf nodes and their unoccupied ancestors from the tree.
+    ///   Enabling this option streamlines the tree by removing nodes that do not contain any point data, potentially
+    ///   enhancing query efficiency and reducing memory usage by focusing the tree structure on regions with actual data.
     #[allow(unused)]
     pub(crate) fn from_roots(
         roots: &MortonKeys<T>,
         points: &mut Points<T>,
-        global_domain: &Domain<T>,
+        domain: &Domain<T>,
         global_depth: u64,
         local_depth: u64,
         prune_empty: bool,
@@ -485,7 +492,7 @@ where
                     &local_coordinates,
                     depth,
                     prune_empty,
-                    Some(*global_domain),
+                    Some(*domain),
                     Some(*root),
                     local_indices,
                 )
@@ -498,9 +505,15 @@ where
         result
     }
 
-    /// Construct a tree form specified key/leaf data, may not contain points. All data expected in Morton order.
-    // Optionally create index maps for coordinate data
-    // TODO: add index maps for coordinate data
+    /// Construct a tree form specified leaves.
+    /// TODO: add index maps for coordinate data, used in experimental distributed FMM, where at
+    /// present unit charges are assigned to all nodes, in a future release this function will be
+    /// updated to also include coordinate and associated charge data for each leaf.
+    ///
+    /// # Arguments
+    /// * `leaves` - The leaves being used to construct the tree.
+    /// * `domain` - The domain being used to construct the tree.
+    /// * `depth` - The depth of the tree.
     #[allow(unused)]
     pub(crate) fn from_leaves(
         leaves: Vec<MortonKey<T>>,
