@@ -15,7 +15,6 @@ This means we need to find out just how much a single node can handle, say 10e6 
 - PrgEnv-aocc
 - set RUSTFLAGS as well as LD lib path to find BLAS/LAPACK
 - BLAS/LAPACK symlinked with libblas.so and liblapack.so
-- Same for MPI?
 
 ### Dependencies
 
