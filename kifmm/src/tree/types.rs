@@ -14,13 +14,6 @@ use num::Float;
 use rlst::RlstScalar;
 
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
-///
-/// # Fields
-/// - `origin` - Defines the lower left corner (minimum x, y, z values) of the domain. This point serves as
-/// the reference from which the domain extends in the positive direction along the Cartesian axes.
-///
-/// - `side_length` - Specifies the length of the domain along each of the Cartesian axes ([x, y, z] respectively).
-/// This represents the domain's size and how far it extends from the origin along each axis.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Domain<T>
@@ -41,15 +34,6 @@ where
 /// 'anchor' point (`anchor`), which specifies the origin of the node it encodes in relation to the
 /// deepest level of the octree. The anchor acts as a spatial reference point, indicating the
 /// position of the node within the broader domain.
-///
-/// # Fields
-/// - `anchor` - The index coordinate of the key's anchor point relative to the origin
-///   of the domain. It represents the spatial starting point of the node in the octree, defined in
-///   three-dimensional space (x, y, z).
-///
-/// - `morton` - The Morton-encoded value of the anchor. This single integer represents the
-///   three-dimensional position of the node in a bit-interleaved format, enabling efficient
-///   spatial indexing and operations.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MortonKey<T>

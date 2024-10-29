@@ -31,7 +31,6 @@ use crate::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
             FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
-        KiFmm,
     },
     linalg::{pinv::pinv, rsvd::MatrixRsvd},
     traits::{
@@ -51,7 +50,7 @@ use crate::{
         helpers::find_corners,
         types::MortonKey,
     },
-    Evaluate,
+    Evaluate, KiFmm,
 };
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values

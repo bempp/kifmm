@@ -1,5 +1,4 @@
 //! Even simpler than sample sort, statically define key distribution without sampling, allows simple pinning of MPI processes to CPUs
-//!
 
 use std::fmt::Debug;
 

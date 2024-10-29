@@ -20,7 +20,6 @@ use crate::fmm::helpers::multi_node::{
 };
 use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale, optionally_time};
 use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
-use crate::fmm::KiFmm;
 use crate::linalg::pinv::pinv;
 use crate::traits::fftw::{Dft, DftType};
 use crate::traits::fmm::{DataAccess, DataAccessMulti, Metadata, MetadataAccess};
@@ -33,6 +32,7 @@ use crate::traits::types::{CommunicationTime, CommunicationType};
 use crate::tree::constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM};
 use crate::tree::helpers::find_corners;
 use crate::tree::types::MortonKey;
+use crate::KiFmm;
 use crate::{
     fmm::types::{KiFmmMulti, NeighbourhoodCommunicator},
     linalg::rsvd::MatrixRsvd,
@@ -1235,7 +1235,9 @@ where
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
-        + SourceToTargetTranslationMetadata,
+        + SourceToTargetTranslationMetadata
+        + SourceTranslationMetadata
+        + TargetTranslationMetadata,
 {
     fn fft_map_index(&self, _level: u64) -> usize {
         0

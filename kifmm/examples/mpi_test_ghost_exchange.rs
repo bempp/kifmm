@@ -10,11 +10,11 @@ fn main() {
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
-            fmm::{DataAccessMulti, EvaluateMulti},
+            fmm::{DataAccess, DataAccessMulti, EvaluateMulti},
             tree::{MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
         },
         tree::{helpers::points_fixture, types::SortKind},
-        DataAccess, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        Evaluate, FftFieldTranslation, SingleNodeBuilder,
     };
 
     use rayon::ThreadPoolBuilder;
@@ -153,7 +153,7 @@ fn main() {
                 .iter()
                 .flat_map(|pn| pn.children())
                 .filter(|pnc| {
-                    !key.is_adjacent(pnc) && single_fmm.tree.source_tree.keys_set.contains(pnc)
+                    !key.is_adjacent(pnc) && single_fmm.tree().source_tree.keys_set.contains(pnc)
                 })
                 .collect_vec();
 
@@ -177,7 +177,7 @@ fn main() {
                     !key.is_adjacent(pnc)
                         && multi_fmm
                             .ghost_fmm_v
-                            .tree
+                            .tree()
                             .source_tree
                             .keys_set
                             .contains(pnc)
@@ -234,8 +234,8 @@ fn main() {
                 .iter()
                 .cloned()
                 .filter(|n| {
-                    single_fmm.tree.source_tree.keys_set.contains(n)
-                        && single_fmm.tree.source_tree.coordinates(n).is_some()
+                    single_fmm.tree().source_tree.keys_set.contains(n)
+                        && single_fmm.tree().source_tree.coordinates(n).is_some()
                 })
                 .collect_vec();
 
@@ -257,13 +257,13 @@ fn main() {
                 .filter(|n| {
                     multi_fmm
                         .ghost_fmm_u
-                        .tree
+                        .tree()
                         .source_tree
                         .leaves_set
                         .contains(n)
                         && multi_fmm
                             .ghost_fmm_u
-                            .tree
+                            .tree()
                             .source_tree
                             .coordinates(n)
                             .is_some()
@@ -285,12 +285,12 @@ fn main() {
                 assert!(
                     distributed_interaction_list.contains(s),
                     "Test failed: element {:?} is missing in distributed_interaction_list. at leaf: {:?} \n: {:?} = {:?} \n is it contained locally? {:?} or in ghost tree? {:?}",
-                    s, leaf.morton, i1, i2, multi_fmm.tree.source_tree.keys_set.contains(s), multi_fmm.ghost_fmm_u.tree.source_tree.keys_set.contains(s)
+                    s, leaf.morton, i1, i2, multi_fmm.tree.source_tree.keys_set.contains(s), multi_fmm.ghost_fmm_u.tree().source_tree.keys_set.contains(s)
                 );
             }
 
             for s in interaction_list.iter() {
-                if let Some(c1) = single_fmm.tree.source_tree.coordinates(s) {
+                if let Some(c1) = single_fmm.tree().source_tree.coordinates(s) {
                     // Look for coordinates
 
                     if multi_fmm.tree.source_tree.keys_set.contains(s) {
@@ -303,7 +303,7 @@ fn main() {
                     } else {
                         let c2 = multi_fmm
                             .ghost_fmm_u
-                            .tree
+                            .tree()
                             .source_tree
                             .coordinates(s)
                             .unwrap();
@@ -318,7 +318,7 @@ fn main() {
             // Test that the target coordinates are the same
             for s in multi_fmm.tree.target_tree.leaves.iter() {
                 if let Some(c1) = multi_fmm.tree.target_tree.coordinates(s) {
-                    let c2 = single_fmm.tree.target_tree.coordinates(s).unwrap();
+                    let c2 = single_fmm.tree().target_tree.coordinates(s).unwrap();
                     assert_eq!(c1.len(), c2.len());
                 }
             }

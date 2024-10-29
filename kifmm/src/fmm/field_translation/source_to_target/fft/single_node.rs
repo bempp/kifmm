@@ -16,7 +16,6 @@ use crate::{
     fmm::{
         helpers::single_node::{chunk_size, homogenous_kernel_scale, m2l_scale},
         types::{FmmEvalType, SendPtrMut},
-        KiFmm,
     },
     traits::{
         fftw::Dft,
@@ -30,7 +29,7 @@ use crate::{
         constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
         types::MortonKey,
     },
-    FftFieldTranslation, SingleNodeFmmTree,
+    FftFieldTranslation, KiFmm, SingleNodeFmmTree,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation

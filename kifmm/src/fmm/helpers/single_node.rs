@@ -19,7 +19,7 @@ use crate::{
 
 /// Optionally time a function call
 #[inline]
-pub fn optionally_time<T, F>(timed: bool, f: F) -> (T, Option<Duration>)
+pub(crate) fn optionally_time<T, F>(timed: bool, f: F) -> (T, Option<Duration>)
 where
     F: FnOnce() -> T,
 {
@@ -39,7 +39,7 @@ where
 ///
 /// # Arguments
 /// * `expansion_order` - Expansion order of the FMM
-pub fn ncoeffs_kifmm(expansion_order: usize) -> usize {
+pub(crate) fn ncoeffs_kifmm(expansion_order: usize) -> usize {
     6 * (expansion_order - 1).pow(2) + 2
 }
 
@@ -47,7 +47,7 @@ pub fn ncoeffs_kifmm(expansion_order: usize) -> usize {
 ///
 /// # Arguments
 /// * `max` - The maximum chunk size
-pub fn chunk_size(n: usize, max: usize) -> usize {
+pub(crate) fn chunk_size(n: usize, max: usize) -> usize {
     let max_divisor = max;
     for divisor in (1..=max_divisor).rev() {
         if n % divisor == 0 {
@@ -61,7 +61,7 @@ pub fn chunk_size(n: usize, max: usize) -> usize {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> T {
+pub(crate) fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> T {
     let numerator = T::from(1).unwrap();
     let denominator = T::from(2.).unwrap();
     let power = T::from(level).unwrap().re();
@@ -73,7 +73,7 @@ pub fn homogenous_kernel_scale<T: RlstScalar>(level: u64) -> T {
 ///
 /// # Arguments
 /// * `level` - The octree level
-pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
+pub(crate) fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
     if level < 2 {
         return Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
@@ -97,7 +97,10 @@ pub fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> {
 /// # Arguments
 /// * `tree`- Single node tree
 /// * `n_coeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales_single_node<T>(tree: &SingleNodeTree<T::Real>, n_coeffs_leaf: usize) -> Vec<T>
+pub(crate) fn leaf_scales_single_node<T>(
+    tree: &SingleNodeTree<T::Real>,
+    n_coeffs_leaf: usize,
+) -> Vec<T>
 where
     T: RlstScalar + Default,
 {
@@ -121,7 +124,7 @@ where
 /// * `n_coeffs`- Number of interpolation points on leaf box
 /// * `alpha` - The multiplier being used to modify the diameter of the surface grid uniformly along each coordinate axis.
 /// * `expansion_order` - Expansion order of the FMM
-pub fn leaf_surfaces_single_node<T>(
+pub(crate) fn leaf_surfaces_single_node<T>(
     tree: &SingleNodeTree<T>,
     n_coeffs_leaf: usize,
     alpha: T,
@@ -147,7 +150,9 @@ where
 
 /// Create an index pointer for the coordinates in a source and a target tree
 /// between the local indices for each leaf and their associated charges
-pub fn coordinate_index_pointer_single_node<T>(tree: &SingleNodeTree<T>) -> Vec<(usize, usize)>
+pub(crate) fn coordinate_index_pointer_single_node<T>(
+    tree: &SingleNodeTree<T>,
+) -> Vec<(usize, usize)>
 where
     T: RlstScalar + Float,
 {
@@ -167,7 +172,7 @@ where
 }
 
 /// Create index pointers for each key at each level of an octree
-pub fn level_index_pointer_single_node<T>(
+pub(crate) fn level_index_pointer_single_node<T>(
     tree: &SingleNodeTree<T>,
 ) -> Vec<HashMap<MortonKey<T>, usize>>
 where
@@ -186,7 +191,7 @@ where
 }
 
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
-pub fn level_expansion_pointers_single_node<T>(
+pub(crate) fn level_expansion_pointers_single_node<T>(
     tree: &SingleNodeTree<T::Real>,
     n_coeffs: &[usize],
     n_matvecs: usize,
@@ -235,7 +240,7 @@ where
 }
 
 /// Create mutable pointers for leaf expansions in a tree
-pub fn leaf_expansion_pointers_single_node<T>(
+pub(crate) fn leaf_expansion_pointers_single_node<T>(
     tree: &SingleNodeTree<T::Real>,
     n_coeffs: &[usize],
     n_matvecs: usize,
@@ -285,7 +290,7 @@ where
 }
 
 /// Create mutable pointers for potentials in a tree
-pub fn potential_pointers_single_node<T>(
+pub(crate) fn potential_pointers_single_node<T>(
     tree: &SingleNodeTree<T::Real>,
     n_matvecs: usize,
     kernel_eval_size: usize,
@@ -333,7 +338,7 @@ where
 }
 
 /// Map charges to map global indices
-pub fn map_charges<T: RlstScalar>(
+pub(crate) fn map_charges<T: RlstScalar>(
     global_indices: &[usize],
     charges: &[T],
     n_matvecs: usize,
@@ -351,46 +356,11 @@ pub fn map_charges<T: RlstScalar>(
     reordered_charges
 }
 
-/// Pad an Array3D from a given `pad_index` with an amount of zeros specified by `pad_size` to the right of each axis.
-///
-/// # Arguments
-/// * `arr` - An array to be padded.
-/// * `pad_size` - The amount of padding to be added along each axis.
-/// * `pad_index` - The position in the array to start the padding from.
-pub fn pad3<T>(
-    arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-    pad_size: (usize, usize, usize),
-    pad_index: (usize, usize, usize),
-) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
-where
-    T: Clone + Copy + RlstScalar,
-{
-    let [m, n, o] = arr.shape();
-
-    let (x, y, z) = pad_index;
-    let (p, q, r) = pad_size;
-
-    // Check that there is enough space for pad
-    assert!(x + p <= m + p && y + q <= n + q && z + r <= o + r);
-
-    let mut padded = rlst_dynamic_array3!(T, [p + m, q + n, r + o]);
-
-    for i in 0..m {
-        for j in 0..n {
-            for k in 0..o {
-                *padded.get_mut([x + i, y + j, z + k]).unwrap() = *arr.get([i, j, k]).unwrap();
-            }
-        }
-    }
-
-    padded
-}
-
 /// Flip an Array3D along each axis, returns a new array.
 ///
 /// # Arguments
 /// * `arr` - An array to be flipped.
-pub fn flip3<T>(
+pub(crate) fn flip3<T>(
     arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
 ) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
 where
@@ -438,78 +408,5 @@ mod test {
         assert_relative_eq!(*result.get([1, 0, 1]).unwrap(), 2.0);
         assert_relative_eq!(*result.get([1, 1, 0]).unwrap(), 4.0);
         assert_relative_eq!(*result.get([1, 1, 1]).unwrap(), 0.0);
-    }
-
-    #[test]
-    fn test_pad3() {
-        let dim = 3;
-        // Initialise input data
-        let mut input = rlst_dynamic_array3!(f64, [dim, dim, dim]);
-        for i in 0..dim {
-            for j in 0..dim {
-                for k in 0..dim {
-                    *input.get_mut([i, j, k]).unwrap() = (i + j * dim + k * dim * dim + 1) as f64
-                }
-            }
-        }
-
-        // Test padding at edge of each axis
-        let pad_size = (2, 3, 4);
-        let pad_index = (0, 0, 0);
-        let padded = pad3(&input, pad_size, pad_index);
-
-        let [m, n, o] = padded.shape();
-
-        // Check dimension
-        assert_eq!(m, dim + pad_size.0);
-        assert_eq!(n, dim + pad_size.1);
-        assert_eq!(o, dim + pad_size.2);
-
-        // Check that padding has been correctly applied
-        for i in dim..m {
-            for j in dim..n {
-                for k in dim..o {
-                    assert_eq!(*padded.get([i, j, k]).unwrap(), 0f64)
-                }
-            }
-        }
-
-        for i in 0..dim {
-            for j in 0..dim {
-                for k in 0..dim {
-                    assert_eq!(
-                        *padded.get([i, j, k]).unwrap(),
-                        *input.get([i, j, k]).unwrap()
-                    )
-                }
-            }
-        }
-
-        // Test padding at the start of each axis
-        let pad_index = (2, 2, 2);
-
-        let padded = pad3(&input, pad_size, pad_index);
-
-        // Check that padding has been correctly applied
-        for i in 0..pad_index.0 {
-            for j in 0..pad_index.1 {
-                for k in 0..pad_index.2 {
-                    assert_eq!(*padded.get([i, j, k]).unwrap(), 0f64)
-                }
-            }
-        }
-
-        for i in 0..dim {
-            for j in 0..dim {
-                for k in 0..dim {
-                    assert_eq!(
-                        *padded
-                            .get([i + pad_index.0, j + pad_index.1, k + pad_index.2])
-                            .unwrap(),
-                        *input.get([i, j, k]).unwrap()
-                    );
-                }
-            }
-        }
     }
 }

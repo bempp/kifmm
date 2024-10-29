@@ -15,29 +15,23 @@ use mpi::Count;
 use num::Float;
 use rlst::RlstScalar;
 
-use crate::traits::field::FieldTranslation as FieldTranslationTrait;
-use crate::traits::field::SourceToTargetTranslationMetadata;
-use crate::traits::fmm::DataAccess;
-use crate::traits::fmm::DataAccessMulti;
-use crate::traits::fmm::HomogenousKernel;
-use crate::traits::general::multi_node::GhostExchange;
-use crate::traits::general::multi_node::GlobalFmmMetadata;
-use crate::traits::tree::MultiFmmTree;
-use crate::traits::tree::MultiTree;
-use crate::traits::tree::SingleFmmTree;
-use crate::traits::tree::SingleTree;
-use crate::tree::types::Domain;
-use crate::tree::types::MortonKey;
-use crate::tree::SingleNodeTree;
-use crate::MultiNodeFmmTree;
-use crate::SingleNodeFmmTree;
-
-use super::helpers::single_node::coordinate_index_pointer_single_node;
-use super::helpers::single_node::leaf_expansion_pointers_single_node;
-use super::helpers::single_node::level_expansion_pointers_single_node;
-use super::helpers::single_node::level_index_pointer_single_node;
-use super::types::KiFmmMulti;
-use super::KiFmm;
+use crate::{
+    fmm::helpers::single_node::{
+        coordinate_index_pointer_single_node, leaf_expansion_pointers_single_node,
+        level_expansion_pointers_single_node, level_index_pointer_single_node,
+    },
+    traits::{
+        field::{FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata},
+        fmm::{DataAccess, DataAccessMulti, HomogenousKernel},
+        general::multi_node::{GhostExchange, GlobalFmmMetadata},
+        tree::{MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
+    },
+    tree::{
+        types::{Domain, MortonKey},
+        SingleNodeTree,
+    },
+    KiFmm, KiFmmMulti, MultiNodeFmmTree, SingleNodeFmmTree,
+};
 
 impl<Scalar, Kernel, FieldTranslation> GhostExchange
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>

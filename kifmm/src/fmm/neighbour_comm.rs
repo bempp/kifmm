@@ -7,7 +7,7 @@ use mpi::{
 };
 use mpi_sys;
 
-use super::types::NeighbourhoodCommunicator;
+use crate::fmm::types::NeighbourhoodCommunicator;
 
 impl NeighbourhoodCommunicator {
     /// Number of associated ranks

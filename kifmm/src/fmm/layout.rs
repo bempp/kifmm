@@ -3,9 +3,7 @@ use itertools::Itertools;
 use num::Float;
 use rlst::RlstScalar;
 
-use crate::tree::types::MortonKey;
-
-use super::types::Layout;
+use crate::{fmm::types::Layout, tree::types::MortonKey};
 
 impl<T: RlstScalar + Float> Layout<T> {
     /// rank associated with this rank

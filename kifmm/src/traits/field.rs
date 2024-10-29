@@ -28,10 +28,11 @@ pub trait TargetTranslationMetadata {
 
 /// Set M2L metadata associated with a kernel
 pub trait SourceToTargetTranslationMetadata {
-    /// Source to target field translation
+    /// Constructor
     fn source_to_target(&mut self);
 
-    /// Map between source/target nodes, indexed by level.
+    /// Create level-wise map between source and target data required by translation at
+    /// pre-computation time.
     fn displacements(&mut self, start_level: Option<u64>);
 }
 

@@ -15,7 +15,6 @@ use crate::{
     fmm::{
         helpers::single_node::{homogenous_kernel_scale, m2l_scale},
         types::{BlasFieldTranslationIa, FmmEvalType, SendPtrMut},
-        KiFmm,
     },
     traits::{
         field::SourceToTargetTranslation,
@@ -24,7 +23,7 @@ use crate::{
         types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationSaRcmp,
+    BlasFieldTranslationSaRcmp, KiFmm,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation

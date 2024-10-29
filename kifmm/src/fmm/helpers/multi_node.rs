@@ -6,15 +6,13 @@ use num::Float;
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::types::SendPtrMut,
+    fmm::{helpers::single_node::homogenous_kernel_scale, types::SendPtrMut},
     traits::tree::{FmmTreeNode, MultiTree},
     tree::{types::MortonKey, MultiNodeTree},
 };
 
-use super::single_node::homogenous_kernel_scale;
-
 /// Create index pointers for each key at each level of an octree
-pub fn level_index_pointer_multi_node<T>(
+pub(crate) fn level_index_pointer_multi_node<T>(
     tree: &MultiNodeTree<T, SimpleCommunicator>,
 ) -> Vec<HashMap<MortonKey<T>, usize>>
 where
@@ -37,7 +35,7 @@ where
 /// # Arguments
 /// * `tree`- Multi node tree
 /// * `ncoeffs`- Number of interpolation points on leaf box
-pub fn leaf_scales_multi_node<T>(
+pub(crate) fn leaf_scales_multi_node<T>(
     tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
     n_coeffs_leaf: usize,
 ) -> Vec<T>
@@ -59,7 +57,7 @@ where
 }
 
 /// Compute surfaces for each leaf box
-pub fn leaf_surfaces_multi_node<T>(
+pub(crate) fn leaf_surfaces_multi_node<T>(
     tree: &MultiNodeTree<T, SimpleCommunicator>,
     n_coeffs_leaf: usize,
     alpha: T,
@@ -84,7 +82,7 @@ where
 }
 
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
-pub fn level_expansion_pointers_multi_node<T>(
+pub(crate) fn level_expansion_pointers_multi_node<T>(
     tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
     n_coeffs: usize,
     expansions: &[T],
@@ -117,7 +115,7 @@ where
 }
 
 /// Create mutable pointers for leaf expansions in a tree
-pub fn leaf_expansion_pointers_multi_node<T>(
+pub(crate) fn leaf_expansion_pointers_multi_node<T>(
     tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
     n_coeffs: usize,
     expansions: &[T],
@@ -149,7 +147,7 @@ where
 }
 
 /// Create mutable pointers for potentials in a tree
-pub fn potential_pointers_multi_node<T>(
+pub(crate) fn potential_pointers_multi_node<T>(
     tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
     kernel_eval_size: usize,
     potentials: &[T],

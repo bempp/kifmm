@@ -70,7 +70,7 @@ fn main() {
         let multipole = fmm.multipole(root).unwrap();
 
         let upward_equivalent_surface = root.surface_grid(
-            fmm.equivalent_surface_order,
+            fmm.equivalent_surface_order(0),
             fmm.tree().domain(),
             ALPHA_INNER as f32,
         );
@@ -113,12 +113,12 @@ fn main() {
     assert!(rel_error <= threshold);
 
     // Gather all coordinates for the test
-    let root_process = fmm.communicator.process_at_rank(0);
+    let root_process = fmm.communicator().process_at_rank(0);
     let n_coords = fmm.tree().source_tree().coordinates.len() as i32;
     let mut all_coordinates = vec![0f32; 3 * n_points * world.size() as usize];
 
     if world.rank() == 0 {
-        let mut coordinates_counts = vec![0i32; fmm.communicator.size() as usize];
+        let mut coordinates_counts = vec![0i32; fmm.communicator().size() as usize];
         root_process.gather_into_root(&n_coords, &mut coordinates_counts);
 
         let mut coordinates_displacements = Vec::new();
@@ -161,7 +161,7 @@ fn main() {
         let mut found = vec![0.];
 
         let upward_equivalent_surface = root.surface_grid(
-            fmm.equivalent_surface_order,
+            fmm.equivalent_surface_order(0),
             fmm.tree().domain(),
             ALPHA_INNER as f32,
         );

@@ -9,9 +9,12 @@ use super::{tree::SingleTree, types::FmmError};
 use super::tree::MultiFmmTree;
 
 #[cfg(feature = "mpi")]
+use mpi::{topology::SimpleCommunicator, Rank};
+
+#[cfg(feature = "mpi")]
 use crate::traits::tree::MultiTree;
 
-/// Multinode FMM data access
+/// Data access in a multi-node setting for objects which implement the FMM.
 #[cfg(feature = "mpi")]
 pub trait DataAccessMulti {
     /// Data associated with FMM, must implement RlstScalar.
@@ -30,6 +33,9 @@ pub trait DataAccessMulti {
         &self,
         leaf: &<<<Self::Tree as MultiFmmTree>::Tree as MultiTree>::SingleTree as SingleTree>::Node,
     ) -> Option<Vec<&[Self::Scalar]>>;
+
+    /// Get all potential data at all particles, stored in order by global index
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>>;
 
     /// Get the multipole expansion data associated with a node as a slice
     /// # Arguments
@@ -74,18 +80,26 @@ pub trait DataAccessMulti {
     fn locals(&self, level: u64) -> Option<&[Self::Scalar]>;
 
     /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
+    /// # Arguments
+    /// * `level` - The tree level.
     fn equivalent_surface_order(&self, level: u64) -> usize;
 
     /// Get the expansion order associated with this FMM, used to discretise the check surface.
+    /// # Arguments
+    /// * `level` - The tree level.
     fn check_surface_order(&self, level: u64) -> usize;
 
     /// Check whether or not expansion order is set variably
     fn variable_expansion_order(&self) -> bool;
 
     /// Get the number of multipole/local coefficients associated with this FMM
+    /// # Arguments
+    /// * `level` - The tree level.
     fn n_coeffs_equivalent_surface(&self, level: u64) -> usize;
 
     /// Get the number of multipole/local coefficients associated with this FMM
+    /// # Arguments
+    /// * `level` - The tree level.
     fn n_coeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
@@ -94,11 +108,17 @@ pub trait DataAccessMulti {
     /// Get the kernel associated with this FMM
     fn kernel(&self) -> &Self::Kernel;
 
+    /// Get communicator associated with this FMM
+    fn communicator(&self) -> &SimpleCommunicator;
+
+    /// Rank of this FMM
+    fn rank(&self) -> Rank;
+
     /// Get the dimension of the data in this FMM
     fn dim(&self) -> usize;
 }
 
-/// Access data for FMM objects
+/// Data access for objects which implement the FMM
 pub trait DataAccess {
     /// Data associated with FMM, must implement RlstScalar.
     type Scalar: RlstScalar;
@@ -117,6 +137,14 @@ pub trait DataAccess {
         key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
     ) -> Option<&[Self::Scalar]>;
 
+    /// Get the multipole expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The source node.
+    fn multipole_mut(
+        &self,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+    ) -> Option<&mut [Self::Scalar]>;
+
     /// Get the multipole expansion data associated with a tree level as a slice
     /// # Arguments
     /// * `level` - The tree level.
@@ -129,6 +157,14 @@ pub trait DataAccess {
         &self,
         key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
     ) -> Option<&[Self::Scalar]>;
+
+    /// Get the local expansion data associated with a node as a slice
+    /// # Arguments
+    /// * `key` - The target node.
+    fn local_mut(
+        &self,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+    ) -> Option<&mut [Self::Scalar]>;
 
     /// Get the local expansion data associated with a tree level as a slice
     /// # Arguments
@@ -147,18 +183,26 @@ pub trait DataAccess {
     fn potentials(&self) -> Option<&Vec<Self::Scalar>>;
 
     /// Get the expansion order associated with this FMM, used to discretise the equivalent surface.
+    /// # Arguments
+    /// * `level` - The tree level.
     fn equivalent_surface_order(&self, level: u64) -> usize;
 
     /// Get the expansion order associated with this FMM, used to discretise the check surface.
+    /// # Arguments
+    /// * `level` - The tree level.
     fn check_surface_order(&self, level: u64) -> usize;
 
     /// Check whether or not expansion order is set variably
     fn variable_expansion_order(&self) -> bool;
 
     /// Get the number of multipole/local coefficients associated with this FMM
+    /// # Arguments
+    /// * `level` - The tree level.
     fn n_coeffs_equivalent_surface(&self, level: u64) -> usize;
 
     /// Get the number of multipole/local coefficients associated with this FMM
+    /// # Arguments
+    /// * `level` - The tree level.
     fn n_coeffs_check_surface(&self, level: u64) -> usize;
 
     /// Get the tree associated with this FMM
@@ -177,12 +221,7 @@ pub trait DataAccess {
     fn clear(&mut self, charges: &[<Self as DataAccess>::Scalar]);
 }
 
-/// Interface for a Kernel-Independent Fast Multipole Method (FMM).
-///
-/// This trait abstracts the core functionalities of FMM, allowing for different underlying
-/// data structures, kernels, and precision types. It supports operations essential for
-/// executing FMM calculations, including accessing multipole and local expansions, evaluating
-/// potentials, and managing the underlying tree structure and kernel functions.
+/// Defines evaluation of the FMM on a single node, which has implemented `DataAccess`
 pub trait Evaluate
 where
     Self: DataAccess,
@@ -203,7 +242,7 @@ where
     fn evaluate(&mut self) -> Result<(), FmmError>;
 }
 
-/// Interface for multi node FMM
+/// Defines evaluation of the FMM in a multinode setting, which has implemented `DataAccessMulti`
 #[cfg(feature = "mpi")]
 pub trait EvaluateMulti
 where
@@ -226,17 +265,21 @@ where
 }
 
 /// Set all metadata required for FMMs
+///
+/// Metadata relates to the buffers for storing multipole and local coefficient data, index pointers, and buffers for results.
+///
+/// TODO: This trait must be broken up for clarity of abstraction.
 pub trait Metadata {
     /// Associated scalar
     type Scalar: RlstScalar;
 
     /// Compute all metadata required for FMM.
-    /// TODO: Breakup into smaller pieces of functionality for clarity.
     fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]);
 }
 
-/// Defines how metadata associated with field translations is looked up at runtime.
-/// Defined by kernel type, as well as field translation method.
+/// Defines access to important Metadata required for field translations
+///
+/// TODO: To be deprecated along with `Metadata` trait as its too general
 pub trait MetadataAccess
 where
     Self: Metadata,

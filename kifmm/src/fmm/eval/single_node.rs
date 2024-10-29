@@ -3,7 +3,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::{helpers::single_node::optionally_time, types::KiFmm},
+    fmm::helpers::single_node::optionally_time,
     traits::{
         field::{
             FieldTranslation as FieldTranslationTrait, SourceToTargetTranslation,
@@ -13,7 +13,7 @@ use crate::{
         tree::{SingleFmmTree, SingleTree},
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    Evaluate, SingleNodeFmmTree,
+    Evaluate, KiFmm, SingleNodeFmmTree,
 };
 
 impl<Scalar, Kernel, FieldTranslation> Evaluate for KiFmm<Scalar, Kernel, FieldTranslation>

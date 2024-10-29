@@ -1,5 +1,4 @@
-//! Should eventually store all parallel traits
-
+//! Useful traits in a distributed setting
 use rlst::RlstScalar;
 
 use crate::{
@@ -8,17 +7,16 @@ use crate::{
         fmm::DataAccess,
         tree::{SingleFmmTree, SingleTree},
     },
-    tree::types::Domain,
+    tree::Domain,
 };
 
 /// Interface for ghost exchange implementations
 pub trait GhostExchange {
-    /// Exchange V List keys and metadata, which can be done during pre-computation
+    /// Exchange Ghost V list keys and set associated metadata, which can be done during pre-computation
     fn v_list_exchange(&mut self);
 
-    /// Exchange V list data, must be done at runtime as relies on partially completed upward pass
-    /// Only the actual multipole coefficients have to be exchanged at runtime, but this isn't required
-    /// for calculating the displacements
+    /// Exchange partial multipoles, and set metadata, must be done after local upward passes complete at
+    /// runtime.
     fn v_list_exchange_runtime(&mut self);
 
     /// Exchange U list data, can be done during pre-computation

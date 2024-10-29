@@ -1,7 +1,6 @@
-//! Traits that are useful across modules
+//! Useful traits
 use num::Complex;
-use rlst::RlstScalar;
-use rlst::{c32, c64};
+use rlst::{c32, c64, RlstScalar};
 
 use crate::fmm::types::Isa;
 

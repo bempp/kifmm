@@ -4,7 +4,7 @@ use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
     traits::types::{CommunicationType, FmmOperatorType, MetadataType},
     tree::{helpers::points_fixture, types::SortKind},
-    EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
+    DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
 use mpi::traits::*;
 use rayon::ThreadPoolBuilder;
@@ -212,7 +212,7 @@ fn main() {
          {:?},{:?},{:?},{:?},{:?},{:?},\
          {:?},{:?},{:?},{:?},{:?},{:?},{:?}",
         id,
-        multi_fmm.rank,
+        multi_fmm.rank(),
         runtime,
         operator_times.get("p2m").unwrap_or(&0),
         operator_times.get("m2m").unwrap_or(&0),

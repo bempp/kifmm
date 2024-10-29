@@ -7,14 +7,13 @@ use crate::{
             potential_pointers_single_node,
         },
         types::FmmEvalType,
-        KiFmm,
     },
     traits::{
         field::FieldTranslation as FieldTranslationTrait,
         fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         tree::{SingleFmmTree, SingleTree},
     },
-    SingleNodeFmmTree,
+    KiFmm, SingleNodeFmmTree,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -87,6 +86,30 @@ where
         }
     }
 
+    fn multipole_mut(
+        &self,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+    ) -> Option<&mut [Self::Scalar]> {
+        if let Some(&key_idx) = self.tree().source_tree().level_index(key) {
+            let multipole_ptr = &self.level_multipoles[key.level() as usize][key_idx][0];
+
+            unsafe {
+                match self.fmm_eval_type {
+                    FmmEvalType::Vector => Some(std::slice::from_raw_parts_mut(
+                        multipole_ptr.raw,
+                        self.n_coeffs_equivalent_surface(key.level()),
+                    )),
+                    FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts_mut(
+                        multipole_ptr.raw,
+                        self.n_coeffs_equivalent_surface(key.level()) * n_matvecs,
+                    )),
+                }
+            }
+        } else {
+            None
+        }
+    }
+
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
         let multipole_ptr = &self.level_multipoles[level as usize][0][0];
         let n_sources = self.tree.source_tree.n_keys(level).unwrap();
@@ -118,6 +141,30 @@ where
                         self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
+                        local_ptr.raw,
+                        self.n_coeffs_equivalent_surface(key.level()) * n_matvecs,
+                    )),
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn local_mut(
+        &self,
+        key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
+    ) -> Option<&mut [Self::Scalar]> {
+        if let Some(&key_idx) = self.tree().target_tree().level_index(key) {
+            let local_ptr = &self.level_locals[key.level() as usize][key_idx][0];
+
+            unsafe {
+                match self.fmm_eval_type {
+                    FmmEvalType::Vector => Some(std::slice::from_raw_parts_mut(
+                        local_ptr.raw,
+                        self.n_coeffs_equivalent_surface(key.level()),
+                    )),
+                    FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts_mut(
                         local_ptr.raw,
                         self.n_coeffs_equivalent_surface(key.level()) * n_matvecs,
                     )),

@@ -4,7 +4,7 @@ fn main() {
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
-            fmm::DataAccessMulti,
+            fmm::{DataAccess, DataAccessMulti},
             general::multi_node::GhostExchange,
             tree::{MultiFmmTree, MultiTree},
         },
@@ -181,15 +181,15 @@ fn main() {
 
         // Test that all keys are contained
         for key in all_keys.iter() {
-            assert!(single_fmm.tree.source_tree.keys_set.contains(key))
+            assert!(single_fmm.tree().source_tree.keys_set.contains(key))
         }
         println!("...test_keys passed");
 
         // Test that all leaves span the same domain as if constructed locally
-        assert_eq!(single_fmm.tree.source_tree.leaves.len(), all_leaves.len());
+        assert_eq!(single_fmm.tree().source_tree.leaves.len(), all_leaves.len());
 
         for leaf in all_leaves.iter() {
-            assert!(single_fmm.tree.source_tree.leaves_set.contains(leaf))
+            assert!(single_fmm.tree().source_tree.leaves_set.contains(leaf))
         }
 
         println!("...test_leaves passed");

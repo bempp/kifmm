@@ -8,14 +8,14 @@ fn main() {
         fmm::types::MultiNodeBuilder,
         traits::{
             field::SourceTranslation,
-            fmm::DataAccessMulti,
+            fmm::{DataAccess, DataAccessMulti},
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{
             helpers::points_fixture,
             types::{MortonKey, SortKind},
         },
-        DataAccess, FftFieldTranslation, SingleNodeBuilder,
+        FftFieldTranslation, SingleNodeBuilder,
     };
 
     use rayon::ThreadPoolBuilder;
@@ -117,7 +117,7 @@ fn main() {
         vec![MortonKey::<f32>::default(); global_leaves_counts.iter().sum::<i32>() as usize];
     let mut global_multipoles = vec![
         0f32;
-        multi_fmm.n_coeffs_equivalent_surface
+        multi_fmm.n_coeffs_equivalent_surface(0)
             * global_leaves_counts.iter().sum::<i32>() as usize
     ];
 
@@ -133,9 +133,9 @@ fn main() {
         let mut global_multipoles_displacements = Vec::new();
         let mut displacement = 0;
         for &count in global_leaves_counts.iter() {
-            global_multipoles_counts.push(count * multi_fmm.n_coeffs_equivalent_surface as i32);
+            global_multipoles_counts.push(count * multi_fmm.n_coeffs_equivalent_surface(0) as i32);
             global_multipoles_displacements.push(displacement);
-            displacement += multi_fmm.n_coeffs_equivalent_surface as i32 * count;
+            displacement += multi_fmm.n_coeffs_equivalent_surface(0) as i32 * count;
         }
 
         let mut partition = PartitionMut::new(
@@ -147,10 +147,10 @@ fn main() {
         let leaves = &multi_fmm.tree.source_tree.leaves;
         root_process.gather_varcount_into_root(&leaves[..], &mut partition);
 
-        let mut multipoles = vec![0f32; multi_fmm.n_coeffs_equivalent_surface * leaves.len()];
+        let mut multipoles = vec![0f32; multi_fmm.n_coeffs_equivalent_surface(0) * leaves.len()];
         for (i, leaf) in leaves.iter().enumerate() {
-            let l = i * multi_fmm.n_coeffs_equivalent_surface;
-            let r = l + multi_fmm.n_coeffs_equivalent_surface;
+            let l = i * multi_fmm.n_coeffs_equivalent_surface(0);
+            let r = l + multi_fmm.n_coeffs_equivalent_surface(0);
             multipoles[l..r].copy_from_slice(multi_fmm.multipole(leaf).unwrap());
         }
 
@@ -164,10 +164,10 @@ fn main() {
     } else {
         let leaves = &multi_fmm.tree.source_tree.leaves;
 
-        let mut multipoles = vec![0f32; multi_fmm.n_coeffs_equivalent_surface * leaves.len()];
+        let mut multipoles = vec![0f32; multi_fmm.n_coeffs_equivalent_surface(0) * leaves.len()];
         for (i, leaf) in leaves.iter().enumerate() {
-            let l = i * multi_fmm.n_coeffs_equivalent_surface;
-            let r = l + multi_fmm.n_coeffs_equivalent_surface;
+            let l = i * multi_fmm.n_coeffs_equivalent_surface(0);
+            let r = l + multi_fmm.n_coeffs_equivalent_surface(0);
             multipoles[l..r].copy_from_slice(multi_fmm.multipole(leaf).unwrap());
         }
 
@@ -199,7 +199,7 @@ fn main() {
         single_fmm.p2m().unwrap();
 
         let leaf_level = local_depth + global_depth;
-        let leaves = &single_fmm.tree.source_tree.leaves;
+        let leaves = &single_fmm.tree().source_tree.leaves;
 
         let mut re_ordered_global_leaves = global_leaves.iter().cloned().collect_vec();
         re_ordered_global_leaves.sort();
@@ -218,11 +218,11 @@ fn main() {
 
         for (leaf, new_idx) in new_key_to_index.iter() {
             let old_idx = old_key_to_index.get(leaf).unwrap();
-            let l = old_idx * multi_fmm.n_coeffs_equivalent_surface;
-            let r = l + multi_fmm.n_coeffs_equivalent_surface;
+            let l = old_idx * multi_fmm.n_coeffs_equivalent_surface(0);
+            let r = l + multi_fmm.n_coeffs_equivalent_surface(0);
 
-            let new_l = new_idx * multi_fmm.n_coeffs_equivalent_surface;
-            let new_r = new_l + multi_fmm.n_coeffs_equivalent_surface;
+            let new_l = new_idx * multi_fmm.n_coeffs_equivalent_surface(0);
+            let new_r = new_l + multi_fmm.n_coeffs_equivalent_surface(0);
 
             re_ordered_global_multipoles[new_l..new_r].copy_from_slice(&global_multipoles[l..r]);
         }

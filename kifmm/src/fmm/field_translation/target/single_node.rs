@@ -9,9 +9,7 @@ use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAcces
 use green_kernels::traits::Kernel as KernelTrait;
 
 use crate::{
-    fmm::{
-        constants::L2L_MAX_BLOCK_SIZE, helpers::single_node::chunk_size, types::FmmEvalType, KiFmm,
-    },
+    fmm::{constants::L2L_MAX_BLOCK_SIZE, helpers::single_node::chunk_size, types::FmmEvalType},
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, TargetTranslation},
         fmm::{DataAccess, HomogenousKernel, MetadataAccess},
@@ -19,6 +17,7 @@ use crate::{
         types::FmmError,
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
+    KiFmm,
 };
 
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation for KiFmm<Scalar, Kernel, FieldTranslation>

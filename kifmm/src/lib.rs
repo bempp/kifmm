@@ -99,9 +99,16 @@ pub use fmm::types::SingleNodeBuilder;
 #[doc(inline)]
 pub use fmm::types::SingleNodeFmmTree;
 
+#[doc(inline)]
+pub use fmm::types::KiFmm;
+
 #[cfg(feature = "mpi")]
 #[doc(inline)]
 pub use fmm::types::MultiNodeFmmTree;
+
+#[cfg(feature = "mpi")]
+#[doc(inline)]
+pub use fmm::types::KiFmmMulti;
 
 #[cfg(feature = "mpi")]
 #[doc(inline)]

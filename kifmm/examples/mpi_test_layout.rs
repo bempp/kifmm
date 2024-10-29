@@ -4,6 +4,7 @@ fn main() {
     use itertools::Itertools;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
+        traits::fmm::DataAccessMulti,
         tree::{
             helpers::points_fixture,
             types::{MortonKey, SortKind},
@@ -110,7 +111,7 @@ fn main() {
                 .source_layout
                 .rank_from_key(intersection[0])
                 .unwrap();
-            assert_ne!(rank, fmm.rank);
+            assert_ne!(rank, fmm.rank());
 
             // Calculate rank from layout directly, and test that it is
             // as expected
@@ -127,12 +128,12 @@ fn main() {
         let mut total_receive_count = 0;
 
         for rank in 0..comm.size() {
-            fmm.communicator.all_reduce_into(
+            fmm.communicator().all_reduce_into(
                 &fmm.tree.u_list_query.receive_counts[rank as usize],
                 &mut total_receive_count,
                 SystemOperation::sum(),
             );
-            if rank == fmm.rank {
+            if rank == fmm.rank() {
                 assert_eq!(total_receive_count, total_send_count);
             }
         }
@@ -177,7 +178,7 @@ fn main() {
                 .source_layout
                 .rank_from_key(intersection[0])
                 .unwrap();
-            assert_ne!(rank, fmm.rank);
+            assert_ne!(rank, fmm.rank());
 
             // Calculate rank from layout directly, and test that it is
             // as expected
@@ -194,12 +195,12 @@ fn main() {
         let mut total_receive_count = 0;
 
         for rank in 0..comm.size() {
-            fmm.communicator.all_reduce_into(
+            fmm.communicator().all_reduce_into(
                 &fmm.tree.v_list_query.receive_counts[rank as usize],
                 &mut total_receive_count,
                 SystemOperation::sum(),
             );
-            if rank == fmm.rank {
+            if rank == fmm.rank() {
                 assert_eq!(total_receive_count, total_send_count);
             }
         }

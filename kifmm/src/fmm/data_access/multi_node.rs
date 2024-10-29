@@ -1,4 +1,4 @@
-use mpi::{topology::SimpleCommunicator, traits::Equivalence};
+use mpi::{topology::SimpleCommunicator, traits::Equivalence, Rank};
 use num::Float;
 use rlst::RlstScalar;
 
@@ -29,6 +29,14 @@ where
 
     fn dim(&self) -> usize {
         self.dim
+    }
+
+    fn rank(&self) -> Rank {
+        self.rank
+    }
+
+    fn communicator(&self) -> &SimpleCommunicator {
+        &self.communicator
     }
 
     fn variable_expansion_order(&self) -> bool {
@@ -75,6 +83,10 @@ where
         } else {
             None
         }
+    }
+
+    fn potentials(&self) -> Option<&Vec<Self::Scalar>> {
+        Some(&self.potentials)
     }
 
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {

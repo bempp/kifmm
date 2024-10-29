@@ -119,7 +119,7 @@ fn main() {
             single_fmm.evaluate().unwrap();
             let mut expected = vec![0f32; &multi_fmm.tree.target_tree.coordinates.len() / 3];
 
-            multi_fmm.kernel.evaluate_st(
+            multi_fmm.kernel().evaluate_st(
                 GreenKernelEvalType::Value,
                 &all_coordinates,
                 &multi_fmm.tree.target_tree.coordinates,
@@ -127,7 +127,7 @@ fn main() {
                 &mut expected,
             );
 
-            let distributed = &multi_fmm.potentials;
+            let distributed = multi_fmm.potentials().unwrap();
 
             distributed
                 .iter()
@@ -232,7 +232,7 @@ fn main() {
             single_fmm.evaluate().unwrap();
             let mut expected = vec![0f32; &multi_fmm.tree.target_tree.coordinates.len() / 3];
 
-            multi_fmm.kernel.evaluate_st(
+            multi_fmm.kernel().evaluate_st(
                 GreenKernelEvalType::Value,
                 &all_coordinates,
                 &multi_fmm.tree.target_tree.coordinates,
@@ -240,7 +240,7 @@ fn main() {
                 &mut expected,
             );
 
-            let distributed = &multi_fmm.potentials;
+            let distributed = multi_fmm.potentials().unwrap();
 
             distributed
                 .iter()

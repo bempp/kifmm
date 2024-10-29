@@ -13,7 +13,6 @@ use crate::{
             FmmEvalType, Isa, KiFmmMulti, Layout, MultiNodeBuilder, NeighbourhoodCommunicator,
             Query,
         },
-        KiFmm,
     },
     traits::{
         field::{
@@ -28,7 +27,7 @@ use crate::{
         types::{Domain, SortKind},
         MultiNodeTree,
     },
-    MultiNodeFmmTree, SingleNodeFmmTree,
+    KiFmm, MultiNodeFmmTree, SingleNodeFmmTree,
 };
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
@@ -327,7 +326,6 @@ where
                 charges: Vec::default(),
                 charge_index_pointer_sources: Vec::default(),
                 charge_index_pointer_targets: Vec::default(),
-                charge_index_pointer_ghost_sources: Vec::default(),
                 leaf_upward_check_surfaces_sources: Vec::default(),
                 leaf_downward_equivalent_surfaces_targets: Vec::default(),
                 leaf_upward_equivalent_surfaces_sources: Vec::default(),

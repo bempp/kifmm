@@ -5,7 +5,7 @@ use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel
 use rlst::{c32, c64};
 
 use crate::{
-    fmm::KiFmm, BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation,
+    BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, KiFmm,
     SingleNodeBuilder,
 };
 
@@ -1308,12 +1308,12 @@ pub mod api {
             tree::{SingleFmmTree, SingleTree, TreeNode},
         },
         tree::types::MortonKey,
-        BlasFieldTranslationIa, Evaluate, FftFieldTranslation,
+        BlasFieldTranslationIa, Evaluate, FftFieldTranslation, KiFmm,
     };
 
     use super::{
         c32, c64, BlasFieldTranslationSaRcmp, CommunicationTimes, Coordinates, FmmCType,
-        FmmEvaluator, FmmOperatorTimes, FmmTranslationCType, GlobalIndices, KiFmm, Laplace3dKernel,
+        FmmEvaluator, FmmOperatorTimes, FmmTranslationCType, GlobalIndices, Laplace3dKernel,
         MortonKeys, Potential, Potentials, ScalarType,
     };
 

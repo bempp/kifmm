@@ -1,22 +1,22 @@
-use crate::fmm::helpers::single_node::optionally_time;
-use crate::fmm::KiFmm;
-use crate::traits::field::{
-    FieldTranslation as FieldTranslationTrait, SourceToTargetTranslation, SourceTranslation,
-    TargetTranslation,
+use crate::{
+    fmm::{helpers::single_node::optionally_time, types::KiFmmMulti},
+    traits::{
+        field::{
+            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslation,
+            SourceTranslation, TargetTranslation,
+        },
+        fmm::{DataAccessMulti, EvaluateMulti, HomogenousKernel},
+        general::multi_node::GhostExchange,
+        tree::{MultiFmmTree, MultiTree},
+        types::{CommunicationTime, CommunicationType, FmmOperatorTime, FmmOperatorType},
+    },
+    Evaluate, KiFmm,
 };
-use crate::traits::fmm::{DataAccessMulti, EvaluateMulti, HomogenousKernel};
-use crate::traits::general::multi_node::GhostExchange;
-use crate::traits::tree::{MultiFmmTree, MultiTree};
-use crate::traits::types::{
-    CommunicationTime, CommunicationType, FmmOperatorTime, FmmOperatorType,
-};
+
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::traits::{Communicator, Equivalence};
 use num::Float;
 use rlst::RlstScalar;
-
-use crate::fmm::types::KiFmmMulti;
-use crate::Evaluate;
 
 impl<Scalar, Kernel, FieldTranslation> EvaluateMulti
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
