@@ -51,19 +51,19 @@ pub trait SingleTree {
     /// Gets a reference to the coordinates contained with a leaf node.
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn coordinates(&self, leaf: &Self::Node) -> Option<&[Self::Scalar]>;
 
     /// Gets a reference to the points contained with a leaf node.
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn points(&self, leaf: &Self::Node) -> Option<&[Point<Self::Scalar>]>;
 
     /// Query number of coordinates contained at a given leaf node
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn n_coordinates(&self, leaf: &Self::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
@@ -78,7 +78,7 @@ pub trait SingleTree {
     /// gets global indices at a leaf node (local in multi node setting)
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]>;
 
     /// gets all global indices (local in mult inode setting)
@@ -90,19 +90,19 @@ pub trait SingleTree {
     /// Map from the key to index position in sorted keys
     ///
     /// # Arguments
-    /// - `key` - Node being query.
+    /// - `key` - Node being queried.
     fn index(&self, key: &Self::Node) -> Option<&usize>;
 
     /// Map from the key to index position in sorted keys at a given level
     ///
     /// # Arguments
-    /// - `key` - Node being query.
+    /// - `key` - Node being queried.
     fn level_index(&self, key: &Self::Node) -> Option<&usize>;
 
     /// Map from the leaf to its index position in sorted leaves
     ///
     /// # Arguments
-    /// - `leaf` - Node being query.
+    /// - `leaf` - Node being queried.
     fn leaf_index(&self, leaf: &Self::Node) -> Option<&usize>;
 
     /// Map from an index position to a node
@@ -166,7 +166,7 @@ pub trait MultiTree {
     /// Gets a reference to the coordinates contained with a leaf node.
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn coordinates(
         &self,
         leaf: &<Self::SingleTree as SingleTree>::Node,
@@ -175,7 +175,7 @@ pub trait MultiTree {
     /// Gets a reference to the points contained with a leaf node.
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn points(
         &self,
         leaf: &<Self::SingleTree as SingleTree>::Node,
@@ -184,7 +184,7 @@ pub trait MultiTree {
     /// Query number of coordinates contained at a given leaf node
     ///
     /// # arguments
-    /// - `leaf` - node being query.
+    /// - `leaf` - node being queried.
     fn n_coordinates(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<usize>;
 
     /// Gets a reference to the coordinates contained in across tree (local in multi node setting)
@@ -196,19 +196,19 @@ pub trait MultiTree {
     /// Map from the key to index position in sorted keys
     ///
     /// # Arguments
-    /// - `key` - Node being query.
+    /// - `key` - Node being queried.
     fn index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
 
     /// Map from the key to index position in sorted keys at a given level
     ///
     /// # Arguments
-    /// - `key` - Node being query.
+    /// - `key` - Node being queried.
     fn level_index(&self, key: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
 
     /// Map from the leaf to its index position in sorted leaves
     ///
     /// # Arguments
-    /// - `leaf` - Node being query.
+    /// - `leaf` - Node being queried.
     fn leaf_index(&self, leaf: &<Self::SingleTree as SingleTree>::Node) -> Option<&usize>;
 
     /// Map from an index position to a node
@@ -292,7 +292,7 @@ where
     /// Checks adjacency, defined by sharing a vertex, edge, or face, between this node and another
     ///
     /// # Arguments
-    /// - `other` - Node being query.
+    /// - `other` - Node being queried.
     fn is_adjacent(&self, other: &Self) -> bool;
 }
 

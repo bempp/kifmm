@@ -1,9 +1,11 @@
 //! Data structures to create distributed octrees with MPI.
 
 #[cfg(feature = "mpi")]
-use mpi::traits::{Communicator, Equivalence};
+use mpi::{
+    traits::{Communicator, Equivalence},
+    Count, Rank,
+};
 
-use mpi::{Count, Rank};
 use num::Float;
 use rlst::RlstScalar;
 

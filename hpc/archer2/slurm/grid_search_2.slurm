@@ -1,11 +1,12 @@
 #!/bin/bash
-# Here, we perform grid search where the number of MPI processes is set equal to the number of NUMA regions, i.e. 8 per node
+# Here, we perform grid search where the number of MPI processes is set equal to the number of CCX units, each of which
+# share an L3 cache, conist of 4 processors. There are 16 CCX regions per processor, and 32 per node
 
 #SBATCH --job-name=grid_search
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=8
-#SBATCH --cpus-per-task=16
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=4
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
@@ -43,25 +44,29 @@ cd ${SCRATCH}
 # Pass variable to SRUN from SBATCH
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
+# Script being run, expected in the work directory
+script_name="fmm_m2l_blas_mpi_f32"
+
 # Set simulation parameters
-n_points=1000000 # points per MPI process
-n_tasks=8
-global_depth=1 # Number of local roots matches the number of MPI processes, therefore the number of NUMA regions
-local_depth=(5 6)
-n_samples=(100 1000)
-block_size=(128 256)
-n_threads=(8 16) # See if bandwidth saturates with different threading parameters for Rayon thread pool
+n_points=250000 # points per MPI process
+n_tasks=32
+cpus_per_task=4
+global_depth=2 # Number of local roots matches the number of MPI processes, therefore the number of NUMA regions
+local_depth=(4 5)
+n_samples=(5000)
+block_size=(128)
+n_threads=(4) # See if bandwidth saturates with different threading parameters for Rayon thread pool
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/grid_search_fft_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/grid_search_blas_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
-experiment_id, rank, runtime, p2m, m2m, l2l, m2l, p2p, \
-source_tree, target_tree, source_domain, target_domain, layout, \
-ghost_exchange_v, ghost_exchange_u, gather_global_fmm, scatter_global_fmm, \
-source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u \
-expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples" >> ${OUTPUT}
+experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
+source_tree,target_tree,source_domain,target_domain, layout,\
+ghost_exchange_v,ghost_exchange_v_runtime,ghost_exchange_u,gather_global_fmm,scatter_global_fmm,\
+source_to_target_data,source_data,target_data,global_fmm,ghost_fmm_v,ghost_fmm_u,\
+expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples" >> ${OUTPUT}
 
 # Perform grid search
 for i in ${!local_depth[@]}; do
@@ -69,14 +74,13 @@ for i in ${!local_depth[@]}; do
         for k in ${!block_size[@]}; do
             for l in ${!n_threads[@]}; do
                 experiment_id="${i}_${j}_${k}_${l}"
-                srun --ntasks=$n_tasks --cpus-per-task=16 --distribution=block:block --hint=nomultithread \
-                    ${WORK}/grid_search_mpi --id $experiment_id --n-points $n_points \
+                srun --ntasks=$n_tasks --cpus-per-task=$cpus_per_task --distribution=block:block --hint=nomultithread \
+                    "${WORK}/${script_name}" --id $experiment_id --n-points $n_points \
                     --expansion-order 3 \
                     --prune-empty \
                     --global-depth $global_depth \
                     --local-depth ${local_depth[$i]} \
                     --n-samples ${n_samples[$j]} \
-                    --block-size ${block_size[$k]} \
                     --n-threads ${n_threads[$l]} >> ${OUTPUT}
             done
         done

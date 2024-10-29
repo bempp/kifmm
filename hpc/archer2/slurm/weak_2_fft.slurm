@@ -7,9 +7,9 @@
 
 # This should give a good baseline of what to expect when communication costs are minimal
 
-#SBATCH --job-name=weak_scaling
+#SBATCH --job-name=weak_scaling_fft
 #SBATCH --time=00:30:00
-#SBATCH --nodes=16
+#SBATCH --nodes=128
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=4
 #SBATCH --contiguous
@@ -51,18 +51,19 @@ cd ${SCRATCH}
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 # Script being run, expected in the work directory
-script_name="fmm_m2l_blas_mpi_f32"
+script_name="fmm_m2l_fft_mpi_f32"
 
 # Set simulation parameters for FMM
 expansion_order=3
 n_points=250000 # points per MPI process (n_tasks)
-global_depth=(1 2 2 2 3 3 3) # Number of local roots
+global_depth=(4 4 4) # Number of local roots
 local_depth=4
 n_samples=5000
+block_size=128
 
 # Set parameters for weak scaling run
-n_tasks=(8 16 32 64 128 256 512)
-n_nodes=(1 1 1 2 4 8 16)
+n_tasks=(1024 2048 4096)
+n_nodes=(32 64 128)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=4
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
@@ -71,11 +72,11 @@ export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Ray
 export OUTPUT=${SCRATCH}/weak_blas_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
-experiment_id, rank, runtime, p2m, m2m, l2l, m2l, p2p, \
-source_tree, target_tree, source_domain, target_domain, layout, \
-ghost_exchange_v, ghost_exchange_v_runtime, ghost_exchange_u, gather_global_fmm, scatter_global_fmm, \
-source_to_target_data, source_data, target_data, global_fmm, ghost_fmm_v, ghost_fmm_u, \
-expansion_order, n_points, local_depth, global_depth, block_size, n_threads, n_samples" >> ${OUTPUT}
+experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
+source_tree,target_tree,source_domain,target_domain,layout,\
+ghost_exchange_v,ghost_exchange_v_runtime,ghost_exchange_u,gather_global_fmm,scatter_global_fmm,\
+source_to_target_data,source_data,target_data,global_fmm,ghost_fmm_v,ghost_fmm_u,\
+expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples" >> ${OUTPUT}
 
 # Perform weak scaling
 for i in ${!n_tasks[@]}; do
@@ -87,6 +88,7 @@ for i in ${!n_tasks[@]}; do
         --global-depth ${global_depth[$i]} \
         --local-depth $local_depth \
         --n-samples $n_samples \
+        --block-size $block_size \
         --n-threads $n_threads >> ${OUTPUT}
 done
 

@@ -1,3 +1,4 @@
+//! C bindings for KIFMM-rs. Used as a basis for language bindings into Python, C and other C ABI compatible languages.
 #![allow(missing_docs)]
 
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
@@ -300,7 +301,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -401,7 +402,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -502,7 +503,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -619,7 +620,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -735,7 +736,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -825,7 +826,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `sources`: A pointer to the source points.
@@ -915,7 +916,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -1014,7 +1015,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -1113,7 +1114,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -1205,7 +1206,7 @@ pub mod constructors {
     ///
     ///
     /// # Parameters
-    ///
+    /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
     /// - `n_expansion_order`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -1316,7 +1317,7 @@ pub mod api {
         MortonKeys, Potential, Potentials, ScalarType,
     };
 
-    /// Get the metadata runtimes
+    /// Get the communication runtimes
     ///
     /// # Parameters
     ///

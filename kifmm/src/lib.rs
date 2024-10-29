@@ -1,6 +1,6 @@
 //! # Kernel Independent Fast Multipole Method (KiFMM)
 //!
-//! A Kernel Independent Fast Multipole method designed for portability, and flexible algorithmic construction based on \[1\].
+//! A Kernel Independent Fast Multipole method designed for portability, and flexible algorithmic construction.
 //!
 //! Notable features of this library are:
 //! * Highly competitive single-node implementation of the kernel independent fast multipole method, with a Laplace/Helmholtz implementation provided.
@@ -8,6 +8,7 @@
 //! * The ability to handle multiple right hand sides when using BLAS based M2L
 //! * Overdetermined check and equivalent surface construction when using BLAS based M2L
 //! * The ability to vary expansion orders by level, useful for oscillatory problems
+//! * Experimental distributed implementation
 //!
 //! # Example Usage
 //!
@@ -68,12 +69,8 @@
 //! }
 //!
 //! ````
-//!
-//!
-//! More sophisticated examples, such as setting up FMMs to operate on multiple input charge vectors, can be found in the `examples` folder.
-//!
-//! ## References
-//! \[1\] Ying, L., Biros, G., & Zorin, D. (2004). A kernel-independent adaptive fast multipole algorithm in two and three dimensions. Journal of Computational Physics, 196(2), 591-626.
+//! More sophisticated examples, such as setting up FMMs to operate on multiple input charge vectors, or distributed computation, can be found in the `examples` folder.
+
 #![cfg_attr(feature = "strict", deny(warnings), deny(unused_crate_dependencies))]
 #![warn(missing_docs)]
 #![allow(clippy::doc_lazy_continuation)]
@@ -128,9 +125,9 @@ pub use traits::fmm::DataAccessMulti;
 #[warn(missing_docs)]
 pub mod bindings;
 
-use pulp as _; // To avoid lint error on CI where no simd enabled
-
+/// Avoid CI errors for dependencies under feature flags
+use pulp as _;
 #[cfg(test)]
 mod test {
-    use criterion as _; // Hack to show that criterion is used, as cargo test does not see benches
+    use criterion as _;
 }

@@ -1,4 +1,4 @@
-//! # Single and Multi Node Octrees
+//! # Single and Multi Node Octrees specialised for usage in the FMM
 //!
 //!
 //! # Example Usage
@@ -29,8 +29,6 @@
 //! )
 //! .unwrap();
 //!  ```
-//!
-//! For more examples, including the creation of multi-node trees, see the `examples` folder
 
 pub mod constants;
 pub mod types;

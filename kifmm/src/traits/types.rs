@@ -109,7 +109,7 @@ pub struct FmmOperatorTime {
     pub time: u64,
 }
 
-/// C compatible struct for operator timing
+/// C compatible struct for communication timing
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct CommunicationTime {
@@ -120,7 +120,7 @@ pub struct CommunicationTime {
     pub time: u64,
 }
 
-/// C compatible struct for operator timing
+/// C compatible struct for metadata timing
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct MetadataTime {
@@ -131,68 +131,34 @@ pub struct MetadataTime {
     pub time: u64,
 }
 
-impl FmmOperatorTime {
-    /// Constructor
-    pub fn new(operator: FmmOperatorType, time: u64) -> Self {
-        Self { operator, time }
-    }
+macro_rules! impl_time_constructors {
+    ($struct_name:ident, $operator_type:ty) => {
+        impl $struct_name {
+            /// Constructor
+            pub fn new(operator: $operator_type, time: u64) -> Self {
+                Self { operator, time }
+            }
 
-    /// Constructor from instant
-    pub fn from_instant(operator: FmmOperatorType, time: Instant) -> Self {
-        let time = time.elapsed().as_millis() as u64;
-        Self { operator, time }
-    }
+            /// Constructor from instant
+            pub fn from_instant(operator: $operator_type, time: Instant) -> Self {
+                let time = time.elapsed().as_millis() as u64;
+                Self { operator, time }
+            }
 
-    /// Constructor from duration
-    pub fn from_duration(operator: FmmOperatorType, time: Duration) -> Self {
-        Self {
-            operator,
-            time: time.as_millis() as u64,
+            /// Constructor from duration
+            pub fn from_duration(operator: $operator_type, time: Duration) -> Self {
+                Self {
+                    operator,
+                    time: time.as_millis() as u64,
+                }
+            }
         }
-    }
+    };
 }
 
-impl CommunicationTime {
-    /// Constructor
-    pub fn new(operator: CommunicationType, time: u64) -> Self {
-        Self { operator, time }
-    }
-
-    /// Constructor from instant
-    pub fn from_instant(operator: CommunicationType, time: Instant) -> Self {
-        let time = time.elapsed().as_millis() as u64;
-        Self { operator, time }
-    }
-
-    /// Constructor from duration
-    pub fn from_duration(operator: CommunicationType, time: Duration) -> Self {
-        Self {
-            operator,
-            time: time.as_millis() as u64,
-        }
-    }
-}
-
-impl MetadataTime {
-    /// Constructor
-    pub fn new(operator: MetadataType, time: u64) -> Self {
-        Self { operator, time }
-    }
-
-    /// Constructor from instant
-    pub fn from_instant(operator: MetadataType, time: Instant) -> Self {
-        let time = time.elapsed().as_millis() as u64;
-        Self { operator, time }
-    }
-
-    /// Constructor from duration
-    pub fn from_duration(operator: MetadataType, time: Duration) -> Self {
-        Self {
-            operator,
-            time: time.as_millis() as u64,
-        }
-    }
-}
+impl_time_constructors!(FmmOperatorTime, FmmOperatorType);
+impl_time_constructors!(CommunicationTime, CommunicationType);
+impl_time_constructors!(MetadataTime, MetadataType);
 
 impl fmt::Display for FmmOperatorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

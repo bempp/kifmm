@@ -125,10 +125,12 @@ class CommunicationTimes:
                 elif tag == 5:
                     operator_name = "ghost_exchange_v"
                 elif tag == 6:
-                    operator_name = "ghost_exchange_u"
+                    operator_name = "ghost_exchange_v_runtime"
                 elif tag == 7:
-                    operator_name = "gather_global_fmm"
+                    operator_name = "ghost_exchange_u"
                 elif tag == 8:
+                    operator_name = "gather_global_fmm"
+                elif tag == 9:
                     operator_name = "scatter_global_fmm"
 
                 self._times[operator_name] = time

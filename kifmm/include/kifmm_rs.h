@@ -129,7 +129,7 @@ typedef struct FmmEvaluator {
 } FmmEvaluator;
 
 /**
- * C compatible struct for operator timing
+ * C compatible struct for communication timing
  */
 typedef struct CommunicationTime {
   /**
@@ -148,7 +148,7 @@ typedef struct CommunicationTimes {
 } CommunicationTimes;
 
 /**
- * C compatible struct for operator timing
+ * C compatible struct for metadata timing
  */
 typedef struct MetadataTime {
   /**
@@ -334,7 +334,7 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -382,7 +382,7 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -430,7 +430,7 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -482,7 +482,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -533,7 +533,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -578,7 +578,7 @@ struct FmmEvaluator *laplace_fft_f32_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `sources`: A pointer to the source points.
@@ -623,7 +623,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -673,7 +673,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -722,7 +722,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -769,7 +769,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(bool timed,
  *
  *
  * # Parameters
- *
+ * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
  * - `n_expansion_order`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
@@ -808,7 +808,7 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(bool timed,
                                              uintptr_t block_size);
 
 /**
- * Get the metadata runtimes
+ * Get the communication runtimes
  *
  * # Parameters
  *
