@@ -1,6 +1,5 @@
 //! Implementations of 8x8 operation during Hadamard product in FFT based M2L operations.
-use crate::{fmm::types::Isa, traits::general::Hadamard8x8};
-use bytemuck as _;
+use crate::{fmm::types::Isa, traits::general::single_node::Hadamard8x8};
 use rlst::{c32, c64, RlstScalar};
 
 /// The 8x8 Hadamard operation, always inlined.
@@ -403,6 +402,7 @@ pub mod aarch64 {
 #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
 pub mod x86 {
     use super::{c32, c64, Hadamard8x8Data};
+    use bytemuck::{cast_slice, cast_slice_mut};
     use pulp::x86::V3;
     use pulp::{f32x8, f64x4};
 
@@ -414,9 +414,8 @@ pub mod x86 {
                 {
                     let n =
                         std::mem::size_of::<$array_type>() / std::mem::size_of::<$scalar_type>();
-                    let out: &mut [$scalar_type] =
-                        bytemuck::cast_slice_mut(std::slice::from_mut(&mut out));
-                    let x: &[$scalar_type] = bytemuck::cast_slice(std::slice::from_ref(&value));
+                    let out: &mut [$scalar_type] = cast_slice_mut(std::slice::from_mut(&mut out));
+                    let x: &[$scalar_type] = cast_slice(std::slice::from_ref(&value));
 
                     for i in 0..n {
                         out[i] = x[2 * i];

@@ -7,7 +7,7 @@ Indeed, the full API is more extensive, including features that enable for varia
 
 ```rust
 use rand::{thread_rng, Rng};
-use green_kernels::{laplace_3d::Laplace3dKernel, types::EvalType};
+use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder, FmmSvdMode};
 use kifmm::traits::tree::{FmmTree, Tree};
 use kifmm::traits::fmm::Fmm;
@@ -16,15 +16,15 @@ use kifmm::traits::fmm::Fmm;
 fn main() {
     // Generate some random source/target/charge data
     let dim = 3;
-    let nsources = 1000000;
-    let ntargets = 2000000;
+    let n_sources = 1000000;
+    let n_targets = 2000000;
 
     // The number of vectors of source densities, FMM is configured from data
     let n = 1;
     let mut rng = thread_rng();
-    let mut sources = vec![0f32; nsources * dim * n];
-    let mut targets = vec![0f32; ntargets * dim * n];
-    let mut charges = vec![0f32; nsources * n];
+    let mut sources = vec![0f32; n_sources * dim * n];
+    let mut targets = vec![0f32; n_targets * dim * n];
+    let mut charges = vec![0f32; n_sources * n];
 
     sources.iter_mut().for_each(|s| *s = rng.gen());
     targets.iter_mut().for_each(|t| *t = rng.gen());
@@ -38,6 +38,8 @@ fn main() {
     // Choose to branches associated with empty leaves from constructed tree
     let prune_empty = true;
 
+    let timed = true; // Optionally time the operators
+
     // Set FMM Parameters
     // Can either set globally for whole tree, or level-by-level
     let expansion_order = &[6];
@@ -48,14 +50,14 @@ fn main() {
     // Create an FMM
     let svd_mode = FmmSvdMode::Deterministic; // Choose SVD compression mode, random or deterministic
 
-    let mut fmm = SingleNodeBuilder::new()
+    let mut fmm = SingleNodeBuilder::new(timed)
         .tree(&sources, &targets, n_crit, depth, prune_empty) // Create tree
         .unwrap()
         .parameters(
             &charges,
             expansion_order, // Set expansion order, by tree level or globally
             Laplace3dKernel::new(), // Choose kernel,
-            EvalType::Value, // Choose potential or potential + deriv evaluation
+            GreenKernelEvalType::Value, // Choose potential or potential + deriv evaluation
             BlasFieldTranslationSaRcmp::new(
               singular_value_threshold,
               check_surface_diff,
@@ -66,7 +68,7 @@ fn main() {
         .unwrap();
 
     // Run FMM
-    fmm.evaluate(true); // Optionally time the operators
+    fmm.evaluate();
 
     // Lookup potentials by leaf from target leaf boxes
     let leaf_idx = 0;

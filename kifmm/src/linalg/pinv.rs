@@ -1,5 +1,5 @@
 //! Implementation of Moore-Penrose PseudoInverse
-use crate::traits::general::Epsilon;
+use crate::traits::general::single_node::Epsilon;
 use rlst::{
     rlst_dynamic_array2, Array, BaseArray, MatrixSvd, RlstError, RlstResult, RlstScalar, Shape,
     SvdMode, VectorContainer,

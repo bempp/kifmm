@@ -36,6 +36,21 @@ The functionality of the library can be tested by running:
 cargo test
 ```
 
+### Library
+
+This project uses Rust workspaces to organise the associated crates.
+
+The `fftw-src` and `fftw-sys` are responsible for downloading, compiling and linking FFTW 3.9 with custom bindings and build steps. This is currently only available for UNIX systems, and therefore the entire library is also limited to UNIX systems at present.
+
+The `kifmm` crate contains the source code of the library. This crate contains benchmarks, Rust, Python and C examples for library usage and installation.
+
+The `scripts` crate contains various useful scripts for examining the performance of the software, used in single node and distributed benchmarks
+
+Additionally, there are a few directories containing metadata for the project. The `paper` directory contains our JOSS paper, which should be cited for any derivative works based on `kifmm-rs`.
+
+The `hpc` directory contains 
+
+
 ## Contributing
 
 We welcome contributions to this project, and are grateful for your interest. Contributions can take many forms, including bug reports, feature requests code contributions and documentation.

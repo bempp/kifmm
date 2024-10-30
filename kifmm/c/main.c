@@ -2,25 +2,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-const int NSOURCES = 100000;
-const int NTARGETS = 100000;
+const int n_sources = 100000;
+const int n_targets = 100000;
 
 double drand() { return (double)rand() / RAND_MAX; }
 
 int main() {
-  double *sources = (double *)malloc(3 * NSOURCES * sizeof(double));
-  double *targets = (double *)malloc(3 * NTARGETS * sizeof(double));
-  double *charges = (double *)malloc(NSOURCES * sizeof(double));
+  double *sources = (double *)malloc(3 * n_sources * sizeof(double));
+  double *targets = (double *)malloc(3 * n_targets * sizeof(double));
+  double *charges = (double *)malloc(n_sources * sizeof(double));
 
-  for (int i = 0; i < 3 * NSOURCES; ++i) {
+  for (int i = 0; i < 3 * n_sources; ++i) {
     sources[i] = drand();
   }
 
-  for (int i = 0; i < 3 * NTARGETS; ++i) {
+  for (int i = 0; i < 3 * n_targets; ++i) {
     targets[i] = drand();
   }
 
-  for (int i = 0; i < NSOURCES; ++i) {
+  for (int i = 0; i < n_sources; ++i) {
     charges[i] = drand();
   }
 
@@ -29,6 +29,7 @@ int main() {
   uint64_t depth = 0;
   double singular_value_threshold = 0.001;
   bool eval_type = true; // evaluate potentials
+  bool timed = true;
 
   uintptr_t expansion_order[] = {6};
   uintptr_t nexpansion_order = 1;
@@ -36,14 +37,15 @@ int main() {
 
   // Instantiate a Laplace evaluator
   struct FmmEvaluator *evaluator = laplace_fft_f64_alloc(
+      timed,
       expansion_order, nexpansion_order, eval_type, (const void *)sources,
-      NSOURCES * 3, (const void *)targets, NTARGETS * 3, (const void *)charges,
-      NSOURCES, prune_empty, n_crit, depth, block_size);
+      n_sources * 3, (const void *)targets, n_targets * 3, (const void *)charges,
+      n_sources, prune_empty, n_crit, depth, block_size);
 
-  bool timed = true;
-  FmmOperatorTimes *times = evaluate(evaluator, timed);
+   evaluate(evaluator);
+   FmmOperatorTimes *times =operator_times(evaluator);
 
-  if (times->length > 0) {
+   if (times->length > 0) {
     MortonKeys *leaves = leaves_target_tree(evaluator);
 
     printf("\n");

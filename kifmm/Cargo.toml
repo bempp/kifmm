@@ -1,11 +1,11 @@
 [features]
 # Treat warnings as a build error.
 strict = []
-mpi = ["dep:mpi", "dep:superslice", "dep:memoffset"]
+mpi = ["dep:mpi", "dep:superslice", "dep:memoffset", "dep:mpi-sys"]
 
 [package]
 name = "kifmm"
-version = "1.0.2"
+version = "1.0.2-dev"
 edition = "2021"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
 description = "Kernel-independent fast multipole method"
@@ -25,17 +25,18 @@ itertools = "0.13.*"
 num = "0.4"
 rayon = "1.9"
 rand = "0.8.5"
-kifmm-fftw-sys = { version = "0.2.0"}
-green-kernels = { version = "0.2.0"}
+kifmm-fftw-sys = { path = "../fftw-sys" }
+green-kernels = { version = "0.2.2", default-features = false}
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
+mpi-sys = { version="0.2.2", optional=true }
 memoffset = {version = "0.9.1", optional = true}
 pulp = "0.18.12"
 bytemuck = "1.16.0"
 superslice = {version = "1.0.0", optional = true}
 rand_distr = "0.4.3"
-rlst = {version = "0.2.0"}
+rlst = {version = "0.2.0", default-features = false}
 
 [dev-dependencies]
 approx = "0.5"
@@ -45,23 +46,11 @@ criterion = { version = "0.5.*", features = ["html_reports"]}
 cbindgen = "0.26.0"
 
 [[bench]]
-name = "direct_f32"
-harness = false
-
-[[bench]]
-name = "direct_f64"
-harness = false
-
-[[bench]]
-name = "laplace_mat_f64"
-harness = false
-
-[[bench]]
-name = "laplace_mat_f32"
-harness = false
-
-[[bench]]
 name = "laplace_f32"
+harness = false
+
+[[bench]]
+name = "laplace_f32_m1"
 harness = false
 
 [[bench]]

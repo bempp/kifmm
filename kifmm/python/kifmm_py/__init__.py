@@ -31,7 +31,7 @@ def read_stl_triangle_mesh_vertices(filepath, dtype=np.float32):
     return (result, faces)
 
 
-class Times:
+class OperatorTimes:
     """
     Helper class to destructure operator runtimes.
     """
@@ -60,6 +60,78 @@ class Times:
                     operator_name = "L2P"
                 elif tag == lib.FmmOperatorType_P2P:
                     operator_name = "P2P"
+
+                self._times[operator_name] = time
+
+    def __repr__(self):
+        return str(self._times)
+
+class MetadataTimes:
+    """
+    Helper class to destructure metadata runtimes.
+    """
+
+    def __init__(self, times_p):
+        self.times_p = times_p
+        self._times = dict()
+        if self.times_p.length > 0:
+            for i in range(0, self.times_p.length):
+                metadata_time = self.times_p.times[i]
+                tag = metadata_time.operator_
+                time = metadata_time.time
+
+                if tag == 0:
+                    operator_name = "source_to_target_data"
+                elif tag == 1:
+                    operator_name = "source_data"
+                elif tag == 2:
+                    operator_name = "target_data"
+                elif tag == 3:
+                    operator_name = "global_fmm"
+                elif tag == 4:
+                    operator_name = "ghost_fmm_v"
+                elif tag == 5:
+                    operator_name = "ghost_fmm_u"
+
+                self._times[operator_name] = time
+
+    def __repr__(self):
+        return str(self._times)
+
+class CommunicationTimes:
+    """
+    Helper class to destructure communication runtimes.
+    """
+
+    def __init__(self, times_p):
+        self.times_p = times_p
+        self._times = dict()
+        if self.times_p.length > 0:
+            for i in range(0, self.times_p.length):
+                communication_time = self.times_p.times[i]
+                tag = communication_time.operator_
+                time = communication_time.time
+
+                if tag == 0:
+                    operator_name = "source_tree"
+                elif tag == 1:
+                    operator_name = "target_tree"
+                elif tag == 2:
+                    operator_name = "target_domain"
+                elif tag == 3:
+                    operator_name = "source_domain"
+                elif tag == 4:
+                    operator_name = "layout"
+                elif tag == 5:
+                    operator_name = "ghost_exchange_v"
+                elif tag == 6:
+                    operator_name = "ghost_exchange_v_runtime"
+                elif tag == 7:
+                    operator_name = "ghost_exchange_u"
+                elif tag == 8:
+                    operator_name = "gather_global_fmm"
+                elif tag == 9:
+                    operator_name = "scatter_global_fmm"
 
                 self._times[operator_name] = time
 
@@ -287,8 +359,8 @@ class SingleNodeTree:
         self.targets = targets
         self.charges = charges
         self.prune_empty = prune_empty
-        self.nsources = len(sources)
-        self.ntargets = len(targets)
+        self.n_sources = len(sources)
+        self.n_targets = len(targets)
         self.ncharges = len(charges)
         self.sources_c = ffi.cast("void* ", self.sources.ctypes.data)
         self.targets_c = ffi.cast("void* ", self.targets.ctypes.data)
@@ -297,7 +369,7 @@ class SingleNodeTree:
     def new_charges(self, new_charges):
 
         try:
-            assert len(new_charges) % self.nsources == 0
+            assert len(new_charges) % self.n_sources == 0
         except:
             TypeError("Incompatible number of new_charges for sources")
 
@@ -333,7 +405,7 @@ class KiFmm:
         dim = 3
 
         try:
-            if self._tree.ncharges // (self._tree.nsources // dim) > 1:
+            if self._tree.ncharges // (self._tree.n_sources // dim) > 1:
                 assert isinstance(self._field_translation, BlasFieldTranslation)
         except:
             raise TypeError(
@@ -369,13 +441,14 @@ class KiFmm:
             if isinstance(self._field_translation.kernel, LaplaceKernel):
                 if self._field_translation.kernel.dtype == np.float32:
                     self._fmm = lib.laplace_fft_f32_alloc(
+                        self._timed,
                         self._expansion_order_c,
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -387,13 +460,14 @@ class KiFmm:
 
                 elif self._field_translation.kernel.dtype == np.float64:
                     self._fmm = lib.laplace_fft_f64_alloc(
+                        self._timed,
                         self._expansion_order_c,
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -409,14 +483,15 @@ class KiFmm:
             elif isinstance(self._field_translation.kernel, HelmholtzKernel):
                 if self._field_translation.kernel.dtype == np.float32:
                     self._fmm = lib.helmholtz_fft_f32_alloc(
+                        self._timed,
                         self._expansion_order_c,
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -428,14 +503,15 @@ class KiFmm:
 
                 elif self._field_translation.kernel.dtype == np.float64:
                     self._fmm = lib.helmholtz_fft_f64_alloc(
+                        self._timed,
                         self._expansion_order_c,
                         self._nexpansion_order,
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
-                        self._tree.nsources,
+                        self._tree.n_sources,
                         self._tree.targets_c,
-                        self._tree.ntargets,
+                        self._tree.n_targets,
                         self._tree.charges_c,
                         self._tree.ncharges,
                         self._tree.prune_empty,
@@ -458,13 +534,14 @@ class KiFmm:
                 if self._field_translation.random:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.laplace_blas_rsvd_f32_alloc(
+                            self._timed,
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -480,13 +557,14 @@ class KiFmm:
                     elif self._field_translation.kernel.dtype == np.float64:
 
                         self._fmm = lib.laplace_blas_rsvd_f64_alloc(
+                            self._timed,
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -506,13 +584,14 @@ class KiFmm:
                 else:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.laplace_blas_svd_f32_alloc(
+                            self._timed,
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -525,13 +604,14 @@ class KiFmm:
 
                     elif self._field_translation.kernel.dtype == np.float64:
                         self._fmm = lib.laplace_blas_svd_f64_alloc(
+                            self._timed,
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -554,14 +634,15 @@ class KiFmm:
                 else:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.helmholtz_blas_svd_f32_alloc(
+                            self._timed,
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -574,14 +655,15 @@ class KiFmm:
 
                     elif self._field_translation.kernel.dtype == np.float64:
                         self._fmm = lib.helmholtz_blas_svd_f64_alloc(
+                            self._timed,
                             self._expansion_order_c,
                             self._nexpansion_order,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
-                            self._tree.nsources,
+                            self._tree.n_sources,
                             self._tree.targets_c,
-                            self._tree.ntargets,
+                            self._tree.n_targets,
                             self._tree.charges_c,
                             self._tree.ncharges,
                             self._tree.prune_empty,
@@ -642,14 +724,14 @@ class KiFmm:
                 ffi,
             )
 
-            n_evals = self._tree.ncharges // (self._tree.nsources // 3)
+            n_evals = self._tree.ncharges // (self._tree.n_sources // 3)
 
             # if self.
             self.all_potentials = np.reshape(
                 all_potentials,
                 (
                     n_evals,
-                    self._tree.ntargets // dim,
+                    self._tree.n_targets // dim,
                     self._field_translation.kernel.eval_type_r.value,
                 ),
             )
@@ -720,9 +802,24 @@ class KiFmm:
 
     def evaluate(self):
         """Evaluate FMM"""
-        self.times = Times(lib.evaluate(self._fmm, self._timed))
+        lib.evaluate(self._fmm)
         self._evaluated = True
         self._all_potentials()
+
+    def operator_times(self):
+        """Get operator runtimes"""
+        if self._timed:
+            return OperatorTimes(lib.operator_times(self._fmm))
+
+    def metadata_times(self):
+        """Get metadata runtimes"""
+        if self._timed:
+            return MetadataTimes(lib.metadata_times(self._fmm))
+
+    def communication_times(self):
+        """Get communication runtimes"""
+        if self._timed:
+            return CommunicationTimes(lib.communication_times(self._fmm))
 
     def clear(self, charges):
         """Clear charge data, and add new charge data
@@ -772,8 +869,8 @@ class KiFmm:
         except:
             raise TypeError("result vector must match number of targets")
 
-        nsources = len(sources)
-        ntargets = len(targets)
+        n_sources = len(sources)
+        n_targets = len(targets)
         ncharges = len(charges)
         nresult = len(result)
         sources_c = ffi.cast("void* ", sources.ctypes.data)
@@ -785,9 +882,9 @@ class KiFmm:
             self._fmm,
             eval_type,
             sources_c,
-            nsources,
+            n_sources,
             targets_c,
-            ntargets,
+            n_targets,
             charges_c,
             ncharges,
             result_c,
