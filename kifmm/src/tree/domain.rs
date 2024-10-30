@@ -31,22 +31,22 @@ where
         let min_z = zs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
         // Find maximum dimension, this will define the size of the boxes in the domain
-        let diameter_x = Float::abs(*max_x - *min_x);
-        let diameter_y = Float::abs(*max_y - *min_y);
-        let diameter_z = Float::abs(*max_z - *min_z);
+        let side_length_x = Float::abs(*max_x - *min_x);
+        let side_length_y = Float::abs(*max_y - *min_y);
+        let side_length_z = Float::abs(*max_z - *min_z);
 
         // Want a cubic box to place everything in
-        let diameter = diameter_x.max(diameter_y).max(diameter_z);
+        let side_length = side_length_x.max(side_length_y).max(side_length_z);
 
         // Increase size of bounding box by 1% along each dimension to capture all points
         let err_fraction = T::from(0.005).unwrap();
-        let err = diameter * err_fraction;
+        let err = side_length * err_fraction;
 
         let two = T::from(2.0).unwrap();
-        let diameter = [
-            diameter + two * err,
-            diameter + two * err,
-            diameter + two * err,
+        let side_length = [
+            side_length + two * err,
+            side_length + two * err,
+            side_length + two * err,
         ];
 
         // The origin is defined by the minimum point
@@ -54,7 +54,7 @@ where
 
         Domain {
             origin,
-            side_length: diameter,
+            side_length,
         }
     }
 
@@ -68,18 +68,50 @@ where
         let min_y = self.origin[1].min(other.origin[1]);
         let min_z = self.origin[2].min(other.origin[2]);
 
-        let min_origin = [min_x, min_y, min_z];
+        let origin = [min_x, min_y, min_z];
 
-        // Find maximum diameter (+max origin)
-        let max_x = self.side_length[0].max(other.side_length[0]);
-        let max_y = self.side_length[0].max(other.side_length[0]);
-        let max_z = self.side_length[0].max(other.side_length[0]);
+        // Side length determined by distance from new origin of maximum point
+        let max_point_1 = [
+            self.origin[0] + self.side_length[0],
+            self.origin[1] + self.side_length[1],
+            self.origin[2] + self.side_length[2],
+        ];
 
-        let max_diameter = [max_x, max_y, max_z];
+        let max_point_2 = [
+            other.origin[0] + other.side_length[0],
+            other.origin[1] + other.side_length[1],
+            other.origin[2] + other.side_length[2],
+        ];
+
+        let side_length_1 = [
+            Float::abs(max_point_1[0] - origin[0]),
+            Float::abs(max_point_1[1] - origin[1]),
+            Float::abs(max_point_1[2] - origin[2]),
+        ];
+
+        let side_length_2 = [
+            Float::abs(max_point_2[0] - origin[0]),
+            Float::abs(max_point_2[1] - origin[1]),
+            Float::abs(max_point_2[2] - origin[2]),
+        ];
+
+        let side_length = [
+            side_length_1[0].max(side_length_2[0]),
+            side_length_1[1].max(side_length_2[1]),
+            side_length_1[2].max(side_length_2[2]),
+        ];
+
+        // Want to make a square box, so pick maximum
+        let max_side_length = side_length
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        let side_length = [*max_side_length, *max_side_length, *max_side_length];
 
         Domain {
-            origin: min_origin,
-            side_length: max_diameter,
+            origin,
+            side_length,
         }
     }
 
@@ -117,7 +149,9 @@ mod mpi_domain {
     use super::{Float, RlstScalar};
 
     use super::Domain;
+    use itertools::Itertools;
     use memoffset::offset_of;
+    use mpi::datatype::PartitionMut;
     use mpi::{
         datatype::{UncommittedUserDatatype, UserDatatype},
         traits::{Buffer, BufferMut, Communicator, CommunicatorCollectives, Equivalence},
@@ -148,67 +182,144 @@ mod mpi_domain {
     where
         [Domain<T>]: BufferMut,
         Vec<Domain<T>>: Buffer,
-        T: RlstScalar + Float,
+        T: RlstScalar + Float + Equivalence,
     {
         /// Compute the points domain over all nodes by computing `local' domains on each MPI process, communicating the bounds
         /// globally and using the local domains to create a globally defined domain. Relies on an `all to all` communication.
         ///
         /// # Arguments
-        /// * `local_points` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
+        /// * `local_coordinates` - A slice of point coordinates, expected in column major order  [x_1, x_2, ... x_N, y_1, y_2, ..., y_N, z_1, z_2, ..., z_N].
         /// * `comm` - An MPI (User) communicator over which the domain is defined.
-        pub fn from_global_points<C: Communicator>(local_points: &[T], comm: &C) -> Domain<T> {
+        pub fn from_global_points<C: Communicator>(local_coordinates: &[T], comm: &C) -> Domain<T> {
             let size = comm.size();
 
-            let local_domain = Domain::<T>::from_local_points(local_points);
-            let local_bounds: Vec<Domain<T>> = vec![local_domain; size as usize];
-            let zero = T::zero();
-            let one = T::one();
-            let mut buffer =
-                vec![Domain::<T>::new(&[zero, zero, zero], &[one, one, one]); size as usize];
+            // Find minimum and maximum coordinates at this rank
+            let xs = local_coordinates.iter().step_by(3).cloned().collect_vec();
+            let ys = local_coordinates
+                .iter()
+                .skip(1)
+                .step_by(3)
+                .cloned()
+                .collect_vec();
+            let zs = local_coordinates
+                .iter()
+                .skip(2)
+                .step_by(3)
+                .cloned()
+                .collect_vec();
 
-            comm.all_to_all_into(&local_bounds, &mut buffer[..]);
+            let max_x = *xs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-            // Find minimum origin
-            let min_x = buffer
-                .iter()
-                .min_by(|a, b| a.origin[0].partial_cmp(&b.origin[0]).unwrap())
-                .unwrap()
-                .origin[0];
-            let min_y = buffer
-                .iter()
-                .min_by(|a, b| a.origin[1].partial_cmp(&b.origin[1]).unwrap())
-                .unwrap()
-                .origin[1];
-            let min_z = buffer
-                .iter()
-                .min_by(|a, b| a.origin[2].partial_cmp(&b.origin[2]).unwrap())
-                .unwrap()
-                .origin[2];
+            let max_y = *ys.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-            let min_origin = [min_x, min_y, min_z];
+            let max_z = *zs.iter().max_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-            // Find maximum diameter (+max origin)
-            let max_x = buffer
-                .iter()
-                .max_by(|a, b| a.side_length[0].partial_cmp(&b.side_length[0]).unwrap())
-                .unwrap()
-                .side_length[0];
-            let max_y = buffer
-                .iter()
-                .max_by(|a, b| a.side_length[1].partial_cmp(&b.side_length[1]).unwrap())
-                .unwrap()
-                .side_length[1];
-            let max_z = buffer
-                .iter()
-                .max_by(|a, b| a.side_length[2].partial_cmp(&b.side_length[2]).unwrap())
-                .unwrap()
-                .side_length[2];
+            let min_x = *xs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
 
-            let max_diameter = [max_x, max_y, max_z];
+            let min_y = *ys.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            let min_z = *zs.iter().min_by(|a, b| a.partial_cmp(b).unwrap()).unwrap();
+
+            // Communicate minimum and maximum coordinates from each rank, globally
+            let min = [min_x, min_y, min_z];
+            let max = [max_x, max_y, max_z];
+
+            let mut buffer_max = vec![T::default(); 3 * size as usize];
+            let mut buffer_min = vec![T::default(); 3 * size as usize];
+
+            {
+                let counts = vec![3; size as usize];
+                let displs = counts
+                    .iter()
+                    .scan(0, |acc, &x| {
+                        let tmp = *acc;
+                        *acc += x;
+                        Some(tmp)
+                    })
+                    .collect_vec();
+
+                let mut partition = PartitionMut::new(&mut buffer_max[..], counts, displs);
+                comm.all_gather_varcount_into(&max[..], &mut partition);
+            }
+
+            {
+                let counts = vec![3; size as usize];
+                let displs = counts
+                    .iter()
+                    .scan(0, |acc, &x| {
+                        let tmp = *acc;
+                        *acc += x;
+                        Some(tmp)
+                    })
+                    .collect_vec();
+
+                let mut partition = PartitionMut::new(&mut buffer_min[..], counts, displs);
+                comm.all_gather_varcount_into(&min[..], &mut partition);
+            }
+
+            let max_xs = buffer_max.iter().step_by(3).cloned().collect_vec();
+            let max_ys = buffer_max.iter().skip(1).step_by(3).cloned().collect_vec();
+            let max_zs = buffer_max.iter().skip(2).step_by(3).cloned().collect_vec();
+
+            let min_xs = buffer_min.iter().step_by(3).cloned().collect_vec();
+            let min_ys = buffer_min.iter().skip(1).step_by(3).cloned().collect_vec();
+            let min_zs = buffer_min.iter().skip(2).step_by(3).cloned().collect_vec();
+
+            let max_x = *max_xs
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let max_y = *max_ys
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let max_z = *max_zs
+                .iter()
+                .max_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let min_x = *min_xs
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let min_y = *min_ys
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            let min_z = *min_zs
+                .iter()
+                .min_by(|a, b| a.partial_cmp(b).unwrap())
+                .unwrap();
+
+            // Find maximum dimension, this will define the size of the boxes in the domain
+            let side_length_x = Float::abs(max_x - min_x);
+            let side_length_y = Float::abs(max_y - min_y);
+            let side_length_z = Float::abs(max_z - min_z);
+
+            // Want a cubic box to place everything in
+            let side_length = side_length_x.max(side_length_y).max(side_length_z);
+
+            // Increase size of bounding box by 1% along each dimension to capture all points
+            let err_fraction = T::from(0.005).unwrap();
+            let err = side_length * err_fraction;
+
+            let two = T::from(2.0).unwrap();
+            let side_length = [
+                side_length + two * err,
+                side_length + two * err,
+                side_length + two * err,
+            ];
+
+            // The origin is defined by the minimum point
+            let origin = [min_x - err, min_y - err, min_z - err];
 
             Domain {
-                origin: min_origin,
-                side_length: max_diameter,
+                origin,
+                side_length,
             }
         }
     }

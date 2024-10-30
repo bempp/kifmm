@@ -1,0 +1,34 @@
+[package]
+name = "scripts"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kifmm ={ path = "../kifmm", features = ["mpi"]}
+itertools = "0.13.*"
+green-kernels = { version = "0.2.2", default-features = false }
+rlst = {version = "0.2.0", default-features = false}
+rand = "0.8.5"
+num = "0.4"
+csv = "1.3.0"
+mpi = { version = "0.8.*", optional = true}
+rayon = "1.9"
+clap = { version = "4.5.4", features = ["derive"] }
+
+[features]
+mpi = ["kifmm/mpi", "dep:mpi"]
+
+[[bin]]
+name = "grid_search_single_node"
+path = "src/bin/grid_search_single_node.rs"
+required-features = []
+
+[[bin]]
+name = "fmm_m2l_fft_mpi_f32"
+path = "src/bin/fmm_m2l_fft_mpi_f32.rs"
+required-features = ["mpi"]
+
+[[bin]]
+name = "fmm_m2l_blas_mpi_f32"
+path = "src/bin/fmm_m2l_blas_mpi_f32.rs"
+required-features = ["mpi"]
