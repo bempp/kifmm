@@ -13,7 +13,7 @@ use crate::{
         tree::{SingleFmmTree, SingleTree},
         types::{FmmError, FmmOperatorTime, FmmOperatorType},
     },
-    Evaluate, KiFmm, SingleNodeFmmTree,
+    Evaluate, KiFmm,
 };
 
 impl<Scalar, Kernel, FieldTranslation> Evaluate for KiFmm<Scalar, Kernel, FieldTranslation>
@@ -22,10 +22,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: DataAccess<Scalar = Scalar, Kernel = Kernel, Tree = SingleNodeFmmTree<Scalar::Real>>
-        + SourceTranslation
-        + TargetTranslation
-        + SourceToTargetTranslation,
+    Self: DataAccess + SourceTranslation + TargetTranslation + SourceToTargetTranslation,
 {
     #[inline(always)]
     fn evaluate_leaf_sources(&mut self) -> Result<(), FmmError> {
