@@ -724,6 +724,9 @@ where
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
+
+    /// Select SVD algorithm for compression, either deterministic or randomised
+    pub svd_mode: FmmSvdMode,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.
