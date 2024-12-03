@@ -641,7 +641,7 @@ where
             let sources = self.tree.source_tree().keys(level).unwrap();
             let n_sources = sources.len();
             let m2l_operator_index = self.m2l_operator_index(level);
-            let sentinel = n_sources;
+            let sentinel = -1i32;
 
             let result = vec![vec![sentinel; n_sources]; 316];
             let result = result.into_iter().map(RwLock::new).collect_vec();
@@ -693,7 +693,7 @@ where
                             let &target_idx = self.level_index_pointer_locals[level as usize]
                                 .get(target)
                                 .unwrap();
-                            all_displacements_lock[source_idx] = target_idx;
+                            all_displacements_lock[source_idx] = target_idx as i32;
                         }
                     }
                 });
