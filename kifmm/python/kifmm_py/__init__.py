@@ -66,6 +66,7 @@ class OperatorTimes:
     def __repr__(self):
         return str(self._times)
 
+
 class MetadataTimes:
     """
     Helper class to destructure metadata runtimes.
@@ -97,6 +98,7 @@ class MetadataTimes:
 
     def __repr__(self):
         return str(self._times)
+
 
 class CommunicationTimes:
     """
@@ -210,11 +212,9 @@ class BlasFieldTranslation:
         self.surface_diff = surface_diff
         self.random = random
 
-        if isinstance(self.kernel, HelmholtzKernel):
-            if self.random:
-                raise TypeError("Randomised compression unimplemented for this kernel")
-
-        elif isinstance(self.kernel, LaplaceKernel):
+        if isinstance(self.kernel, HelmholtzKernel) or isinstance(
+            self.kernel, LaplaceKernel
+        ):
             if self.random:
                 self.rsvd = RandomSvdSettings(
                     n_components,
@@ -628,9 +628,52 @@ class KiFmm:
             elif isinstance(self._field_translation.kernel, HelmholtzKernel):
 
                 if self._field_translation.random:
-                    raise TypeError(
-                        "Randomised SVD not yet supported for Helmholtz Kernel"
-                    )
+                    if self._field_translation.kernel.dtype == np.float32:
+                        self._fmm = lib.helmholtz_blas_rsvd_f32_alloc(
+                            self._timed,
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self._field_translation.kernel.eval_type,
+                            self._field_translation.kernel.wavenumber,
+                            self._tree.sources_c,
+                            self._tree.n_sources,
+                            self._tree.targets_c,
+                            self._tree.n_targets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold,
+                            self._field_translation.surface_diff,
+                            self._field_translation.rsvd.n_components,
+                            self._field_translation.rsvd.n_oversamples,
+                        )
+                        self.potential_dtype = np.complex64
+
+                    elif self._field_translation.kernel.dtype == np.float64:
+                        self._fmm = lib.helmholtz_blas_rsvd_f64_alloc(
+                            self._timed,
+                            self._expansion_order_c,
+                            self._nexpansion_order,
+                            self._field_translation.kernel.eval_type,
+                            self._field_translation.kernel.wavenumber,
+                            self._tree.sources_c,
+                            self._tree.n_sources,
+                            self._tree.targets_c,
+                            self._tree.n_targets,
+                            self._tree.charges_c,
+                            self._tree.ncharges,
+                            self._tree.prune_empty,
+                            self._tree.n_crit,
+                            self._tree.depth,
+                            self._field_translation.svd_threshold,
+                            self._field_translation.surface_diff,
+                            self._field_translation.rsvd.n_components,
+                            self._field_translation.rsvd.n_oversamples,
+                        )
+                        self.potential_dtype = np.complex128
+
                 else:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.helmholtz_blas_svd_f32_alloc(

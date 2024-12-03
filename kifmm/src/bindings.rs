@@ -286,7 +286,9 @@ pub mod constructors {
 
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
 
-    use crate::{BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation};
+    use crate::{
+        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, FmmSvdMode,
+    };
 
     use super::{
         c32, c64, FmmCType, FmmEvaluator, FmmTranslationCType, Laplace3dKernel, SingleNodeBuilder,
@@ -933,6 +935,244 @@ pub mod constructors {
     /// - `depth`: The maximum depth of the tree, max supported depth is 16.
     /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
     /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_blas_rsvd_f32_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f32,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f32,
+        surface_diff: usize,
+        n_components: usize,
+        n_oversamples: usize,
+    ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
+
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
+
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
+
+        let fmm = SingleNodeBuilder::new(timed)
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluator {
+            data,
+            ctype: FmmCType::Helmholtz32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///    reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_blas_rsvd_f64_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f64,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        singular_value_threshold: f64,
+        surface_diff: usize,
+        n_components: usize,
+        n_oversamples: usize,
+    ) -> *mut FmmEvaluator {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
+
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
+
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
+
+        let fmm = SingleNodeBuilder::new(timed)
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluator {
+            data,
+            ctype: FmmCType::Helmholtz64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///    reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
@@ -979,7 +1219,11 @@ pub mod constructors {
             None
         };
 
-        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            FmmSvdMode::Deterministic,
+        );
 
         let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)
@@ -1079,7 +1323,11 @@ pub mod constructors {
             None
         };
 
-        let field_translation = BlasFieldTranslationIa::new(singular_value_threshold, surface_diff);
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            FmmSvdMode::Deterministic,
+        );
 
         let fmm = SingleNodeBuilder::new(timed)
             .tree(sources, targets, n_crit, depth, prune_empty)

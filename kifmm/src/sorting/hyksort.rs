@@ -30,7 +30,7 @@ fn power_of_two(n: Rank) -> bool {
 /// Parallel selection algorithm to determine 'n_splitters' splitters from the global array currently being
 /// considered in the communicator.
 pub fn parallel_select<T, C: Communicator>(
-    array: &Vec<T>,
+    array: &[T],
     &n_splitters: &Rank,
     communicator: C,
 ) -> Vec<T>
