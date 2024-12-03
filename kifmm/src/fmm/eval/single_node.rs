@@ -1068,7 +1068,7 @@ mod test {
     }
 
     #[test]
-    fn test_foo_bar() {
+    fn test_helmholtz_fmm_vector() {
         // Setup random sources and targets
         let n_sources = 9000;
         let n_targets = 10000;
