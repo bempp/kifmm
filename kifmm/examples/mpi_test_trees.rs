@@ -21,11 +21,12 @@ fn main() {
         datatype::PartitionMut,
         traits::{Communicator, Root},
     };
-    use rlst::RawAccess;
+    use rlst::{rlst_dynamic_array1, RawAccess};
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
     let world = universe.world();
     let comm = world.duplicate();
+    let rank = comm.rank();
 
     // Tree parameters
     let prune_empty = false;
@@ -41,6 +42,8 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let mut charges = rlst_dynamic_array1!(f32, [n_points]);
+    charges.fill_from_seed_equally_distributed(rank as usize);
 
     ThreadPoolBuilder::new()
         .num_threads(1)
@@ -58,7 +61,7 @@ fn main() {
             sort_kind,
         )
         .unwrap()
-        .parameters(expansion_order, kernel, source_to_target)
+        .parameters(charges.data(), expansion_order, kernel, source_to_target)
         .unwrap()
         .build()
         .unwrap();

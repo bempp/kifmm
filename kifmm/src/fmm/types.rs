@@ -467,8 +467,8 @@ where
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
 
-    /// Charges associated with each source tree
-    pub charges: Option<Vec<Vec<Scalar>>>,
+    /// All charges at this rank
+    pub charges: Option<Vec<Scalar>>,
 
     /// Communication runtimes
     pub communication_times: Option<Vec<CommunicationTime>>,

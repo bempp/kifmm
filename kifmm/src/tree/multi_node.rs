@@ -11,7 +11,7 @@ use num::Float;
 use rlst::RlstScalar;
 
 use crate::{
-    sorting::{hyksort, samplesort, simplesort},
+    sorting::{samplesort, simplesort},
     traits::tree::{MultiTree, SingleTree},
     tree::{
         constants::DEEPEST_LEVEL, Domain, MortonKey, MortonKeys, MultiNodeTree, Point, Points,
@@ -66,9 +66,17 @@ where
         }
 
         // Perform parallel Morton sort over encoded points
+        let coordinate_destination_ranks;
+        let coordinate_sort_indices;
+
         match sort_kind {
-            SortKind::Hyksort { subcomm_size } => hyksort(&mut points, subcomm_size, communicator)?,
-            SortKind::Samplesort { n_samples } => samplesort(&mut points, communicator, n_samples)?,
+            SortKind::Hyksort { subcomm_size: _ } =>
+            {
+                return Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Hyksort currently unsupported"))
+            },
+            SortKind::Samplesort { n_samples } => {
+                (coordinate_destination_ranks, coordinate_sort_indices) = samplesort(&mut points, communicator, n_samples)?;
+            },
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters
@@ -82,9 +90,13 @@ where
                     .collect_vec();
                 splitters.sort();
                 let splitters = &mut splitters[1..];
-                simplesort(&mut points, communicator, splitters)?;
+                (coordinate_destination_ranks, coordinate_sort_indices) = simplesort(&mut points, communicator, splitters)?;
             }
         }
+
+        // Find ordering of input global indices after local sort has completed
+        // but before global sort, used for attaching charges
+        let unsorted_global_indices = coordinate_sort_indices.iter().map(|&i| global_indices[i]).collect_vec();
 
         // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
@@ -275,6 +287,8 @@ where
 
         Ok(MultiNodeTree {
             domain,
+            coordinate_destination_ranks,
+            coordinate_sort_indices,
             communicator: communicator.duplicate(),
             rank,
             global_depth,
@@ -290,6 +304,7 @@ where
             key_to_index,
             leaf_to_index,
             key_to_level_index,
+            unsorted_global_indices,
             global_indices,
             leaves,
             keys,

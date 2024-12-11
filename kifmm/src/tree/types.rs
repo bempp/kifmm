@@ -181,6 +181,15 @@ where
     /// Associated global indices
     pub global_indices: Vec<usize>,
 
+    /// Associated global indices before global sort
+    pub unsorted_global_indices: Vec<usize>,
+
+    /// Indices that sort input points/charges at this rank
+    pub coordinate_sort_indices: Vec<usize>,
+
+    /// Destination ranks for input points/charges at this rank
+    pub coordinate_destination_ranks: Vec<Rank>,
+
     /// All associated leaves
     pub leaves: MortonKeys<T>,
 

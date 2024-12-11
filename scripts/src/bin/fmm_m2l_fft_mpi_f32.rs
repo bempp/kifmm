@@ -8,7 +8,7 @@ use kifmm::{
 };
 use mpi::traits::*;
 use rayon::ThreadPoolBuilder;
-use rlst::RawAccess;
+use rlst::{rlst_dynamic_array1, RawAccess};
 use std::{collections::HashMap, time::Instant};
 
 /// Struct for parsing command-line arguments
@@ -55,6 +55,7 @@ fn main() {
         mpi::initialize_with_threading(mpi::Threading::Serialized).unwrap();
     let world = universe.world();
     let comm = world.duplicate();
+    let rank = comm.rank();
 
     // Tree parameters
     let args = Args::parse();
@@ -84,6 +85,8 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let mut charges = rlst_dynamic_array1!(f32, [n_points]);
+    charges.fill_from_seed_equally_distributed(rank as usize);
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
         .tree(
@@ -96,7 +99,7 @@ fn main() {
             sort_kind.clone(),
         )
         .unwrap()
-        .parameters(expansion_order, kernel.clone(), source_to_target)
+        .parameters(charges.data(), expansion_order, kernel.clone(), source_to_target)
         .unwrap()
         .build()
         .unwrap();

@@ -1,10 +1,10 @@
 use mpi::{
-    topology::{Communicator, SimpleCommunicator},
-    traits::Equivalence,
+    collective::CommunicatorCollectives, datatype::{Partition, PartitionMut}, topology::{Communicator, SimpleCommunicator}, traits::Equivalence, Count
 };
+use itertools::Itertools;
 use num::Float;
 use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use crate::{
     fmm::{
@@ -206,6 +206,7 @@ where
     /// Parameters
     pub fn parameters(
         mut self,
+        charges: &[Scalar],
         expansion_order: usize,
         kernel: Kernel,
         source_to_target: FieldTranslation,
@@ -216,7 +217,119 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-            // TODO: Mapping of global indices needs to happen here eventually.
+
+            // Impose local ordering on charges after input points have been sorted locally, before send
+            let coordinate_sort_indices = &self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree
+                .coordinate_sort_indices;
+
+            // Global indices of charges to be sent alongside them to their new destination ranks
+            let unsorted_global_indices = &self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree
+                .unsorted_global_indices
+                .iter()
+                .map(|&i| i as i64)
+                .collect_vec();
+
+            // New destination ranks of charges
+            let coordinate_destination_ranks= &self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree
+                .coordinate_destination_ranks;
+
+            let comm = &self.tree.as_ref().unwrap().source_tree.communicator;
+            let size = comm.size();
+
+            // Sort input charges by their destination ranks
+            let charges = {
+                let mut tmp = Vec::new();
+                for &i in coordinate_sort_indices.iter() {
+                    tmp.push(charges[i])
+                }
+                tmp
+            };
+
+            // Can now communicate charges to same destination ranks as their corresponding points
+            let mut counts_snd = vec![0i32; size as usize];
+            for &rank in coordinate_destination_ranks.iter() {
+                counts_snd[rank as usize] += 1
+            }
+
+            let counts_snd_clone = counts_snd.iter().cloned().collect_vec();
+
+            let displs_snd = counts_snd
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let mut counts_recv = vec![0 as Count; size as usize];
+            comm.all_to_all_into(&counts_snd, &mut counts_recv);
+            let counts_recv_clone = counts_recv.iter().cloned().collect_vec();
+
+            let displs_recv = counts_recv
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let total = counts_recv.iter().sum::<Count>();
+
+            // Send global indices
+            let mut received_global_indices = vec![i64::default(); total as usize];
+            let mut partition_received =
+                PartitionMut::new(&mut received_global_indices[..], counts_recv, &displs_recv[..]);
+            let partition_snd = Partition::new(&unsorted_global_indices[..], counts_snd, &displs_snd[..]);
+
+            comm.all_to_all_varcount_into(&partition_snd, &mut partition_received);
+
+            // Send charges
+            let mut received_charges= vec![Scalar::default(); total as usize];
+            let mut partition_received =
+                PartitionMut::new(&mut received_charges[..], counts_recv_clone, &displs_recv[..]);
+            let partition_snd = Partition::new(&charges[..], counts_snd_clone, &displs_snd[..]);
+
+            comm.all_to_all_varcount_into(&partition_snd, &mut partition_received);
+
+            let unsorted_global_indices = received_global_indices.into_iter().map(|i| i as usize).collect_vec();
+
+            // Have now got both received charges, their corresponding global indices as well as the global indices after global sort
+
+            let mut mapping = HashMap::new();
+            for (global_index, charge) in unsorted_global_indices.iter().zip(received_charges.iter()) {
+                mapping.insert(global_index, charge);
+            }
+
+            let global_indices = &self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree
+                .global_indices;
+
+            let mut charges = Vec::new();
+            for global_index in global_indices.iter() {
+                let charge = **mapping.get(global_index).unwrap();
+                charges.push(charge);
+            }
+
+            println!("RANK {:?} N local sources IN BUILDER {:?}", comm.rank(), charges.len());
+
+            self.charges = Some(charges);
             self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
             self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
@@ -403,7 +516,7 @@ where
             }
 
             // pass dummy charges for now.
-            result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]);
+            result.metadata(self.kernel_eval_type.unwrap(),  &self.charges.unwrap());
             result.displacements(None);
 
             Ok(result)

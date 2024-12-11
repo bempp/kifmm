@@ -17,11 +17,12 @@ fn main() {
         datatype::PartitionMut,
         traits::{Communicator, Root},
     };
-    use rlst::{RawAccess, RlstScalar};
+    use rlst::{rlst_dynamic_array1, RawAccess, RlstScalar};
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
     let comm = world.duplicate();
+    let rank = comm.rank();
 
     // Tree parameters
     let prune_empty = true;
@@ -38,6 +39,8 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, None);
+    let mut charges = rlst_dynamic_array1!(f32, [n_points]);
+    charges.fill_from_seed_equally_distributed(rank as usize);
 
     let mut fmm = MultiNodeBuilder::new(false)
         .tree(
@@ -50,7 +53,7 @@ fn main() {
             sort_kind,
         )
         .unwrap()
-        .parameters(expansion_order, kernel, source_to_target)
+        .parameters(charges.data(), expansion_order, kernel, source_to_target)
         .unwrap()
         .build()
         .unwrap();

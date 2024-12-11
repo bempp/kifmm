@@ -940,7 +940,7 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: GreenKernelEvalType, _charges: &[Self::Scalar]) {
+    fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]) {
         // Check if computing potentials, or potentials and derivatives
         match eval_type {
             GreenKernelEvalType::Value => {}
@@ -1030,8 +1030,6 @@ where
         let potential_send_pointers =
             potential_pointers_multi_node(&self.tree.target_tree, kernel_eval_size, &potentials);
 
-        // TODO: Add functionality for charges at some point
-        let charges = vec![Scalar::one(); self.tree.source_tree().n_coordinates_tot().unwrap()];
         let charge_index_pointer_targets =
             coordinate_index_pointer_multi_node(&self.tree.target_tree);
         let charge_index_pointer_sources =
@@ -1064,7 +1062,7 @@ where
         self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
         self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
         self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
-        self.charges = charges;
+        self.charges = charges.to_vec();
         self.charge_index_pointer_sources = charge_index_pointer_sources;
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.leaf_scales_sources = leaf_scales_sources;

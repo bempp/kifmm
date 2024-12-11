@@ -6,9 +6,11 @@ use mpi::{
     datatype::{Partition, PartitionMut},
     topology::SimpleCommunicator,
     traits::{Communicator, CommunicatorCollectives, Equivalence},
-    Count,
+    Count, Rank,
 };
 use rand::{thread_rng, Rng};
+
+use super::helpers::argsort;
 
 /// A sample sort implementation, the number of samples must be at most
 /// the size of the local array, and greater than 0.
@@ -21,7 +23,7 @@ pub fn samplesort<T>(
     array: &mut Vec<T>,
     communicator: &SimpleCommunicator,
     n_samples: usize,
-) -> Result<(), std::io::Error>
+) -> Result<(Vec<Rank>, Vec<usize>), std::io::Error>
 where
     T: Equivalence + Ord + Default + Clone + Debug,
 {
@@ -40,7 +42,10 @@ where
     let size = communicator.size();
 
     // Perform local sort
+    let local_sort_indices = argsort(&array);
     array.sort();
+
+    let mut destination_ranks = Vec::new();
 
     if size > 1 {
         // 1. Collect k samples from each process onto all other processes
@@ -67,7 +72,6 @@ where
             .step_by(n_samples)
             .collect_vec();
 
-        let mut ranks = Vec::new();
         for item in array.iter() {
             let mut rank_index = -1i32;
             for (i, splitter) in splitters.iter().enumerate() {
@@ -80,11 +84,11 @@ where
                 }
             }
 
-            ranks.push(rank_index);
+            destination_ranks.push(rank_index);
         }
 
         let mut counts_snd = vec![0i32; size as usize];
-        for &rank in ranks.iter() {
+        for &rank in destination_ranks.iter() {
             counts_snd[rank as usize] += 1
         }
 
@@ -120,7 +124,8 @@ where
         communicator.all_to_all_varcount_into(&partition_snd, &mut partition_received);
         received.sort();
         *array = received;
+
     }
 
-    Ok(())
+    Ok((destination_ranks, local_sort_indices))
 }
