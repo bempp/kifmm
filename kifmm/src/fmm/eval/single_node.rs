@@ -139,7 +139,7 @@ mod test {
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder,
         SingleNodeFmmTree,
     };
 
@@ -1102,7 +1102,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1124,7 +1124,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1227,7 +1227,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1249,7 +1249,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1353,7 +1353,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, surface_diff),
+                    BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1376,7 +1376,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1429,7 +1429,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, surface_diff),
+                    BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1577,7 +1577,11 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold, None),
+                    BlasFieldTranslationIa::new(
+                        singular_value_threshold,
+                        None,
+                        FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1599,7 +1603,11 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold, None),
+                    BlasFieldTranslationIa::new(
+                        singular_value_threshold,
+                        None,
+                        FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
