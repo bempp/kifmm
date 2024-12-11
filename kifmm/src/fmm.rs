@@ -3,7 +3,7 @@ mod builder;
 pub mod constants;
 mod data_access;
 mod eval;
-mod field_translation;
+pub mod field_translation;
 pub mod helpers;
 pub mod isa;
 mod kernel;

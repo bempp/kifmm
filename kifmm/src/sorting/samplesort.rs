@@ -6,7 +6,7 @@ use mpi::{
     datatype::{Partition, PartitionMut},
     topology::SimpleCommunicator,
     traits::{Communicator, CommunicatorCollectives, Equivalence},
-    Count,
+    Count, Rank,
 };
 use rand::{thread_rng, Rng};
 
@@ -21,7 +21,7 @@ pub fn samplesort<T>(
     array: &mut Vec<T>,
     communicator: &SimpleCommunicator,
     n_samples: usize,
-) -> Result<(), std::io::Error>
+) -> Result<Option<Vec<Rank>>, std::io::Error>
 where
     T: Equivalence + Ord + Default + Clone + Debug,
 {
@@ -67,7 +67,7 @@ where
             .step_by(n_samples)
             .collect_vec();
 
-        let mut ranks = Vec::new();
+        let mut destination_ranks = Vec::new();
         for item in array.iter() {
             let mut rank_index = -1i32;
             for (i, splitter) in splitters.iter().enumerate() {
@@ -80,12 +80,12 @@ where
                 }
             }
 
-            ranks.push(rank_index);
+            destination_ranks.push(rank_index);
         }
 
         let mut counts_snd = vec![0i32; size as usize];
-        for &rank in ranks.iter() {
-            counts_snd[rank as usize] += 1
+        for &destination_rank in destination_ranks.iter() {
+            counts_snd[destination_rank as usize] += 1
         }
 
         let displs_snd = counts_snd
@@ -120,7 +120,9 @@ where
         communicator.all_to_all_varcount_into(&partition_snd, &mut partition_received);
         received.sort();
         *array = received;
+
+        return Ok(Some(destination_ranks))
     }
 
-    Ok(())
+    Ok(None)
 }

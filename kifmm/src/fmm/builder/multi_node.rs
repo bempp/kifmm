@@ -1,6 +1,9 @@
+use itertools::Itertools;
+
 use mpi::{
+    datatype::{Partition, PartitionMut},
     topology::{Communicator, SimpleCommunicator},
-    traits::Equivalence,
+    traits::{Equivalence, CommunicatorCollectives}, Count,
 };
 use num::Float;
 use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
@@ -22,6 +25,7 @@ use crate::{
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::{multi_node::GlobalFmmMetadata, single_node::Epsilon},
         types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
+        tree::MultiTree,
     },
     tree::{
         types::{Domain, SortKind},
@@ -206,6 +210,7 @@ where
     /// Parameters
     pub fn parameters(
         mut self,
+        charges: &[Scalar],
         expansion_order: usize,
         kernel: Kernel,
         source_to_target: FieldTranslation,
@@ -216,7 +221,68 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-            // TODO: Mapping of global indices needs to happen here eventually.
+
+            let global_indices = &self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree
+                .unsorted_global_indices;
+
+            let destination_ranks = &self
+                .tree
+                .as_ref()
+                .unwrap()
+                .source_tree
+                .destination_ranks;
+
+            let packets= charges.iter().zip(global_indices.iter())
+                    .map(|(c, gidx)| (c, gidx)).collect_vec();
+
+            // Communicate message sizes
+            let size = self.tree.as_ref().unwrap().source_tree.communicator.size();
+            let communicator = &self.tree.as_ref().unwrap().source_tree.communicator;
+
+            let mut counts_snd = vec![0i32; size as usize];
+            for &destination_rank in destination_ranks.iter() {
+                counts_snd[destination_rank as usize] += 1
+            }
+
+            let displs_snd = counts_snd
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let mut counts_recv = vec![0 as Count; size as usize];
+
+            communicator.all_to_all_into(&counts_snd, &mut counts_recv);
+
+            // Communicate packets
+            let displs_recv = counts_recv
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let total = counts_recv.iter().sum::<Count>();
+
+            let total = counts_recv.iter().sum::<Count>();
+
+            let mut received = vec![T::default(); total as usize];
+            let mut partition_received =
+                PartitionMut::new(&mut received[..], counts_recv, &displs_recv[..]);
+            let partition_snd = Partition::new(&packets[..], counts_snd, &displs_snd[..]);
+
+
+
+
             self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
             self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);

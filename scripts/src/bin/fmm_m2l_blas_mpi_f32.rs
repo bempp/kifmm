@@ -8,7 +8,7 @@ use kifmm::{
 };
 use mpi::traits::*;
 use rayon::ThreadPoolBuilder;
-use rlst::RawAccess;
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 use std::{collections::HashMap, time::Instant};
 
 /// Struct for parsing command-line arguments
@@ -85,6 +85,9 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let tmp = vec![1.0; n_points];
+    let mut charges = rlst_dynamic_array2!(f32, [n_points, 1]);
+    charges.data_mut().copy_from_slice(&tmp);
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
         .tree(
@@ -97,7 +100,7 @@ fn main() {
             sort_kind.clone(),
         )
         .unwrap()
-        .parameters(expansion_order, kernel.clone(), source_to_target)
+        .parameters(charges.data(), expansion_order, kernel.clone(), source_to_target)
         .unwrap()
         .build()
         .unwrap();

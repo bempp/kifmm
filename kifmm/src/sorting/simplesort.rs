@@ -7,7 +7,7 @@ use mpi::{
     datatype::{Partition, PartitionMut},
     topology::SimpleCommunicator,
     traits::{Communicator, CommunicatorCollectives, Equivalence},
-    Count,
+    Count, Rank,
 };
 
 /// Simple sort is a bucket style sort specialised for octrees. In this case, the number of 'splitters'
@@ -26,7 +26,7 @@ pub fn simplesort<T>(
     array: &mut Vec<T>,
     communicator: &SimpleCommunicator,
     splitters: &mut [T],
-) -> Result<(), std::io::Error>
+) -> Result<Option<Vec<Rank>>, std::io::Error>
 where
     T: Equivalence + Ord + Default + Clone + Debug,
 {
@@ -47,7 +47,7 @@ where
 
     if size > 1 {
         // Sort local data into buckets
-        let mut ranks = Vec::new();
+        let mut destination_ranks = Vec::new();
         for item in array.iter() {
             let mut rank_index = -1i32;
             for (i, splitter) in splitters.iter().enumerate() {
@@ -60,11 +60,11 @@ where
                 }
             }
 
-            ranks.push(rank_index);
+            destination_ranks.push(rank_index);
         }
 
         let mut counts_snd = vec![0i32; size as usize];
-        for &rank in ranks.iter() {
+        for &rank in destination_ranks.iter() {
             counts_snd[rank as usize] += 1
         }
 
@@ -101,7 +101,9 @@ where
         received.sort();
 
         *array = received;
+
+        return Ok(Some(destination_ranks))
     }
 
-    Ok(())
+    Ok(None)
 }

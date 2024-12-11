@@ -81,7 +81,7 @@ pub trait SingleTree {
     /// - `leaf` - node being queried.
     fn global_indices(&self, leaf: &Self::Node) -> Option<&[usize]>;
 
-    /// gets all global indices (local in mult inode setting)
+    /// gets all global indices
     fn all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points, gets global domain in multi node setting.
@@ -216,6 +216,9 @@ pub trait MultiTree {
     /// # Arguments
     /// - `idx` - Index being query.
     fn node(&self, idx: usize) -> Option<&<Self::SingleTree as SingleTree>::Node>;
+
+    /// gets all global indices
+    fn all_global_indices(&self) -> Option<&[usize]>;
 
     /// Get domain defined by the points across all nodes.
     fn domain(&self) -> &<Self::SingleTree as SingleTree>::Domain;

@@ -66,9 +66,14 @@ where
         }
 
         // Perform parallel Morton sort over encoded points
+        let destination_ranks;
         match sort_kind {
-            SortKind::Hyksort { subcomm_size } => hyksort(&mut points, subcomm_size, communicator)?,
-            SortKind::Samplesort { n_samples } => samplesort(&mut points, communicator, n_samples)?,
+            SortKind::Hyksort { subcomm_size } => {
+                return Err(std::io::Error::new(std::io::ErrorKind::Unsupported, "Hyksort Currently Unsupported"))
+            },
+            SortKind::Samplesort { n_samples } => {
+                destination_ranks =    samplesort(&mut points, communicator, n_samples)?;
+            },
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters
@@ -82,9 +87,12 @@ where
                     .collect_vec();
                 splitters.sort();
                 let splitters = &mut splitters[1..];
-                simplesort(&mut points, communicator, splitters)?;
+                destination_ranks = simplesort(&mut points, communicator, splitters)?;
             }
         }
+
+        let destination_ranks = destination_ranks.unwrap();
+        let unsorted_global_indices = global_indices.into_iter().cloned().collect_vec();
 
         // Find unique leaves specified by points on each processor
         let leaves: HashSet<MortonKey<_>> = points.iter().map(|p| p.encoded_key).collect();
@@ -191,7 +199,7 @@ where
             .collect_vec();
 
         // Collect global indices, in Morton sorted order
-        let global_indices = points.iter().map(|p| p.global_index).collect_vec();
+        let sorted_global_indices = points.iter().map(|p| p.global_index).collect_vec();
 
         // Map between keys/leaves and their respective indices
         let mut key_to_index = HashMap::new();
@@ -274,6 +282,7 @@ where
         }
 
         Ok(MultiNodeTree {
+            destination_ranks,
             domain,
             communicator: communicator.duplicate(),
             rank,
@@ -290,7 +299,8 @@ where
             key_to_index,
             leaf_to_index,
             key_to_level_index,
-            global_indices,
+            unsorted_global_indices,
+            sorted_global_indices,
             leaves,
             keys,
             leaves_to_coordinates,
@@ -370,6 +380,10 @@ where
 
     fn rank(&self) -> i32 {
         self.rank
+    }
+
+    fn all_global_indices(&self) -> Option<&[usize]> {
+        Some(&self.sorted_global_indices)
     }
 
     fn trees(&self) -> &[Self::SingleTree] {

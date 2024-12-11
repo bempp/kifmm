@@ -145,6 +145,10 @@ pub struct MultiNodeTree<T, C: Communicator>
 where
     T: RlstScalar + Float + Equivalence,
 {
+
+    /// Destination ranks of input charges at this rank
+    pub destination_ranks: Vec<i32>,
+
     /// Roots associated with trees at this rank
     pub roots: Vec<MortonKey<T>>,
 
@@ -178,8 +182,11 @@ where
     /// All points coordinate with associated morton key
     pub points: Points<T>,
 
-    /// Associated global indices
-    pub global_indices: Vec<usize>,
+    /// Associated global indices before parallel sort
+    pub unsorted_global_indices: Vec<usize>,
+
+    /// Associated global indices after parallel sort
+    pub sorted_global_indices: Vec<usize>,
 
     /// All associated leaves
     pub leaves: MortonKeys<T>,
