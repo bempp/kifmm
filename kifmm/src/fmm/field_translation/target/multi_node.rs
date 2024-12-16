@@ -96,8 +96,8 @@ where
 
                             for (i, target_vec_i) in target_vec.iter().enumerate().take(NSIBLINGS) {
                                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    target_vec_i.view(),
-                                    parent_locals.view(),
+                                    target_vec_i.r(),
+                                    parent_locals.r(),
                                 );
 
                                 for j in 0..chunk_size {
