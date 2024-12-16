@@ -26,7 +26,8 @@ num = "0.4"
 rayon = "1.9"
 rand = "0.8.5"
 kifmm-fftw-sys = { path = "../fftw-sys" }
-green-kernels = { version = "0.2.2", default-features = false}
+#green-kernels = { version = "0.2.2", default-features = false}
+green-kernels = { git = "https://github.com/bempp/green-kernels" }
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
 mpi = { version = "0.8.*", optional = true}
@@ -36,7 +37,8 @@ pulp = "0.18.12"
 bytemuck = "1.16.0"
 superslice = {version = "1.0.0", optional = true}
 rand_distr = "0.4.3"
-rlst = {version = "0.2.0", default-features = false}
+# rlst = {version = "0.2.0", default-features = false}
+rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"]}
 
 [dev-dependencies]
 approx = "0.5"
