@@ -564,10 +564,8 @@ where
                             let check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     u.r(),
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        vt.r(),
-                                        multipoles_subset.r(),
-                                    ),
+                                    empty_array::<Scalar, 2>()
+                                        .simple_mult_into_resize(vt.r(), multipoles_subset.r()),
                                 );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
@@ -703,10 +701,8 @@ where
                             let check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     u.r(),
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        vt.r(),
-                                        multipoles_subset.r(),
-                                    ),
+                                    empty_array::<Scalar, 2>()
+                                        .simple_mult_into_resize(vt.r(), multipoles_subset.r()),
                                 );
 
                             for (local_multipole_idx, &global_local_idx) in
