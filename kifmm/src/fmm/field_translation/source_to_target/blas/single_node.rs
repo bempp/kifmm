@@ -132,7 +132,7 @@ where
                 let mut compressed_multipoles;
                 {
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.source_to_target.metadata[m2l_operator_index].st.view(),
+                        self.source_to_target.metadata[m2l_operator_index].st.r(),
                         multipoles,
                     );
 
@@ -181,10 +181,10 @@ where
 
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    c_u_sub.view(),
+                                    c_u_sub.r(),
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        c_vt_sub.view(),
-                                        compressed_multipoles_subset.view(),
+                                        c_vt_sub.r(),
+                                        compressed_multipoles_subset.r(),
                                     ),
                                 );
 
@@ -213,11 +213,11 @@ where
                 // 3. Compute local expansions from compressed check potentials
                 {
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1[c2e_operator_index].view(),
+                        self.dc2e_inv_1[c2e_operator_index].r(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2[c2e_operator_index].view(),
+                            self.dc2e_inv_2[c2e_operator_index].r(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_to_target.metadata[m2l_operator_index].u.view(),
+                                self.source_to_target.metadata[m2l_operator_index].u.r(),
                                 compressed_check_potentials,
                             ),
                         ),
@@ -281,7 +281,7 @@ where
                 let mut compressed_multipoles;
                 {
                     compressed_multipoles = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.source_to_target.metadata[m2l_operator_index].st.view(),
+                        self.source_to_target.metadata[m2l_operator_index].st.r(),
                         multipoles,
                     );
 
@@ -347,10 +347,10 @@ where
 
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    c_u_sub.view(),
+                                    c_u_sub.r(),
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        c_vt_sub.view(),
-                                        compressed_multipoles_subset.view(),
+                                        c_vt_sub.r(),
+                                        compressed_multipoles_subset.r(),
                                     ),
                                 );
 
@@ -396,11 +396,11 @@ where
                 // 3. Compute local expansions from compressed check potentials
                 {
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1[c2e_operator_index].view(),
+                        self.dc2e_inv_1[c2e_operator_index].r(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2[c2e_operator_index].view(),
+                            self.dc2e_inv_2[c2e_operator_index].r(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_to_target.metadata[m2l_operator_index].u.view(),
+                                self.source_to_target.metadata[m2l_operator_index].u.r(),
                                 compressed_check_potentials,
                             ),
                         ),
@@ -563,11 +563,9 @@ where
 
                             let check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    u.view(),
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        vt.view(),
-                                        multipoles_subset.view(),
-                                    ),
+                                    u.r(),
+                                    empty_array::<Scalar, 2>()
+                                        .simple_mult_into_resize(vt.r(), multipoles_subset.r()),
                                 );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
@@ -596,9 +594,9 @@ where
                 // 2. Compute local expansions from compressed check potentials
                 {
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1[c2e_operator_index].view(),
+                        self.dc2e_inv_1[c2e_operator_index].r(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2[c2e_operator_index].view(),
+                            self.dc2e_inv_2[c2e_operator_index].r(),
                             check_potentials,
                         ),
                     );
@@ -702,11 +700,9 @@ where
 
                             let check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    u.view(),
-                                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        vt.view(),
-                                        multipoles_subset.view(),
-                                    ),
+                                    u.r(),
+                                    empty_array::<Scalar, 2>()
+                                        .simple_mult_into_resize(vt.r(), multipoles_subset.r()),
                                 );
 
                             for (local_multipole_idx, &global_local_idx) in
@@ -748,9 +744,9 @@ where
                 // 2. Compute local expansions from compressed check potentials
                 {
                     let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        self.dc2e_inv_1[c2e_operator_index].view(),
+                        self.dc2e_inv_1[c2e_operator_index].r(),
                         empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_2[c2e_operator_index].view(),
+                            self.dc2e_inv_2[c2e_operator_index].r(),
                             check_potentials,
                         ),
                     );
