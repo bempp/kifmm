@@ -97,10 +97,6 @@ where
                 let multipoles =
                     rlst_array_from_slice2!(multipoles, [n_coeffs_equivalent_surface, n_sources]);
 
-                println!(
-                    "HERE {:?} {:?}",
-                    self.source_to_target.cutoff_rank, m2l_operator_index
-                );
                 // Allocate buffer to store compressed check potentials
                 let compressed_check_potentials = rlst_dynamic_array2!(
                     Scalar,
