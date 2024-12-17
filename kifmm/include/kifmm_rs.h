@@ -978,15 +978,43 @@ struct FmmOperatorTimes *evaluate(struct FmmEvaluator *fmm);
  * # Parameters
  *
  * - `fmm`: Pointer to an `FmmEvaluator` instance.
- * - `charges`: A pointer to the new charges associated with the source points.
- * - `n_charges`: The length of the charges buffer.
  *
  * # Safety
  * This function is intended to be called from C. The caller must ensure that:
  * - Input data corresponds to valid pointers
  * - That they remain valid for the duration of the function call
  */
-void clear(struct FmmEvaluator *fmm, const void *charges, uintptr_t n_charges);
+void clear(struct FmmEvaluator *fmm);
+
+/**
+ * Attach new charges, in final Morton ordering
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `charges`: A pointer to the new charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+void attach_charges_ordered(struct FmmEvaluator *fmm, const void *charges, uintptr_t n_charges);
+
+/**
+ * Attach new charges, in initial input ordering before global Morton sort
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `charges`: A pointer to the new charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+void attach_charges_unordered(struct FmmEvaluator *fmm, const void *charges, uintptr_t n_charges);
 
 /**
  * Query for all evaluated potentials, returned in order of global index.

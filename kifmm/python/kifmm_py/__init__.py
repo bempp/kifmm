@@ -864,14 +864,29 @@ class KiFmm:
         if self._timed:
             return CommunicationTimes(lib.communication_times(self._fmm))
 
-    def clear(self, charges):
-        """Clear charge data, and add new charge data
+    def clear(self):
+        """Clear buffers to re-initialise FMM"""
+        lib.clear(self._fmm)
+
+    def attach_charges_unordered(self, charges):
+        """Attach charges in initial point ordering, before Morton sort.
 
         Args:
             charges (np.array): New charge data
         """
         self._tree.new_charges(charges)
-        lib.clear(self._fmm, self._tree.charges_c, self._tree.ncharges)
+        lib.attach_charges_unordered(
+            self._fmm, self._tree.charges_c, self._tree.ncharges
+        )
+
+    def attach_charges_ordered(self, charges):
+        """Attach charges in final point ordering, after Morton sort.
+
+        Args:
+            charges (np.array): New charge data
+        """
+        self._tree.new_charges(charges)
+        lib.attach_charges_ordered(self._fmm, self._tree.charges_c, self._tree.ncharges)
 
     def evaluate_kernel(self, eval_type, sources, targets, charges, result):
         """Evaluate associated kernel function

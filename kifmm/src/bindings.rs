@@ -1552,7 +1552,7 @@ pub mod api {
         bindings::MetadataTimes,
         fmm::types::FmmEvalType,
         traits::{
-            fmm::DataAccess,
+            fmm::{ChargeHandler, DataAccess},
             tree::{SingleFmmTree, SingleTree, TreeNode},
         },
         tree::types::MortonKey,
@@ -2076,15 +2076,104 @@ pub mod api {
     /// # Parameters
     ///
     /// - `fmm`: Pointer to an `FmmEvaluator` instance.
-    /// - `charges`: A pointer to the new charges associated with the source points.
-    /// - `n_charges`: The length of the charges buffer.
     ///
     /// # Safety
     /// This function is intended to be called from C. The caller must ensure that:
     /// - Input data corresponds to valid pointers
     /// - That they remain valid for the duration of the function call
     #[no_mangle]
-    pub unsafe extern "C" fn clear(
+    pub unsafe extern "C" fn clear(fmm: *mut FmmEvaluator) {
+        if !fmm.is_null() {
+            let ctype = unsafe { (*fmm).get_ctype() };
+            let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+            let pointer = unsafe { (*fmm).get_pointer() };
+
+            match ctype {
+                FmmCType::Laplace32 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<
+                                f32,
+                                Laplace3dKernel<f32>,
+                                BlasFieldTranslationSaRcmp<f32>,
+                            >;
+
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+                },
+
+                FmmCType::Laplace64 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<
+                                f64,
+                                Laplace3dKernel<f64>,
+                                BlasFieldTranslationSaRcmp<f64>,
+                            >;
+
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+                },
+
+                FmmCType::Helmholtz32 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+                },
+
+                FmmCType::Helmholtz64 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                        unsafe { (*fmm).clear().unwrap() };
+                    }
+                },
+            }
+        }
+    }
+
+    /// Attach new charges, in final Morton ordering
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `charges`: A pointer to the new charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn attach_charges_ordered(
         fmm: *mut FmmEvaluator,
         charges: *const c_void,
         n_charges: usize,
@@ -2101,7 +2190,7 @@ pub mod api {
                             as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
 
                     FmmTranslationCType::Blas => {
@@ -2114,7 +2203,7 @@ pub mod api {
 
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
                 },
 
@@ -2126,7 +2215,7 @@ pub mod api {
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
 
                     FmmTranslationCType::Blas => {
@@ -2140,7 +2229,7 @@ pub mod api {
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
                 },
 
@@ -2152,7 +2241,7 @@ pub mod api {
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
 
                     FmmTranslationCType::Blas => {
@@ -2161,7 +2250,7 @@ pub mod api {
 
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
                 },
 
@@ -2172,7 +2261,7 @@ pub mod api {
 
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
                     }
 
                     FmmTranslationCType::Blas => {
@@ -2181,7 +2270,123 @@ pub mod api {
 
                         let charges =
                             unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
-                        unsafe { (*fmm).clear(charges) };
+                        unsafe { (*fmm).attach_charges_ordered(charges).unwrap() };
+                    }
+                },
+            }
+        }
+    }
+
+    /// Attach new charges, in initial input ordering before global Morton sort
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `charges`: A pointer to the new charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn attach_charges_unordered(
+        fmm: *mut FmmEvaluator,
+        charges: *const c_void,
+        n_charges: usize,
+    ) {
+        if !fmm.is_null() {
+            let ctype = unsafe { (*fmm).get_ctype() };
+            let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+            let pointer = unsafe { (*fmm).get_pointer() };
+
+            match ctype {
+                FmmCType::Laplace32 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<
+                                f32,
+                                Laplace3dKernel<f32>,
+                                BlasFieldTranslationSaRcmp<f32>,
+                            >;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+                },
+
+                FmmCType::Laplace64 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<
+                                f64,
+                                Laplace3dKernel<f64>,
+                                BlasFieldTranslationSaRcmp<f64>,
+                            >;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+                },
+
+                FmmCType::Helmholtz32 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+                },
+
+                FmmCType::Helmholtz64 => match ctranslation_type {
+                    FmmTranslationCType::Fft => {
+                        let fmm = pointer
+                            as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
+                    }
+
+                    FmmTranslationCType::Blas => {
+                        let fmm = pointer
+                            as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                        let charges =
+                            unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+                        unsafe { (*fmm).attach_charges_unordered(charges).unwrap() };
                     }
                 },
             }
