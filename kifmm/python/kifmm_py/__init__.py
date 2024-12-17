@@ -868,7 +868,7 @@ class KiFmm:
         """Clear buffers to re-initialise FMM"""
         lib.clear(self._fmm)
 
-    def attach_charges_unordered(self):
+    def attach_charges_unordered(self, charges):
         """Attach charges in initial point ordering, before Morton sort.
 
         Args:
@@ -879,7 +879,7 @@ class KiFmm:
             self._fmm, self._tree.charges_c, self._tree.ncharges
         )
 
-    def attach_charges_ordered(self):
+    def attach_charges_ordered(self, charges):
         """Attach charges in final point ordering, after Morton sort.
 
         Args:
