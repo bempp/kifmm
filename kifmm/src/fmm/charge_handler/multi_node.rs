@@ -54,17 +54,17 @@ where
         };
 
         let n_source_points = self.tree.source_tree().n_coordinates_tot().unwrap();
-        let n_matvecs_input = charges.len() / n_source_points;
+        let n_source_points_input = charges.len() / n_matvecs;
 
-        if n_matvecs == n_matvecs_input {
+        if n_source_points == n_source_points_input {
             self.charges = charges.to_vec();
             Ok(())
         } else {
             Err(FmmError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!(
-                    "Expected {} right hand side vectors, found {}",
-                    n_matvecs, n_matvecs_input
+                    "Expected {} charges at rank {}, found {}",
+                    n_source_points, self.rank, n_source_points_input
                 ),
             )))
         }
