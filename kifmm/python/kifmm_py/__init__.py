@@ -399,13 +399,15 @@ class KiFmm:
 
         self._evaluated = False
         self._expansion_order = expansion_order
+        self._n_coeffs = 6 * (expansion_order - 1) ** 2 + 2
         self._tree = tree
+        self._n_evals = self._tree.n_charges // (self._tree.n_sources // 3)
         self._field_translation = field_translation
         self._timed = timed
         dim = 3
 
         try:
-            if self._tree.n_charges // (self._tree.n_sources // dim) > 1:
+            if self._n_evals > 1:
                 assert isinstance(self._field_translation, BlasFieldTranslation)
         except:
             raise TypeError(
@@ -422,7 +424,7 @@ class KiFmm:
                 "expansion_order length must be depth + 1 if specified, otherwise of length 1 if n_crit specified"
             )
 
-        self._nexpansion_order = len(self._expansion_order)
+        self._n_expansion_order = len(self._expansion_order)
         self._expansion_order_c = ffi.cast(
             "uintptr_t*", self._expansion_order.ctypes.data
         )
@@ -431,6 +433,8 @@ class KiFmm:
 
         # Build FMM runtime object
         self._construct()
+        self._keys_target_tree()
+        self._keys_source_tree()
         self._leaves_target_tree()
         self._leaves_source_tree()
         self._target_global_indices()
@@ -443,7 +447,7 @@ class KiFmm:
                     self._fmm = lib.laplace_fft_f32_alloc(
                         self._timed,
                         self._expansion_order_c,
-                        self._nexpansion_order,
+                        self._n_expansion_order,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
                         self._tree.n_sources,
@@ -462,7 +466,7 @@ class KiFmm:
                     self._fmm = lib.laplace_fft_f64_alloc(
                         self._timed,
                         self._expansion_order_c,
-                        self._nexpansion_order,
+                        self._n_expansion_order,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
                         self._tree.n_sources,
@@ -485,7 +489,7 @@ class KiFmm:
                     self._fmm = lib.helmholtz_fft_f32_alloc(
                         self._timed,
                         self._expansion_order_c,
-                        self._nexpansion_order,
+                        self._n_expansion_order,
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
@@ -505,7 +509,7 @@ class KiFmm:
                     self._fmm = lib.helmholtz_fft_f64_alloc(
                         self._timed,
                         self._expansion_order_c,
-                        self._nexpansion_order,
+                        self._n_expansion_order,
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
@@ -536,7 +540,7 @@ class KiFmm:
                         self._fmm = lib.laplace_blas_rsvd_f32_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -559,7 +563,7 @@ class KiFmm:
                         self._fmm = lib.laplace_blas_rsvd_f64_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -586,7 +590,7 @@ class KiFmm:
                         self._fmm = lib.laplace_blas_svd_f32_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -606,7 +610,7 @@ class KiFmm:
                         self._fmm = lib.laplace_blas_svd_f64_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -632,7 +636,7 @@ class KiFmm:
                         self._fmm = lib.helmholtz_blas_rsvd_f32_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -655,7 +659,7 @@ class KiFmm:
                         self._fmm = lib.helmholtz_blas_rsvd_f64_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -679,7 +683,7 @@ class KiFmm:
                         self._fmm = lib.helmholtz_blas_svd_f32_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -700,7 +704,7 @@ class KiFmm:
                         self._fmm = lib.helmholtz_blas_svd_f64_alloc(
                             self._timed,
                             self._expansion_order_c,
-                            self._nexpansion_order,
+                            self._n_expansion_order,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -755,6 +759,23 @@ class KiFmm:
         )
         self._morton_keys_refs.add(morton_keys_p)
 
+    def _keys_target_tree(self):
+        morton_keys_p = lib.keys_target_tree(self._fmm)
+        ptr = ffi.cast("uint64_t*", morton_keys_p.data)
+        self.keys_target_tree = np.frombuffer(
+            ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")), dtype=np.uint64
+        )
+
+        self._morton_keys_refs.add(morton_keys_p)
+
+    def _keys_source_tree(self):
+        morton_keys_p = lib.keys_source_tree(self._fmm)
+        ptr = ffi.cast("uint64_t*", morton_keys_p.data)
+        self.keys_source_tree = np.frombuffer(
+            ffi.buffer(ptr, morton_keys_p.len * ffi.sizeof("uint64_t")), dtype=np.uint64
+        )
+        self._morton_keys_refs.add(morton_keys_p)
+
     def _all_potentials(self):
         dim = 3
         if self._evaluated:
@@ -767,13 +788,11 @@ class KiFmm:
                 ffi,
             )
 
-            n_evals = self._tree.n_charges // (self._tree.n_sources // 3)
-
             # if self.
             self.all_potentials = np.reshape(
                 all_potentials,
                 (
-                    n_evals,
+                    self._n_evals,
                     self._tree.n_targets // dim,
                     self._field_translation.kernel.eval_type_r.value,
                 ),
@@ -812,6 +831,100 @@ class KiFmm:
             ).view(np.complex128)
         else:
             raise ValueError(f"Unsupported dtype: {dtype}")
+
+    def level(self, level, key):
+        """Lookup key level"""
+        try:
+            assert isinstance(key, int) or (isinstance(key, np.uint64))
+        except:
+            raise TypeError("key must be of type int")
+
+        return lib.level(key)
+
+    def surface(self, alpha, expansion_order, key):
+        """Calculate surface
+
+        Args:
+            alpha (float): scaling parameter
+            expansion_order (int): expansion order
+            key (int): key
+        """
+        try:
+            assert isinstance(key, int) or (isinstance(key, np.uint64))
+        except:
+            raise TypeError("key must be of type int")
+
+        coords_p = lib.surface(alpha, expansion_order, key)
+
+        coords = KiFmm._cast_to_numpy_array(
+            coord_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
+        )
+
+        return coords
+
+    def local(self, key):
+        """Lookup local associated with each key
+
+        Args:
+            key (int): key
+
+        Returns:
+            np.array(self.potential_dtype): Local data associated with this key
+        """
+        try:
+            assert isinstance(key, int) or (isinstance(key, np.uint64))
+        except:
+            raise TypeError("key must be of type int")
+
+        if len(self._expansion_order) > 1:
+            idx = lib.level(key)
+        else:
+            idx = 0
+
+        if self._evaluated:
+            result = []
+
+            local = lib.multipole(self._fmm, key)
+            local_p = local.data
+            local_len = local.len
+            tmp = KiFmm._cast_to_numpy_array(
+                local_p, local_len, self.potential_dtype, ffi
+            )
+
+            tmp = tmp.reshape(self._n_evals, self._n_coeffs[idx])
+            return tmp
+
+    def multipole(self, key):
+        """Lookup multipole associated with each key
+
+        Args:
+            key (int): key
+
+        Returns:
+            np.array(self.potential_dtype): Multipole data associated with this key
+        """
+        try:
+            assert isinstance(key, int) or (isinstance(key, np.uint64))
+        except:
+            raise TypeError("key must be of type int")
+
+        if len(self._expansion_order) > 1:
+            idx = lib.level(key)
+        else:
+            idx = 0
+
+        if self._evaluated:
+            result = []
+
+            multipole = lib.multipole(self._fmm, key)
+            multipole_p = multipole.data
+            multipole_len = multipole.len
+            tmp = KiFmm._cast_to_numpy_array(
+                multipole_p, multipole_len, self.potential_dtype, ffi
+            )
+
+            tmp = tmp.reshape(self._n_evals, self._n_coeffs[idx])
+            return tmp
 
     def leaf_potentials(self, leaf):
         """Lookup potentials associated with each leaf
@@ -886,7 +999,9 @@ class KiFmm:
             charges (np.array): New charge data
         """
         self._tree.new_charges(charges)
-        lib.attach_charges_ordered(self._fmm, self._tree.charges_c, self._tree.n_charges)
+        lib.attach_charges_ordered(
+            self._fmm, self._tree.charges_c, self._tree.n_charges
+        )
 
     def evaluate_kernel_st(self, eval_type, sources, targets, charges, result):
         """Evaluate associated kernel function in single threaded mode

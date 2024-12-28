@@ -93,6 +93,17 @@ pub mod types {
         pub scalar: ScalarType,
     }
 
+    /// Expansion data
+    #[repr(C)]
+    pub struct Expansion {
+        /// Length of underlying buffer, of length n_eval_mode*n_evals*n_coeffs
+        pub len: usize,
+        /// Pointer to underlying buffer
+        pub data: *const c_void,
+        /// Associated scalar type
+        pub scalar: ScalarType,
+    }
+
     /// Container for multiple Potentials. Used when FMM run over multiple
     /// charge vectors.
     #[repr(C)]
@@ -1553,14 +1564,14 @@ pub mod api {
         fmm::types::FmmEvalType,
         traits::{
             fmm::{ChargeHandler, DataAccess},
-            tree::{SingleFmmTree, SingleTree, TreeNode},
+            tree::{FmmTreeNode, SingleFmmTree, SingleTree, TreeNode},
         },
         tree::types::MortonKey,
         BlasFieldTranslationIa, Evaluate, FftFieldTranslation, KiFmm,
     };
 
     use super::{
-        c32, c64, BlasFieldTranslationSaRcmp, CommunicationTimes, Coordinates, FmmCType,
+        c32, c64, BlasFieldTranslationSaRcmp, CommunicationTimes, Coordinates, Expansion, FmmCType,
         FmmEvaluator, FmmOperatorTimes, FmmTranslationCType, GlobalIndices, Laplace3dKernel,
         MortonKeys, Potential, Potentials, ScalarType,
     };
@@ -2872,6 +2883,528 @@ pub mod api {
         }
     }
 
+    /// Query for locals at a specific key.
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `key`: The identifier of a node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn local(fmm: *mut FmmEvaluator, key: u64) -> *mut Expansion {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).local(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+        }
+    }
+
+    /// Query for multipoles at a specific key.
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `key`: The identifier of a node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn multipole(fmm: *mut FmmEvaluator, key: u64) -> *mut Expansion {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len();
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let len;
+                    let ptr;
+                    unsafe {
+                        if let Some(m) = (*fmm).multipole(&key) {
+                            len = m.len() * 2;
+                            ptr = m.as_ptr()
+                        } else {
+                            len = 0;
+                            ptr = std::ptr::null()
+                        }
+                    }
+
+                    let data = ptr as *const c_void;
+
+                    let m = Expansion {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(m))
+                }
+            },
+        }
+    }
+
     /// Query for potentials at a specific leaf.
     ///
     /// # Parameters
@@ -3209,6 +3742,241 @@ pub mod api {
                     };
 
                     Box::into_raw(Box::new(potentials))
+                }
+            },
+        }
+    }
+
+    /// Query key for level
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `key`: The identifier of the key.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn level(key: u64) -> u64 {
+        let key = MortonKey::<f32>::from_morton(key);
+        key.level()
+    }
+
+    /// Query source tree for coordinates contained in a leaf box.
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `leaf`: The identifier of the leaf node.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn surface(
+        fmm: *mut FmmEvaluator,
+        alpha: f64,
+        expansion_order: u64,
+        key: u64,
+    ) -> *mut Coordinates {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f32;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f32;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F32,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f64;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f64;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f32;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f32;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f64;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(surface))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let key = MortonKey::from_morton(key);
+
+                    let alpha = alpha as f64;
+                    let surface =
+                        key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
+                    let len = surface.len();
+                    let ptr = surface.as_ptr();
+
+                    let data = ptr as *const c_void;
+
+                    let surface = Coordinates {
+                        len,
+                        data,
+                        scalar: ScalarType::F64,
+                    };
+
+                    Box::into_raw(Box::new(surface))
                 }
             },
         }
@@ -3742,7 +4510,447 @@ pub mod api {
         }
     }
 
-    /// Query target tree for coordinates contained in a leaf box.
+    /// Query source tree for all keys
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn keys_source_tree(fmm: *mut FmmEvaluator) -> *mut MortonKeys {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let keys: Vec<u64> = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .source_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+        }
+    }
+
+    /// Query target tree for all keys
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn keys_target_tree(fmm: *mut FmmEvaluator) -> *mut MortonKeys {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let keys: Vec<u64> = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let keys = unsafe {
+                        (*fmm)
+                            .tree()
+                            .target_tree()
+                            .keys
+                            .iter()
+                            .map(|l| l.raw())
+                            .collect_vec()
+                    };
+
+                    let keys = ManuallyDrop::new(keys);
+
+                    let keys = MortonKeys {
+                        len: keys.len(),
+                        data: keys.as_ptr(),
+                    };
+
+                    Box::into_raw(Box::new(keys))
+                }
+            },
+        }
+    }
+
+    /// Query target tree for leaves.
     ///
     /// # Parameters
     ///
