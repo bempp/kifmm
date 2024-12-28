@@ -3843,7 +3843,6 @@ pub mod api {
 
                     let key = MortonKey::from_morton(key);
 
-                    let alpha = alpha as f64;
                     let surface =
                         key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
                     let len = surface.len();
@@ -3866,7 +3865,6 @@ pub mod api {
 
                     let key = MortonKey::from_morton(key);
 
-                    let alpha = alpha as f64;
                     let surface =
                         key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
                     let len = surface.len();
@@ -3939,7 +3937,6 @@ pub mod api {
 
                     let key = MortonKey::from_morton(key);
 
-                    let alpha = alpha as f64;
                     let surface =
                         key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
                     let len = surface.len();
@@ -3962,7 +3959,6 @@ pub mod api {
 
                     let key = MortonKey::from_morton(key);
 
-                    let alpha = alpha as f64;
                     let surface =
                         key.surface_grid(expansion_order as usize, (*fmm).tree().domain(), alpha);
                     let len = surface.len();
