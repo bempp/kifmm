@@ -278,6 +278,24 @@ typedef struct GlobalIndices {
 } GlobalIndices;
 
 /**
+ * Expansion data
+ */
+typedef struct Expansion {
+  /**
+   * Length of underlying buffer, of length n_eval_mode*n_evals*n_coeffs
+   */
+  uintptr_t len;
+  /**
+   * Pointer to underlying buffer
+   */
+  const void *data;
+  /**
+   * Associated scalar type
+   */
+  enum ScalarType scalar;
+} Expansion;
+
+/**
  * Container for multiple Potentials. Used when FMM run over multiple
  * charge vectors.
  */
@@ -1057,6 +1075,36 @@ void free_morton_keys(struct MortonKeys *keys_p);
 struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
 
 /**
+ * Query for locals at a specific key.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `key`: The identifier of a node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct Expansion *local(struct FmmEvaluator *fmm, uint64_t key);
+
+/**
+ * Query for multipoles at a specific key.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `key`: The identifier of a node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct Expansion *multipole(struct FmmEvaluator *fmm, uint64_t key);
+
+/**
  * Query for potentials at a specific leaf.
  *
  * # Parameters
@@ -1070,6 +1118,67 @@ struct GlobalIndices *global_indices_target_tree(struct FmmEvaluator *fmm);
  * - That they remain valid for the duration of the function call
  */
 struct Potentials *leaf_potentials(struct FmmEvaluator *fmm, uint64_t leaf);
+
+/**
+ * Query key for level
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `key`: The identifier of the key.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+uint64_t level(uint64_t key);
+
+/**
+ * Query source tree for coordinates contained in a leaf box.
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `leaf`: The identifier of the leaf node.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct Coordinates *surface(struct FmmEvaluator *fmm,
+                            double alpha,
+                            uint64_t expansion_order,
+                            uint64_t key);
+
+/**
+ * Query target tree for depth
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+uint64_t target_tree_depth(struct FmmEvaluator *fmm);
+
+/**
+ * Query source tree for depth
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+uint64_t source_tree_depth(struct FmmEvaluator *fmm);
 
 /**
  * Query source tree for coordinates contained in a leaf box.
@@ -1102,7 +1211,35 @@ struct Coordinates *coordinates_source_tree(struct FmmEvaluator *fmm, uint64_t l
 struct Coordinates *coordinates_target_tree(struct FmmEvaluator *fmm, uint64_t leaf);
 
 /**
- * Query target tree for coordinates contained in a leaf box.
+ * Query source tree for all keys
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct MortonKeys *keys_source_tree(struct FmmEvaluator *fmm);
+
+/**
+ * Query target tree for all keys
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct MortonKeys *keys_target_tree(struct FmmEvaluator *fmm);
+
+/**
+ * Query target tree for leaves.
  *
  * # Parameters
  *
@@ -1132,7 +1269,7 @@ struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
 struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
 
 /**
- * Evaluate the kernel
+ * Evaluate the kernel in single threaded mode
  *
  * # Parameters
  *
@@ -1153,6 +1290,38 @@ struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
  * - That they remain valid for the duration of the function call
  */
 void evaluate_kernel_st(struct FmmEvaluator *fmm,
+                        bool eval_type,
+                        const void *sources,
+                        uintptr_t n_sources,
+                        const void *targets,
+                        uintptr_t n_targets,
+                        const void *charges,
+                        uintptr_t n_charges,
+                        void *result,
+                        uintptr_t nresult);
+
+/**
+ * Evaluate the kernel in multithreaded mode
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `result`: A pointer to the results associated with the target points.
+ * - `n_charges`: The length of the charges buffer.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+void evaluate_kernel_mt(struct FmmEvaluator *fmm,
                         bool eval_type,
                         const void *sources,
                         uintptr_t n_sources,
