@@ -3978,6 +3978,174 @@ pub mod api {
         }
     }
 
+    /// Query target tree for depth
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn target_tree_depth(fmm: *mut FmmEvaluator) -> u64 {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    (*fmm).tree().target_tree().depth()
+                }
+            },
+        }
+    }
+
+    /// Query source tree for depth
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn source_tree_depth(fmm: *mut FmmEvaluator) -> u64 {
+        assert!(!fmm.is_null());
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    (*fmm).tree().source_tree().depth()
+                }
+            },
+        }
+    }
+
     /// Query source tree for coordinates contained in a leaf box.
     ///
     /// # Parameters

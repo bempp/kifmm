@@ -438,6 +438,8 @@ class KiFmm:
         self._leaves_target_tree()
         self._leaves_source_tree()
         self._target_global_indices()
+        self._target_tree_depth()
+        self._source_tree_depth()
 
     def _construct(self):
         """Construct runtime FMM object"""
@@ -741,6 +743,12 @@ class KiFmm:
         self.target_global_indices = np.zeros_like(tmp)
         for i, j in enumerate(tmp):
             self.target_global_indices[j] = i
+
+    def _source_tree_depth(self):
+        self.source_tree_depth = lib.source_tree_depth(self._fmm)
+
+    def _target_tree_depth(self):
+        self.target_tree_depth = lib.target_tree_depth(self._fmm)
 
     def _leaves_target_tree(self):
         morton_keys_p = lib.leaves_target_tree(self._fmm)

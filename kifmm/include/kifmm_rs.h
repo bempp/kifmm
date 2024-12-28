@@ -1153,6 +1153,34 @@ struct Coordinates *surface(struct FmmEvaluator *fmm,
                             uint64_t key);
 
 /**
+ * Query target tree for depth
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+uint64_t target_tree_depth(struct FmmEvaluator *fmm);
+
+/**
+ * Query source tree for depth
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+uint64_t source_tree_depth(struct FmmEvaluator *fmm);
+
+/**
  * Query source tree for coordinates contained in a leaf box.
  *
  * # Parameters
