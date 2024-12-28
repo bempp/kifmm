@@ -1132,7 +1132,7 @@ struct MortonKeys *leaves_target_tree(struct FmmEvaluator *fmm);
 struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
 
 /**
- * Evaluate the kernel
+ * Evaluate the kernel in single threaded mode
  *
  * # Parameters
  *
@@ -1153,6 +1153,38 @@ struct MortonKeys *leaves_source_tree(struct FmmEvaluator *fmm);
  * - That they remain valid for the duration of the function call
  */
 void evaluate_kernel_st(struct FmmEvaluator *fmm,
+                        bool eval_type,
+                        const void *sources,
+                        uintptr_t n_sources,
+                        const void *targets,
+                        uintptr_t n_targets,
+                        const void *charges,
+                        uintptr_t n_charges,
+                        void *result,
+                        uintptr_t nresult);
+
+/**
+ * Evaluate the kernel in multithreaded mode
+ *
+ * # Parameters
+ *
+ * - `fmm`: Pointer to an `FmmEvaluator` instance.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `result`: A pointer to the results associated with the target points.
+ * - `n_charges`: The length of the charges buffer.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+void evaluate_kernel_mt(struct FmmEvaluator *fmm,
                         bool eval_type,
                         const void *sources,
                         uintptr_t n_sources,

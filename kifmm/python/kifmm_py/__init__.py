@@ -361,7 +361,7 @@ class SingleNodeTree:
         self.prune_empty = prune_empty
         self.n_sources = len(sources)
         self.n_targets = len(targets)
-        self.ncharges = len(charges)
+        self.n_charges = len(charges)
         self.sources_c = ffi.cast("void* ", self.sources.ctypes.data)
         self.targets_c = ffi.cast("void* ", self.targets.ctypes.data)
         self.charges_c = ffi.cast("void* ", self.charges.ctypes.data)
@@ -373,7 +373,7 @@ class SingleNodeTree:
         except:
             TypeError("Incompatible number of new_charges for sources")
 
-        self.ncharges = len(new_charges)
+        self.n_charges = len(new_charges)
         self.charges = new_charges
         self.charges_c = ffi.cast("void* ", new_charges.ctypes.data)
 
@@ -405,7 +405,7 @@ class KiFmm:
         dim = 3
 
         try:
-            if self._tree.ncharges // (self._tree.n_sources // dim) > 1:
+            if self._tree.n_charges // (self._tree.n_sources // dim) > 1:
                 assert isinstance(self._field_translation, BlasFieldTranslation)
         except:
             raise TypeError(
@@ -450,7 +450,7 @@ class KiFmm:
                         self._tree.targets_c,
                         self._tree.n_targets,
                         self._tree.charges_c,
-                        self._tree.ncharges,
+                        self._tree.n_charges,
                         self._tree.prune_empty,
                         self._tree.n_crit,
                         self._tree.depth,
@@ -469,7 +469,7 @@ class KiFmm:
                         self._tree.targets_c,
                         self._tree.n_targets,
                         self._tree.charges_c,
-                        self._tree.ncharges,
+                        self._tree.n_charges,
                         self._tree.prune_empty,
                         self._tree.n_crit,
                         self._tree.depth,
@@ -493,7 +493,7 @@ class KiFmm:
                         self._tree.targets_c,
                         self._tree.n_targets,
                         self._tree.charges_c,
-                        self._tree.ncharges,
+                        self._tree.n_charges,
                         self._tree.prune_empty,
                         self._tree.n_crit,
                         self._tree.depth,
@@ -513,7 +513,7 @@ class KiFmm:
                         self._tree.targets_c,
                         self._tree.n_targets,
                         self._tree.charges_c,
-                        self._tree.ncharges,
+                        self._tree.n_charges,
                         self._tree.prune_empty,
                         self._tree.n_crit,
                         self._tree.depth,
@@ -543,7 +543,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -566,7 +566,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -593,7 +593,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -613,7 +613,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -640,7 +640,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -663,7 +663,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -687,7 +687,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -708,7 +708,7 @@ class KiFmm:
                             self._tree.targets_c,
                             self._tree.n_targets,
                             self._tree.charges_c,
-                            self._tree.ncharges,
+                            self._tree.n_charges,
                             self._tree.prune_empty,
                             self._tree.n_crit,
                             self._tree.depth,
@@ -767,7 +767,7 @@ class KiFmm:
                 ffi,
             )
 
-            n_evals = self._tree.ncharges // (self._tree.n_sources // 3)
+            n_evals = self._tree.n_charges // (self._tree.n_sources // 3)
 
             # if self.
             self.all_potentials = np.reshape(
@@ -876,7 +876,7 @@ class KiFmm:
         """
         self._tree.new_charges(charges)
         lib.attach_charges_unordered(
-            self._fmm, self._tree.charges_c, self._tree.ncharges
+            self._fmm, self._tree.charges_c, self._tree.n_charges
         )
 
     def attach_charges_ordered(self, charges):
@@ -886,10 +886,10 @@ class KiFmm:
             charges (np.array): New charge data
         """
         self._tree.new_charges(charges)
-        lib.attach_charges_ordered(self._fmm, self._tree.charges_c, self._tree.ncharges)
+        lib.attach_charges_ordered(self._fmm, self._tree.charges_c, self._tree.n_charges)
 
-    def evaluate_kernel(self, eval_type, sources, targets, charges, result):
-        """Evaluate associated kernel function
+    def evaluate_kernel_st(self, eval_type, sources, targets, charges, result):
+        """Evaluate associated kernel function in single threaded mode
 
         Args:
             eval_type (EvalType): Value or ValueDeriv
@@ -929,8 +929,8 @@ class KiFmm:
 
         n_sources = len(sources)
         n_targets = len(targets)
-        ncharges = len(charges)
-        nresult = len(result)
+        n_charges = len(charges)
+        n_result = len(result)
         sources_c = ffi.cast("void* ", sources.ctypes.data)
         targets_c = ffi.cast("void* ", targets.ctypes.data)
         charges_c = ffi.cast("void* ", charges.ctypes.data)
@@ -944,9 +944,70 @@ class KiFmm:
             targets_c,
             n_targets,
             charges_c,
-            ncharges,
+            n_charges,
             result_c,
-            nresult,
+            n_result,
+        )
+
+    def evaluate_kernel_mt(self, eval_type, sources, targets, charges, result):
+        """Evaluate associated kernel function in multi threaded mode
+
+        Args:
+            eval_type (EvalType): Value or ValueDeriv
+            sources (np.array): 1D buffer of source points, expected in Fortran order [x_1, x_2, ..., x_N, y_1, y_2, .., y_N, z_1, z_2, z_N]
+            targets (np.array): 1D buffer of target points, expected in Fortran order [x_1, x_2, ..., x_N, y_1, y_2, .., y_N, z_1, z_2, z_N]
+            charges (np.array): 1D buffer of charge associated with source points.
+            result (np.array): 1D buffer of result data, associated with target points.
+        """
+
+        dim = 3
+
+        if eval_type == EvalType.Value:
+            eval_type = True
+        elif eval_type == EvalType.ValueDeriv:
+            eval_type = False
+        else:
+            raise TypeError("Unrecognised eval_type")
+
+        try:
+            assert len(charges) == len(sources) // dim
+        except:
+            raise TypeError("Number of charges must match number of sources")
+
+        try:
+            assert result.dtype == charges.dtype
+        except:
+            raise TypeError("dtype of result must match source/charge/target data")
+
+        try:
+            if eval_type:
+                assert len(result) == len(targets) // dim
+            else:
+                assert len(result) // 4 == len(targets) // dim
+
+        except:
+            raise TypeError("result vector must match number of targets")
+
+        n_sources = len(sources)
+        n_targets = len(targets)
+        n_charges = len(charges)
+        n_result = len(result)
+        sources_c = ffi.cast("void* ", sources.ctypes.data)
+        targets_c = ffi.cast("void* ", targets.ctypes.data)
+        charges_c = ffi.cast("void* ", charges.ctypes.data)
+        result_c = ffi.cast("void* ", result.ctypes.data)
+
+        lib.evaluate_kernel_mt(
+            self._fmm,
+            eval_type,
+            sources_c,
+            n_sources,
+            targets_c,
+            n_targets,
+            charges_c,
+            n_charges,
+            result_c,
+            n_result,
         )
 
     def coordinates_source_tree(self, leaf):

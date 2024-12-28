@@ -4184,7 +4184,7 @@ pub mod api {
         }
     }
 
-    /// Evaluate the kernel
+    /// Evaluate the kernel in single threaded mode
     ///
     /// # Parameters
     ///
@@ -4392,6 +4392,220 @@ pub mod api {
                         (*fmm)
                             .kernel()
                             .evaluate_st(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+        }
+    }
+
+    /// Evaluate the kernel in multithreaded mode
+    ///
+    /// # Parameters
+    ///
+    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `result`: A pointer to the results associated with the target points.
+    /// - `n_charges`: The length of the charges buffer.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn evaluate_kernel_mt(
+        fmm: *mut FmmEvaluator,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        result: *mut c_void,
+        nresult: usize,
+    ) {
+        assert!(!fmm.is_null());
+
+        let ctype = unsafe { (*fmm).get_ctype() };
+        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+        let pointer = unsafe { (*fmm).get_pointer() };
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        match ctype {
+            FmmCType::Laplace32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+
+            FmmCType::Laplace64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm =
+                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut f64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+
+            FmmCType::Helmholtz32 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c32, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+            },
+
+            FmmCType::Helmholtz64 => match ctranslation_type {
+                FmmTranslationCType::Fft => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
+                    };
+                }
+
+                FmmTranslationCType::Blas => {
+                    let fmm = pointer
+                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+
+                    let sources =
+                        unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+                    let targets =
+                        unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+                    let result =
+                        unsafe { std::slice::from_raw_parts_mut(result as *mut c64, nresult) };
+                    let charges =
+                        unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+
+                    unsafe {
+                        (*fmm)
+                            .kernel()
+                            .evaluate_mt(eval_type, sources, targets, charges, result)
                     };
                 }
             },
