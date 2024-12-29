@@ -865,7 +865,7 @@ class KiFmm:
         coords_p = lib.surface(alpha, expansion_order, key)
 
         coords = KiFmm._cast_to_numpy_array(
-            coord_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
+            coords_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
         )
 
         return coords
@@ -1151,7 +1151,7 @@ class KiFmm:
         if self._evaluated:
             coords_p = lib.coordinates_source_tree(self._fmm, leaf)
             coords = KiFmm._cast_to_numpy_array(
-                coord_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
+                coords_p.data, coords_p.len, self._field_translation.kernel.dtype, ffi
             )
 
         return coords

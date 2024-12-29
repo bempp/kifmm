@@ -138,7 +138,11 @@ mod test {
             fmm::ChargeHandler,
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         },
-        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
+        tree::{
+            constants::ALPHA_INNER,
+            helpers::{points_fixture, points_fixture_sphere},
+            types::MortonKey,
+        },
         BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder,
         SingleNodeFmmTree,
     };
@@ -320,7 +324,7 @@ mod test {
             GreenKernelEvalType::ValueDeriv => 4,
         };
 
-        let leaf_idx = 0;
+        let mut leaf_idx = 0;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
 
@@ -591,6 +595,8 @@ mod test {
         let max = None;
         let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
         let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
+        let sources = points_fixture_sphere(n_sources);
+        let targets = points_fixture_sphere(n_targets);
 
         // FMM parameters
         let n_crit = Some(100);
