@@ -206,6 +206,7 @@ where
     /// Parameters
     pub fn parameters(
         mut self,
+        charges: &[Scalar],
         expansion_order: usize,
         kernel: Kernel,
         source_to_target: FieldTranslation,
@@ -226,6 +227,7 @@ where
             self.source_to_target = Some(source_to_target);
             self.equivalent_surface_order = Some(expansion_order);
             self.check_surface_order = Some(expansion_order);
+            self.charges = Some(charges.to_vec()); // un-ordered charges
             Ok(self)
         }
     }
@@ -402,8 +404,7 @@ where
                 result.global_fmm.displacements(None);
             }
 
-            // pass dummy charges for now.
-            result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]);
+            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
             result.displacements(None);
 
             Ok(result)

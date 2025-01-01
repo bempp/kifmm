@@ -27,6 +27,10 @@ where
     type Kernel = Kernel;
     type Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>;
 
+    fn charges(&self) -> Option<&[Self::Scalar]> {
+        Some(&self.charges)
+    }
+
     fn dim(&self) -> usize {
         self.dim
     }

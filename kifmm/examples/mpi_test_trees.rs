@@ -41,6 +41,7 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let charges = vec![1f32; n_points];
 
     ThreadPoolBuilder::new()
         .num_threads(1)
@@ -58,7 +59,7 @@ fn main() {
             sort_kind,
         )
         .unwrap()
-        .parameters(expansion_order, kernel, source_to_target)
+        .parameters(&charges, expansion_order, kernel, source_to_target)
         .unwrap()
         .build()
         .unwrap();

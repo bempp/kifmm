@@ -74,6 +74,9 @@ pub trait DataAccessMulti {
     /// * `level` - The tree level.
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
 
+    /// All charges held locally
+    fn charges(&self) -> Option<&[Self::Scalar]>;
+
     /// Get the local expansion data associated with a tree level as a slice
     /// # Arguments
     /// * `level` - The tree level.
