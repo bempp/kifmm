@@ -37,10 +37,10 @@ required-features = ["mpi"]
 
 [[bin]]
 name = "fmm_m2l_fft_mpi_f64"
-path = "src/bin/fmm_m2l_fft_mpi_f32.rs"
+path = "src/bin/fmm_m2l_fft_mpi_f64.rs"
 required-features = ["mpi"]
 
 [[bin]]
 name = "fmm_m2l_blas_mpi_f64"
-path = "src/bin/fmm_m2l_blas_mpi_f32.rs"
+path = "src/bin/fmm_m2l_blas_mpi_f64.rs"
 required-features = ["mpi"]
