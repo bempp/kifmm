@@ -1,13 +1,7 @@
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::{
-        helpers::single_node::{
-            leaf_expansion_pointers_single_node, level_expansion_pointers_single_node, map_charges,
-            potential_pointers_single_node,
-        },
-        types::FmmEvalType,
-    },
+    fmm::types::FmmEvalType,
     traits::{
         field::FieldTranslation as FieldTranslationTrait,
         fmm::{DataAccess, HomogenousKernel, MetadataAccess},
@@ -227,67 +221,5 @@ where
 
     fn potentials(&self) -> Option<&Vec<Self::Scalar>> {
         Some(&self.potentials)
-    }
-
-    fn clear(&mut self, charges: &[<Self as DataAccess>::Scalar]) {
-        let n_source_points = self.tree().source_tree().n_coordinates_tot().unwrap();
-        let n_matvecs = charges.len() / n_source_points;
-
-        // Clear buffers and set new buffers
-        self.multipoles = vec![Scalar::default(); self.multipoles.len()];
-        self.locals = vec![Scalar::default(); self.locals.len()];
-        self.potentials = vec![Scalar::default(); self.potentials.len()];
-        self.charges = vec![Scalar::default(); self.charges.len()];
-
-        // Recreate mutable pointers for new buffers
-        let potentials_send_pointers = potential_pointers_single_node(
-            self.tree.target_tree(),
-            n_matvecs,
-            self.kernel_eval_size,
-            &self.potentials,
-        );
-
-        let leaf_multipoles = leaf_expansion_pointers_single_node(
-            self.tree().source_tree(),
-            &self.n_coeffs_equivalent_surface,
-            n_matvecs,
-            &self.multipoles,
-        );
-
-        let level_multipoles = level_expansion_pointers_single_node(
-            self.tree().source_tree(),
-            &self.n_coeffs_equivalent_surface,
-            n_matvecs,
-            &self.multipoles,
-        );
-
-        let level_locals = level_expansion_pointers_single_node(
-            self.tree().target_tree(),
-            &self.n_coeffs_equivalent_surface,
-            n_matvecs,
-            &self.locals,
-        );
-
-        let leaf_locals = leaf_expansion_pointers_single_node(
-            self.tree().target_tree(),
-            &self.n_coeffs_equivalent_surface,
-            n_matvecs,
-            &self.locals,
-        );
-
-        // Set mutable pointers
-        self.level_locals = level_locals;
-        self.level_multipoles = level_multipoles;
-        self.leaf_locals = leaf_locals;
-        self.leaf_multipoles = leaf_multipoles;
-        self.potentials_send_pointers = potentials_send_pointers;
-
-        // Set new charges
-        self.charges = map_charges(
-            self.tree.source_tree().all_global_indices().unwrap(),
-            charges,
-            n_matvecs,
-        )
-        .to_vec();
     }
 }

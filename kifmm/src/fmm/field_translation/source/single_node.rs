@@ -109,18 +109,18 @@ where
                             scaled_check_potential.scale_inplace(scale[0]);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_1[operator_index].view(),
+                                self.uc2e_inv_1[operator_index].r(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_2[operator_index].view(),
+                                    self.uc2e_inv_2[operator_index].r(),
                                     scaled_check_potential,
                                 ),
                             )
                         } else {
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_1[operator_index].view(),
+                                self.uc2e_inv_1[operator_index].r(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_2[operator_index].view(),
-                                    check_potential.view(),
+                                    self.uc2e_inv_2[operator_index].r(),
+                                    check_potential.r(),
                                 ),
                             )
                         };
@@ -213,18 +213,18 @@ where
                             scaled_check_potential.scale_inplace(scale[0]);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_1[operator_index].view(),
+                                self.uc2e_inv_1[operator_index].r(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_2[operator_index].view(),
-                                    scaled_check_potential.view(),
+                                    self.uc2e_inv_2[operator_index].r(),
+                                    scaled_check_potential.r(),
                                 ),
                             )
                         } else {
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.uc2e_inv_1[operator_index].view(),
+                                self.uc2e_inv_1[operator_index].r(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.uc2e_inv_2[operator_index].view(),
-                                    check_potential.view(),
+                                    self.uc2e_inv_2[operator_index].r(),
+                                    check_potential.r(),
                                 ),
                             )
                         };
@@ -305,7 +305,7 @@ where
 
                             let parent_multipoles_chunk = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    self.source[operator_index].view(),
+                                    self.source[operator_index].r(),
                                     child_multipoles_chunk_mat,
                                 );
 
@@ -367,7 +367,7 @@ where
                             );
 
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.source_vec[operator_index][i].view(),
+                                self.source_vec[operator_index][i].r(),
                                 child_multipoles_i,
                             );
 

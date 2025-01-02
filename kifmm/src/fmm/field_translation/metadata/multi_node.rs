@@ -108,8 +108,7 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let uc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let uc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r())];
 
         let uc2e_inv_2 = vec![ut];
 
@@ -134,15 +133,13 @@ where
             );
 
             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), ce2pc.view()),
+                uc2e_inv_1[0].r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].r(), ce2pc.r()),
             );
 
             let tmp1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), ce2pc.view()),
+                uc2e_inv_1[0].r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].r(), ce2pc.r()),
             );
 
             let l = i * n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
@@ -208,8 +205,7 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let dc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let dc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r())];
         let dc2e_inv_2 = vec![ut];
 
         let mut dc2e_inv_1_global = dc2e_inv_1
@@ -252,9 +248,8 @@ where
             );
 
             let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                dc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(dc2e_inv_2[0].view(), pe2cc.view()),
+                dc2e_inv_1[0].r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[0].r(), pe2cc.r()),
             );
 
             tmp.data_mut()
@@ -395,17 +390,17 @@ where
                 tmp_gram.data_mut(),
             );
 
-            let mut block = se2tc_fat.view_mut().into_subview(
+            let mut block = se2tc_fat.r_mut().into_subview(
                 [0, i * n_coeffs_equivalent_surface],
                 [n_coeffs_check_surface, n_coeffs_equivalent_surface],
             );
-            block.fill_from(tmp_gram.view_mut());
+            block.fill_from(tmp_gram.r_mut());
 
-            let mut block_column = se2tc_thin.view_mut().into_subview(
+            let mut block_column = se2tc_thin.r_mut().into_subview(
                 [i * n_coeffs_check_surface, 0],
                 [n_coeffs_check_surface, n_coeffs_equivalent_surface],
             );
-            block_column.fill_from(tmp_gram.view());
+            block_column.fill_from(tmp_gram.r());
         }
 
         let mu = se2tc_fat.shape()[0];
@@ -436,10 +431,10 @@ where
                 }
 
                 let mut se2tc_fat_transpose =
-                    rlst_dynamic_array2!(Scalar, se2tc_fat.view().transpose().shape());
+                    rlst_dynamic_array2!(Scalar, se2tc_fat.r().transpose().shape());
                 se2tc_fat_transpose
-                    .view_mut()
-                    .fill_from(se2tc_fat.view().transpose());
+                    .r_mut()
+                    .fill_from(se2tc_fat.r().transpose());
 
                 let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
                     &se2tc_fat_transpose,
@@ -459,8 +454,8 @@ where
             FmmSvdMode::Deterministic => {
                 se2tc_fat
                     .into_svd_alloc(
-                        u_big.view_mut(),
-                        vt_big.view_mut(),
+                        u_big.r_mut(),
+                        vt_big.r_mut(),
                         &mut sigma[..],
                         SvdMode::Reduced,
                     )
@@ -482,8 +477,8 @@ where
 
         // Store compressed M2L operators
         let nst = se2tc_thin.shape()[1];
-        let mut st = rlst_dynamic_array2!(Scalar, u_big.view().transpose().shape());
-        st.fill_from(u_big.view().transpose());
+        let mut st = rlst_dynamic_array2!(Scalar, u_big.r().transpose().shape());
+        st.fill_from(u_big.r().transpose());
         u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
         vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
 
@@ -515,21 +510,21 @@ where
         }
 
         (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-            let vt_block = vt.view().into_subview(
+            let vt_block = vt.r().into_subview(
                 [0, i * n_coeffs_check_surface],
                 [cutoff_rank, n_coeffs_check_surface],
             );
 
             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                sigma_mat.view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+                sigma_mat.r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.r(), s_trunc.r()),
             );
 
             let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
             let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
             let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
 
-            tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+            tmp.into_svd_alloc(u_i.r_mut(), vt_i.r_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
 
             let directional_cutoff_rank =
@@ -555,7 +550,7 @@ where
             }
 
             let vt_i_compressed = empty_array::<Scalar, 2>()
-                .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
+                .simple_mult_into_resize(sigma_mat_i_compressed.r(), vt_i_compressed_.r());
 
             directional_cutoff_ranks.lock().unwrap()[i] = directional_cutoff_rank;
             c_u.lock().unwrap()[i] = u_i_compressed;
@@ -899,7 +894,7 @@ where
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft =
                     rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
-                k_ft.fill_from(k_f_.view());
+                k_ft.fill_from(k_f_.r());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
         }

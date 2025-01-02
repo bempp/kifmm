@@ -48,9 +48,9 @@ where
         let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
 
         let mut mat_copy = rlst_dynamic_array2!(T, shape);
-        mat_copy.fill_from(mat.view());
+        mat_copy.fill_from(mat.r());
         mat_copy
-            .into_svd_alloc(u.view_mut(), vt.view_mut(), &mut s[..], SvdMode::Reduced)
+            .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
             .unwrap();
 
         let eps = T::real(T::epsilon());
@@ -102,11 +102,11 @@ mod test {
         }
 
         let inv = empty_array::<f64, 2>().simple_mult_into_resize(
-            v.view(),
-            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.view(), ut.view()),
+            v.r(),
+            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.r(), ut.r()),
         );
 
-        let actual = empty_array::<f64, 2>().simple_mult_into_resize(inv.view(), mat.view());
+        let actual = empty_array::<f64, 2>().simple_mult_into_resize(inv.r(), mat.r());
 
         // Expect the identity matrix
         let mut expected = rlst_dynamic_array2!(f64, actual.shape());
@@ -139,11 +139,11 @@ mod test {
         }
 
         let inv = empty_array::<f64, 2>().simple_mult_into_resize(
-            v.view(),
-            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.view(), ut.view()),
+            v.r(),
+            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.r(), ut.r()),
         );
 
-        let actual = empty_array::<f64, 2>().simple_mult_into_resize(mat.view(), inv.view());
+        let actual = empty_array::<f64, 2>().simple_mult_into_resize(mat.r(), inv.r());
 
         // Expect the identity matrix
         let mut expected = rlst_dynamic_array2!(f64, actual.shape());

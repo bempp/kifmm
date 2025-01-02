@@ -720,10 +720,13 @@ where
     pub cutoff_ranks: Vec<Vec<usize>>,
 
     /// The map between sources/targets in the field translation, indexed by level, then by source index.
-    pub displacements: Vec<Vec<RwLock<Vec<usize>>>>,
+    pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
+
+    /// Select SVD algorithm for compression, either deterministic or randomised
+    pub svd_mode: FmmSvdMode,
 }
 
 /// Represents the vector between a source and target boxes encoded by Morton keys.

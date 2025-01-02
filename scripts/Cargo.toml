@@ -6,8 +6,10 @@ edition = "2021"
 [dependencies]
 kifmm ={ path = "../kifmm", features = ["mpi"]}
 itertools = "0.13.*"
-green-kernels = { version = "0.2.2", default-features = false }
-rlst = {version = "0.2.0", default-features = false}
+#green-kernels = { version = "0.2.2", default-features = false }
+green-kernels = { git = "https://github.com/bempp/green-kernels.git"}
+#rlst = {version = "0.2.0", default-features = false}
+rlst = { git = "https://github.com/linalg-rs/rlst.git", features = ["mpi"]}
 rand = "0.8.5"
 num = "0.4"
 csv = "1.3.0"

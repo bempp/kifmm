@@ -17,3 +17,5 @@ mod ghost_exchange;
 pub mod layout;
 #[cfg(feature = "mpi")]
 mod neighbour_comm;
+
+mod charge_handler;

@@ -29,7 +29,7 @@ jobs:
         with:
           mpi: ${{ matrix.mpi }}
       - name: Install cargo-mpirun
-        run: cargo install cargo-mpirun
+        run: cargo install cargo-mpirun --force
       - uses: actions/checkout@v3
       - name: Install Blas
         run: sudo apt-get install -y libopenblas-dev

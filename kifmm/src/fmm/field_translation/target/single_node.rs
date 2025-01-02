@@ -91,8 +91,8 @@ where
 
                         for i in 0..NSIBLINGS {
                             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.target_vec[operator_index][i].view(),
-                                parent_locals.view(),
+                                self.target_vec[operator_index][i].r(),
+                                parent_locals.r(),
                             );
 
                             for j in 0..chunk_size {
@@ -160,8 +160,8 @@ where
                             child_locals_pointers.iter().enumerate().take(NSIBLINGS)
                         {
                             let result_i = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.target_vec[operator_index][i].view(),
-                                parent_locals.view(),
+                                self.target_vec[operator_index][i].r(),
+                                parent_locals.r(),
                             );
 
                             for (j, child_locals_ij) in

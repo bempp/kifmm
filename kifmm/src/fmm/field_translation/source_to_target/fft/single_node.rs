@@ -346,9 +346,9 @@ where
 
                             // Can now find local expansion coefficients
                             let local_chunk = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_1[c2e_operator_index].view(),
+                                self.dc2e_inv_1[c2e_operator_index].r(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.dc2e_inv_2[c2e_operator_index].view(),
+                                    self.dc2e_inv_2[c2e_operator_index].r(),
                                     potential_chunk,
                                 ),
                             );

@@ -121,8 +121,7 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            uc2e_inv_1
-                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            uc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
             uc2e_inv_2.push(ut);
         }
 
@@ -168,10 +167,10 @@ where
                 );
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    uc2e_inv_1[self.expansion_index(parent_level as u64)].view(),
+                    uc2e_inv_1[self.expansion_index(parent_level as u64)].r(),
                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        uc2e_inv_2[self.expansion_index(parent_level as u64)].view(),
-                        ce2pc.view(),
+                        uc2e_inv_2[self.expansion_index(parent_level as u64)].r(),
+                        ce2pc.r(),
                     ),
                 );
 
@@ -244,8 +243,7 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            dc2e_inv_1
-                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            dc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
             dc2e_inv_2.push(ut);
         }
 
@@ -286,10 +284,10 @@ where
                 );
 
                 let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    dc2e_inv_1[self.expansion_index(parent_level + 1)].view(),
+                    dc2e_inv_1[self.expansion_index(parent_level + 1)].r(),
                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        dc2e_inv_2[self.expansion_index(parent_level + 1)].view(),
-                        pe2cc.view(),
+                        dc2e_inv_2[self.expansion_index(parent_level + 1)].r(),
+                        pe2cc.r(),
                     ),
                 );
 
@@ -374,8 +372,7 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            uc2e_inv_1
-                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            uc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
             uc2e_inv_2.push(ut);
 
             curr = curr.first_child();
@@ -446,9 +443,9 @@ where
                 );
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    uc2e_inv_1[level as usize].view(),
+                    uc2e_inv_1[level as usize].r(),
                     empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(uc2e_inv_2[level as usize].view(), ce2pc.view()),
+                        .simple_mult_into_resize(uc2e_inv_2[level as usize].r(), ce2pc.r()),
                 );
                 let l = i * nequiv_surface_child * nequiv_surface_parent;
                 let r = l + nequiv_surface_child * nequiv_surface_parent;
@@ -535,8 +532,7 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            dc2e_inv_1
-                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view()));
+            dc2e_inv_1.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
             dc2e_inv_2.push(ut);
             curr = curr.first_child();
         }
@@ -599,11 +595,9 @@ where
                 );
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    dc2e_inv_1[(level + 1) as usize].view(),
-                    empty_array::<Scalar, 2>().simple_mult_into_resize(
-                        dc2e_inv_2[(level + 1) as usize].view(),
-                        pe2cc.view(),
-                    ),
+                    dc2e_inv_1[(level + 1) as usize].r(),
+                    empty_array::<Scalar, 2>()
+                        .simple_mult_into_resize(dc2e_inv_2[(level + 1) as usize].r(), pe2cc.r()),
                 );
 
                 l2l.push(tmp);
@@ -622,7 +616,7 @@ where
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixSvd,
+    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixRsvd,
     <Scalar as RlstScalar>::Real: Default,
 {
     fn displacements(&mut self, start_level: Option<u64>) {
@@ -641,7 +635,7 @@ where
             let sources = self.tree.source_tree().keys(level).unwrap();
             let n_sources = sources.len();
             let m2l_operator_index = self.m2l_operator_index(level);
-            let sentinel = n_sources;
+            let sentinel = -1i32;
 
             let result = vec![vec![sentinel; n_sources]; 316];
             let result = result.into_iter().map(RwLock::new).collect_vec();
@@ -693,7 +687,7 @@ where
                             let &target_idx = self.level_index_pointer_locals[level as usize]
                                 .get(target)
                                 .unwrap();
-                            all_displacements_lock[source_idx] = target_idx;
+                            all_displacements_lock[source_idx] = target_idx as i32;
                         }
                     }
                 });
@@ -785,14 +779,48 @@ where
                     let mut sigma = vec![Scalar::zero().re(); k];
                     let mut vt = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
-                    tmp_gram
-                        .into_svd_alloc(
-                            u.view_mut(),
-                            vt.view_mut(),
-                            &mut sigma[..],
-                            SvdMode::Reduced,
-                        )
-                        .unwrap();
+                    let target_rank;
+
+                    match &self.source_to_target.svd_mode {
+                        &FmmSvdMode::Random {
+                            n_components,
+                            normaliser,
+                            n_oversamples,
+                            random_state,
+                        } => {
+                            // Estimate targget rank if unspecified by user
+                            if let Some(n_components) = n_components {
+                                target_rank = n_components
+                            } else {
+                                let max_equivalent_surface_ncoeffs =
+                                    self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                                let max_check_surface_ncoeffs =
+                                    self.n_coeffs_check_surface.iter().max().unwrap();
+                                target_rank =
+                                    *max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs);
+                            }
+
+                            (sigma, u, vt) = Scalar::rsvd_fixed_rank(
+                                &tmp_gram,
+                                target_rank,
+                                n_oversamples,
+                                normaliser,
+                                random_state,
+                            )
+                            .unwrap();
+                        }
+
+                        FmmSvdMode::Deterministic => {
+                            tmp_gram
+                                .into_svd_alloc(
+                                    u.r_mut(),
+                                    vt.r_mut(),
+                                    &mut sigma[..],
+                                    SvdMode::Reduced,
+                                )
+                                .unwrap();
+                        }
+                    }
 
                     let mut sigma_mat = rlst_dynamic_array2!(Scalar, [k, k]);
 
@@ -802,8 +830,8 @@ where
                         }
                     }
 
-                    let vt = empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(sigma_mat.view(), vt.view());
+                    let vt =
+                        empty_array::<Scalar, 2>().simple_mult_into_resize(sigma_mat.r(), vt.r());
 
                     let cutoff_rank =
                         find_cutoff_rank(&sigma, self.source_to_target.threshold, n_sources);
@@ -832,6 +860,386 @@ where
         }
 
         self.source_to_target = result;
+    }
+}
+
+impl<Scalar> SourceToTargetTranslationMetadata
+    for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
+where
+    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixRsvd,
+    <Scalar as RlstScalar>::Real: Default,
+{
+    fn displacements(&mut self, start_level: Option<u64>) {
+        let mut displacements = Vec::new();
+        let start_level = if let Some(start_level) = start_level {
+            if start_level >= 2 {
+                start_level
+            } else {
+                2
+            }
+        } else {
+            2
+        };
+
+        for level in start_level..=self.tree.source_tree().depth() {
+            let sources = self.tree.source_tree().keys(level).unwrap();
+            let n_sources = sources.len();
+            let sentinel = -1i32;
+
+            let result = vec![vec![sentinel; n_sources]; 316];
+            let result = result.into_iter().map(RwLock::new).collect_vec();
+
+            sources
+                .into_par_iter()
+                .enumerate()
+                .for_each(|(source_idx, source)| {
+                    // Find interaction list of each source, as this defines scatter locations
+                    let interaction_list = source
+                        .parent()
+                        .neighbors()
+                        .iter()
+                        .flat_map(|pn| pn.children())
+                        .filter(|pnc| {
+                            !source.is_adjacent(pnc)
+                                && self
+                                    .tree
+                                    .target_tree()
+                                    .all_keys_set()
+                                    .unwrap()
+                                    .contains(pnc)
+                        })
+                        .collect_vec();
+
+                    let transfer_vectors = interaction_list
+                        .iter()
+                        .map(|target| source.find_transfer_vector(target).unwrap())
+                        .collect_vec();
+
+                    let mut transfer_vectors_map = HashMap::new();
+                    for (i, v) in transfer_vectors.iter().enumerate() {
+                        transfer_vectors_map.insert(v, i);
+                    }
+
+                    let transfer_vectors_set: HashSet<_> =
+                        transfer_vectors.iter().cloned().collect();
+
+                    // Mark items in interaction list for scattering
+                    for (tv_idx, tv) in self.source_to_target.transfer_vectors.iter().enumerate() {
+                        let mut all_displacements_lock = result[tv_idx].write().unwrap();
+                        if transfer_vectors_set.contains(&tv.hash) {
+                            // Look up scatter location in target tree
+                            let target =
+                                &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                            let &target_idx = self.level_index_pointer_locals[level as usize]
+                                .get(target)
+                                .unwrap();
+                            all_displacements_lock[source_idx] = target_idx as i32;
+                        }
+                    }
+                });
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
+    fn source_to_target(&mut self) {
+        // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
+        // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
+        let depth = self.tree.source_tree().depth();
+
+        let iterator = if self.equivalent_surface_order.len() > 1 {
+            (2..=depth)
+                .zip(self.equivalent_surface_order.iter().skip(2).cloned())
+                .zip(self.check_surface_order.iter().skip(2).cloned())
+                .collect_vec()
+        } else {
+            (2..=depth)
+                .zip(vec![
+                    *self.equivalent_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .zip(vec![
+                    *self.check_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .collect_vec()
+        };
+
+        for ((level, equivalent_surface_order), check_surface_order) in iterator {
+            let transfer_vectors =
+                compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
+
+            let nrows = ncoeffs_kifmm(check_surface_order);
+            let ncols = ncoeffs_kifmm(equivalent_surface_order);
+
+            let mut se2tc_fat =
+                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+            let mut se2tc_thin =
+                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+            let alpha = Scalar::real(ALPHA_INNER);
+
+            transfer_vectors.iter().enumerate().for_each(|(i, t)| {
+                let source_equivalent_surface = t.source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+                let target_check_surface = t.target.surface_grid(
+                    check_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
+
+                self.kernel.assemble_st(
+                    GreenKernelEvalType::Value,
+                    &target_check_surface[..],
+                    &source_equivalent_surface[..],
+                    tmp_gram.data_mut(),
+                );
+
+                let mut block = se2tc_fat
+                    .r_mut()
+                    .into_subview([0, i * ncols], [nrows, ncols]);
+                block.fill_from(tmp_gram.r());
+
+                let mut block_column = se2tc_thin
+                    .r_mut()
+                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                block_column.fill_from(tmp_gram.r());
+            });
+
+            let mu = se2tc_fat.shape()[0];
+            let nvt = se2tc_fat.shape()[1];
+            let k = std::cmp::min(mu, nvt);
+
+            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut sigma = vec![Scalar::zero().re(); k];
+            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+
+            // Target rank defined by max dimension before cutoff
+            let mut target_rank = k;
+
+            match &self.source_to_target.svd_mode {
+                &FmmSvdMode::Random {
+                    n_components,
+                    normaliser,
+                    n_oversamples,
+                    random_state,
+                } => {
+                    // Estimate target rank if unspecified by user
+                    if let Some(n_components) = n_components {
+                        target_rank = n_components
+                    } else {
+                        let max_equivalent_surface_ncoeffs =
+                            self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                        let max_check_surface_ncoeffs =
+                            self.n_coeffs_check_surface.iter().max().unwrap();
+                        target_rank =
+                            max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                    }
+
+                    let mut se2tc_fat_transpose =
+                        rlst_dynamic_array2!(Scalar, se2tc_fat.r().transpose().shape());
+                    se2tc_fat_transpose
+                        .r_mut()
+                        .fill_from(se2tc_fat.r().transpose());
+
+                    let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
+                        &se2tc_fat_transpose,
+                        target_rank,
+                        n_oversamples,
+                        normaliser,
+                        random_state,
+                    )
+                    .unwrap();
+                    u_big = rlst_dynamic_array2!(Scalar, [mu, sigma_t.len()]);
+                    vt_big = rlst_dynamic_array2!(Scalar, [sigma_t.len(), nvt]);
+
+                    vt_big.fill_from(u_big_t.transpose());
+                    u_big.fill_from(vt_big_t.transpose());
+                    sigma = sigma_t;
+                }
+                FmmSvdMode::Deterministic => {
+                    se2tc_fat
+                        .into_svd_alloc(
+                            u_big.r_mut(),
+                            vt_big.r_mut(),
+                            &mut sigma[..],
+                            SvdMode::Reduced,
+                        )
+                        .unwrap();
+                }
+            }
+
+            // Cutoff rank is the minimum of the target rank and the value found by user threshold
+            let cutoff_rank =
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
+
+            let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
+            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+            let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+
+            // Store compressed M2L operators
+            let thin_nrows = se2tc_thin.shape()[0];
+            let nst = se2tc_thin.shape()[1];
+            let k = std::cmp::min(thin_nrows, nst);
+            let mut st;
+            let mut _gamma;
+            let mut _r;
+
+            if self.source_to_target.surface_diff() == 0 {
+                st = rlst_dynamic_array2!(Scalar, u_big.r().transpose().shape());
+                st.fill_from(u_big.r().transpose())
+            } else {
+                match &self.source_to_target.svd_mode {
+                    &FmmSvdMode::Random {
+                        n_components,
+                        normaliser,
+                        n_oversamples,
+                        random_state,
+                    } => {
+                        let target_rank;
+                        if let Some(n_components) = n_components {
+                            target_rank = n_components
+                        } else {
+                            // Estimate target rank
+                            let max_equivalent_surface_ncoeffs =
+                                self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                            let max_check_surface_ncoeffs =
+                                self.n_coeffs_check_surface.iter().max().unwrap();
+                            target_rank =
+                                max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                        }
+
+                        (_gamma, _r, st) = Scalar::rsvd_fixed_rank(
+                            &se2tc_thin,
+                            target_rank,
+                            n_oversamples,
+                            normaliser,
+                            random_state,
+                        )
+                        .unwrap();
+                    }
+                    FmmSvdMode::Deterministic => {
+                        _r = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
+                        _gamma = vec![Scalar::zero().re(); k];
+                        st = rlst_dynamic_array2!(Scalar, [k, nst]);
+                        se2tc_thin
+                            .into_svd_alloc(
+                                _r.r_mut(),
+                                st.r_mut(),
+                                &mut _gamma[..],
+                                SvdMode::Reduced,
+                            )
+                            .unwrap();
+                    }
+                }
+            }
+
+            u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
+            vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
+            for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
+                unsafe {
+                    *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                }
+            }
+
+            let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
+            for j in 0..cutoff_rank {
+                for i in 0..nst {
+                    unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
+                }
+            }
+
+            let c_u = Mutex::new(Vec::new());
+            let c_vt = Mutex::new(Vec::new());
+            let directional_cutoff_ranks =
+                Mutex::new(vec![0usize; self.source_to_target.transfer_vectors.len()]);
+
+            for _ in 0..NTRANSFER_VECTORS_KIFMM {
+                c_u.lock()
+                    .unwrap()
+                    .push(rlst_dynamic_array2!(Scalar, [1, 1]));
+                c_vt.lock()
+                    .unwrap()
+                    .push(rlst_dynamic_array2!(Scalar, [1, 1]));
+            }
+
+            (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
+                let vt_block = vt.r().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat.r(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.r(), s_trunc.r()),
+                );
+
+                let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+                let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
+                let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+
+                tmp.into_svd_alloc(u_i.r_mut(), vt_i.r_mut(), &mut sigma_i, SvdMode::Full)
+                    .unwrap();
+
+                let directional_cutoff_rank =
+                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold, cutoff_rank);
+
+                let mut u_i_compressed =
+                    rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
+                let mut vt_i_compressed_ =
+                    rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
+
+                let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
+                    Scalar,
+                    [directional_cutoff_rank, directional_cutoff_rank]
+                );
+
+                u_i_compressed
+                    .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
+                vt_i_compressed_
+                    .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
+
+                for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+                    unsafe {
+                        *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
+                            Scalar::from(*s).unwrap();
+                    }
+                }
+
+                let vt_i_compressed = empty_array::<Scalar, 2>()
+                    .simple_mult_into_resize(sigma_mat_i_compressed.r(), vt_i_compressed_.r());
+
+                directional_cutoff_ranks.lock().unwrap()[i] = directional_cutoff_rank;
+                c_u.lock().unwrap()[i] = u_i_compressed;
+                c_vt.lock().unwrap()[i] = vt_i_compressed;
+            });
+
+            let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
+            st_trunc.fill_from(s_trunc.transpose());
+
+            let c_vt = std::mem::take(&mut *c_vt.lock().unwrap());
+            let c_u = std::mem::take(&mut *c_u.lock().unwrap());
+            let directional_cutoff_ranks =
+                std::mem::take(&mut *directional_cutoff_ranks.lock().unwrap());
+
+            let result = BlasMetadataSaRcmp {
+                u,
+                st: st_trunc,
+                c_u,
+                c_vt,
+            };
+
+            self.source_to_target.metadata.push(result);
+            self.source_to_target.cutoff_rank.push(cutoff_rank);
+            self.source_to_target
+                .directional_cutoff_ranks
+                .push(directional_cutoff_ranks);
+        }
+
+        // self.source_to_target = result;
     }
 }
 
@@ -1144,7 +1552,7 @@ where
                         <Scalar as DftType>::OutputType,
                         [NSIBLINGS, NSIBLINGS]
                     );
-                    k_ft.fill_from(k_f_.view());
+                    k_ft.fill_from(k_f_.r());
                     kernel_data_ft.push(k_ft.data().to_vec());
                 }
             }
@@ -1363,7 +1771,7 @@ where
                             <Scalar as DftType>::OutputType,
                             [NSIBLINGS, NSIBLINGS]
                         );
-                        k_ft.fill_from(k_f_.view());
+                        k_ft.fill_from(k_f_.r());
                         kernel_data_ft.push(k_ft.data().to_vec());
                     }
                 }
@@ -1540,14 +1948,14 @@ where
                 );
 
                 let mut block = se2tc_fat
-                    .view_mut()
+                    .r_mut()
                     .into_subview([0, i * ncols], [nrows, ncols]);
-                block.fill_from(tmp_gram.view());
+                block.fill_from(tmp_gram.r());
 
                 let mut block_column = se2tc_thin
-                    .view_mut()
+                    .r_mut()
                     .into_subview([i * nrows, 0], [nrows, ncols]);
-                block_column.fill_from(tmp_gram.view());
+                block_column.fill_from(tmp_gram.r());
             }
 
             let mu = se2tc_fat.shape()[0];
@@ -1581,10 +1989,10 @@ where
                     }
 
                     let mut se2tc_fat_transpose =
-                        rlst_dynamic_array2!(Scalar, se2tc_fat.view().transpose().shape());
+                        rlst_dynamic_array2!(Scalar, se2tc_fat.r().transpose().shape());
                     se2tc_fat_transpose
-                        .view_mut()
-                        .fill_from(se2tc_fat.view().transpose());
+                        .r_mut()
+                        .fill_from(se2tc_fat.r().transpose());
 
                     let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
                         &se2tc_fat_transpose,
@@ -1604,8 +2012,8 @@ where
                 FmmSvdMode::Deterministic => {
                     se2tc_fat
                         .into_svd_alloc(
-                            u_big.view_mut(),
-                            vt_big.view_mut(),
+                            u_big.r_mut(),
+                            vt_big.r_mut(),
                             &mut sigma[..],
                             SvdMode::Reduced,
                         )
@@ -1630,8 +2038,8 @@ where
             let mut _r;
 
             if self.source_to_target.surface_diff() == 0 {
-                st = rlst_dynamic_array2!(Scalar, u_big.view().transpose().shape());
-                st.fill_from(u_big.view().transpose())
+                st = rlst_dynamic_array2!(Scalar, u_big.r().transpose().shape());
+                st.fill_from(u_big.r().transpose())
             } else {
                 match &self.source_to_target.svd_mode {
                     &FmmSvdMode::Random {
@@ -1668,8 +2076,8 @@ where
                         st = rlst_dynamic_array2!(Scalar, [k, nst]);
                         se2tc_thin
                             .into_svd_alloc(
-                                _r.view_mut(),
-                                st.view_mut(),
+                                _r.r_mut(),
+                                st.r_mut(),
                                 &mut _gamma[..],
                                 SvdMode::Reduced,
                             )
@@ -1708,19 +2116,18 @@ where
             }
 
             (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-                let vt_block = vt.view().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+                let vt_block = vt.r().into_subview([0, i * ncols], [cutoff_rank, ncols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    sigma_mat.view(),
-                    empty_array::<Scalar, 2>()
-                        .simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+                    sigma_mat.r(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.r(), s_trunc.r()),
                 );
 
                 let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
                 let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
                 let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
 
-                tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+                tmp.into_svd_alloc(u_i.r_mut(), vt_i.r_mut(), &mut sigma_i, SvdMode::Full)
                     .unwrap();
 
                 let directional_cutoff_rank =
@@ -1748,10 +2155,8 @@ where
                     }
                 }
 
-                let vt_i_compressed = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                    sigma_mat_i_compressed.view(),
-                    vt_i_compressed_.view(),
-                );
+                let vt_i_compressed = empty_array::<Scalar, 2>()
+                    .simple_mult_into_resize(sigma_mat_i_compressed.r(), vt_i_compressed_.r());
 
                 directional_cutoff_ranks.lock().unwrap()[i] = directional_cutoff_rank;
                 c_u.lock().unwrap()[i] = u_i_compressed;
@@ -2213,7 +2618,7 @@ where
                         <Scalar as DftType>::OutputType,
                         [NSIBLINGS, NSIBLINGS]
                     );
-                    k_ft.fill_from(k_f_.view());
+                    k_ft.fill_from(k_f_.r());
                     kernel_data_ft.push(k_ft.data().to_vec());
                 }
             }
@@ -2572,12 +2977,17 @@ where
 {
     /// Constructor for BLAS based field translations, specify a compression threshold for the SVD compressed operators
     /// TODO: More docs
-    pub fn new(threshold: Option<Scalar::Real>, surface_diff: Option<usize>) -> Self {
+    pub fn new(
+        threshold: Option<Scalar::Real>,
+        surface_diff: Option<usize>,
+        svd_mode: FmmSvdMode,
+    ) -> Self {
         let tmp = Scalar::epsilon().re();
 
         Self {
             threshold: threshold.unwrap_or(tmp),
             surface_diff: surface_diff.unwrap_or_default(),
+            svd_mode,
             ..Default::default()
         }
     }
@@ -2672,18 +3082,17 @@ mod test {
         }
 
         let compressed_multipole = empty_array::<f64, 2>()
-            .simple_mult_into_resize(fmm.source_to_target.metadata[0].st.view(), multipole.view());
+            .simple_mult_into_resize(fmm.source_to_target.metadata[0].st.r(), multipole.r());
 
         let compressed_check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
-            c_u.view(),
-            empty_array::<f64, 2>()
-                .simple_mult_into_resize(c_vt.view(), compressed_multipole.view()),
+            c_u.r(),
+            empty_array::<f64, 2>().simple_mult_into_resize(c_vt.r(), compressed_multipole.r()),
         );
 
         // Post process to find check potential
         let check_potential = empty_array::<f64, 2>().simple_mult_into_resize(
-            fmm.source_to_target.metadata[0].u.view(),
-            compressed_check_potential.view(),
+            fmm.source_to_target.metadata[0].u.r(),
+            compressed_check_potential.r(),
         );
 
         let alpha = ALPHA_INNER;
@@ -2750,7 +3159,7 @@ mod test {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
-                BlasFieldTranslationIa::new(None, None),
+                BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
             )
             .unwrap()
             .build()
@@ -2793,8 +3202,8 @@ mod test {
         }
 
         let check_potential = empty_array::<c64, 2>().simple_mult_into_resize(
-            u.view(),
-            empty_array::<c64, 2>().simple_mult_into_resize(vt.view(), multipole.view()),
+            u.r(),
+            empty_array::<c64, 2>().simple_mult_into_resize(vt.r(), multipole.r()),
         );
 
         let alpha = ALPHA_INNER;

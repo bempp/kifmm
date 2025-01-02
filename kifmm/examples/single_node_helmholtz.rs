@@ -1,6 +1,6 @@
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::BlasFieldTranslationIa;
-use kifmm::{Evaluate, FftFieldTranslation, SingleNodeBuilder};
+use kifmm::{Evaluate, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};
@@ -70,7 +70,11 @@ fn main() {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
-                BlasFieldTranslationIa::new(singular_value_threshold, None),
+                BlasFieldTranslationIa::new(
+                    singular_value_threshold,
+                    None,
+                    FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()
@@ -99,7 +103,11 @@ fn main() {
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
-                BlasFieldTranslationIa::new(singular_value_threshold, None),
+                BlasFieldTranslationIa::new(
+                    singular_value_threshold,
+                    None,
+                    FmmSvdMode::Deterministic,
+                ),
             )
             .unwrap()
             .build()

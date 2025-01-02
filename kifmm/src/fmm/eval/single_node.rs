@@ -135,11 +135,11 @@ mod test {
     use crate::{
         fmm::types::BlasFieldTranslationIa,
         traits::{
-            fmm::DataAccess,
+            fmm::ChargeHandler,
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::MortonKey},
-        BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder,
         SingleNodeFmmTree,
     };
 
@@ -340,7 +340,7 @@ mod test {
         direct.iter().zip(potential).for_each(|(&d, &p)| {
             let abs_error = RlstScalar::abs(d - p);
             let rel_error = abs_error / p;
-            // println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
+            println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
             assert!(rel_error <= threshold)
         });
     }
@@ -625,7 +625,8 @@ mod test {
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        fmm.clear(charges.data());
+        let _ = fmm.clear();
+        let _ = fmm.attach_charges_unordered(charges.data());
         fmm.evaluate().unwrap();
 
         let fmm = Box::new(fmm);
@@ -1102,7 +1103,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1124,7 +1125,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1227,7 +1228,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1249,7 +1250,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1353,7 +1354,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, surface_diff),
+                    BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1376,7 +1377,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
-                    BlasFieldTranslationIa::new(None, None),
+                    BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1429,7 +1430,7 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
-                    BlasFieldTranslationIa::new(None, surface_diff),
+                    BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
                 )
                 .unwrap()
                 .build()
@@ -1577,7 +1578,11 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold, None),
+                    BlasFieldTranslationIa::new(
+                        singular_value_threshold,
+                        None,
+                        FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
@@ -1599,7 +1604,11 @@ mod test {
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
-                    BlasFieldTranslationIa::new(singular_value_threshold, None),
+                    BlasFieldTranslationIa::new(
+                        singular_value_threshold,
+                        None,
+                        FmmSvdMode::Deterministic,
+                    ),
                 )
                 .unwrap()
                 .build()
