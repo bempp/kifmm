@@ -59,7 +59,7 @@ n_threads=(4) # See if bandwidth saturates with different threading parameters f
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/grid_search_fft_f32_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/grid_search_fft_f32_ccx_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
