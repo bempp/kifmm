@@ -67,6 +67,14 @@ harness = false
 name = "laplace_direct_f32"
 harness = false
 
+[[bench]]
+name = "helmholtz_direct_f64"
+harness = false
+
+[[bench]]
+name = "helmholtz_direct_f32"
+harness = false
+
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]

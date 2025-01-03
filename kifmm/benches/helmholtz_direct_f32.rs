@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::traits::Kernel;
-use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
 use kifmm::tree::helpers::points_fixture;
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
+use num::{Complex, One};
+use rlst::{c32, c64, rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 
 fn multithreaded_direct_f64(c: &mut Criterion) {
@@ -17,18 +18,19 @@ fn multithreaded_direct_f64(c: &mut Criterion) {
     {
         let nsources = 20000;
         let ntargets = 20000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
         // FFT based M2L for a vector of charges
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let tmp = vec![Complex::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
+        let wavenumber = 1f32;
 
-        let kernel = Laplace3dKernel::new();
+        let kernel = Helmholtz3dKernel::new(wavenumber);
 
-        let mut result = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut result = rlst_dynamic_array2!(c32, [nsources, nvecs]);
 
         group.bench_function(format!("N={nsources}"), |b| {
             b.iter(|| {
@@ -46,18 +48,19 @@ fn multithreaded_direct_f64(c: &mut Criterion) {
     {
         let nsources = 100000;
         let ntargets = 100000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
         // FFT based M2L for a vector of charges
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let tmp = vec![Complex::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
+        let wavenumber =1f32;
 
-        let kernel = Laplace3dKernel::new();
+        let kernel = Helmholtz3dKernel::new(wavenumber);
 
-        let mut result = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut result = rlst_dynamic_array2!(c32, [nsources, nvecs]);
 
         group.bench_function(format!("N={nsources}"), |b| {
             b.iter(|| {
@@ -75,18 +78,19 @@ fn multithreaded_direct_f64(c: &mut Criterion) {
     {
         let nsources = 500000;
         let ntargets = 500000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
         // FFT based M2L for a vector of charges
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let tmp = vec![Complex::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
+        let wavenumber = 1f32;
 
-        let kernel = Laplace3dKernel::new();
+        let kernel = Helmholtz3dKernel::new(wavenumber);
 
-        let mut result = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut result = rlst_dynamic_array2!(c32, [nsources, nvecs]);
 
         group.bench_function(format!("N={nsources}"), |b| {
             b.iter(|| {
@@ -112,18 +116,19 @@ fn singlethreaded_direct_f64(c: &mut Criterion) {
     {
         let nsources = 5000;
         let ntargets = 5000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
         // FFT based M2L for a vector of charges
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let tmp = vec![Complex::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
+        let wavenumber = 1f32;
 
-        let kernel = Laplace3dKernel::new();
+        let kernel = Helmholtz3dKernel::new(wavenumber);
 
-        let mut result = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut result = rlst_dynamic_array2!(c32, [nsources, nvecs]);
 
         group.bench_function(format!("N={nsources}"), |b| {
             b.iter(|| {
@@ -141,18 +146,19 @@ fn singlethreaded_direct_f64(c: &mut Criterion) {
     {
         let nsources = 20000;
         let ntargets = 20000;
-        let sources = points_fixture::<f64>(nsources, None, None, Some(0));
-        let targets = points_fixture::<f64>(ntargets, None, None, Some(1));
+        let sources = points_fixture::<f32>(nsources, None, None, Some(0));
+        let targets = points_fixture::<f32>(ntargets, None, None, Some(1));
 
         // FFT based M2L for a vector of charges
         let nvecs = 1;
-        let tmp = vec![1.0; nsources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let tmp = vec![Complex::one(); nsources * nvecs];
+        let mut charges = rlst_dynamic_array2!(c32, [nsources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
+        let wavenumber = 1f32;
 
-        let kernel = Laplace3dKernel::new();
+        let kernel = Helmholtz3dKernel::new(wavenumber);
 
-        let mut result = rlst_dynamic_array2!(f64, [nsources, nvecs]);
+        let mut result = rlst_dynamic_array2!(c32, [nsources, nvecs]);
 
         group.bench_function(format!("N={nsources}"), |b| {
             b.iter(|| {
