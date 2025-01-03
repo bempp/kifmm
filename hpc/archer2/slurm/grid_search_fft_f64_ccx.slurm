@@ -5,8 +5,8 @@
 #SBATCH --job-name=grid_search
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=16
-#SBATCH --cpus-per-task=8
+#SBATCH --ntasks-per-node=32
+#SBATCH --cpus-per-task=4
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
@@ -23,7 +23,7 @@ export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export SCRATCH=${WORK}/grid_search_fft_f32_ccd_${SLURM_JOBID}
+export SCRATCH=${WORK}/grid_search_fft_f64_ccx_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
@@ -45,21 +45,21 @@ cd ${SCRATCH}
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 # Script being run, expected in the work directory
-script_name="fmm_m2l_fft_mpi_f32"
+script_name="fmm_m2l_fft_mpi_f64"
 
 # Set simulation parameters
-n_points=500000 # points per MPI process
-n_tasks=16
-cpus_per_task=8
+n_points=250000 # points per MPI process
+n_tasks=32
+cpus_per_task=4
 global_depth=2 # Number of local roots matches the number of MPI processes
 local_depth=(4 5)
 n_samples=(5000)
 block_size=(128 256)
-n_threads=(8) # See if bandwidth saturates with different threading parameters for Rayon thread pool
+n_threads=(4) # See if bandwidth saturates with different threading parameters for Rayon thread pool
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/grid_search_fft_f32_ccd_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/grid_search_fft_f64_ccx_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
@@ -76,7 +76,7 @@ for i in ${!local_depth[@]}; do
                 experiment_id="${i}_${j}_${k}_${l}"
                 srun --ntasks=$n_tasks --cpus-per-task=$cpus_per_task --distribution=block:block --hint=nomultithread \
                     "${WORK}/${script_name}" --id $experiment_id --n-points $n_points \
-                    --expansion-order 3 \
+                    --expansion-order 6 \
                     --prune-empty \
                     --global-depth $global_depth \
                     --local-depth ${local_depth[$i]} \

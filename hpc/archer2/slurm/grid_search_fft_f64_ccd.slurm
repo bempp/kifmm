@@ -23,7 +23,7 @@ export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export SCRATCH=${WORK}/grid_search_fft_f32_ccd_${SLURM_JOBID}
+export SCRATCH=${WORK}/grid_search_fft_f64_ccd_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
@@ -45,7 +45,7 @@ cd ${SCRATCH}
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 # Script being run, expected in the work directory
-script_name="fmm_m2l_fft_mpi_f32"
+script_name="fmm_m2l_fft_mpi_f64"
 
 # Set simulation parameters
 n_points=500000 # points per MPI process
@@ -59,7 +59,7 @@ n_threads=(8) # See if bandwidth saturates with different threading parameters f
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/grid_search_fft_f32_ccd_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/grid_search_fft_f64_ccd_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
@@ -76,7 +76,7 @@ for i in ${!local_depth[@]}; do
                 experiment_id="${i}_${j}_${k}_${l}"
                 srun --ntasks=$n_tasks --cpus-per-task=$cpus_per_task --distribution=block:block --hint=nomultithread \
                     "${WORK}/${script_name}" --id $experiment_id --n-points $n_points \
-                    --expansion-order 3 \
+                    --expansion-order 7 \
                     --prune-empty \
                     --global-depth $global_depth \
                     --local-depth ${local_depth[$i]} \
