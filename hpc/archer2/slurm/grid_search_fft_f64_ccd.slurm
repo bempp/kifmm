@@ -48,7 +48,7 @@ export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 script_name="fmm_m2l_fft_mpi_f64"
 
 # Set simulation parameters
-n_points=500000 # points per MPI process
+n_points=250000 # points per MPI process
 n_tasks=16
 cpus_per_task=8
 global_depth=2 # Number of local roots matches the number of MPI processes
