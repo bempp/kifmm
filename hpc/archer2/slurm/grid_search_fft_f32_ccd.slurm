@@ -5,8 +5,8 @@
 #SBATCH --job-name=grid_search
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=32
-#SBATCH --cpus-per-task=4
+#SBATCH --ntasks-per-node=16
+#SBATCH --cpus-per-task=8
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
