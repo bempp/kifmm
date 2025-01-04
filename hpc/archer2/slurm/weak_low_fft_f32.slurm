@@ -29,7 +29,7 @@ export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export SCRATCH=${WORK}/weak_${SLURM_JOBID}
+export SCRATCH=${WORK}/weak_low_fft_f32_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
@@ -69,7 +69,7 @@ cpus_per_task=4
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/weak_blas_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/weak_low_fft_f32_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
