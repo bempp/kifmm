@@ -9,9 +9,9 @@
 
 #SBATCH --job-name=weak_scaling_blas
 #SBATCH --time=00:30:00
-#SBATCH --nodes=128
-#SBATCH --ntasks-per-node=32
-#SBATCH --cpus-per-task=4
+#SBATCH --nodes=64
+#SBATCH --ntasks-per-node=16
+#SBATCH --cpus-per-task=8
 #SBATCH --contiguous
 
 #SBATCH --account=e738
@@ -55,16 +55,16 @@ script_name="fmm_m2l_blas_mpi_f32"
 
 # Set simulation parameters for FMM
 expansion_order=3
-n_points=250000 # points per MPI process (n_tasks)
-global_depth=(4 4 4) # Number of local roots
+n_points=500000 # points per MPI process (n_tasks)
+global_depth=(4 4) # Number of local roots
 local_depth=4
 n_samples=5000
 
 # Set parameters for weak scaling run
-n_tasks=(1024 2048 4096)
-n_nodes=(32 64 128)
-n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
-cpus_per_task=4
+n_tasks=(1024 2048)
+n_nodes=(32 64)
+n_threads=8 # See if bandwidth saturates with different threading parameters for Rayon thread pool
+cpus_per_task=8
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
