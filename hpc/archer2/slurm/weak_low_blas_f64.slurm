@@ -16,7 +16,7 @@
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
-#SBATCH --qos=short
+#SBATCH --qos=standard
 # Development environment for KiFMM
 
 # Restore AMD compiler env

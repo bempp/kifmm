@@ -29,7 +29,7 @@ export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export SCRATCH=${WORK}/weak_high_fft_f32_${SLURM_JOBID}
+export SCRATCH=${WORK}/weak_high_fft_f64_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
@@ -51,11 +51,11 @@ cd ${SCRATCH}
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 # Script being run, expected in the work directory
-script_name="fmm_m2l_fft_mpi_f32"
+script_name="fmm_m2l_fft_mpi_f64"
 
 # Set simulation parameters for FMM
-expansion_order=3
-n_points=250000 # points per MPI process (n_tasks)
+expansion_order=6
+n_points=125000 # points per MPI process (n_tasks)
 global_depth=(4 4) # Number of local roots
 local_depth=4
 n_samples=5000
@@ -69,7 +69,7 @@ cpus_per_task=4
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/weak_high_fft_f32_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/weak_high_fft_f64_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
