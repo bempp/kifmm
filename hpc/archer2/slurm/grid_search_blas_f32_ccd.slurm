@@ -55,7 +55,7 @@ global_depth=2 # Number of local roots matches the number of MPI processes, ther
 local_depth=(4 5)
 n_samples=(5000)
 block_size=(128)
-n_threads=(4) # See if bandwidth saturates with different threading parameters for Rayon thread pool
+n_threads=(8) # See if bandwidth saturates with different threading parameters for Rayon thread pool
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
