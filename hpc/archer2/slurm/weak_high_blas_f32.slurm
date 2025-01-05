@@ -61,7 +61,7 @@ local_depth=4
 n_samples=5000
 
 # Set parameters for weak scaling run
-n_tasks=(1024 2048)
+n_tasks=(512 1024)
 n_nodes=(32 64)
 n_threads=8 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=8
