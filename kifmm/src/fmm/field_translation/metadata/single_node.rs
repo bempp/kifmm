@@ -40,7 +40,7 @@ use crate::{
             SourceTranslationMetadata, TargetTranslationMetadata,
         },
         fmm::{DataAccess, HomogenousKernel, Metadata, MetadataAccess},
-        general::single_node::{AsComplex, Epsilon},
+        general::single_node::{AsComplex, Epsilon, GetCutoffRank},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
     tree::{
@@ -1810,6 +1810,16 @@ where
     }
 }
 
+impl <Scalar> GetCutoffRank for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
+where
+    Scalar: RlstScalar + Default + MatrixRsvd + Clone,
+    <Scalar as RlstScalar>::Real: Default + Clone,
+{
+    fn get_cutoff_rank(&self) -> &[usize] {
+        &self.source_to_target.cutoff_rank[..]
+    }
+}
+
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
 where
@@ -2186,6 +2196,7 @@ where
         }
     }
 }
+
 
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where

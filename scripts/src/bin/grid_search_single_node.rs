@@ -11,7 +11,7 @@ use kifmm::{
     traits::{
         fftw::Dft,
         fmm::{DataAccess, Evaluate},
-        general::single_node::{AsComplex, Epsilon, Hadamard8x8},
+        general::single_node::{AsComplex, Epsilon, GetCutoffRank, Hadamard8x8},
         tree::{SingleFmmTree, SingleTree},
     },
     tree::helpers::{points_fixture, points_fixture_oblate_spheroid, points_fixture_sphere},
@@ -143,6 +143,8 @@ fn grid_search_laplace_blas<T>(
             "n_iter".to_string(),
             "n_oversamples".to_string(),
             "setup_time".to_string(),
+            "cutoff_rank".to_string(),
+            "rsvd".to_string(),
         ])
         .unwrap();
 
@@ -214,6 +216,7 @@ fn grid_search_laplace_blas<T>(
 
         let n_iter_;
         let n_oversamples_;
+        let rsvd;
         match rsvd_settings {
             FmmSvdMode::Random {
                 n_components: _,
@@ -221,6 +224,7 @@ fn grid_search_laplace_blas<T>(
                 n_oversamples,
                 random_state: _,
             } => {
+                rsvd = 1;
                 if let Some(Normaliser::Qr(n)) = normaliser {
                     n_iter_ = *n
                 } else {
@@ -232,6 +236,7 @@ fn grid_search_laplace_blas<T>(
             FmmSvdMode::Deterministic => {
                 n_iter_ = 0usize;
                 n_oversamples_ = 0usize;
+                rsvd = 0;
             }
         }
 
@@ -248,6 +253,8 @@ fn grid_search_laplace_blas<T>(
                 n_iter_.to_string(),
                 n_oversamples_.to_string(),
                 (setup_time.as_millis() as f32).to_string(),
+                fmm.get_cutoff_rank().iter().min().unwrap().to_string(),
+                rsvd.to_string()
             ])
             .unwrap();
     }
@@ -454,64 +461,75 @@ fn grid_search_laplace_fft<T>(
 }
 
 fn main() {
-    let rsvd_settings_vec = [FmmSvdMode::new(false, None, None, None, None)];
-    let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3), Some(1e-1)];
-    let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
-
-    let n_points = 10000;
+    let n_points = 1000000;
     let geometries = ["sphere", "uniform", "spheroid"];
     let arch = "m1"; // change on each arch
 
     // FFT Grid Search
-    {
-        for geometry in geometries.iter() {
-            let precision = "f32";
-            let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
-            let depth_vec: Vec<u64> = vec![4, 5];
-            let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
+    // {
+    //     for geometry in geometries.iter() {
+    //         let precision = "f32";
+    //         let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
+    //         let depth_vec: Vec<u64> = vec![4, 5];
+    //         let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
 
-            grid_search_laplace_fft::<f32>(
-                format!("grid_search_laplace_fft_{}_{}_{}", precision, arch, geometry).to_string(),
-                &geometry,
-                n_points,
-                &expansion_order_vec,
-                &depth_vec,
-                &max_m2l_fft_block_size_vec,
-            );
-        }
+    //         grid_search_laplace_fft::<f32>(
+    //             format!("grid_search_laplace_fft_{}_{}_{}", precision, arch, geometry).to_string(),
+    //             &geometry,
+    //             n_points,
+    //             &expansion_order_vec,
+    //             &depth_vec,
+    //             &max_m2l_fft_block_size_vec,
+    //         );
+    //     }
 
-        for geometry in geometries.iter() {
-            let precision = "f64";
-            let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10, 11];
-            let depth_vec: Vec<u64> = vec![4, 5];
-            let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
+    //     for geometry in geometries.iter() {
+    //         let precision = "f64";
+    //         let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10, 11];
+    //         let depth_vec: Vec<u64> = vec![4, 5];
+    //         let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
 
-            grid_search_laplace_fft::<f64>(
-                format!("grid_search_laplace_fft_{}_{}_{}", precision, arch, geometry).to_string(),
-                &geometry,
-                n_points,
-                &expansion_order_vec,
-                &depth_vec,
-                &max_m2l_fft_block_size_vec,
-            );
-        }
-    }
+    //         grid_search_laplace_fft::<f64>(
+    //             format!("grid_search_laplace_fft_{}_{}_{}", precision, arch, geometry).to_string(),
+    //             &geometry,
+    //             n_points,
+    //             &expansion_order_vec,
+    //             &depth_vec,
+    //             &max_m2l_fft_block_size_vec,
+    //         );
+    //     }
+    // }
 
     // BLAS Grid Search
     {
 
-        // for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
-        //     grid_search_laplace_blas::<f32>(
-        //         format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
-        //         &geometry,
-        //         n_points,
-        //         &expansion_order_vec,
-        //         &svd_threshold_vec,
-        //         &surface_diff_vec,
-        //         &depth_vec,
-        //         &[rsvd_settings],
-        //     );
-        // }
+        for geometry in geometries.iter() {
+            let precision = "f32";
+            let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
+            let depth_vec: Vec<u64> = vec![4];
 
+            let rsvd_settings_vec = [
+                FmmSvdMode::new(false, None, None, None, None),
+                FmmSvdMode::new(true, None, None, Some(5), None),
+                FmmSvdMode::new(true, None, None, Some(10), None),
+                FmmSvdMode::new(true, None, None, Some(20), None),
+            ];
+
+            let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3), Some(1e-1)];
+            let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
+
+            for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
+                grid_search_laplace_blas::<f32>(
+                    format!("grid_search_laplace_blas_{}_{}_{}", precision, arch, i).to_string(),
+                    &geometry,
+                    n_points,
+                    &expansion_order_vec,
+                    &svd_threshold_vec,
+                    &surface_diff_vec,
+                    &depth_vec,
+                    &[rsvd_settings],
+                );
+            }
+        }
     }
 }
