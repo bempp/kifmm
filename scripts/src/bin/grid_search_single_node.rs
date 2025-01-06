@@ -157,7 +157,17 @@ fn grid_search_laplace_blas<T>(
         progress += 1;
         println!("BLAS Evaluated {:?}/{:?}", progress, n_params);
 
-        let leaf_idx = 1;
+        let mut leaf_idx = 0;
+
+        for leaf in fmm.tree().target.tree().target_tree().all_leaves().unwrap().iter() {
+            if let Some(n_targets) = fmm.tree().target_tree().n_coordinates(&leaf) {
+                if n_targets > 0 {
+                    leaf_idx = 0;
+                    break;
+                }
+            }
+        }
+
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
@@ -358,10 +368,20 @@ fn grid_search_laplace_fft<T>(
         progress += 1;
         println!("FFT Evaluated {:?}/{:?}", progress, n_params);
 
-        let leaf_idx = 1;
+        let mut leaf_idx = 1;
+        for leaf in fmm.tree().target.tree().target_tree().all_leaves().unwrap().iter() {
+            if let Some(n_targets) = fmm.tree().target_tree().n_coordinates(&leaf) {
+                if n_targets > 0 {
+                    leaf_idx = 0;
+                    break;
+                }
+            }
+        }
+
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
         let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
+
         let n_targets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::zero(); n_targets];
         fmm.kernel().evaluate_st(
