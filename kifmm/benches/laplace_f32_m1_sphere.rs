@@ -108,7 +108,6 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         group.bench_function(format!("M2L=BLAS digits=3, P2P "), |b| {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
-
     }
 
     let nvecs = 5;

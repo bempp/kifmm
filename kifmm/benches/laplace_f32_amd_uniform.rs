@@ -108,17 +108,16 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         group.bench_function(format!("M2L=BLAS digits=3, P2P "), |b| {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
-
     }
 
-    let nvecs = 5;
-    let tmp = vec![1.0; n_sources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
 
     // 3 Digits matrix
     {
-        // BLAS based M2L for a matrix of charges
+        let nvecs = 5;
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+
         // FMM parameters
         let n_crit = None;
         let depth = Some(4);
@@ -156,6 +155,55 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=3 nvecs=5, P2P "), |b| {
+            b.iter(|| fmm_blas.p2p().unwrap())
+        });
+    }
+
+    // 3 Digits matrix
+    {
+        let nvecs = 10;
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+        // BLAS based M2L for a matrix of charges
+
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let e = 3;
+        let expansion_order = vec![e; depth.unwrap() as usize + 1];
+        let prune_empty = true;
+        let surface_diff = Some(1);
+        let svd_mode = crate::FmmSvdMode::new(false, None, None, None, None);
+        let svd_threshold = None;
+
+        let mut fmm_blas = SingleNodeBuilder::new(false)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                GreenKernelEvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        group.bench_function(format!("M2L=BLAS digits=3 nvecs=10"), |b| {
+            b.iter(|| fmm_blas.evaluate())
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=3 nvecs=10, M2L "), |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=3 nvecs=10, P2P "), |b| {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
     }
@@ -243,14 +291,14 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
     }
 
-    let nvecs = 5;
-    let tmp = vec![1.0; n_sources * nvecs];
-    let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
-    charges.data_mut().copy_from_slice(&tmp);
-
     // 4 Digits matrix
     {
+        let nvecs = 5;
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
         // BLAS based M2L for a matrix of charges
+
         // FMM parameters
         let n_crit = None;
         let depth = Some(4);
@@ -288,6 +336,55 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         });
 
         group.bench_function(format!("M2L=BLAS digits=4 nvecs=5, P2P "), |b| {
+            b.iter(|| fmm_blas.p2p().unwrap())
+        });
+    }
+
+    // 4 Digits matrix
+    {
+        let nvecs = 10;
+        let tmp = vec![1.0; n_sources * nvecs];
+        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        charges.data_mut().copy_from_slice(&tmp);
+        // BLAS based M2L for a matrix of charges
+
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let e = 5;
+        let expansion_order = vec![e; depth.unwrap() as usize + 1];
+        let prune_empty = true;
+        let surface_diff = Some(0);
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(10), None);
+        let svd_threshold = Some(1e-7);
+
+        let mut fmm_blas = SingleNodeBuilder::new(false)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                GreenKernelEvalType::Value,
+                BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        group.bench_function(format!("M2L=BLAS digits=4 nvecs=10"), |b| {
+            b.iter(|| fmm_blas.evaluate())
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=4 nvecs=10, M2L "), |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        });
+
+        group.bench_function(format!("M2L=BLAS digits=4 nvecs=10, P2P "), |b| {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
     }

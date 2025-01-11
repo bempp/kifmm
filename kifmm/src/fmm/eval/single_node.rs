@@ -138,7 +138,11 @@ mod test {
             fmm::ChargeHandler,
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         },
-        tree::{constants::ALPHA_INNER, helpers::{points_fixture, points_fixture_sphere}, types::MortonKey},
+        tree::{
+            constants::ALPHA_INNER,
+            helpers::{points_fixture, points_fixture_sphere},
+            types::MortonKey,
+        },
         BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder,
         SingleNodeFmmTree,
     };
@@ -322,7 +326,14 @@ mod test {
 
         let mut leaf_idx = 0;
 
-        for (i, leaf) in fmm.tree().target_tree().all_leaves().unwrap().iter().enumerate() {
+        for (i, leaf) in fmm
+            .tree()
+            .target_tree()
+            .all_leaves()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
             if let Some(n_coords) = fmm.tree().target_tree().n_coordinates(&leaf) {
                 if n_coords > 0 {
                     leaf_idx = i;

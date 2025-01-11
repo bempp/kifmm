@@ -120,15 +120,16 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     points
 }
 
-
-pub fn points_fixture_oblate_spheroid<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture_oblate_spheroid<
+    T: RlstScalar + rand::distributions::uniform::SampleUniform,
+>(
     n_points: usize,
     a: T, // Semi-axis length along x- and y-axes
     c: T, // Semi-axis length along the z-axis
 ) -> PointsMat<T> {
     use rand::distributions::Uniform;
-    use rand::SeedableRng;
     use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     let mut rng = StdRng::seed_from_u64(0); // Use a fixed seed for reproducibility
     let pi = T::from(std::f64::consts::PI).unwrap();
@@ -136,19 +137,19 @@ pub fn points_fixture_oblate_spheroid<T: RlstScalar + rand::distributions::unifo
     let one = T::one();
 
     let phi_dist = Uniform::from(T::zero()..(two * pi)); // Azimuthal angle
-    let cos_theta_dist = Uniform::from(-one..one);       // Cosine of polar angle
+    let cos_theta_dist = Uniform::from(-one..one); // Cosine of polar angle
 
     let mut points = rlst_dynamic_array2!(T, [3, n_points]);
 
     for i in 0..n_points {
-        let phi = phi_dist.sample(&mut rng);               // Random azimuthal angle
-        let cos_theta = cos_theta_dist.sample(&mut rng);   // Random cosine of polar angle
-        let theta = cos_theta.acos();                      // Compute polar angle
+        let phi = phi_dist.sample(&mut rng); // Random azimuthal angle
+        let cos_theta = cos_theta_dist.sample(&mut rng); // Random cosine of polar angle
+        let theta = cos_theta.acos(); // Compute polar angle
 
         // Parametric equations for the oblate spheroid
         points[[0, i]] = a * theta.sin() * phi.cos(); // x-axis
         points[[1, i]] = a * theta.sin() * phi.sin(); // y-axis
-        points[[2, i]] = c * theta.cos();            // z-axis
+        points[[2, i]] = c * theta.cos(); // z-axis
     }
 
     points

@@ -75,8 +75,16 @@ fn grid_search_laplace_blas<T>(
         sources = points_fixture_sphere::<T::Real>(n_sources);
         targets = points_fixture_sphere::<T::Real>(n_targets);
     } else if geometry == "spheroid" {
-        sources = points_fixture_oblate_spheroid::<T::Real>(n_sources, T::from(1.0).unwrap(), T::from(0.5).unwrap());
-        targets = points_fixture_oblate_spheroid::<T::Real>(n_targets, T::from(1.0).unwrap(), T::from(0.5).unwrap());
+        sources = points_fixture_oblate_spheroid::<T::Real>(
+            n_sources,
+            T::from(1.0).unwrap(),
+            T::from(0.5).unwrap(),
+        );
+        targets = points_fixture_oblate_spheroid::<T::Real>(
+            n_targets,
+            T::from(1.0).unwrap(),
+            T::from(0.5).unwrap(),
+        );
     } else {
         panic!("Unsupported geometry")
     }
@@ -153,7 +161,6 @@ fn grid_search_laplace_blas<T>(
         s.elapsed().as_secs()
     );
 
-
     let mut progress = 0;
     for (i, fmm, setup_time) in fmms.lock().unwrap().iter_mut() {
         let (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings) =
@@ -168,7 +175,14 @@ fn grid_search_laplace_blas<T>(
         println!("BLAS Evaluated {:?}/{:?}", progress, n_params);
 
         let mut leaf_idx = 0;
-        for (i, leaf) in fmm.tree().target_tree().all_leaves().unwrap().iter().enumerate() {
+        for (i, leaf) in fmm
+            .tree()
+            .target_tree()
+            .all_leaves()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
             if let Some(n_targets) = fmm.tree().target_tree().n_coordinates(&leaf) {
                 if n_targets > 0 {
                     leaf_idx = i;
@@ -254,7 +268,7 @@ fn grid_search_laplace_blas<T>(
                 n_oversamples_.to_string(),
                 (setup_time.as_millis() as f32).to_string(),
                 fmm.get_cutoff_rank().iter().min().unwrap().to_string(),
-                rsvd.to_string()
+                rsvd.to_string(),
             ])
             .unwrap();
     }
@@ -318,8 +332,16 @@ fn grid_search_laplace_fft<T>(
                 sources = points_fixture_sphere::<T::Real>(n_sources);
                 targets = points_fixture_sphere::<T::Real>(n_targets);
             } else if geometry == "spheroid" {
-                sources = points_fixture_oblate_spheroid::<T::Real>(n_sources, T::from(1.0).unwrap(), T::from(0.5).unwrap());
-                targets = points_fixture_oblate_spheroid::<T::Real>(n_targets, T::from(1.0).unwrap(), T::from(0.5).unwrap());
+                sources = points_fixture_oblate_spheroid::<T::Real>(
+                    n_sources,
+                    T::from(1.0).unwrap(),
+                    T::from(0.5).unwrap(),
+                );
+                targets = points_fixture_oblate_spheroid::<T::Real>(
+                    n_targets,
+                    T::from(1.0).unwrap(),
+                    T::from(0.5).unwrap(),
+                );
             } else {
                 panic!("Unsupported geometry")
             }
@@ -397,7 +419,14 @@ fn grid_search_laplace_fft<T>(
         println!("FFT Evaluated {:?}/{:?}", progress, n_params);
 
         let mut leaf_idx = 0;
-        for (i, leaf) in fmm.tree().target_tree().all_leaves().unwrap().iter().enumerate() {
+        for (i, leaf) in fmm
+            .tree()
+            .target_tree()
+            .all_leaves()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
             if let Some(n_targets) = fmm.tree().target_tree().n_coordinates(&leaf) {
                 if n_targets > 0 {
                     leaf_idx = i;
@@ -552,7 +581,11 @@ fn main() {
 
             for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
                 grid_search_laplace_blas::<f64>(
-                    format!("grid_search_laplace_blas_{}_{}_{}_{}", geometry, precision, arch, i).to_string(),
+                    format!(
+                        "grid_search_laplace_blas_{}_{}_{}_{}",
+                        geometry, precision, arch, i
+                    )
+                    .to_string(),
                     &geometry,
                     n_points,
                     &expansion_order_vec,

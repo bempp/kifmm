@@ -1810,7 +1810,8 @@ where
     }
 }
 
-impl <Scalar> GetCutoffRank for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
+impl<Scalar> GetCutoffRank
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
 where
     Scalar: RlstScalar + Default + MatrixRsvd + Clone,
     <Scalar as RlstScalar>::Real: Default + Clone,
@@ -2196,7 +2197,6 @@ where
         }
     }
 }
-
 
 impl<Scalar, Kernel> KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where

@@ -22,7 +22,6 @@ fn laplace_potentials_f32(c: &mut Criterion) {
     let sources = points_fixture_sphere::<f32>(n_sources);
     let targets = points_fixture_sphere::<f32>(n_targets);
 
-
     let nvecs = 1;
     let tmp = vec![1.0; n_sources * nvecs];
     let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
@@ -109,7 +108,6 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         group.bench_function(format!("M2L=BLAS digits=3, P2P "), |b| {
             b.iter(|| fmm_blas.p2p().unwrap())
         });
-
     }
 
     let nvecs = 5;
