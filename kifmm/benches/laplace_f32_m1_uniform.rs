@@ -32,13 +32,13 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         // FFT based M2L for a vector of charges
         // FMM parameters
         let n_crit = None;
-        let depth = Some(4);
+        let depth = Some(5);
         let e = 3;
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
-        let block_size = Some(32);
+        let block_size = Some(256);
 
-        let mut fmm_fft = SingleNodeBuilder::new(false)
+        let mut fmm_fft = SingleNodeBuilder::new(true)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
@@ -71,13 +71,13 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         // BLAS based M2L for a vector of charges
         // FMM parameters
         let n_crit = None;
-        let depth = Some(4);
+        let depth = Some(5);
         let e = 3;
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
         let surface_diff = None;
-        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(10), None);
-        let svd_threshold = None;
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(5), None);
+        let svd_threshold = Some(1e-7);
 
         let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -115,11 +115,11 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         // FFT based M2L for a vector of charges
         // FMM parameters
         let n_crit = None;
-        let depth = Some(4);
+        let depth = Some(5);
         let e = 4;
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
-        let block_size = Some(16);
+        let block_size = Some(128);
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -154,13 +154,13 @@ fn laplace_potentials_f32(c: &mut Criterion) {
         // BLAS based M2L for a vector of charges
         // FMM parameters
         let n_crit = None;
-        let depth = Some(4);
-        let e = 4;
+        let depth = Some(5);
+        let e = 3;
         let expansion_order = vec![e; depth.unwrap() as usize + 1];
         let prune_empty = true;
         let surface_diff = Some(1);
-        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(20), None);
-        let svd_threshold = Some(0.001);
+        let svd_mode = crate::FmmSvdMode::new(true, None, None, Some(5), None);
+        let svd_threshold = Some(1e-4);
 
         let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
