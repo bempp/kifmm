@@ -51,6 +51,10 @@ cbindgen = "0.26.0"
 name = "laplace_f32_amd"
 harness = false
 
+[[bench]]
+name = "laplace_f64_amd"
+harness = false
+
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]
