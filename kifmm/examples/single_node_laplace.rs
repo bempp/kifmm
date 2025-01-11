@@ -6,22 +6,22 @@ use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 fn main() {
     // Setup random sources and targets
-    let n_sources = 1000;
-    let n_targets = 2000;
-    let sources = points_fixture::<f32>(n_sources, None, None, Some(0));
-    let targets = points_fixture::<f32>(n_targets, None, None, Some(1));
+    let n_sources = 1000000;
+    let n_targets = 1000000;
+    let sources = points_fixture::<f64>(n_sources, None, None, Some(0));
+    let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
-    // FMM parameters
-    let n_crit = Some(150);
-    let depth = None;
-    let expansion_order = [5];
-    let prune_empty = true;
 
     // FFT based M2L for a vector of charges
     {
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let expansion_order = [10; 5];
+        let prune_empty = true;
         let nvecs = 1;
         let tmp = vec![1.0; n_sources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
@@ -32,26 +32,34 @@ fn main() {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
-                FftFieldTranslation::new(None),
+                FftFieldTranslation::new(Some(64)),
             )
             .unwrap()
             .build()
             .unwrap();
         fmm_fft.evaluate().unwrap();
+
+        println!("FFT FLOPS {:?}", fmm_fft.nflops);
     }
 
     // BLAS based M2L
     {
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(4);
+        let expansion_order = [9; 5];
+        let prune_empty = true;
+
         // Vector of charges
         let nvecs = 1;
-        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(n_sources)
             .enumerate()
-            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
+            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
 
-        let singular_value_threshold = Some(1e-5);
+        let singular_value_threshold = Some(1e-6);
 
         let mut fmm_vec = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
@@ -63,8 +71,8 @@ fn main() {
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
                     singular_value_threshold,
-                    None,
-                    kifmm::fmm::types::FmmSvdMode::Deterministic,
+                    Some(2),
+                    kifmm::fmm::types::FmmSvdMode::Random { n_components: None, normaliser: None, n_oversamples: Some(10), random_state: None },
                 ),
             )
             .unwrap()
@@ -73,32 +81,34 @@ fn main() {
 
         fmm_vec.evaluate().unwrap();
 
-        // Matrix of charges
-        let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
-        charges
-            .data_mut()
-            .chunks_exact_mut(n_sources)
-            .enumerate()
-            .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
+        println!("BLAS FLOPS {:?}", fmm_vec.nflops);
 
-        let mut fmm_mat = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
-            .unwrap()
-            .parameters(
-                charges.data(),
-                &expansion_order,
-                Laplace3dKernel::new(),
-                GreenKernelEvalType::Value,
-                BlasFieldTranslationSaRcmp::new(
-                    singular_value_threshold,
-                    None,
-                    kifmm::fmm::types::FmmSvdMode::Deterministic,
-                ),
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-        fmm_mat.evaluate().unwrap();
+        // // Matrix of charges
+        // let nvecs = 5;
+        // let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        // charges
+        //     .data_mut()
+        //     .chunks_exact_mut(n_sources)
+        //     .enumerate()
+        //     .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f64));
+
+        // let mut fmm_mat = SingleNodeBuilder::new(false)
+        //     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+        //     .unwrap()
+        //     .parameters(
+        //         charges.data(),
+        //         &expansion_order,
+        //         Laplace3dKernel::new(),
+        //         GreenKernelEvalType::Value,
+        //         BlasFieldTranslationSaRcmp::new(
+        //             singular_value_threshold,
+        //             None,
+        //             kifmm::fmm::types::FmmSvdMode::Deterministic,
+        //         ),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
+        // fmm_mat.evaluate().unwrap();
     }
 }

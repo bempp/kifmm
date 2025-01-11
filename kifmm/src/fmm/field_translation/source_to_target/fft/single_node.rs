@@ -321,8 +321,9 @@ where
 
                 // Count flops for hadamard product
                 // 64 muls, 8 eight adds for each of 26 directions direction
-                nflops += (26 * 64 * 4 * n_targets * size_out) as f64; // Real multiplications for 64 complex multiplications
-                nflops += (26 * (64 * 2 + 8 * 2) * n_targets * size_out) as f64; // Real additions
+                let n_parents = n_targets / 8;
+                nflops += (26 * 64 * 4 * n_parents * size_out) as f64; // Real multiplications for 64 complex multiplications
+                nflops += (26 * (64 * 2 + 8 * 2) * n_parents * size_out) as f64; // Real additions
 
                 // Real additions for both operations
                 // 3. Post process to find local expansions at target boxes
