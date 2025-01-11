@@ -285,6 +285,9 @@ where
     /// Transformed size in Fourier space, sequence shortened for real to complex transforms
     fn size_out(expansion_order: usize) -> usize;
 
+    /// Count flops
+    fn count_flops(plan: &Self::Plan, add: &mut f64, mul: &mut f64, fmas: &mut f64);
+
     /// Forward transform, if real data is used as input computes R2C dft
     fn forward_dft(
         in_: &mut [<Self as DftType>::InputType],

@@ -34,7 +34,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<f64, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(
                 "No target boxes at this level".to_string(),
@@ -229,7 +229,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(0.);
             }
             FmmEvalType::Matrix(n_matvecs) => {
                 let multipoles = rlst_array_from_slice2!(
@@ -416,7 +416,7 @@ where
             }
         }
 
-        Ok(())
+        Ok(0.)
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -432,7 +432,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: MetadataAccess,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<f64, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(format!(
                 "M2L failed at level {:?}, no targets found",
@@ -607,7 +607,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(0.);
             }
             FmmEvalType::Matrix(n_matvecs) => {
                 // Lookup multipole data from source tree
@@ -761,7 +761,7 @@ where
                 }
             }
         }
-        Ok(())
+        Ok(0.)
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {

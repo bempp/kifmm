@@ -6,7 +6,7 @@ use num::{One, Zero};
 
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
+    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar, Shape
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -48,7 +48,7 @@ where
         + DataAccess<Scalar = Scalar, Kernel = Kernel, Tree = SingleNodeFmmTree<Scalar::Real>>,
     <Scalar as Dft>::Plan: Sync,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<f64, FmmError> {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let Some(targets) = self.tree().target_tree().keys(level) else {
@@ -63,6 +63,8 @@ where
                         level
                     )));
                 };
+
+                let mut nflops = 0.;
 
                 let m2l_operator_index = self.m2l_operator_index(level);
                 let fft_map_index = self.fft_map_index(level);
@@ -145,6 +147,25 @@ where
                     let mut in_ = AlignedVec::new(size_in);
                     let mut out = AlignedVec::new(size_out);
                     let plan = Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
+
+                    // Count flops for FFT
+                    let mut add = 0.;
+                    let mut mul = 0.;
+                    let mut fmas = 0.;
+                    Scalar::count_flops(&plan, &mut add, &mut mul, &mut fmas);
+                    add = add * n_sources as f64;
+                    mul = mul * n_sources as f64;
+                    fmas = fmas * n_sources as f64;
+
+                    nflops += add;
+                    nflops += mul;
+                    nflops += fmas;
+
+                    // Count flops for creating convolution grid 1 mul and 1 add (real data)
+                    nflops += (2 * multipoles.len()) as f64;
+
+                    // Count flops for frequency based re-ordering 1 mul and 1 add (real data)
+                    nflops += (2 * multipoles.len()) as f64;
 
                     multipoles
                         .par_chunks_exact(
@@ -298,6 +319,12 @@ where
                         });
                 }
 
+                // Count flops for hadamard product
+                // 64 muls, 8 eight adds for each of 26 directions direction
+                nflops += (26 * 64 * 4 * n_targets * size_out) as f64; // Real multiplications for 64 complex multiplications
+                nflops += (26 * (64 * 2 + 8 * 2) * n_targets * size_out) as f64; // Real additions
+
+                // Real additions for both operations
                 // 3. Post process to find local expansions at target boxes
                 {
                     check_potential_hat_c
@@ -322,6 +349,20 @@ where
                         &shape_in,
                         &plan,
                     );
+
+
+                    // Count flops for inverse FFT
+                    let mut add = 0.;
+                    let mut mul = 0.;
+                    let mut fmas = 0.;
+                    Scalar::count_flops(&plan, &mut add, &mut mul, &mut fmas);
+                    add = add * n_targets as f64;
+                    mul = mul * n_targets as f64;
+                    fmas = fmas * n_targets as f64;
+
+                    nflops += add;
+                    nflops += mul;
+                    nflops += fmas;
 
                     check_potential
                         .par_chunks_exact(NSIBLINGS * size_in)
@@ -367,9 +408,20 @@ where
                                     local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                                 });
                         });
+
+
+                        // Count flops for post processing
+                        nflops += (2 * check_potential.len()) as f64; // For re-ordering the check potentials
+                        let [m, n] = self.dc2e_inv_2[c2e_operator_index].shape();
+                        nflops += (m * n * n_targets) as f64; // Real multiplications
+                        nflops += (m * n_targets * (n - 1)) as f64; // Real additions
+                        let [m, n] = self.dc2e_inv_1[c2e_operator_index].shape();
+                        nflops += (m * n * n_targets) as f64; // Real multiplications
+                        nflops += (m * n_targets * (n - 1)) as f64; // Real additions
+
                 }
 
-                Ok(())
+                Ok(nflops)
             }
             FmmEvalType::Matrix(_) => Err(FmmError::Unimplemented(
                 "M2L unimplemented for matrix input with FFT field translations".to_string(),

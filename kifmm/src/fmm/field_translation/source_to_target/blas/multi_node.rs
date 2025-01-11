@@ -43,7 +43,7 @@ where
     KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>:
         DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<f64, FmmError> {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 if let Some(targets) = self.tree().target_tree().keys(level) {
@@ -279,7 +279,7 @@ where
                     }
                 }
 
-                Ok(())
+                Ok(0.)
             }
             FmmEvalType::Matrix(_) => Err(FmmError::Unimplemented(
                 "M2L unimplemented for matrix input with BLAS field translations".to_string(),

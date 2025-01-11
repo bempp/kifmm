@@ -14,6 +14,12 @@ use super::helpers::validate_plan;
 impl Dft for f32 {
     type Plan = Plan<Self, Plan32>;
 
+    fn count_flops(plan: &Self::Plan, add: &mut f64, mul: &mut f64, fmas: &mut f64) {
+       unsafe {
+        ffi::fftwf_flops(plan.plan.0, add, mul, fmas);
+       }
+    }
+
     fn plan_forward(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
@@ -186,6 +192,12 @@ impl Dft for f32 {
 
 impl Dft for f64 {
     type Plan = Plan<Self, Plan64>;
+
+    fn count_flops(plan: &Self::Plan, add: &mut f64, mul: &mut f64, fmas: &mut f64) {
+       unsafe {
+        ffi::fftw_flops(plan.plan.0, add, mul, fmas);
+       }
+    }
 
     fn plan_forward(
         in_: &mut [<Self as DftType>::InputType],
@@ -373,6 +385,12 @@ impl Dft for f64 {
 impl Dft for c32 {
     type Plan = Plan<Self, Plan32>;
 
+    fn count_flops(plan: &Self::Plan, add: &mut f64, mul: &mut f64, fmas: &mut f64) {
+       unsafe {
+        ffi::fftwf_flops(plan.plan.0, add, mul, fmas);
+       }
+    }
+
     fn plan_forward(
         in_: &mut [<Self as DftType>::InputType],
         out: &mut [<Self as DftType>::OutputType],
@@ -549,6 +567,12 @@ impl Dft for c32 {
 
 impl Dft for c64 {
     type Plan = Plan<Self, Plan64>;
+
+    fn count_flops(plan: &Self::Plan, add: &mut f64, mul: &mut f64, fmas: &mut f64) {
+       unsafe {
+        ffi::fftw_flops(plan.plan.0, add, mul, fmas);
+       }
+    }
 
     fn plan_forward(
         in_: &mut [<Self as DftType>::InputType],

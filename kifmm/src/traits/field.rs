@@ -76,7 +76,7 @@ pub trait SourceToTargetTranslation {
     ///
     /// # Arguments
     /// * `level` - The level of the tree at which this translation is being applied.
-    fn m2l(&self, level: u64) -> Result<(), FmmError>;
+    fn m2l(&self, level: u64) -> Result<f64, FmmError>;
 
     /// Particle to local translations, applies to leaf boxes when a source box is within
     /// the far field of a target box, but is too large for the multipole expansion to converge
