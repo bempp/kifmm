@@ -11,6 +11,10 @@ use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, points_fixture_sphere};
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
+fn configure_criterion() -> Criterion {
+    Criterion::default().sample_size(10) // Set global sample size to 10
+}
+
 fn fft_f64(c: &mut Criterion) {
     let mut group = c.benchmark_group("F64 Potentials FFT-M2L");
 
@@ -238,5 +242,10 @@ fn blas_f64(c: &mut Criterion) {
     }
 }
 
-criterion_group!(laplace_p_f64, fft_f64, blas_f64);
+criterion_group! {
+    name = laplace_p_f64;
+    config = configure_criterion();
+    targets = fft_f64, blas_f64
+}
+
 criterion_main!(laplace_p_f64);
