@@ -21,8 +21,6 @@ fn fft_f32(c: &mut Criterion) {
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for sphere and spheroid are dummies for now
-
     // Tree depth
     let depth_vec = vec![
         [4, 5, 5], // 3 digits, for each geometry
@@ -32,7 +30,7 @@ fn fft_f32(c: &mut Criterion) {
     // Expansion order
     let e_vec = vec![
         [3, 3, 3], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
+        [4, 5, 5], // 4 digits for each geometry
     ];
 
     // Block size
@@ -125,13 +123,13 @@ fn blas_f32(c: &mut Criterion) {
     // Expansion order
     let e_vec = vec![
         [3, 2, 3], // 3 digits, for each geometry
-        [3, 4, 5], // 4 digits for each geometry
+        [3, 3, 4], // 4 digits for each geometry
     ];
 
     // SVD threshold
     let svd_threshold_vec = vec![
         [Some(0.00001), Some(0.00001), Some(0.001)],              // 3 digits
-        [Some(1e-3), None, Some(0.001)], // 4 digits
+        [None, None, None], // 4 digits
     ];
 
     let svd_mode_vec = vec![
@@ -141,15 +139,15 @@ fn blas_f32(c: &mut Criterion) {
             FmmSvdMode::new(false, None, None, None, None),
         ],
         [
-            FmmSvdMode::new(true, None, None, Some(10), None),
+            FmmSvdMode::new(false, None, None, None, None),
             FmmSvdMode::new(true, None, None, Some(20), None),
-            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(5), None),
         ],
     ];
 
     let surface_diff_vec = vec![
         [None, Some(2), Some(2)], // 3 digits
-        [Some(1), Some(1), None],       // 4 digits
+        [Some(1), Some(2), Some(1)],       // 4 digits
     ];
 
     let nvecs = vec![1, 5, 10];
