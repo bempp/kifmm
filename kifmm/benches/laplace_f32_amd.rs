@@ -12,7 +12,7 @@ use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, point
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 fn configure_criterion() -> Criterion {
-    Criterion::default().sample_size(10) // Set global sample size to 10
+    Criterion::default().sample_size(5) // Set global sample size to 10
 }
 
 fn fft_f32(c: &mut Criterion) {
