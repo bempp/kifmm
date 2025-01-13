@@ -1,47 +1,171 @@
 use core::panic;
-use std::time::Duration;
 
-use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
+use kifmm::traits::fftw::Dft;
 use kifmm::traits::field::{SourceToTargetTranslation, TargetTranslation};
 use kifmm::traits::fmm::{DataAccess, Evaluate};
+use kifmm::traits::general::single_node::AsComplex;
 use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, points_fixture_sphere};
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
+use kifmm::{fmm, KiFmm};
+use num::Float;
+use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
 
-fn fft_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("F32 Potentials FFT-M2L");
+use std::mem;
 
+
+fn calculate_fmm_storage_fft_m2l<Scalar: RlstScalar + Float + AsComplex + Dft>(
+    fmm: &KiFmm<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslation<Scalar>>,
+) -> (f64, f64, f64) {
+    let element_size = mem::size_of::<Scalar>(); // Assuming f32 is the element type
+
+    // UC2E_INV_1
+    let mut storage_uc2e_inv_1 = 0;
+    let mut size_uc2e_inv_1 = 0;
+    for mat in &fmm.uc2e_inv_1 {
+        size_uc2e_inv_1 += mat.shape()[0] * mat.shape()[1];
+    }
+    storage_uc2e_inv_1 = size_uc2e_inv_1 * element_size;
+
+    // UC2E_INV_2
+    let mut storage_uc2e_inv_2 = 0;
+    let mut size_uc2e_inv_2 = 0;
+    for mat in &fmm.uc2e_inv_2 {
+        size_uc2e_inv_2 += mat.shape()[0] * mat.shape()[1];
+    }
+    storage_uc2e_inv_2 = size_uc2e_inv_2 * element_size;
+
+    // M2M
+    let mut storage_m2m = 0;
+    let mut size_m2m = 0;
+    for mat in &fmm.source {
+        size_m2m += mat.shape()[0] * mat.shape()[1];
+    }
+    storage_m2m = size_m2m * element_size;
+
+    // L2L
+    let mut storage_l2l = 0;
+    let mut size_l2l = 0;
+    for vec in &fmm.target_vec {
+        for mat in vec.iter() {
+            size_l2l += mat.shape()[0] * mat.shape()[1];
+        }
+    }
+    storage_l2l = size_l2l * element_size;
+
+    // M2L
+    let kernel_data = &fmm.source_to_target.metadata[0].kernel_data;
+    let mut size_m2l = 0;
+    let mut storage_m2l = 0;
+    for vec in kernel_data {
+        size_m2l += vec.len();
+    }
+    size_m2l *= 2; // need it twice, freq re-ordered
+    storage_m2l = size_m2l * element_size * 2; // complex numbers
+
+    // Convert storage to megabytes
+    (
+        (storage_m2m + storage_uc2e_inv_1 + storage_uc2e_inv_2) as f64 / 1_048_576.0,
+        (storage_l2l + storage_uc2e_inv_1 + storage_uc2e_inv_2) as f64 / 1_048_576.0,
+        storage_m2l as f64 / 1_048_576.0,
+    )
+}
+
+fn calculate_fmm_storage_blas_m2l<Scalar: RlstScalar + Float + AsComplex + Dft>(
+    fmm: &KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>,
+) -> (f64, f64, f64) {
+    let element_size = mem::size_of::<Scalar>(); // Assuming f32 is the element type
+
+    // UC2E_INV_1
+    let mut storage_uc2e_inv_1 = 0;
+    let mut size_uc2e_inv_1 = 0;
+    for mat in &fmm.uc2e_inv_1 {
+        size_uc2e_inv_1 += mat.shape()[0] * mat.shape()[1];
+    }
+    storage_uc2e_inv_1 = size_uc2e_inv_1 * element_size;
+
+    // UC2E_INV_2
+    let mut storage_uc2e_inv_2 = 0;
+    let mut size_uc2e_inv_2 = 0;
+    for mat in &fmm.uc2e_inv_2 {
+        size_uc2e_inv_2 += mat.shape()[0] * mat.shape()[1];
+    }
+    storage_uc2e_inv_2 = size_uc2e_inv_2 * element_size;
+
+    // M2M
+    let mut storage_m2m = 0;
+    let mut size_m2m = 0;
+    for mat in &fmm.source {
+        size_m2m += mat.shape()[0] * mat.shape()[1];
+    }
+    storage_m2m = size_m2m * element_size;
+
+    // L2L
+    let mut storage_l2l = 0;
+    let mut size_l2l = 0;
+    for vec in &fmm.target_vec {
+        for mat in vec.iter() {
+            size_l2l += mat.shape()[0] * mat.shape()[1];
+        }
+    }
+    storage_l2l = size_l2l * element_size;
+
+    // M2L
+    let data = &fmm.source_to_target.metadata;
+    let mut size_m2l = 0;
+    let mut storage_m2l = 0;
+
+    for metadata in data {
+        let u = &metadata.u;
+        let st = &metadata.st;
+        let c_u = &metadata.c_u;
+        let c_vt = &metadata.c_vt;
+
+        let mut size: usize = u.shape()[0] * u.shape()[1] + st.shape()[0] + st.shape()[1];
+        for (l, r) in c_u.iter().zip(c_vt.iter()) {
+            size += l.shape()[0] + l.shape()[1] + r.shape()[0] * r.shape()[1];
+        }
+        size_m2l += size;
+    }
+
+    storage_m2l = size_m2l * element_size;
+
+    // Convert storage to megabytes
+    (
+        (storage_m2m + storage_uc2e_inv_1 + storage_uc2e_inv_2) as f64 / 1_048_576.0,
+        (storage_l2l + storage_uc2e_inv_1 + storage_uc2e_inv_2) as f64 / 1_048_576.0,
+        storage_m2l as f64 / 1_048_576.0,
+    )
+}
+
+fn fft_f32() {
     let n_points = 1000000;
-    let geometries = ["uniform", "sphere", "spheroid"];
+    let geometries = ["uniform"];
 
     // TODO: 4 digits for sphere and spheroid are dummies for now
 
     // Tree depth
     let depth_vec = vec![
-        [5, 5, 5], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
+        [5], // 3 digits, for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
-        [4, 5, 5], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
+        [4], // 3 digits, for each geometry
     ];
 
     // Block size
     let b_vec = vec![
-        [32, 128, 128], // 3 digits, for each geometry
-        [64, 64, 64],   // 4 digits for each geometry
+        [32], // 3 digits, for each geometry
     ];
 
-    let experiments = [3, 4]; // number of digits sought
+    let experiments = [3]; // number of digits sought
 
     let prune_empty = true;
 
-    for (i, digits) in experiments.iter().enumerate() {
+    for (i, _digits) in experiments.iter().enumerate() {
         for (j, &geometry) in geometries.iter().enumerate() {
             let sources;
             let targets;
@@ -66,7 +190,7 @@ fn fft_f32(c: &mut Criterion) {
             let expansion_order = vec![e; depth.unwrap() as usize + 1];
             let block_size = Some(b);
 
-            let mut fmm_fft = SingleNodeBuilder::new(false)
+            let fmm_fft = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), None, depth, prune_empty)
                 .unwrap()
                 .parameters(
@@ -80,33 +204,14 @@ fn fft_f32(c: &mut Criterion) {
                 .build()
                 .unwrap();
 
-            group.bench_function(
-                format!("M2L=FFT digits={} geometry={}", digits, geometry),
-                |b| b.iter(|| fmm_fft.evaluate()),
-            );
+            let (m2m, l2l, m2l) = calculate_fmm_storage_fft_m2l(&fmm_fft);
 
-            group.bench_function(
-                format!("M2L=FFT digits={}, geometry={} M2L ", digits, geometry),
-                |b| {
-                    b.iter(|| {
-                        for level in 2..=fmm_fft.tree().target_tree().depth() {
-                            fmm_fft.m2l(level).unwrap();
-                        }
-                    })
-                },
-            );
-
-            group.bench_function(
-                format!("M2L=FFT digits={} geometry={}, P2P ", digits, geometry),
-                |b| b.iter(|| fmm_fft.p2p().unwrap()),
-            );
+            println!("STORAGE COSTS {:?} {:?} {:?}", m2m, l2l, m2l);
         }
     }
 }
 
-fn blas_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("F32 Potentials BLAS-M2L");
-
+fn blas_f32() {
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
@@ -195,40 +300,11 @@ fn blas_f32(c: &mut Criterion) {
                     .unwrap()
                     .build()
                     .unwrap();
-
-                group.bench_function(
-                    format!(
-                        "M2L=BLAS digits={} geometry={} nvecs={}",
-                        digits, geometry, nvec
-                    ),
-                    |b| b.iter(|| fmm.evaluate()),
-                );
-
-                group.bench_function(
-                    format!(
-                        "M2L=BLAS digits={}, geometry={} nvecs={} M2L ",
-                        digits, geometry, nvec
-                    ),
-                    |b| {
-                        b.iter(|| {
-                            for level in 2..=fmm.tree().target_tree().depth() {
-                                fmm.m2l(level).unwrap();
-                            }
-                        })
-                    },
-                );
-
-                group.bench_function(
-                    format!(
-                        "M2L=BLAS digits={} geometry={} nvecs={} P2P ",
-                        digits, geometry, nvec
-                    ),
-                    |b| b.iter(|| fmm.p2p().unwrap()),
-                );
             }
         }
     }
 }
 
-criterion_group!(laplace_p_f32, fft_f32, blas_f32);
-criterion_main!(laplace_p_f32);
+fn main() {
+    fft_f32();
+}

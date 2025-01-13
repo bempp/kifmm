@@ -1,5 +1,4 @@
 use core::panic;
-use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
@@ -9,35 +8,36 @@ use kifmm::traits::field::{SourceToTargetTranslation, TargetTranslation};
 use kifmm::traits::fmm::{DataAccess, Evaluate};
 use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, points_fixture_sphere};
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
+use rlst::RawAccess;
 
-fn fft_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("F32 Potentials FFT-M2L");
+fn fft_f64(c: &mut Criterion) {
+    let mut group = c.benchmark_group("F64 Potentials FFT-M2L");
 
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for sphere and spheroid are dummies for now
-
     // Tree depth
     let depth_vec = vec![
-        [4, 5, 5], // 3 digits, for each geometry
-        [4, 5, 5], // 4 digits for each geometry
+        [4, 5, 5], // 6 digits, for each geometry
+        [4, 5, 5], // 8 digits for each geometry
+        [4, 4, 5], // 10 digits for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
-        [3, 3, 3], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
+        [7, 7, 7],    // 6 digits, for each geometry
+        [9, 10, 9],   // 8 digits for each geometry
+        [10, 11, 11], // 10 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
-        [128, 64, 128], // 3 digits, for each geometry
-        [16, 64, 64], // 4 digits for each geometry
+        [32, 128, 64], // 6 digits, for each geometry
+        [64, 128, 64], // 8 digits for each geometry
+        [32, 32, 64],  // 10 digits for each geometry
     ];
 
-    let experiments = [3, 4]; // number of digits sought
+    let experiments = [6, 8, 10]; // number of digits sought
 
     let prune_empty = true;
 
@@ -46,8 +46,8 @@ fn fft_f32(c: &mut Criterion) {
             let sources;
             let targets;
             if geometry == "uniform" {
-                sources = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
-                targets = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
+                sources = points_fixture::<f64>(n_points, Some(0.), Some(1.), None);
+                targets = points_fixture::<f64>(n_points, Some(0.), Some(1.), None);
             } else if geometry == "sphere" {
                 sources = points_fixture_sphere(n_points);
                 targets = points_fixture_sphere(n_points);
@@ -58,7 +58,7 @@ fn fft_f32(c: &mut Criterion) {
                 panic!("invalid geometry");
             }
 
-            let charges = vec![1f32; n_points];
+            let charges = vec![1f64; n_points];
 
             let depth = Some(depth_vec[i][j]);
             let e = e_vec[i][j];
@@ -104,37 +104,43 @@ fn fft_f32(c: &mut Criterion) {
     }
 }
 
-fn blas_f32(c: &mut Criterion) {
-    let mut group = c.benchmark_group("F32 Potentials BLAS-M2L");
+fn blas_f64(c: &mut Criterion) {
+    let mut group = c.benchmark_group("F64 Potentials BLAS-M2L");
 
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for spheroid are dummies for now
-
     // Tree depth
     let depth_vec = vec![
-        [4, 4, 4], // 3 digits, for each geometry
-        [4, 4, 4], // 4 digits for each geometry
+        [5, 4, 4], // 6 digits, for each geometry
+        [4, 4, 4], // 8 digits for each geometry
+        [4, 4, 4], // 10 digits for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
-        [3, 2, 3], // 3 digits, for each geometry
-        [3, 4, 5], // 4 digits for each geometry
+        [6, 7, 7],   // 6 digits, for each geometry
+        [7, 8, 9],   // 8 digits for each geometry
+        [9, 10, 11], // 10 digits for each geometry
     ];
 
     // SVD threshold
     let svd_threshold_vec = vec![
-        [Some(0.00001), Some(0.00001), Some(0.001)],              // 3 digits
-        [Some(1e-3), None, Some(0.001)], // 4 digits
+        [Some(1e-6), Some(1e-5), Some(1e-9)],  // 6 digits
+        [Some(1e-6), Some(1e-7), Some(1e-7)],  // 8 digits
+        [Some(1e-6), Some(1e-7), Some(1e-11)], // 10 digits
     ];
 
     let svd_mode_vec = vec![
         [
             FmmSvdMode::new(true, None, None, Some(10), None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
             FmmSvdMode::new(true, None, None, Some(10), None),
-            FmmSvdMode::new(false, None, None, None, None),
+        ],
+        [
+            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(10), None),
         ],
         [
             FmmSvdMode::new(true, None, None, Some(10), None),
@@ -144,13 +150,14 @@ fn blas_f32(c: &mut Criterion) {
     ];
 
     let surface_diff_vec = vec![
-        [None, Some(2), Some(2)], // 3 digits
-        [Some(1), Some(1), None],       // 4 digits
+        [None, Some(1), None],       // 6 digits
+        [Some(1), Some(1), Some(1)], // 8 digits
+        [Some(2), Some(2), Some(1)], // 10 digits
     ];
 
     let nvecs = vec![1, 5, 10];
 
-    let experiments = [3, 4]; // number of digits sought
+    let experiments = [6, 8, 10]; // number of digits sought
 
     let prune_empty = true;
 
@@ -160,8 +167,8 @@ fn blas_f32(c: &mut Criterion) {
                 let sources;
                 let targets;
                 if geometry == "uniform" {
-                    sources = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
-                    targets = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
+                    sources = points_fixture::<f64>(n_points, Some(0.), Some(1.), None);
+                    targets = points_fixture::<f64>(n_points, Some(0.), Some(1.), None);
                 } else if geometry == "sphere" {
                     sources = points_fixture_sphere(n_points);
                     targets = points_fixture_sphere(n_points);
@@ -172,7 +179,7 @@ fn blas_f32(c: &mut Criterion) {
                     panic!("invalid geometry");
                 }
 
-                let charges = vec![1f32; n_points * nvec];
+                let charges = vec![1f64; n_points * nvec];
 
                 let depth = Some(depth_vec[i][j]);
                 let e = e_vec[i][j];
@@ -230,5 +237,5 @@ fn blas_f32(c: &mut Criterion) {
     }
 }
 
-criterion_group!(laplace_p_f32, fft_f32, blas_f32);
-criterion_main!(laplace_p_f32);
+criterion_group!(laplace_p_f64, fft_f64, blas_f64);
+criterion_main!(laplace_p_f64);

@@ -127,6 +127,7 @@ mod test {
     };
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rayon::vec;
     use rlst::{
         c64, rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
         VectorContainer,
@@ -290,18 +291,19 @@ mod test {
             &mut direct,
         );
 
-        direct.iter().zip(potential).for_each(|(&d, &p)| {
+        let mut total_rel_error = T::from(0.0).unwrap();
+        let mut count = T::zero();
+
+        for (_i, (&d, &p)) in direct.iter().zip(potential).enumerate() {
             let abs_error = (d - p).abs();
             let rel_error = abs_error / p.abs();
+            total_rel_error += T::from(rel_error).unwrap();
+            count += T::one();
+        }
 
-            println!(
-                "err {:?} \nd {:?} \np {:?}",
-                rel_error,
-                &direct[0..5],
-                &potential[0..5]
-            );
-            assert!(rel_error <= threshold)
-        });
+        let avg_rel_error = total_rel_error / count as T;
+        println!("Average Relative Error: {}", avg_rel_error);
+        assert!(false);
     }
 
     fn test_single_node_laplace_fmm_vector_helper<T: RlstScalar + Float + Default>(
@@ -358,12 +360,19 @@ mod test {
             &mut direct,
         );
 
-        direct.iter().zip(potential).for_each(|(&d, &p)| {
+        let mut total_rel_error = T::from(0.0).unwrap();
+        let mut count = T::zero();
+
+        for (_i, (&d, &p)) in direct.iter().zip(potential).enumerate() {
             let abs_error = RlstScalar::abs(d - p);
             let rel_error = abs_error / p;
-            println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
-            assert!(rel_error <= threshold)
-        });
+            total_rel_error += T::from(rel_error).unwrap();
+            count += T::one();
+        }
+
+        let avg_rel_error = total_rel_error / count as T;
+        println!("Average Relative Error: {}", avg_rel_error);
+        assert!(false);
     }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
@@ -605,8 +614,8 @@ mod test {
     #[test]
     fn test_fmm_api() {
         // Setup random sources and targets
-        let n_sources = 9000;
-        let n_targets = 10000;
+        let n_sources = 1000000;
+        let n_targets = 1000000;
 
         let min = None;
         let max = None;
@@ -617,11 +626,12 @@ mod test {
         let targets = points_fixture_sphere(n_targets);
 
         // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
+        let n_crit = None;
+        let d = 5;
+        let depth = Some(d);
+        let expansion_order = vec![10; (d + 1) as usize];
         let prune_empty = true;
-        let threshold_pot = 1e-5;
+        let threshold_pot = 1e-9;
 
         // Set charge data and evaluate an FMM
         let nvecs = 1;
@@ -629,7 +639,21 @@ mod test {
         let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
+        // let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
+        // let mut fmm = SingleNodeBuilder::new(false)
+        //     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+        //     .unwrap()
+        //     .parameters(
+        //         charges.data(),
+        //         &expansion_order,
+        //         Laplace3dKernel::new(),
+        //         GreenKernelEvalType::Value,
+        //         BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+        //     )
+        //     .unwrap()
+        //     .build()
+        //     .unwrap();
+
         let mut fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
@@ -638,7 +662,7 @@ mod test {
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
-                BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+                FftFieldTranslation::new(Some(32)),
             )
             .unwrap()
             .build()

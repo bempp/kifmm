@@ -12,7 +12,7 @@ use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, point
 use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
 
 fn fft_f64(c: &mut Criterion) {
-    let mut group = c.benchmark_group("F64 Potentials FFT-M2L 3 Digits");
+    let mut group = c.benchmark_group("F64 Potentials FFT-M2L");
 
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
@@ -26,16 +26,16 @@ fn fft_f64(c: &mut Criterion) {
 
     // Expansion order
     let e_vec = vec![
-        [7, 7, 7], // 6 digits, for each geometry
-        [9, 9, 9], // 8 digits for each geometry
+        [7, 7, 7],    // 6 digits, for each geometry
+        [9, 9, 9],    // 8 digits for each geometry
         [11, 11, 11], // 10 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
         [64, 32, 128], // 6 digits, for each geometry
-        [32, 16, 64], // 8 digits for each geometry
-        [16, 64, 64], // 10 digits for each geometry
+        [32, 16, 64],  // 8 digits for each geometry
+        [16, 64, 64],  // 10 digits for each geometry
     ];
 
     let experiments = [6, 8, 10]; // number of digits sought
@@ -120,28 +120,40 @@ fn blas_f64(c: &mut Criterion) {
 
     // Expansion order
     let e_vec = vec![
-        [7, 7, 7], // 6 digits, for each geometry
-        [8, 8, 9], // 8 digits for each geometry
+        [7, 7, 7],    // 6 digits, for each geometry
+        [8, 8, 9],    // 8 digits for each geometry
         [10, 10, 11], // 10 digits for each geometry
     ];
 
     // SVD threshold
     let svd_threshold_vec = vec![
-        [Some(1e-5), Some(1e-5), Some(1e-9)],              // 6 digits
-        [Some(1e-5), Some(1e-7), Some(1e-7)], // 8 digits
+        [Some(1e-5), Some(1e-5), Some(1e-9)],  // 6 digits
+        [Some(1e-5), Some(1e-7), Some(1e-7)],  // 8 digits
         [Some(1e-9), Some(1e-7), Some(1e-11)], // 10 digits
     ];
 
     let svd_mode_vec = vec![
-        [FmmSvdMode::new(true, None, None, Some(5), None), FmmSvdMode::new(true, None, None, Some(20), None), FmmSvdMode::new(true, None, None, Some(10), None)],
-        [FmmSvdMode::new(false, None, None, None, None), FmmSvdMode::new(true, None, None, Some(20), None), FmmSvdMode::new(true, None, None, Some(10), None)],
-        [FmmSvdMode::new(true, None, None, Some(20), None), FmmSvdMode::new(true, None, None, Some(20), None), FmmSvdMode::new(true, None, None, Some(20), None)],
+        [
+            FmmSvdMode::new(true, None, None, Some(5), None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(10), None),
+        ],
+        [
+            FmmSvdMode::new(false, None, None, None, None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(10), None),
+        ],
+        [
+            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
+        ],
     ];
 
     let surface_diff_vec = vec![
-        [None, Some(1), None], // 6 digits
+        [None, Some(1), None],       // 6 digits
         [Some(1), Some(1), Some(1)], // 8 digits
-        [Some(2), Some(2), Some(1)] // 10 digits
+        [Some(2), Some(2), Some(1)], // 10 digits
     ];
 
     let nvecs = vec![1, 5, 10];
@@ -153,7 +165,6 @@ fn blas_f64(c: &mut Criterion) {
     for (i, digits) in experiments.iter().enumerate() {
         for (j, &geometry) in geometries.iter().enumerate() {
             for (k, nvec) in nvecs.iter().enumerate() {
-
                 let sources;
                 let targets;
                 if geometry == "uniform" {
@@ -169,7 +180,7 @@ fn blas_f64(c: &mut Criterion) {
                     panic!("invalid geometry");
                 }
 
-                let charges = vec![1f64; n_points*nvec];
+                let charges = vec![1f64; n_points * nvec];
 
                 let depth = Some(depth_vec[i][j]);
                 let e = e_vec[i][j];
@@ -187,19 +198,25 @@ fn blas_f64(c: &mut Criterion) {
                         &expansion_order,
                         Laplace3dKernel::new(),
                         GreenKernelEvalType::Value,
-                        BlasFieldTranslationSaRcmp::new(threshold, surface_diff, svd_mode)
+                        BlasFieldTranslationSaRcmp::new(threshold, surface_diff, svd_mode),
                     )
                     .unwrap()
                     .build()
                     .unwrap();
 
                 group.bench_function(
-                    format!("M2L=BLAS digits={} geometry={} nvecs={}", digits, geometry, nvec),
+                    format!(
+                        "M2L=BLAS digits={} geometry={} nvecs={}",
+                        digits, geometry, nvec
+                    ),
                     |b| b.iter(|| fmm.evaluate()),
                 );
 
                 group.bench_function(
-                    format!("M2L=BLAS digits={}, geometry={} nvecs={} M2L ", digits, geometry, nvec),
+                    format!(
+                        "M2L=BLAS digits={}, geometry={} nvecs={} M2L ",
+                        digits, geometry, nvec
+                    ),
                     |b| {
                         b.iter(|| {
                             for level in 2..=fmm.tree().target_tree().depth() {
@@ -210,14 +227,16 @@ fn blas_f64(c: &mut Criterion) {
                 );
 
                 group.bench_function(
-                    format!("M2L=BLAS digits={} geometry={} nvecs={} P2P ", digits, geometry, nvec),
+                    format!(
+                        "M2L=BLAS digits={} geometry={} nvecs={} P2P ",
+                        digits, geometry, nvec
+                    ),
                     |b| b.iter(|| fmm.p2p().unwrap()),
                 );
             }
         }
     }
 }
-
 
 criterion_group!(laplace_p_f64, fft_f64, blas_f64);
 criterion_main!(laplace_p_f64);
