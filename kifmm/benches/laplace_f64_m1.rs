@@ -25,15 +25,15 @@ fn fft_f64(c: &mut Criterion) {
 
     // Expansion order
     let e_vec = vec![
-        [7, 7, 7],    // 6 digits, for each geometry
-        [9, 10, 9],   // 8 digits for each geometry
+        [6, 7, 7],    // 6 digits, for each geometry
+        [8, 9, 9],   // 8 digits for each geometry
         [10, 11, 11], // 10 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
         [32, 128, 64], // 6 digits, for each geometry
-        [64, 128, 64], // 8 digits for each geometry
+        [64, 64, 64], // 8 digits for each geometry
         [32, 32, 64],  // 10 digits for each geometry
     ];
 
@@ -112,47 +112,47 @@ fn blas_f64(c: &mut Criterion) {
 
     // Tree depth
     let depth_vec = vec![
-        [5, 4, 4], // 6 digits, for each geometry
-        [4, 4, 4], // 8 digits for each geometry
-        [4, 4, 4], // 10 digits for each geometry
+        [5, 5, 4], // 6 digits, for each geometry
+        [4, 5, 4], // 8 digits for each geometry
+        [4, 5, 4], // 10 digits for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
-        [6, 7, 7],   // 6 digits, for each geometry
-        [7, 8, 9],   // 8 digits for each geometry
-        [9, 10, 11], // 10 digits for each geometry
+        [5, 6, 7],   // 6 digits, for each geometry
+        [8, 8, 9],   // 8 digits for each geometry
+        [10, 10, 11], // 10 digits for each geometry
     ];
 
     // SVD threshold
     let svd_threshold_vec = vec![
-        [Some(1e-6), Some(1e-5), Some(1e-9)],  // 6 digits
-        [Some(1e-6), Some(1e-7), Some(1e-7)],  // 8 digits
-        [Some(1e-6), Some(1e-7), Some(1e-11)], // 10 digits
+        [Some(1e-5), Some(1e-5), Some(1e-9)],  // 6 digits
+        [Some(1e-5), Some(1e-7), Some(1e-7)],  // 8 digits
+        [Some(1e-7), Some(1e-7), Some(1e-11)], // 10 digits
     ];
 
     let svd_mode_vec = vec![
         [
-            FmmSvdMode::new(true, None, None, Some(10), None),
             FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(true, None, None, Some(5), None),
+            FmmSvdMode::new(true, None, None, Some(10), None),
+        ],
+        [
+            FmmSvdMode::new(true, None, None, Some(5), None),
+            FmmSvdMode::new(true, None, None, Some(5), None),
             FmmSvdMode::new(true, None, None, Some(10), None),
         ],
         [
             FmmSvdMode::new(true, None, None, Some(20), None),
-            FmmSvdMode::new(true, None, None, Some(20), None),
-            FmmSvdMode::new(true, None, None, Some(10), None),
-        ],
-        [
-            FmmSvdMode::new(true, None, None, Some(10), None),
-            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(false, None, None, None, None),
             FmmSvdMode::new(true, None, None, Some(20), None),
         ],
     ];
 
     let surface_diff_vec = vec![
-        [None, Some(1), None],       // 6 digits
-        [Some(1), Some(1), Some(1)], // 8 digits
-        [Some(2), Some(2), Some(1)], // 10 digits
+        [Some(1), Some(1), Some(2)],       // 6 digits
+        [Some(2), Some(1), Some(1)], // 8 digits
+        [Some(2), Some(2), Some(2)], // 10 digits
     ];
 
     let nvecs = vec![1, 5, 10];
