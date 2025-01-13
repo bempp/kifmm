@@ -1,5 +1,4 @@
 use core::panic;
-use std::time::Duration;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
@@ -9,10 +8,10 @@ use kifmm::traits::field::{SourceToTargetTranslation, TargetTranslation};
 use kifmm::traits::fmm::{DataAccess, Evaluate};
 use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, points_fixture_sphere};
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
+use rlst::RawAccess;
 
 fn configure_criterion() -> Criterion {
-    Criterion::default().sample_size(5) // Set global sample size to 10
+    Criterion::default().sample_size(10) // Set global sample size to 10
 }
 
 fn fft_f32(c: &mut Criterion) {
@@ -117,7 +116,7 @@ fn blas_f32(c: &mut Criterion) {
     // Tree depth
     let depth_vec = vec![
         [4, 4, 4], // 3 digits, for each geometry
-        [4, 4, 4], // 4 digits for each geometry
+        [4, 5, 5], // 4 digits for each geometry
     ];
 
     // Expansion order

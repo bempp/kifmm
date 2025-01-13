@@ -29,14 +29,14 @@ fn fft_f32(c: &mut Criterion) {
 
     // Expansion order
     let e_vec = vec![
-        [3, 3, 3], // 3 digits, for each geometry
+        [3, 3, 4], // 3 digits, for each geometry
         [4, 5, 5], // 4 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
         [64, 64, 128], // 3 digits, for each geometry
-        [32, 128, 64],   // 4 digits for each geometry
+        [32, 128, 128],   // 4 digits for each geometry
     ];
 
     let experiments = [3, 4]; // number of digits sought
@@ -126,20 +126,20 @@ fn blas_f32(c: &mut Criterion) {
 
     // SVD threshold
     let svd_threshold_vec = vec![
-        [Some(0.1), Some(0.00001), None], // 3 digits
-        [Some(0.0001), Some(0.001), Some(0.001)],  // 4 digits
+        [Some(0.1), Some(0.00001), Some(0.00001)], // 3 digits
+        [Some(0.001), Some(0.001), None],  // 4 digits
     ];
 
     let svd_mode_vec = vec![
         [
             FmmSvdMode::new(true, None, None, Some(5), None),
             FmmSvdMode::new(false, None, None, None, None),
-            FmmSvdMode::new(false, None, None, None, None),
+            FmmSvdMode::new(true, None, None, Some(20), None),
         ],
         [
             FmmSvdMode::new(true, None, None, Some(10), None),
             FmmSvdMode::new(false, None, None, None, None),
-            FmmSvdMode::new(true, None, None, Some(20), None),
+            FmmSvdMode::new(false, None, None, None, None),
         ],
     ];
 
