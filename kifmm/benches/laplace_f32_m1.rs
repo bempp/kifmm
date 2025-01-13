@@ -17,8 +17,6 @@ fn fft_f32(c: &mut Criterion) {
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for sphere and spheroid are dummies for now
-
     // Tree depth
     let depth_vec = vec![
         [5, 5, 5], // 3 digits, for each geometry
@@ -27,14 +25,14 @@ fn fft_f32(c: &mut Criterion) {
 
     // Expansion order
     let e_vec = vec![
-        [4, 5, 5], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
+        [3, 3, 3], // 3 digits, for each geometry
+        [4, 5, 5], // 4 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
-        [32, 128, 128], // 3 digits, for each geometry
-        [64, 64, 64],   // 4 digits for each geometry
+        [64, 64, 128], // 3 digits, for each geometry
+        [32, 128, 64],   // 4 digits for each geometry
     ];
 
     let experiments = [3, 4]; // number of digits sought
@@ -110,42 +108,40 @@ fn blas_f32(c: &mut Criterion) {
     let n_points = 1000000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for sphere and spheroid are dummies for now
-
     // Tree depth
     let depth_vec = vec![
         [5, 5, 5], // 3 digits, for each geometry
-        [5, 4, 5], // 4 digits for each geometry
+        [5, 5, 5], // 4 digits for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
         [3, 3, 3], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
+        [3, 3, 5], // 4 digits for each geometry
     ];
 
     // SVD threshold
     let svd_threshold_vec = vec![
-        [Some(0.001), Some(0.001), None], // 3 digits
-        [Some(1e-5), Some(0.001), None],  // 4 digits
+        [Some(0.1), Some(0.00001), None], // 3 digits
+        [Some(0.0001), Some(0.001), Some(0.001)],  // 4 digits
     ];
 
     let svd_mode_vec = vec![
         [
-            FmmSvdMode::new(false, None, None, Some(10), None),
+            FmmSvdMode::new(true, None, None, Some(5), None),
             FmmSvdMode::new(false, None, None, None, None),
             FmmSvdMode::new(false, None, None, None, None),
         ],
         [
-            FmmSvdMode::new(true, None, None, Some(5), None),
             FmmSvdMode::new(true, None, None, Some(10), None),
+            FmmSvdMode::new(false, None, None, None, None),
             FmmSvdMode::new(true, None, None, Some(20), None),
         ],
     ];
 
     let surface_diff_vec = vec![
-        [Some(1), Some(1), None], // 3 digits
-        [None, Some(2), None],    // 4 digits
+        [Some(1), None, None], // 3 digits
+        [Some(1), Some(1), None],    // 4 digits
     ];
 
     let nvecs = vec![1, 5, 10];
