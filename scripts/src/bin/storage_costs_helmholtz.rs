@@ -2,6 +2,7 @@ use core::panic;
 
 use green_kernels::helmholtz_3d::Helmholtz3dKernel;
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
+use itertools::{izip, Itertools};
 use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fftw::Dft;
@@ -12,15 +13,32 @@ use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::{points_fixture, points_fixture_oblate_spheroid, points_fixture_sphere};
 use kifmm::{fmm, BlasFieldTranslationIa, KiFmm};
 use num::Float;
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
+use rlst::{c32, c64, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
 
 use std::mem;
+
+
+fn p_vec(p_leaf: usize, p_scale: f64) -> Vec<usize> {
+
+    let mut res = Vec::new();
+
+    let mut curr = p_leaf;
+    for l in 0..5 {
+        res.push(curr as usize);
+        curr = ((curr as f64) * p_scale) as usize;
+    }
+
+    res = res.into_iter().rev().collect_vec();
+    res[0] = 0;
+    res[1] = 0;
+    res
+}
 
 fn calculate_fmm_storage_fft_m2l<Scalar>(
     fmm: &KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FftFieldTranslation<Scalar>>,
 ) -> (f64, f64, f64)
 where
-    Scalar: RlstScalar<Complex = Scalar> + Float + AsComplex + Dft,
+    Scalar: RlstScalar<Complex = Scalar> + AsComplex + Dft,
 
 {
     let element_size = mem::size_of::<Scalar>(); // Assuming f32 is the element type
@@ -67,7 +85,7 @@ where
         size_m2l += vec.len();
     }
     size_m2l *= 2; // need it twice, freq re-ordered
-    storage_m2l = size_m2l * element_size * 2; // complex numbers
+    storage_m2l = size_m2l * element_size; // complex numbers
 
     // Convert storage to megabytes
     (
@@ -135,7 +153,7 @@ where
         size_m2l += size;
     }
 
-    storage_m2l = size_m2l * element_size * 2;
+    storage_m2l = size_m2l * element_size;
 
     // Convert storage to megabytes
     (
@@ -145,36 +163,51 @@ where
     )
 }
 
-fn fft_f32() {
-    let n_points = 1000000;
+fn fft_f32(arch: String) {
+    let n_points = 1000;
     let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for sphere and spheroid are dummies for now
 
-    // Tree depth
-    let depth_vec = vec![
-        [5, 5, 5], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
-    ];
+    let depth = 4;
 
-    // Expansion order
-    let e_vec = vec![
-        [4, 5, 5], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
-    ];
+    let p_leaf_vec;
+    let p_scale_vec;
+    if arch == "amd" {
+        p_leaf_vec = vec![
+            [4, 5, 6, 8, 11], // uniform
+            [4, 5, 6, 8, 11], // sphere
+            [4, 5, 6, 9, 11], //speroid
+        ];
+        p_scale_vec = vec![
+            [1.0, 1.3, 1.3, 1.3, 1.3], // uniform
+            [1., 1.3, 1.3, 1.5, 1.5], //sphere
+            [1., 1.5, 1.3, 1.3, 1.3],
+        ];
+    } else if arch == "m1" {
+        p_leaf_vec = vec![
+            [4, 5, 6, 8, 11], // uniform
+            [4, 5, 6, 8, 11], // sphere
+            [4, 5, 7, 8, 11], //speroid
+        ];
+        p_scale_vec = vec![
+            [1.0, 1.3, 1.3, 1.3, 1.3], // uniform
+            [1., 1.3, 1.3, 1.3, 1.3], //sphere
+            [1., 1.3, 1.3, 1.5, 1.3],
+        ];
+    } else {
+        panic!("")
+    }
 
-    // Block size
-    let b_vec = vec![
-        [32, 128, 128], // 3 digits, for each geometry
-        [64, 64, 64],   // 4 digits for each geometry
-    ];
+    let wavenumber_vec = vec![
+        [5., 25., 50., 75., 100.],
+        [5., 25., 50., 75., 100.],
+        [5., 25., 50., 75., 100.],
+        ];
 
-    let experiments = [3, 4]; // number of digits sought
 
     let prune_empty = true;
 
-    for (i, _digits) in experiments.iter().enumerate() {
-        for (j, &geometry) in geometries.iter().enumerate() {
+    for (i, &geometry) in geometries.iter().enumerate() {
             let sources;
             let targets;
             if geometry == "uniform" {
@@ -190,125 +223,43 @@ fn fft_f32() {
                 panic!("invalid geometry");
             }
 
-            // let charges = vec![1f32; n_points];
+            let charges = vec![c32::ONE; n_points];
 
-            // let depth = Some(depth_vec[i][j]);
-            // let e = e_vec[i][j];
-            // let b = b_vec[i][j];
-            // let expansion_order = vec![e; depth.unwrap() as usize + 1];
-            // let block_size = Some(b);
+        for (wavenumber, p_scale, p_leaf) in izip!(wavenumber_vec[i], p_scale_vec[i], p_leaf_vec[i]) {
 
-            // let mut fmm = SingleNodeBuilder::new(false)
-            //     .tree(sources.data(), targets.data(), None, depth, prune_empty)
-            //     .unwrap()
-            //     .parameters(
-            //         &charges,
-            //         &expansion_order,
-            //         Laplace3dKernel::new(),
-            //         GreenKernelEvalType::Value,
-            //         FftFieldTranslation::new(block_size),
-            //     )
-            //     .unwrap()
-            //     .build()
-            //     .unwrap();
+            let expansion_order = p_vec(p_leaf, p_scale);
+            let mut fmm = SingleNodeBuilder::new(false)
+                .tree(sources.data(), targets.data(), None, Some(depth), prune_empty)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    GreenKernelEvalType::Value,
+                    FftFieldTranslation::new(None),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
 
-            // let (m2m, l2l, m2l) = calculate_fmm_storage_fft_m2l(&fmm);
+            fmm.evaluate();
+
+            let (m2m, l2l, m2l) = calculate_fmm_storage_fft_m2l::<c32>(&fmm);
+
+            println!("FFT M2L geometry {:?}, wave number {:?}", geometry, wavenumber);
+            println!("M2M {:?} mb L2L {:?} mb M2L {:?} mb", m2m, l2l, m2l);
         }
     }
 }
+
 
 fn blas_f32() {
-    let n_points = 1000000;
-    let geometries = ["uniform", "sphere", "spheroid"];
 
-    // TODO: 4 digits for sphere and spheroid are dummies for now
-
-    // Tree depth
-    let depth_vec = vec![
-        [5, 5, 5], // 3 digits, for each geometry
-        [5, 4, 5], // 4 digits for each geometry
-    ];
-
-    // Expansion order
-    let e_vec = vec![
-        [3, 3, 3], // 3 digits, for each geometry
-        [5, 5, 5], // 4 digits for each geometry
-    ];
-
-    // SVD threshold
-    let svd_threshold_vec = vec![
-        [Some(0.001), Some(0.001), None], // 3 digits
-        [Some(1e-5), Some(0.001), None],  // 4 digits
-    ];
-
-    let svd_mode_vec = vec![
-        [
-            FmmSvdMode::new(false, None, None, Some(10), None),
-            FmmSvdMode::new(false, None, None, None, None),
-            FmmSvdMode::new(false, None, None, None, None),
-        ],
-        [
-            FmmSvdMode::new(true, None, None, Some(5), None),
-            FmmSvdMode::new(true, None, None, Some(10), None),
-            FmmSvdMode::new(true, None, None, Some(20), None),
-        ],
-    ];
-
-    let surface_diff_vec = vec![
-        [Some(1), Some(1), None], // 3 digits
-        [None, Some(2), None],    // 4 digits
-    ];
-
-    let nvecs = vec![1, 5, 10];
-
-    let experiments = [3, 4]; // number of digits sought
-
-    let prune_empty = true;
-
-    for (i, digits) in experiments.iter().enumerate() {
-        for (j, &geometry) in geometries.iter().enumerate() {
-            for (k, nvec) in nvecs.iter().enumerate() {
-                let sources;
-                let targets;
-                if geometry == "uniform" {
-                    sources = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
-                    targets = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
-                } else if geometry == "sphere" {
-                    sources = points_fixture_sphere(n_points);
-                    targets = points_fixture_sphere(n_points);
-                } else if geometry == "spheroid" {
-                    sources = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
-                    targets = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
-                } else {
-                    panic!("invalid geometry");
-                }
-
-                let charges = vec![1f32; n_points * nvec];
-
-                let depth = Some(depth_vec[i][j]);
-                let e = e_vec[i][j];
-                let threshold = svd_threshold_vec[i][j];
-                let surface_diff = surface_diff_vec[i][j];
-                let svd_mode = svd_mode_vec[i][j];
-
-                let expansion_order = vec![e; depth.unwrap() as usize + 1];
-
-                let mut fmm = SingleNodeBuilder::new(false)
-                    .tree(sources.data(), targets.data(), None, depth, prune_empty)
-                    .unwrap()
-                    .parameters(
-                        &charges,
-                        &expansion_order,
-                        Laplace3dKernel::new(),
-                        GreenKernelEvalType::Value,
-                        BlasFieldTranslationSaRcmp::new(threshold, surface_diff, svd_mode),
-                    )
-                    .unwrap()
-                    .build()
-                    .unwrap();
-            }
-        }
-    }
 }
 
-fn main() {}
+
+fn main() {
+    fft_f32("amd".to_string());
+
+    // blas_f32();
+}
