@@ -240,7 +240,7 @@ fn blas_f32(c: &mut Criterion) {
 criterion_group! {
     name = laplace_p_f32;
     config = configure_criterion();
-    targets = fft_f32, blas_f32
+    targets = blas_f32
 }
 
 criterion_main!(laplace_p_f32);
