@@ -301,7 +301,7 @@ fn blas_f64() {
 
                     // let compression = calculate_compression(&fmm, &fmm_full);
                     println!("BLAS M2L geometry {:?}, digits {:?}", geometry, digits);
-                    println!("SETUP {:?} ms", e);
+                    println!("SETUP {:?} ms", e.as_millis());
                     // println!("Compression {:?} %", compression);
                 }
             // }
