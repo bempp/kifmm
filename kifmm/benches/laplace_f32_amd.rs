@@ -115,7 +115,7 @@ fn blas_f32(c: &mut Criterion) {
 
     // Tree depth
     let depth_vec = vec![
-        [4, 4, 4], // 3 digits, for each geometry
+        [4, 5, 5], // 3 digits, for each geometry
         [4, 5, 5], // 4 digits for each geometry
     ];
 
@@ -157,75 +157,80 @@ fn blas_f32(c: &mut Criterion) {
 
     for (i, digits) in experiments.iter().enumerate() {
         for (j, &geometry) in geometries.iter().enumerate() {
-            for (k, nvec) in nvecs.iter().enumerate() {
-                let sources;
-                let targets;
-                if geometry == "uniform" {
-                    sources = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
-                    targets = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
-                } else if geometry == "sphere" {
-                    sources = points_fixture_sphere(n_points);
-                    targets = points_fixture_sphere(n_points);
-                } else if geometry == "spheroid" {
-                    sources = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
-                    targets = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
-                } else {
-                    panic!("invalid geometry");
+
+            if geometry == "uniform" {
+                continue;
+            } else {
+                for (k, nvec) in nvecs.iter().enumerate() {
+                    let sources;
+                    let targets;
+                    if geometry == "uniform" {
+                        sources = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
+                        targets = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
+                    } else if geometry == "sphere" {
+                        sources = points_fixture_sphere(n_points);
+                        targets = points_fixture_sphere(n_points);
+                    } else if geometry == "spheroid" {
+                        sources = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
+                        targets = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
+                    } else {
+                        panic!("invalid geometry");
+                    }
+
+                    let charges = vec![1f32; n_points * nvec];
+
+                    let depth = Some(depth_vec[i][j]);
+                    let e = e_vec[i][j];
+                    let threshold = svd_threshold_vec[i][j];
+                    let surface_diff = surface_diff_vec[i][j];
+                    let svd_mode = svd_mode_vec[i][j];
+
+                    let expansion_order = vec![e; depth.unwrap() as usize + 1];
+
+                    let mut fmm = SingleNodeBuilder::new(false)
+                        .tree(sources.data(), targets.data(), None, depth, prune_empty)
+                        .unwrap()
+                        .parameters(
+                            &charges,
+                            &expansion_order,
+                            Laplace3dKernel::new(),
+                            GreenKernelEvalType::Value,
+                            BlasFieldTranslationSaRcmp::new(threshold, surface_diff, svd_mode),
+                        )
+                        .unwrap()
+                        .build()
+                        .unwrap();
+
+                    group.bench_function(
+                        format!(
+                            "M2L=BLAS digits={} geometry={} nvecs={}",
+                            digits, geometry, nvec
+                        ),
+                        |b| b.iter(|| fmm.evaluate()),
+                    );
+
+                    group.bench_function(
+                        format!(
+                            "M2L=BLAS digits={}, geometry={} nvecs={} M2L ",
+                            digits, geometry, nvec
+                        ),
+                        |b| {
+                            b.iter(|| {
+                                for level in 2..=fmm.tree().target_tree().depth() {
+                                    fmm.m2l(level).unwrap();
+                                }
+                            })
+                        },
+                    );
+
+                    group.bench_function(
+                        format!(
+                            "M2L=BLAS digits={} geometry={} nvecs={} P2P ",
+                            digits, geometry, nvec
+                        ),
+                        |b| b.iter(|| fmm.p2p().unwrap()),
+                    );
                 }
-
-                let charges = vec![1f32; n_points * nvec];
-
-                let depth = Some(depth_vec[i][j]);
-                let e = e_vec[i][j];
-                let threshold = svd_threshold_vec[i][j];
-                let surface_diff = surface_diff_vec[i][j];
-                let svd_mode = svd_mode_vec[i][j];
-
-                let expansion_order = vec![e; depth.unwrap() as usize + 1];
-
-                let mut fmm = SingleNodeBuilder::new(false)
-                    .tree(sources.data(), targets.data(), None, depth, prune_empty)
-                    .unwrap()
-                    .parameters(
-                        &charges,
-                        &expansion_order,
-                        Laplace3dKernel::new(),
-                        GreenKernelEvalType::Value,
-                        BlasFieldTranslationSaRcmp::new(threshold, surface_diff, svd_mode),
-                    )
-                    .unwrap()
-                    .build()
-                    .unwrap();
-
-                group.bench_function(
-                    format!(
-                        "M2L=BLAS digits={} geometry={} nvecs={}",
-                        digits, geometry, nvec
-                    ),
-                    |b| b.iter(|| fmm.evaluate()),
-                );
-
-                group.bench_function(
-                    format!(
-                        "M2L=BLAS digits={}, geometry={} nvecs={} M2L ",
-                        digits, geometry, nvec
-                    ),
-                    |b| {
-                        b.iter(|| {
-                            for level in 2..=fmm.tree().target_tree().depth() {
-                                fmm.m2l(level).unwrap();
-                            }
-                        })
-                    },
-                );
-
-                group.bench_function(
-                    format!(
-                        "M2L=BLAS digits={} geometry={} nvecs={} P2P ",
-                        digits, geometry, nvec
-                    ),
-                    |b| b.iter(|| fmm.p2p().unwrap()),
-                );
             }
         }
     }

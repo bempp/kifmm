@@ -99,7 +99,7 @@ fn calculate_fmm_storage_blas_m2l<Scalar>(
     fmm: &KiFmm<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>,
 ) -> (f64, f64, f64)
 where
-    Scalar: RlstScalar<Complex = Scalar> + Float + AsComplex + Dft
+    Scalar: RlstScalar<Complex = Scalar>
 {
     let element_size = mem::size_of::<Scalar>(); // Assuming f32 is the element type
 
@@ -166,7 +166,6 @@ where
 fn fft_f32(arch: String) {
     let n_points = 1000;
     let geometries = ["uniform", "sphere", "spheroid"];
-
 
     let depth = 4;
 
@@ -242,8 +241,6 @@ fn fft_f32(arch: String) {
                 .build()
                 .unwrap();
 
-            fmm.evaluate();
-
             let (m2m, l2l, m2l) = calculate_fmm_storage_fft_m2l::<c32>(&fmm);
 
             println!("FFT M2L geometry {:?}, wave number {:?}", geometry, wavenumber);
@@ -254,12 +251,84 @@ fn fft_f32(arch: String) {
 
 
 fn blas_f32() {
+    let n_points = 1000000;
+    let geometries = ["uniform", "sphere", "spheroid"];
 
+    let depth = 4;
+
+    let p_leaf_vec = vec![
+        [3, 5, 6], // uniform
+        [4, 5, 6], // sphere
+        [4, 5, 6], //speroid
+    ];
+
+    let p_scale_vec = vec![
+        [1.5, 1.3, 1.5], // uniform
+        [1.5, 1.5, 1.3], //sphere
+        [1., 1.3, 1.5],
+    ];
+
+    let wavenumber_vec = vec![
+        [5., 25., 50.],
+        [5., 25., 50.],
+        [5., 25., 50.],
+    ];
+
+    let surface_diff_vec = vec![
+        [1, 0, 0],
+        [0, 0, 2],
+        [0, 0, 2]
+    ];
+
+    let prune_empty = true;
+
+    for (i, &geometry) in geometries.iter().enumerate() {
+            let sources;
+            let targets;
+            if geometry == "uniform" {
+                sources = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
+                targets = points_fixture::<f32>(n_points, Some(0.), Some(1.), None);
+            } else if geometry == "sphere" {
+                sources = points_fixture_sphere(n_points);
+                targets = points_fixture_sphere(n_points);
+            } else if geometry == "spheroid" {
+                sources = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
+                targets = points_fixture_oblate_spheroid(n_points, 1.0, 0.5);
+            } else {
+                panic!("invalid geometry");
+            }
+
+            let charges = vec![c32::ONE; n_points];
+
+        for (wavenumber, p_scale, p_leaf, surface_diff) in izip!(wavenumber_vec[i], p_scale_vec[i], p_leaf_vec[i], surface_diff_vec[i]) {
+
+            let expansion_order = p_vec(p_leaf, p_scale);
+            let mut fmm = SingleNodeBuilder::new(false)
+                .tree(sources.data(), targets.data(), None, Some(depth), prune_empty)
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Helmholtz3dKernel::new(wavenumber),
+                    GreenKernelEvalType::Value,
+                    BlasFieldTranslationIa::new(None, Some(surface_diff), FmmSvdMode::Deterministic),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            let (m2m, l2l, m2l) = calculate_fmm_storage_blas_m2l::<c32>(&fmm);
+
+            println!("BLAS M2L geometry {:?}, wave number {:?}", geometry, wavenumber);
+            println!("M2M {:?} mb L2L {:?} mb M2L {:?} mb", m2m, l2l, m2l);
+
+        }
+    }
 }
 
 
 fn main() {
-    fft_f32("amd".to_string());
+    // fft_f32("m1".to_string());
 
-    // blas_f32();
+    blas_f32();
 }
