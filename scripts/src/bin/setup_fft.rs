@@ -143,6 +143,7 @@ fn fft_f64() {
             let expansion_order = vec![e; depth.unwrap() as usize + 1];
             let block_size = Some(b);
 
+            println!("FFT M2L geometry {:?}, digits {:?}", geometry, digits);
             let s= Instant::now();
             let fmm = SingleNodeBuilder::new(false)
                 .tree(sources.data(), targets.data(), None, depth, prune_empty)
@@ -164,7 +165,7 @@ fn fft_f64() {
 
 fn main() {
     // println!("FFT F32");
-    fft_f32();
+    // fft_f32();
 
 
     // println!("FFT F64");
