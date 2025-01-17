@@ -270,6 +270,7 @@ fn blas_f64() {
 
                     let expansion_order = vec![e; depth.unwrap() as usize + 1];
 
+                    let s = Instant::now();
                     let mut fmm = SingleNodeBuilder::new(false)
                         .tree(sources.data(), targets.data(), None, depth, prune_empty)
                         .unwrap()
@@ -283,23 +284,25 @@ fn blas_f64() {
                         .unwrap()
                         .build()
                         .unwrap();
-                    let mut fmm_full = SingleNodeBuilder::new(false)
-                        .tree(sources.data(), targets.data(), None, depth, prune_empty)
-                        .unwrap()
-                        .parameters(
-                            &charges,
-                            &expansion_order,
-                            Laplace3dKernel::new(),
-                            GreenKernelEvalType::Value,
-                            BlasFieldTranslationSaRcmp::new(None, surface_diff, svd_mode),
-                        )
-                        .unwrap()
-                        .build()
-                        .unwrap();
+                    let e = s.elapsed();
+                    // let mut fmm_full = SingleNodeBuilder::new(false)
+                    //     .tree(sources.data(), targets.data(), None, depth, prune_empty)
+                    //     .unwrap()
+                    //     .parameters(
+                    //         &charges,
+                    //         &expansion_order,
+                    //         Laplace3dKernel::new(),
+                    //         GreenKernelEvalType::Value,
+                    //         BlasFieldTranslationSaRcmp::new(None, surface_diff, svd_mode),
+                    //     )
+                    //     .unwrap()
+                    //     .build()
+                    //     .unwrap();
 
-                    let compression = calculate_compression(&fmm, &fmm_full);
+                    // let compression = calculate_compression(&fmm, &fmm_full);
                     println!("BLAS M2L geometry {:?}, digits {:?}", geometry, digits);
-                    println!("Compression {:?} %", compression);
+                    println!("SETUP {:?} ms", e);
+                    // println!("Compression {:?} %", compression);
                 }
             // }
         }
@@ -309,8 +312,8 @@ fn blas_f64() {
 fn main() {
 
     // println!("BLAS F32");
-    blas_f32();
+    // blas_f32();
 
     // println!("BLAS F64");
-    // blas_f64();
+    blas_f64();
 }
