@@ -21,21 +21,22 @@ fn fft_f32() {
     let geometries = ["uniform", "sphere", "spheroid"];
 
     // Tree depth
+    // Tree depth
     let depth_vec = vec![
-        [4, 5, 5], // 3 digits, for each geometry
-        [4, 5, 5], // 4 digits for each geometry
+        [5, 5, 5], // 3 digits, for each geometry
+        [5, 5, 5], // 4 digits for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
-        [3, 3, 3], // 3 digits, for each geometry
+        [3, 3, 4], // 3 digits, for each geometry
         [4, 5, 5], // 4 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
-        [128, 64, 128], // 3 digits, for each geometry
-        [16, 64, 64], // 4 digits for each geometry
+        [64, 64, 128], // 3 digits, for each geometry
+        [32, 128, 128],   // 4 digits for each geometry
     ];
 
     let experiments = [3, 4]; // number of digits sought
@@ -95,23 +96,23 @@ fn fft_f64() {
     let geometries = ["uniform", "sphere", "spheroid"];
 
     let depth_vec = vec![
-        [4, 4, 4], // 6 digits, for each geometry
+        [5, 5, 5], // 6 digits, for each geometry
         [4, 5, 5], // 8 digits for each geometry
-        [4, 4, 4], // 10 digits for each geometry
+        [4, 5, 5], // 10 digits for each geometry
     ];
 
     // Expansion order
     let e_vec = vec![
-        [6, 6, 6],    // 6 digits, for each geometry
-        [8, 9, 8],    // 8 digits for each geometry
-        [10, 10, 10], // 10 digits for each geometry
+        [6, 6, 7],    // 6 digits, for each geometry
+        [8, 9, 9],   // 8 digits for each geometry
+        [10, 10, 11], // 10 digits for each geometry
     ];
 
     // Block size
     let b_vec = vec![
         [32, 32, 32], // 6 digits, for each geometry
-        [64, 64, 64],  // 8 digits for each geometry
-        [32, 64, 128],  // 10 digits for each geometry
+        [64, 64, 64], // 8 digits for each geometry
+        [32, 64, 64],  // 10 digits for each geometry
     ];
 
     let experiments = [6, 8, 10]; // number of digits sought
@@ -165,7 +166,7 @@ fn fft_f64() {
 
 fn main() {
     // println!("FFT F32");
-    // fft_f32();
+    fft_f32();
 
 
     // println!("FFT F64");
