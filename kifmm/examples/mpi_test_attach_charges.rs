@@ -75,7 +75,7 @@ fn main() {
 
         // Change the charges associated with the FMM object
         let new_charges = vec![1f32; n_points];
-        let _ = multi_fmm.attach_charges_unordered(&new_charges).unwrap();
+        multi_fmm.attach_charges_unordered(&new_charges).unwrap();
         multi_fmm.evaluate().unwrap();
 
         // Gather all coordinates and charges for the test
