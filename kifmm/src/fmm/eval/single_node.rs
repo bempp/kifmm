@@ -625,7 +625,6 @@ mod test {
         let mut rng = StdRng::seed_from_u64(1);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
-        let _ = fmm.clear();
         let _ = fmm.attach_charges_unordered(charges.data());
         fmm.evaluate().unwrap();
 

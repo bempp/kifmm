@@ -84,6 +84,7 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let charges = vec![1f32; n_points];
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
         .tree(
@@ -96,7 +97,7 @@ fn main() {
             sort_kind.clone(),
         )
         .unwrap()
-        .parameters(expansion_order, kernel.clone(), source_to_target)
+        .parameters(&charges, expansion_order, kernel.clone(), source_to_target)
         .unwrap()
         .build()
         .unwrap();
