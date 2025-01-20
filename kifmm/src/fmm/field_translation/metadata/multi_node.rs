@@ -1106,7 +1106,7 @@ where
             }
         }
 
-        let points_neighbourhood_communicator =
+        let neighbourhood_communicator_charge =
             NeighbourhoodCommunicator::new(&self.communicator, &send_marker, &receive_marker);
 
         // Communicate ghost queries and receive from foreign ranks
@@ -1158,7 +1158,7 @@ where
                 neighbourhood_receive_displacements,
             );
 
-            points_neighbourhood_communicator
+            neighbourhood_communicator_charge
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
 
             // Filter for locally available queries to send back
@@ -1199,9 +1199,9 @@ where
 
         // Communicate expected query sizes
         let mut requested_queries_counts =
-            vec![0 as Count; points_neighbourhood_communicator.neighbours.len()];
+            vec![0 as Count; neighbourhood_communicator_charge.neighbours.len()];
         {
-            let send_counts_ = vec![1i32; points_neighbourhood_communicator.neighbours.len()];
+            let send_counts_ = vec![1i32; neighbourhood_communicator_charge.neighbours.len()];
             let send_displacements_ = send_counts_
                 .iter()
                 .scan(0, |acc, &x| {
@@ -1214,7 +1214,7 @@ where
             let partition_send =
                 Partition::new(&available_queries_counts, send_counts_, send_displacements_);
 
-            let recv_counts_ = vec![1i32; points_neighbourhood_communicator.neighbours.len()];
+            let recv_counts_ = vec![1i32; neighbourhood_communicator_charge.neighbours.len()];
             let recv_displacements_ = recv_counts_
                 .iter()
                 .scan(0, |acc, &x| {
@@ -1230,7 +1230,7 @@ where
                 recv_displacements_,
             );
 
-            points_neighbourhood_communicator
+            neighbourhood_communicator_charge
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
@@ -1261,22 +1261,10 @@ where
                 &requested_queries_displacements[..],
             );
 
-            points_neighbourhood_communicator
+            neighbourhood_communicator_charge
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
-
-        println!(
-            "rank {:?} {:?} {:?}={:?}",
-            self.tree.source_tree.communicator.rank(),
-            local_displacement,
-            &queries[0..5],
-            &global_indices[0..5]
-        );
-
-        self.charges = requested_queries;
-
-        // TODO: Add functionality for charges at some point
         let charge_index_pointer_targets =
             coordinate_index_pointer_multi_node(&self.tree.target_tree);
         let charge_index_pointer_sources =
@@ -1295,6 +1283,8 @@ where
             &self.tree.u_list_query.receive_marker,
         );
 
+        self.neighbourhood_communicator_charge = neighbourhood_communicator_charge;
+
         // Set metadata
         self.multipoles = multipoles;
         self.leaf_multipoles = leaf_multipoles;
@@ -1309,12 +1299,11 @@ where
         self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
         self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
         self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
-        // let charges = vec![Scalar::one(); self.tree.source_tree().n_coordinates_tot().unwrap()];
-        // self.charges = charges;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.leaf_scales_sources = leaf_scales_sources;
         self.kernel_eval_size = kernel_eval_size;
+        self.charges = requested_queries;
 
         // Can perform U list exchange now
         let (_, duration) = optionally_time(self.timed, || {

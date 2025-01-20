@@ -217,7 +217,6 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-            // TODO: Mapping of global indices needs to happen here eventually.
             self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
             self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
@@ -244,6 +243,7 @@ where
             let communicator = self.communicator.unwrap();
             let neighbourhood_communicator_v = NeighbourhoodCommunicator::from_comm(&communicator);
             let neighbourhood_communicator_u = NeighbourhoodCommunicator::from_comm(&communicator);
+            let neighbourhood_communicator_charge= NeighbourhoodCommunicator::from_comm(&communicator);
             let rank = communicator.rank();
             let source_to_target = self.source_to_target.unwrap();
             let fmm_eval_type = self.fmm_eval_type.unwrap();
@@ -309,6 +309,7 @@ where
                 communicator,
                 neighbourhood_communicator_v,
                 neighbourhood_communicator_u,
+                neighbourhood_communicator_charge,
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),

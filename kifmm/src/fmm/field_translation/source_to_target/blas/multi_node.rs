@@ -64,7 +64,6 @@ where
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().source_tree().keys(level) {
                         n_translations += 1;
-                        // let sentinel = sources.len();
                         let sentinel = -1i32;
 
                         all_displacements

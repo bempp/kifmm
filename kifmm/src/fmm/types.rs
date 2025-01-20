@@ -981,6 +981,9 @@ where
     /// Neighbourhood communicator for U list communication
     pub(crate) neighbourhood_communicator_u: NeighbourhoodCommunicator,
 
+    /// Neighbourhood communicator for charge data
+    pub(crate) neighbourhood_communicator_charge: NeighbourhoodCommunicator,
+
     /// Associated MPI rank
     pub(crate) rank: i32,
 

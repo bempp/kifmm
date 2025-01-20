@@ -81,7 +81,9 @@ fn main() {
 
 We use Maturin for Python bindings, and provide an example of installation using the `uv` package manager for Python below.
 
-In order to enable plotting with MayaVi only Python 3.10.* is currently supported,
+In order to enable plotting with MayaVi only Python 3.10.* is currently supported.
+
+Dependencies are provided in the associated `pyproject.toml` file.
 
 1. Begin by installing Maturin (and pip) in a new virtual environment.
 
@@ -89,7 +91,7 @@ In order to enable plotting with MayaVi only Python 3.10.* is currently supporte
 uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
 ```
 
-2. Use the Maturin CLI to install the Python bindings into this virtual environment.
+2. Use the Maturin CLI to install the Python bindings into this virtual environment, which additionally will install all required dependencies.
 
 Note that Maturin must be run from the `kifmm` crate root, not the workspace root.
 
@@ -98,7 +100,6 @@ maturin develop --release
 ```
 
 We provide example usage of the Python API, as well as visualisation, in the `python/examples` directory.
-
 
 # C Bindings
 
