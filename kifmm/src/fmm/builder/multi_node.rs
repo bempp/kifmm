@@ -243,7 +243,8 @@ where
             let communicator = self.communicator.unwrap();
             let neighbourhood_communicator_v = NeighbourhoodCommunicator::from_comm(&communicator);
             let neighbourhood_communicator_u = NeighbourhoodCommunicator::from_comm(&communicator);
-            let neighbourhood_communicator_charge= NeighbourhoodCommunicator::from_comm(&communicator);
+            let neighbourhood_communicator_charge =
+                NeighbourhoodCommunicator::from_comm(&communicator);
             let rank = communicator.rank();
             let source_to_target = self.source_to_target.unwrap();
             let fmm_eval_type = self.fmm_eval_type.unwrap();
@@ -355,6 +356,15 @@ where
                 ghost_received_queries_displacements_v: Vec::default(),
                 ghost_received_queries_counts_v: Vec::default(),
                 ghost_received_queries_v: Vec::default(),
+                local_count_charges: 0u64,
+                local_displacement_charges: 0u64,
+                charge_send_queries_counts: Vec::default(),
+                charge_send_queries_displacements: Vec::default(),
+                charge_receive_queries_counts: Vec::default(),
+                charge_receive_queries_displacements: Vec::default(),
+                ghost_received_queries_charge: Vec::default(),
+                ghost_received_queries_charge_counts: Vec::default(),
+                ghost_received_queries_charge_displacements: Vec::default(),
             };
 
             // Calculate required metadata

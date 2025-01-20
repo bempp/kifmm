@@ -86,9 +86,6 @@ pub(crate) struct SendPtr<T> {
 }
 
 /// Holds all required data and metadata for evaluating a kernel independent FMM on a single node.
-///
-/// # Fields
-/// - `operator`
 #[allow(clippy::type_complexity)]
 pub struct KiFmm<Scalar, Kernel, FieldTranslation>
 where
@@ -316,7 +313,7 @@ pub enum FmmEvalType {
 /// # Example
 /// ```
 /// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
-/// use kifmm::traits::fmm::Evaluate;
+/// use kifmm::traits::fmm::{Evaluate, ChargeHandler};
 /// use kifmm::traits::tree::SingleFmmTree;
 /// use kifmm::tree::helpers::points_fixture;
 /// use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
@@ -346,7 +343,7 @@ pub enum FmmEvalType {
 ///     .unwrap();
 ///
 /// /// Specify the FMM parameters, such as the kernel , the kernel evaluation mode, expansion order and charge data
-/// let fmm = fmm
+/// let mut fmm = fmm
 ///     .parameters(
 ///         charges.data(),
 ///         &expansion_order,
@@ -357,6 +354,18 @@ pub enum FmmEvalType {
 ///     .unwrap()
 ///     .build()
 ///     .unwrap();
+///
+/// // Run the FMM
+///
+/// fmm.evaluate().unwrap();
+///
+/// /// Can clear charges on the runtime object, and re-attach
+/// let new_charges = vec![2.0; n_sources * nvecs];
+/// fmm.attach_charges_unordered(&new_charges).unwrap();
+///
+/// /// And then can evaluate again, without having to run pre-computation
+/// fmm.evaluate().unwrap();
+///
 /// ````
 /// This example demonstrates creating a new `KiFmmBuilderSingleNode` instance, configuring it
 /// with source and target points, charge data, and specifying FMM parameters like the kernel
@@ -944,7 +953,7 @@ pub enum Isa {
     Default,
 }
 
-/// Data structure holding data for multinode FMM
+/// Holds all required data and metadata for evaluating a kernel independent FMM on on multiple nodes.
 #[cfg(feature = "mpi")]
 #[allow(clippy::type_complexity)]
 pub struct KiFmmMulti<Scalar, Kernel, FieldTranslation>
@@ -1116,6 +1125,33 @@ where
 
     /// Requested V list queries index map of ghost keys from V list queries
     pub(crate) ghost_requested_queries_key_to_index_v: HashMap<MortonKey<Scalar::Real>, usize>,
+
+    /// Number of input charges (initial input, unordered by Morton sort)
+    pub(crate) local_count_charges: u64,
+
+    /// Displacement of input charges among global input charge vector
+    pub(crate) local_displacement_charges: u64,
+
+    /// All global indices to send new (unordered) charge data to
+    pub(crate) ghost_received_queries_charge: Vec<u64>,
+
+    /// Counts of all global indices to send new (unordered) charge data to
+    pub(crate) ghost_received_queries_charge_counts: Vec<i32>,
+
+    /// Displacements of all global indices to send new (unordered) charge data to
+    pub(crate) ghost_received_queries_charge_displacements: Vec<i32>,
+
+    /// Store charge queries counts to send
+    pub(crate) charge_send_queries_counts: Vec<Count>,
+
+    /// Store charge queries displacments to send
+    pub(crate) charge_send_queries_displacements: Vec<Count>,
+
+    /// Store charge queries counts to receive
+    pub(crate) charge_receive_queries_counts: Vec<Count>,
+
+    /// Store charge queries displacments to receive
+    pub(crate) charge_receive_queries_displacements: Vec<Count>,
 }
 
 /// Specified owned range defined by owned roots of local trees at each rank.

@@ -54,6 +54,7 @@ where
         let n_matvecs_input = charges.len() / n_source_points;
 
         if n_matvecs == n_matvecs_input {
+            self.clear().unwrap();
             self.charges = charges.to_vec();
             Ok(())
         } else {
@@ -80,6 +81,7 @@ where
         let n_matvecs_input = charges.len() / n_source_points;
 
         if n_matvecs == n_matvecs_input {
+            self.clear().unwrap();
             self.charges = map_charges(
                 self.tree.source_tree().all_global_indices().unwrap(),
                 charges,

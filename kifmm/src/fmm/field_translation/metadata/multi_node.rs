@@ -1044,7 +1044,7 @@ where
         let mut curr = 0;
         for count in counts.iter() {
             displacements.push((curr, curr + count - 1));
-            curr = curr + count;
+            curr += count;
         }
 
         let rank = self.tree.source_tree.communicator.rank();
@@ -1052,6 +1052,9 @@ where
         for count in counts.iter().take(rank as usize) {
             local_displacement += count;
         }
+
+        self.local_count_charges = charges.len() as u64;
+        self.local_displacement_charges = local_displacement;
 
         let global_indices = &self.tree.source_tree.global_indices;
 
@@ -1165,6 +1168,12 @@ where
             let receive_counts_ = partition_receive.counts().iter().cloned().collect_vec();
             let receive_displacements_ = partition_receive.displs().iter().cloned().collect_vec();
 
+            self.ghost_received_queries_charge = received_queries.iter().cloned().collect_vec();
+            self.ghost_received_queries_charge_counts =
+                receive_counts_.iter().cloned().collect_vec();
+            self.ghost_received_queries_charge_displacements =
+                receive_displacements_.iter().cloned().collect_vec();
+
             let mut counter = 0;
 
             // Iterate over received data rank by rank
@@ -1237,8 +1246,7 @@ where
         // Create buffers to receive charge data
         let total_receive_count_available_queries =
             requested_queries_counts.iter().sum::<i32>() as usize;
-        let mut requested_queries =
-            vec![Scalar::default(); total_receive_count_available_queries];
+        let mut requested_queries = vec![Scalar::default(); total_receive_count_available_queries];
 
         let mut requested_queries_displacements = Vec::new();
         let mut counter = 0;
@@ -1246,6 +1254,17 @@ where
             requested_queries_displacements.push(counter);
             counter += count;
         }
+
+        self.charge_send_queries_counts = available_queries_counts.iter().cloned().collect_vec();
+        self.charge_send_queries_displacements = available_queries_displacements
+            .iter()
+            .cloned()
+            .collect_vec();
+        self.charge_receive_queries_counts = requested_queries_counts.iter().cloned().collect_vec();
+        self.charge_receive_queries_displacements = requested_queries_displacements
+            .iter()
+            .cloned()
+            .collect_vec();
 
         // Communicate ghost charges
         {
