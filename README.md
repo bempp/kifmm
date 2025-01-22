@@ -6,7 +6,9 @@
 We currently only support Unix distributions. The current head can be built from source by adding the following to your `Cargo.toml` file.
 
 ```toml
-kifmm = { git = "https://github.com/bempp/kifmm" }
+git clone git@github.com:bempp/kifmm.git
+cd kifmm
+cargo install --release
 ```
 
 The current release version can be installed using the deployment on `crates.io`, and can be added to your `Cargo.toml` file with
