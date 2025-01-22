@@ -1,8 +1,13 @@
 use green_kernels::laplace_3d::Laplace3dKernel;
 use green_kernels::traits::Kernel as KernelTrait;
 use green_kernels::types::GreenKernelEvalType;
+use itertools::izip;
 use itertools::Itertools;
-use mpi::traits::Equivalence;
+use mpi::datatype::Partition;
+use mpi::datatype::PartitionMut;
+use mpi::datatype::Partitioned;
+use mpi::traits::{Communicator, CommunicatorCollectives, Equivalence};
+use mpi::{Count, Rank};
 use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
@@ -108,8 +113,7 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let uc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let uc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r())];
 
         let uc2e_inv_2 = vec![ut];
 
@@ -134,15 +138,13 @@ where
             );
 
             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), ce2pc.view()),
+                uc2e_inv_1[0].r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].r(), ce2pc.r()),
             );
 
             let tmp1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                uc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(uc2e_inv_2[0].view(), ce2pc.view()),
+                uc2e_inv_1[0].r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].r(), ce2pc.r()),
             );
 
             let l = i * n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
@@ -208,8 +210,7 @@ where
             mat_s[[i, i]] = Scalar::from_real(s[i]);
         }
 
-        let dc2e_inv_1 =
-            vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.view(), mat_s.view())];
+        let dc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r())];
         let dc2e_inv_2 = vec![ut];
 
         let mut dc2e_inv_1_global = dc2e_inv_1
@@ -252,9 +253,8 @@ where
             );
 
             let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                dc2e_inv_1[0].view(),
-                empty_array::<Scalar, 2>()
-                    .simple_mult_into_resize(dc2e_inv_2[0].view(), pe2cc.view()),
+                dc2e_inv_1[0].r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[0].r(), pe2cc.r()),
             );
 
             tmp.data_mut()
@@ -395,17 +395,17 @@ where
                 tmp_gram.data_mut(),
             );
 
-            let mut block = se2tc_fat.view_mut().into_subview(
+            let mut block = se2tc_fat.r_mut().into_subview(
                 [0, i * n_coeffs_equivalent_surface],
                 [n_coeffs_check_surface, n_coeffs_equivalent_surface],
             );
-            block.fill_from(tmp_gram.view_mut());
+            block.fill_from(tmp_gram.r_mut());
 
-            let mut block_column = se2tc_thin.view_mut().into_subview(
+            let mut block_column = se2tc_thin.r_mut().into_subview(
                 [i * n_coeffs_check_surface, 0],
                 [n_coeffs_check_surface, n_coeffs_equivalent_surface],
             );
-            block_column.fill_from(tmp_gram.view());
+            block_column.fill_from(tmp_gram.r());
         }
 
         let mu = se2tc_fat.shape()[0];
@@ -436,10 +436,10 @@ where
                 }
 
                 let mut se2tc_fat_transpose =
-                    rlst_dynamic_array2!(Scalar, se2tc_fat.view().transpose().shape());
+                    rlst_dynamic_array2!(Scalar, se2tc_fat.r().transpose().shape());
                 se2tc_fat_transpose
-                    .view_mut()
-                    .fill_from(se2tc_fat.view().transpose());
+                    .r_mut()
+                    .fill_from(se2tc_fat.r().transpose());
 
                 let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
                     &se2tc_fat_transpose,
@@ -459,8 +459,8 @@ where
             FmmSvdMode::Deterministic => {
                 se2tc_fat
                     .into_svd_alloc(
-                        u_big.view_mut(),
-                        vt_big.view_mut(),
+                        u_big.r_mut(),
+                        vt_big.r_mut(),
                         &mut sigma[..],
                         SvdMode::Reduced,
                     )
@@ -482,8 +482,8 @@ where
 
         // Store compressed M2L operators
         let nst = se2tc_thin.shape()[1];
-        let mut st = rlst_dynamic_array2!(Scalar, u_big.view().transpose().shape());
-        st.fill_from(u_big.view().transpose());
+        let mut st = rlst_dynamic_array2!(Scalar, u_big.r().transpose().shape());
+        st.fill_from(u_big.r().transpose());
         u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
         vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
 
@@ -515,21 +515,21 @@ where
         }
 
         (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-            let vt_block = vt.view().into_subview(
+            let vt_block = vt.r().into_subview(
                 [0, i * n_coeffs_check_surface],
                 [cutoff_rank, n_coeffs_check_surface],
             );
 
             let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                sigma_mat.view(),
-                empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.view(), s_trunc.view()),
+                sigma_mat.r(),
+                empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.r(), s_trunc.r()),
             );
 
             let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
             let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
             let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
 
-            tmp.into_svd_alloc(u_i.view_mut(), vt_i.view_mut(), &mut sigma_i, SvdMode::Full)
+            tmp.into_svd_alloc(u_i.r_mut(), vt_i.r_mut(), &mut sigma_i, SvdMode::Full)
                 .unwrap();
 
             let directional_cutoff_rank =
@@ -555,7 +555,7 @@ where
             }
 
             let vt_i_compressed = empty_array::<Scalar, 2>()
-                .simple_mult_into_resize(sigma_mat_i_compressed.view(), vt_i_compressed_.view());
+                .simple_mult_into_resize(sigma_mat_i_compressed.r(), vt_i_compressed_.r());
 
             directional_cutoff_ranks.lock().unwrap()[i] = directional_cutoff_rank;
             c_u.lock().unwrap()[i] = u_i_compressed;
@@ -899,7 +899,7 @@ where
                 let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                 let mut k_ft =
                     rlst_dynamic_array2!(<Scalar as DftType>::OutputType, [NSIBLINGS, NSIBLINGS]);
-                k_ft.fill_from(k_f_.view());
+                k_ft.fill_from(k_f_.r());
                 kernel_data_ft.push(k_ft.data().to_vec());
             }
         }
@@ -940,7 +940,7 @@ where
 {
     type Scalar = Scalar;
 
-    fn metadata(&mut self, eval_type: GreenKernelEvalType, _charges: &[Self::Scalar]) {
+    fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]) {
         // Check if computing potentials, or potentials and derivatives
         match eval_type {
             GreenKernelEvalType::Value => {}
@@ -1030,8 +1030,260 @@ where
         let potential_send_pointers =
             potential_pointers_multi_node(&self.tree.target_tree, kernel_eval_size, &potentials);
 
-        // TODO: Add functionality for charges at some point
-        let charges = vec![Scalar::one(); self.tree.source_tree().n_coordinates_tot().unwrap()];
+        // Setup neighbourhood communication for charges
+        let n_sources = charges.len() as u64;
+        let size = self.tree.source_tree.communicator.size();
+        let mut counts = vec![0u64; size as usize];
+        self.tree
+            .source_tree
+            .communicator
+            .all_gather_into(&n_sources, &mut counts[..]);
+
+        let mut displacements = Vec::new();
+
+        let mut curr = 0;
+        for count in counts.iter() {
+            displacements.push((curr, curr + count - 1));
+            curr += count;
+        }
+
+        let rank = self.tree.source_tree.communicator.rank();
+        let mut local_displacement = 0;
+        for count in counts.iter().take(rank as usize) {
+            local_displacement += count;
+        }
+
+        self.local_count_charges = charges.len() as u64;
+        self.local_displacement_charges = local_displacement;
+
+        let global_indices = &self.tree.source_tree.global_indices;
+
+        let mut ranks = Vec::new();
+        let mut send_counts = vec![0 as Count; self.tree.source_tree.communicator.size() as usize];
+        let mut send_marker = vec![0 as Rank; self.tree.source_tree.communicator.size() as usize];
+
+        for &global_index in global_indices.iter() {
+            let rank = displacements
+                .iter()
+                .position(|&(start, end)| {
+                    global_index >= (start as usize) && global_index <= (end as usize)
+                })
+                .unwrap();
+            ranks.push(rank as i32);
+            send_counts[rank] += 1;
+        }
+
+        for (rank, &send_count) in send_counts.iter().enumerate() {
+            if send_count > 0 {
+                send_marker[rank] = 1;
+            }
+        }
+
+        // Sort queries by destination rank
+        let queries = {
+            let mut indices = (0..global_indices.len()).collect_vec();
+            indices.sort_by_key(|&i| ranks[i]);
+
+            let mut sorted_queries_ = Vec::with_capacity(global_indices.len());
+            for i in indices {
+                sorted_queries_.push(global_indices[i])
+            }
+            sorted_queries_
+        };
+
+        // Sort ranks of queries into rank order
+        ranks.sort();
+
+        // Compute the receive counts, and mark again processes involved
+        let mut receive_counts = vec![0i32; self.tree.source_tree.communicator.size() as usize];
+        let mut receive_marker = vec![0i32; self.tree.source_tree.communicator.size() as usize];
+
+        self.tree
+            .source_tree
+            .communicator
+            .all_to_all_into(&send_counts, &mut receive_counts);
+
+        for (rank, &receive_count) in receive_counts.iter().enumerate() {
+            if receive_count > 0 {
+                receive_marker[rank] = 1
+            }
+        }
+
+        let neighbourhood_communicator_charge =
+            NeighbourhoodCommunicator::new(&self.communicator, &send_marker, &receive_marker);
+
+        // Communicate ghost queries and receive from foreign ranks
+        let mut neighbourhood_send_counts = Vec::new();
+        let mut neighbourhood_receive_counts = Vec::new();
+        let mut neighbourhood_send_displacements = Vec::new();
+        let mut neighbourhood_receive_displacements = Vec::new();
+
+        // Now can calculate displacements
+        let mut send_counter = 0;
+        let mut receive_counter = 0;
+
+        // Remember these queries are constructed over the global communicator, so have
+        // to filter for relevant queries in local communicator
+        for (&send_count, &receive_count) in izip!(&send_counts, &receive_counts) {
+            // Note this checks if any communication is happening between these ranks
+            if send_count != 0 || receive_count != 0 {
+                neighbourhood_send_counts.push(send_count);
+                neighbourhood_receive_counts.push(receive_count);
+                neighbourhood_send_displacements.push(send_counter);
+                neighbourhood_receive_displacements.push(receive_counter);
+                send_counter += send_count;
+                receive_counter += receive_count;
+            }
+        }
+
+        let total_receive_count = receive_counter as usize;
+
+        // Setup buffers for queries received at this process and to handle
+        // filtering for available queries to be sent back to partners
+        let mut received_queries = vec![0u64; total_receive_count];
+
+        // Available keys
+        let mut available_queries = Vec::new();
+        let mut available_queries_counts = Vec::new();
+        let mut available_queries_displacements = Vec::new();
+
+        {
+            // Communicate queries
+            let partition_send = Partition::new(
+                &queries,
+                neighbourhood_send_counts,
+                neighbourhood_send_displacements,
+            );
+
+            let mut partition_receive = PartitionMut::new(
+                &mut received_queries,
+                neighbourhood_receive_counts,
+                neighbourhood_receive_displacements,
+            );
+
+            neighbourhood_communicator_charge
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+
+            // Filter for locally available queries to send back
+            let receive_counts_ = partition_receive.counts().iter().cloned().collect_vec();
+            let receive_displacements_ = partition_receive.displs().iter().cloned().collect_vec();
+
+            self.ghost_received_queries_charge = received_queries.iter().cloned().collect_vec();
+            self.ghost_received_queries_charge_counts =
+                receive_counts_.iter().cloned().collect_vec();
+            self.ghost_received_queries_charge_displacements =
+                receive_displacements_.iter().cloned().collect_vec();
+
+            let mut counter = 0;
+
+            // Iterate over received data rank by rank
+            for (count, displacement) in izip!(receive_counts_, receive_displacements_) {
+                let l = displacement as usize;
+                let r = l + (count as usize);
+
+                // Received queries from this rank
+                let received_queries_rank = &received_queries[l..r];
+
+                // Filter for available data corresponding to this request
+                let mut available_queries_rank = Vec::new();
+
+                let mut counter_rank = 0i32;
+
+                // Only communicate back queries and associated data if particle data is found
+                for &query in received_queries_rank.iter() {
+                    available_queries_rank.push(charges[(query - local_displacement) as usize]);
+                    // Update counters
+                    counter_rank += 1;
+                }
+
+                // Update return buffers
+                available_queries.extend(available_queries_rank);
+                available_queries_counts.push(counter_rank);
+                available_queries_displacements.push(counter);
+
+                // Update counters
+                counter += counter_rank;
+            }
+        }
+
+        // Communicate expected query sizes
+        let mut requested_queries_counts =
+            vec![0 as Count; neighbourhood_communicator_charge.neighbours.len()];
+        {
+            let send_counts_ = vec![1i32; neighbourhood_communicator_charge.neighbours.len()];
+            let send_displacements_ = send_counts_
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let partition_send =
+                Partition::new(&available_queries_counts, send_counts_, send_displacements_);
+
+            let recv_counts_ = vec![1i32; neighbourhood_communicator_charge.neighbours.len()];
+            let recv_displacements_ = recv_counts_
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
+
+            let mut partition_receive = PartitionMut::new(
+                &mut requested_queries_counts,
+                recv_counts_,
+                recv_displacements_,
+            );
+
+            neighbourhood_communicator_charge
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
+        // Create buffers to receive charge data
+        let total_receive_count_available_queries =
+            requested_queries_counts.iter().sum::<i32>() as usize;
+        let mut requested_queries = vec![Scalar::default(); total_receive_count_available_queries];
+
+        let mut requested_queries_displacements = Vec::new();
+        let mut counter = 0;
+        for &count in requested_queries_counts.iter() {
+            requested_queries_displacements.push(counter);
+            counter += count;
+        }
+
+        self.charge_send_queries_counts = available_queries_counts.iter().cloned().collect_vec();
+        self.charge_send_queries_displacements = available_queries_displacements
+            .iter()
+            .cloned()
+            .collect_vec();
+        self.charge_receive_queries_counts = requested_queries_counts.iter().cloned().collect_vec();
+        self.charge_receive_queries_displacements = requested_queries_displacements
+            .iter()
+            .cloned()
+            .collect_vec();
+
+        // Communicate ghost charges
+        {
+            let partition_send = Partition::new(
+                &available_queries,
+                &available_queries_counts[..],
+                &available_queries_displacements[..],
+            );
+
+            let mut partition_receive = PartitionMut::new(
+                &mut requested_queries,
+                &requested_queries_counts[..],
+                &requested_queries_displacements[..],
+            );
+
+            neighbourhood_communicator_charge
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
         let charge_index_pointer_targets =
             coordinate_index_pointer_multi_node(&self.tree.target_tree);
         let charge_index_pointer_sources =
@@ -1050,6 +1302,8 @@ where
             &self.tree.u_list_query.receive_marker,
         );
 
+        self.neighbourhood_communicator_charge = neighbourhood_communicator_charge;
+
         // Set metadata
         self.multipoles = multipoles;
         self.leaf_multipoles = leaf_multipoles;
@@ -1064,11 +1318,11 @@ where
         self.leaf_upward_equivalent_surfaces_sources = leaf_upward_equivalent_surfaces_sources;
         self.leaf_upward_check_surfaces_sources = leaf_upward_check_surfaces_sources;
         self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
-        self.charges = charges;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.leaf_scales_sources = leaf_scales_sources;
         self.kernel_eval_size = kernel_eval_size;
+        self.charges = requested_queries;
 
         // Can perform U list exchange now
         let (_, duration) = optionally_time(self.timed, || {

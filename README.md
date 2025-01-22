@@ -2,10 +2,8 @@
 
 ## Install
 
-We currently only support Unix distributions.
 
-The current head can be built from source by adding the following to your `Cargo.toml` file.
-
+We currently only support Unix distributions. The current head can be built from source by adding the following to your `Cargo.toml` file.
 
 ```toml
 kifmm = { git = "https://github.com/bempp/kifmm" }
@@ -16,6 +14,16 @@ The current release version can be installed using the deployment on `crates.io`
 ```bash
 cargo add kifmm
 ```
+
+## Dependencies
+
+The main external dependencies of this package are
+
+- FFTW
+- BLAS
+- LAPACK
+
+FFTW is automatically downloaded, built and linked with optimal settings as a part of the provided Cargo build. For linear algebra and matrix computations we use the [RLST](https://github.com/linalg-rs/rlst/tree/main) crate, which itself detects and compiles with respect to the BLAS and LAPACK installed on your system.
 
 ## Quickstart
 
@@ -48,7 +56,7 @@ The `scripts` crate contains various useful scripts for examining the performanc
 
 Additionally, there are a few directories containing metadata for the project. The `paper` directory contains our JOSS paper, which should be cited for any derivative works based on `kifmm-rs`.
 
-The `hpc` directory contains 
+The `hpc` directory contains example slurm scripts, and build hints for successfully compiling `kifmm-rs` on HPC platforms.
 
 
 ## Contributing

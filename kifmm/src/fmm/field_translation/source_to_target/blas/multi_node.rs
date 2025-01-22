@@ -64,7 +64,6 @@ where
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().source_tree().keys(level) {
                         n_translations += 1;
-                        // let sentinel = sources.len();
                         let sentinel = -1i32;
 
                         all_displacements
@@ -174,7 +173,7 @@ where
                         {
                             compressed_multipoles = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
-                                    self.source_to_target.metadata[m2l_operator_index].st.view(),
+                                    self.source_to_target.metadata[m2l_operator_index].st.r(),
                                     multipoles,
                                 );
 
@@ -220,10 +219,10 @@ where
 
                                     let compressed_check_potential = empty_array::<Scalar, 2>()
                                         .simple_mult_into_resize(
-                                            c_u_sub.view(),
+                                            c_u_sub.r(),
                                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                                c_vt_sub.view(),
-                                                compressed_multipoles_subset.view(),
+                                                c_vt_sub.r(),
+                                                compressed_multipoles_subset.r(),
                                             ),
                                         );
 
@@ -255,12 +254,12 @@ where
                     // 3. Compute local expansions from compressed check potentials
                     {
                         let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                            self.dc2e_inv_1[c2e_operator_index].view(),
+                            self.dc2e_inv_1[c2e_operator_index].r(),
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_2[c2e_operator_index].view(),
+                                self.dc2e_inv_2[c2e_operator_index].r(),
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.source_to_target.metadata[m2l_operator_index].u.view(),
-                                    compressed_check_potentials.view(),
+                                    self.source_to_target.metadata[m2l_operator_index].u.r(),
+                                    compressed_check_potentials.r(),
                                 ),
                             ),
                         );

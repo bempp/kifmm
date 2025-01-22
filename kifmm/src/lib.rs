@@ -19,7 +19,7 @@
 //!
 //! ```rust
 //! use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
-//! use kifmm::{Evaluate, DataAccess, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
+//! use kifmm::{Evaluate, DataAccess, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder, ChargeHandler};
 //! use kifmm::tree::helpers::points_fixture;
 //! use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
 //!
@@ -65,7 +65,8 @@
 //!     let tmp = vec![1.0; n_sources * nvecs];
 //!     let mut new_charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
 //!     new_charges.data_mut().copy_from_slice(&tmp);
-//!     fmm_fft.clear(charges.data());
+//!     fmm_fft.clear();
+//!     fmm_fft.attach_charges_unordered(charges.data());
 //! }
 //!
 //! ````
@@ -127,6 +128,9 @@ pub use traits::fmm::EvaluateMulti;
 #[cfg(feature = "mpi")]
 #[doc(inline)]
 pub use traits::fmm::DataAccessMulti;
+
+#[doc(inline)]
+pub use traits::fmm::ChargeHandler;
 
 #[cfg_attr(feature = "strict", deny(warnings))]
 #[warn(missing_docs)]

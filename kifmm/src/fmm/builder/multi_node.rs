@@ -206,6 +206,7 @@ where
     /// Parameters
     pub fn parameters(
         mut self,
+        charges: &[Scalar],
         expansion_order: usize,
         kernel: Kernel,
         source_to_target: FieldTranslation,
@@ -216,7 +217,6 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-            // TODO: Mapping of global indices needs to happen here eventually.
             self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
             self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
@@ -226,6 +226,7 @@ where
             self.source_to_target = Some(source_to_target);
             self.equivalent_surface_order = Some(expansion_order);
             self.check_surface_order = Some(expansion_order);
+            self.charges = Some(charges.to_vec()); // un-ordered charges
             Ok(self)
         }
     }
@@ -242,6 +243,8 @@ where
             let communicator = self.communicator.unwrap();
             let neighbourhood_communicator_v = NeighbourhoodCommunicator::from_comm(&communicator);
             let neighbourhood_communicator_u = NeighbourhoodCommunicator::from_comm(&communicator);
+            let neighbourhood_communicator_charge =
+                NeighbourhoodCommunicator::from_comm(&communicator);
             let rank = communicator.rank();
             let source_to_target = self.source_to_target.unwrap();
             let fmm_eval_type = self.fmm_eval_type.unwrap();
@@ -307,6 +310,7 @@ where
                 communicator,
                 neighbourhood_communicator_v,
                 neighbourhood_communicator_u,
+                neighbourhood_communicator_charge,
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),
@@ -352,6 +356,15 @@ where
                 ghost_received_queries_displacements_v: Vec::default(),
                 ghost_received_queries_counts_v: Vec::default(),
                 ghost_received_queries_v: Vec::default(),
+                local_count_charges: 0u64,
+                local_displacement_charges: 0u64,
+                charge_send_queries_counts: Vec::default(),
+                charge_send_queries_displacements: Vec::default(),
+                charge_receive_queries_counts: Vec::default(),
+                charge_receive_queries_displacements: Vec::default(),
+                ghost_received_queries_charge: Vec::default(),
+                ghost_received_queries_charge_counts: Vec::default(),
+                ghost_received_queries_charge_displacements: Vec::default(),
             };
 
             // Calculate required metadata
@@ -402,8 +415,7 @@ where
                 result.global_fmm.displacements(None);
             }
 
-            // pass dummy charges for now.
-            result.metadata(self.kernel_eval_type.unwrap(), &[Scalar::zero(); 1]);
+            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
             result.displacements(None);
 
             Ok(result)

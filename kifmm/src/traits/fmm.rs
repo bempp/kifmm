@@ -74,6 +74,9 @@ pub trait DataAccessMulti {
     /// * `level` - The tree level.
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]>;
 
+    /// All charges held locally
+    fn charges(&self) -> Option<&[Self::Scalar]>;
+
     /// Get the local expansion data associated with a tree level as a slice
     /// # Arguments
     /// * `level` - The tree level.
@@ -213,12 +216,27 @@ pub trait DataAccess {
 
     /// Get the dimension of the data in this FMM
     fn dim(&self) -> usize;
+}
 
-    /// Clear the data buffers and add new charge data for re-evaluation.
-    ///
-    /// # Arguments
-    /// * `charges` - new charge data.
-    fn clear(&mut self, charges: &[<Self as DataAccess>::Scalar]);
+/// Clear buffers and attach charges to a runtime FMM object
+pub trait ChargeHandler {
+    /// Data associated with FMM, must implement RlstScalar.
+    type Scalar: RlstScalar;
+
+    /// Clear Buffers in FMM
+    fn clear(&mut self) -> Result<(), FmmError>;
+
+    /// Attach charges in initial ordering
+    fn attach_charges_unordered(
+        &mut self,
+        charges: &[<Self as ChargeHandler>::Scalar],
+    ) -> Result<(), FmmError>;
+
+    /// Attach charges in global sorted ordering
+    fn attach_charges_ordered(
+        &mut self,
+        charges: &[<Self as ChargeHandler>::Scalar],
+    ) -> Result<(), FmmError>;
 }
 
 /// Defines evaluation of the FMM on a single node, which has implemented `DataAccess`

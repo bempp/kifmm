@@ -156,7 +156,7 @@ pub mod aarch64 {
     use pulp::{f32x4, f64x2, Simd};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
-    impl<'a> pulp::NullaryFnOnce for Hadamard8x8Data<'a, c64> {
+    impl pulp::NullaryFnOnce for Hadamard8x8Data<'_, c64> {
         type Output = ();
 
         #[inline(always)]
@@ -297,7 +297,7 @@ pub mod aarch64 {
         }
     }
 
-    impl<'a> pulp::NullaryFnOnce for Hadamard8x8Data<'a, c32> {
+    impl pulp::NullaryFnOnce for Hadamard8x8Data<'_, c32> {
         type Output = ();
 
         #[inline(always)]
