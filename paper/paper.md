@@ -7,17 +7,19 @@ authors:
   - name: Srinath Kailasa
     orcid: 0000-0001-9734-8318
     equal-contrib: false
-    affiliation: "1" # (Multiple affiliations must be quoted)
+    affiliation: "1, 2" # (Multiple affiliations must be quoted)
 affiliations:
  - name: Department of Mathematics, University College London, UK
    index: 1
+ - name: Department of Engineering, University of Cambridge, UK
+   index: 2
 date: 22 January 2025
 bibliography: paper.bib
 ---
 
 # Summary
 
-`kifmm-rs` is an open-source framework for implementing Fast Multipole Methods (FMMs) in shared and distributed memory. FMMs accelerate the calculation of $N$-body potential evaluation problems that arise in computational science and engineering of the form,
+`kifmm-rs` is an open-source framework for implementing Fast Multipole Methods (FMMs) in shared and distributed memory in three dimensions. FMMs accelerate the calculation of $N$-body potential evaluation problems that arise in computational science and engineering of the form,
 
 \begin{equation}
     \phi(x_i) = \sum_{j=1}^N K(x_i, y_j) q(y_j)
@@ -59,7 +61,7 @@ Many parts of an implementation are common across FMM algorithms, such as the tr
 
 # Statement of need
 
-Other notable software efforts for the FMM include PVFMM [@Malhotra2015], ExaFMM [@wang2021exafmm], ScalFMM [@blanchard2015scalfmm] and TBFMM [@bramas2020tbfmm]. PVFMM, ScalFMM and TBFMM are fully distributed implementations of the black box FMM [@fong2009black] and kiFMM respectively. The former two are notable for being distributed using a task-based runtime, with the latter using a more traditional MPI based approach. ExaFMM offers a shared memory implementation of the kiFMM, with Python interfaces and a simple template based design. A commonality of previous implementations is the coupling of algorithmic optimisation with implementation optimisation. For example, ExaFMM and PVFMM both offer field translations that are highly optimised for x64 architectures and lack ARM support, with ScalFMM and TBFMM being tailored to the runtime systems they are designed for.
+Other notable software efforts for the FMM include PVFMM [@Malhotra2015], ExaFMM [@wang2021exafmm], ScalFMM [@blanchard2015scalfmm] and TBFMM [@bramas2020tbfmm]. PVFMM, ScalFMM and TBFMM are fully distributed implementations of the black box FMM [@fong2009black] and kiFMM respectively. The latter two are notable for being distributed using a task-based runtime, with the former using a more traditional MPI based approach. ExaFMM offers a shared memory implementation of the kiFMM, with Python interfaces and a simple template based design. A commonality of previous implementations is the coupling of algorithmic optimisation with implementation optimisation. For example, ExaFMM and PVFMM both offer field translations that are highly optimised for x64 architectures and lack ARM support, with ScalFMM and TBFMM being tailored to the runtime systems they are designed for.
 
 Our design is data oriented, with complex behaviour composed over simple linear data structures using Rust's trait system. Traits offer a way of specifying behaviour defining contracts between types that are enforced by Rust's compiler. This enables the exposure of performance critical sections in a manner that is easy to optimise in isolation. In contrast to previous software efforts, our design enables a decoupling of the underlying algorithmic implementation and the software optimisation. This has enabled the comparative analysis of the implementation of the critical M2L field translation [@Kailasa2024], and the future iterative refinement of field translations in response to algorithmic and hardware advances.
 
@@ -69,7 +71,7 @@ Our principle contributions with `kifmm-rs` can therefore be summarised as:
 - _Optimisations for ARM and x86 targets_. ARM targets are increasingly common in high-performance computing systems, with portability enabled by Rust's LLVM based compiler.
 - _Competitive shared and distributed memory performance_. With state of the art M2L performance [@Kailasa2024], as well as a communication-optimal distributed memory implementation inspired by [@Ibeid2016].
 - _A C API_, using Rust's C ABI compatibility allowing for the construction of bindings into other languages, with full Python bindings for non-specialist users.
-- _A moderate frequency Helmholtz FMM_. Helmholtz FMMs are often presented for the low-frequency case [@wang2021exafmm,@Malhotra2015], due to the challenging data sizes involved. We present an extension of the kiFMM to the Helmholtz problem which has proven so far to be effective in single precision for high wave numbers of up to $k \sim 100$.
+- _A moderate frequency Helmholtz FMM_. Helmholtz FMMs are often presented for the low-frequency case [@wang2021exafmm,@Malhotra2015], due to the challenging data sizes involved. We present an extension of the kiFMM to the Helmholtz problem which has proven so far to be effective in single precision for relatively high wave numbers of up to $k \sim 100$.
 
 `kifmm-rs` is currently a core library used as a part of the Bempp boundary element project [@bempp_rs]. A full API description is available as a part of published [documentation](https://bempp.github.io/kifmm/kifmm/index.html). [Python](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples), [Rust](https://github.com/bempp/kifmm/tree/main/kifmm/examples) and [C](https://github.com/bempp/kifmm/tree/main/kifmm/c) examples can be found in the repository.
 
