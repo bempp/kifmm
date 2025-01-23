@@ -49,6 +49,85 @@ year = {2009}
   year={2021}
 }
 
+@article{fong2009black,
+  title={The black-box fast multipole method},
+  author={Fong, William and Darve, Eric},
+  journal={Journal of Computational Physics},
+  volume={228},
+  number={23},
+  pages={8712--8725},
+  year={2009},
+  publisher={Elsevier}
+}
+
+@article{bramas2020tbfmm,
+  title={TBFMM: A C++ generic and parallel fast multipole method library},
+  author={Bramas, B{\'e}renger},
+  journal={Journal of Open Source Software},
+  volume={5},
+  number={56},
+  pages={2444},
+  year={2020}
+}
+
+@inproceedings{blanchard2015scalfmm,
+  title={ScalFMM: A generic parallel fast multipole library},
+  author={Blanchard, Pierre and Bramas, B{\'e}renger and Coulaud, Olivier and Darve, Eric and Dupuy, Laurent and Etcheverry, Arnaud and Sylvand, Guillaume},
+  booktitle={SIAM Conference on Computational Science and Engineering (SIAM CSE 2015)},
+  year={2015}
+}
+
+@article{Ibeid2016,
+abstract = {Exascale systems are predicted to have approximately 1 billion cores, assuming gigahertz cores. Limitations on affordable network topologies for distributed memory systems of such massive scale bring new challenges to the currently dominant parallel programing model. Currently, there are many efforts to evaluate the hardware and software bottlenecks of exascale designs. It is therefore of interest to model application performance and to understand what changes need to be made to ensure extrapolated scalability. The fast multipole method (FMM) was originally developed for accelerating N-body problems in astrophysics and molecular dynamics but has recently been extended to a wider range of problems. Its high arithmetic intensity combined with its linear complexity and asynchronous communication patterns make it a promising algorithm for exascale systems. In this paper, we discuss the challenges for FMM on current parallel computers and future exascale architectures, with a focus on internode communication. We focus on the communication part only; the efficiency of the computational kernels are beyond the scope of the present study. We develop a performance model that considers the communication patterns of the FMM and observe a good match between our model and the actual communication time on four high-performance computing (HPC) systems, when latency, bandwidth, network topology, and multicore penalties are all taken into account. To our knowledge, this is the first formal characterization of internode communication in FMM that validates the model against actual measurements of communication time. The ultimate communication model is predictive in an absolute sense; however, on complex systems, this objective is often out of reach or of a difficulty out of proportion to its benefit when there exists a simpler model that is inexpensive and sufficient to guide coding decisions leading to improved scaling. The current model provides such guidance.},
+archivePrefix = {arXiv},
+arxivId = {arXiv:1405.6362v1},
+author = {Ibeid, Huda and Yokota, Rio and Keyes, David},
+doi = {10.1177/1094342016634819},
+eprint = {arXiv:1405.6362v1},
+file = {:home/sri/Documents/Mendeley/1405.6362.pdf:pdf},
+issn = {17412846},
+journal = {International Journal of High Performance Computing Applications},
+keywords = {communication complexity,communication performance models,fast multipole method},
+number = {4},
+pages = {423--437},
+title = {{A performance model for the communication in fast multipole methods on high-performance computing platforms}},
+volume = {30},
+year = {2016}
+}
+
+@article{tornberg2008fast,
+  title={A fast multipole method for the three-dimensional Stokes equations},
+  author={Tornberg, Anna-Karin and Greengard, Leslie},
+  journal={Journal of Computational Physics},
+  volume={227},
+  number={3},
+  pages={1613--1619},
+  year={2008},
+  publisher={Elsevier}
+}
+
+@article{fu1998fast,
+  title={A fast solution method for three-dimensional many-particle problems of linear elasticity},
+  author={Fu, Yuhong and Klimkowski, Kenneth J and Rodin, Gregory J and Berger, Emery and Browne, James C and Singer, J{\"u}rgen K and Van De Geijn, Robert A and Vemaganti, Kumar S},
+  journal={International Journal for Numerical Methods in Engineering},
+  volume={42},
+  number={7},
+  pages={1215--1229},
+  year={1998},
+  publisher={Wiley Online Library}
+}
+
+@article{rokhlin1993diagonal,
+  title={Diagonal forms of translation operators for the Helmholtz equation in three dimensions},
+  author={Rokhlin, Vladimir},
+  journal={Applied and computational harmonic analysis},
+  volume={1},
+  number={1},
+  pages={82--93},
+  year={1993},
+  publisher={Elsevier}
+}
+
 @article{Greengard1987,
   title={A fast algorithm for particle simulations},
   author={Greengard, Leslie and Rokhlin, Vladimir},
@@ -61,11 +140,10 @@ year = {2009}
 }
 
 @article{Kailasa2024,
-  author  = {Kailasa, S. and Betcke, T. and El-Kazdadi, S},
-  title   = {M2L Translation operators for kernel independent fast multipole methods on modern architectures},
-  journal = {Submitted To SIAM Journal on Scientific Computing},
-  note    = {submitted},
-  year    = {2024},
+  title={M2L Translation Operators for Kernel Independent Fast Multipole Methods on Modern Architectures},
+  author={Kailasa, Srinath and Betcke, Timo and Kazdadi, Sarah El},
+  journal={arXiv preprint arXiv:2408.07436},
+  year={2024}
 }
 
 @article{engquist2010fast,

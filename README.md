@@ -6,7 +6,16 @@
 We currently only support Unix distributions. The current head can be built from source by adding the following to your `Cargo.toml` file.
 
 ```toml
-kifmm = { git = "https://github.com/bempp/kifmm" }
+
+# Clone the repo
+# git clone git@github.com:bempp/kifmm.git
+# git clone https://github.com/bempp/kifmm.git
+
+# Build in release mode (optional)
+cd kifmm && cargo build --release
+
+# Build with MPI support (optional)
+cd kifmm && cargo build --release --features mpi
 ```
 
 The current release version can be installed using the deployment on `crates.io`, and can be added to your `Cargo.toml` file with
@@ -15,6 +24,8 @@ The current release version can be installed using the deployment on `crates.io`
 cargo add kifmm
 ```
 
+Though we note that MPI functionality is not supported in the current release, and users must install from source.
+
 ## Dependencies
 
 The main external dependencies of this package are
@@ -22,8 +33,9 @@ The main external dependencies of this package are
 - FFTW
 - BLAS
 - LAPACK
+- MPI (Optional)
 
-FFTW is automatically downloaded, built and linked with optimal settings as a part of the provided Cargo build. For linear algebra and matrix computations we use the [RLST](https://github.com/linalg-rs/rlst/tree/main) crate, which itself detects and compiles with respect to the BLAS and LAPACK installed on your system.
+FFTW is automatically downloaded, built and linked with optimal settings as a part of the provided Cargo build. For linear algebra and matrix computations we use the [RLST](https://github.com/linalg-rs/rlst/tree/main) crate, which itself detects and compiles with respect to the BLAS and LAPACK installed on your system, this must be exposed to your `LD_LIBRARY_PATH`. MPI, if used, is also detected from your system MPI and similarly must be exposed to your `LD_LIBRARY_PATH`.
 
 ## Quickstart
 
@@ -39,9 +51,19 @@ RUSTDOCFLAGS="--html-in-header kifmm/src/docs-header.html" cargo doc --no-deps
 ```
 
 ## Testing
-The functionality of the library can be tested by running:
+
+The functionality of the shared memory library can be tested with
+
 ```bash
-cargo test
+# Run tests in release mode (optional)
+cargo test --release
+```
+
+There are also numerous MPI tests and examples in the `examples` folder. Tests are marked with the `mpi_test_*` prefix. For these we recommend the [`cargo mpirun` utility library](https://github.com/AndrewGaspar/cargo-mpirun). With this, distributed memory tests can be run with.
+
+```bash
+# Run tests in release mode (optional)
+cargo mpirun -n <num_processes> --example mpi_test_fmm --release
 ```
 
 ### Library
@@ -52,12 +74,11 @@ The `fftw-src` and `fftw-sys` are responsible for downloading, compiling and lin
 
 The `kifmm` crate contains the source code of the library. This crate contains benchmarks, Rust, Python and C examples for library usage and installation.
 
-The `scripts` crate contains various useful scripts for examining the performance of the software, used in single node and distributed benchmarks
+The `scripts` crate contains various useful scripts for examining the performance of the software, used in single node and distributed benchmarks.
 
 Additionally, there are a few directories containing metadata for the project. The `paper` directory contains our JOSS paper, which should be cited for any derivative works based on `kifmm-rs`.
 
 The `hpc` directory contains example slurm scripts, and build hints for successfully compiling `kifmm-rs` on HPC platforms.
-
 
 ## Contributing
 
@@ -79,7 +100,6 @@ Your pull request should include a description of changes, any relevant issue nu
 ### Questions and Discussion
 
 Questions about the library and its use can be asked on the [Bempp Discourse](https://bempp.discourse.group).
-
 
 ## Licence
 KiFMM is licensed under a BSD 3-Clause licence. Full text of the licence can be found [here](LICENSE.md).
