@@ -74,10 +74,9 @@ fn main() {
         multi_fmm.evaluate().unwrap();
 
         // Change the charges associated with the FMM object
-        let mut new_charges = vec![0f32; n_points];
-        new_charges.iter_mut().for_each(|c| *c = rng.gen());
-
-        multi_fmm.attach_charges_unordered(&new_charges).unwrap();
+        let new_charges =
+            vec![multi_fmm.rank() as f32; multi_fmm.tree().source_tree().global_indices.len()];
+        multi_fmm.attach_charges_ordered(&new_charges).unwrap();
         multi_fmm.evaluate().unwrap();
 
         // Gather all coordinates and charges for the test
@@ -187,7 +186,7 @@ fn main() {
                 .zip(expected.iter())
                 .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-2));
 
-            println!("...test_attach_charges passed");
+            println!("...test_attach_charges_ordered passed");
         }
     }
 }
