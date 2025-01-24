@@ -3,7 +3,6 @@
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
-    use itertools::izip;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
