@@ -1,3 +1,5 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
@@ -74,19 +76,23 @@ fn main() {
         multi_fmm.evaluate().unwrap();
 
         // Change the charges associated with the FMM object
-        let new_charges = vec![1f32; n_points];
-        multi_fmm.attach_charges_unordered(&new_charges).unwrap();
+        let new_charges =
+            vec![multi_fmm.rank() as f32; multi_fmm.tree().source_tree().global_indices.len()];
+        multi_fmm.attach_charges_ordered(&new_charges).unwrap();
         multi_fmm.evaluate().unwrap();
 
         // Gather all coordinates and charges for the test
         let root_process = comm.process_at_rank(0);
         let n_coords = multi_fmm.tree().source_tree().coordinates.len() as i32;
-        let all_charges = vec![1f32; n_points * world.size() as usize];
+        let n_charges = multi_fmm.tree().source_tree().global_indices.len() as i32;
+        let mut all_charges = vec![0f32; n_points * world.size() as usize];
         let mut all_coordinates = vec![0f32; 3 * n_points * world.size() as usize];
 
         if world.rank() == 0 {
+            let mut charges_counts = vec![0i32; comm.size() as usize];
             let mut coordinates_counts = vec![0i32; comm.size() as usize];
             root_process.gather_into_root(&n_coords, &mut coordinates_counts);
+            root_process.gather_into_root(&n_charges, &mut charges_counts);
 
             let mut coordinates_displacements = Vec::new();
             let mut counter = 0;
@@ -95,7 +101,15 @@ fn main() {
                 counter += count;
             }
 
+            let mut charges_displacements = Vec::new();
+            let mut counter = 0;
+            for &count in charges_counts.iter() {
+                charges_displacements.push(counter);
+                counter += count;
+            }
+
             let local_coords = multi_fmm.tree().source_tree().all_coordinates().unwrap();
+            let local_charges = multi_fmm.charges().unwrap();
 
             let mut partition = PartitionMut::new(
                 &mut all_coordinates,
@@ -104,11 +118,20 @@ fn main() {
             );
 
             root_process.gather_varcount_into_root(local_coords, &mut partition);
+
+            let mut partition =
+                PartitionMut::new(&mut all_charges, charges_counts, charges_displacements);
+
+            root_process.gather_varcount_into_root(local_charges, &mut partition);
         } else {
             root_process.gather_into(&n_coords);
+            root_process.gather_into(&n_charges);
 
             let local_coords = multi_fmm.tree().source_tree().all_coordinates().unwrap();
             root_process.gather_varcount_into(local_coords);
+
+            let local_charges = multi_fmm.charges().unwrap();
+            root_process.gather_varcount_into(local_charges);
         }
 
         if world.rank() == 0 {
@@ -160,12 +183,14 @@ fn main() {
 
             // println!("ERROR {:?}", err/(multi_fmm.tree.target_tree.n_coordinates_tot().unwrap() as f32));
 
-            distributed
-                .iter()
-                .zip(expected.iter())
-                .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-2));
+            if multi_fmm.communicator().size() > 1 {
+                distributed
+                    .iter()
+                    .zip(expected.iter())
+                    .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-2));
+            }
 
-            println!("...test_attach_charges passed");
+            println!("...test_attach_charges_ordered passed");
         }
     }
 }

@@ -1,3 +1,5 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::laplace_3d::Laplace3dKernel;
