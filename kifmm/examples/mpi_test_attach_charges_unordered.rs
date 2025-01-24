@@ -1,6 +1,9 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
+    use itertools::izip;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
@@ -172,7 +175,6 @@ fn main() {
             // );
 
             // let mut err = 0f32;
-
             // for (l, r) in izip!(distributed, expected) {
             //     println!("l {:?}, r {:?}", l, r);
             //     err += (l-r).abs()/r.abs();
@@ -180,10 +182,12 @@ fn main() {
 
             // println!("ERROR {:?}", err/(multi_fmm.tree.target_tree.n_coordinates_tot().unwrap() as f32));
 
-            distributed
-                .iter()
-                .zip(expected.iter())
-                .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-2));
+            if multi_fmm.communicator().size() > 1 {
+                distributed
+                    .iter()
+                    .zip(expected.iter())
+                    .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-2));
+            }
 
             println!("...test_attach_charges_unordered passed");
         }

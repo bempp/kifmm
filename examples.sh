@@ -1,33 +1,21 @@
 echo "
-===========================================
-Running mpi_test_all_to_allv on 2 processes
-===========================================
+===============================
+Running mpi_test_ghost_exchange
+===============================
 " && \
-cargo mpirun --example mpi_test_all_to_allv --release -n 2 --features "mpi" && \
+cargo run --example mpi_test_ghost_exchange --release && \
 echo "
-===========================================
-Running mpi_test_all_to_allv on 4 processes
-===========================================
+=======================
+Running mpi_test_layout
+=======================
 " && \
-cargo mpirun --example mpi_test_all_to_allv --release -n 4 --features "mpi" && \
+cargo run --example mpi_test_layout --release && \
 echo "
-===========================
-Running single_node_laplace
-===========================
+=========================================
+Running mpi_test_attach_charges_unordered
+=========================================
 " && \
-cargo run --example single_node_laplace --release && \
-echo "
-========================================
-Running mpi_test_metadata on 2 processes
-========================================
-" && \
-cargo mpirun --example mpi_test_metadata --release -n 2 --features "mpi" && \
-echo "
-========================================
-Running mpi_test_metadata on 4 processes
-========================================
-" && \
-cargo mpirun --example mpi_test_metadata --release -n 4 --features "mpi" && \
+cargo run --example mpi_test_attach_charges_unordered --release && \
 echo "
 ====================
 Running mpi_test_fmm
@@ -35,56 +23,62 @@ Running mpi_test_fmm
 " && \
 cargo run --example mpi_test_fmm --release && \
 echo "
-==============================================
-Running mpi_test_hyksort_unique on 2 processes
-==============================================
+===============
+Running laplace
+===============
 " && \
-cargo mpirun --example mpi_test_hyksort_unique --release -n 2 --features "mpi" && \
+cargo run --example laplace --release && \
 echo "
-==============================================
-Running mpi_test_hyksort_unique on 4 processes
-==============================================
+====================================
+Running mpi_test_sort on 2 processes
+====================================
 " && \
-cargo mpirun --example mpi_test_hyksort_unique --release -n 4 --features "mpi" && \
+cargo mpirun --example mpi_test_sort --release -n 2 --features "mpi" && \
 echo "
-==============================================
-Running single_node_laplace_variable_expansion
-==============================================
+====================================
+Running mpi_test_sort on 4 processes
+====================================
 " && \
-cargo run --example single_node_laplace_variable_expansion --release && \
+cargo mpirun --example mpi_test_sort --release -n 4 --features "mpi" && \
 echo "
-=============================
-Running single_node_helmholtz
-=============================
+=======================================
+Running mpi_test_attach_charges_ordered
+=======================================
 " && \
-cargo run --example single_node_helmholtz --release && \
+cargo run --example mpi_test_attach_charges_ordered --release && \
 echo "
-================================================
-Running mpi_test_tree_sample_sort on 2 processes
-================================================
+====================
+Running mpi_test_p2m
+====================
 " && \
-cargo mpirun --example mpi_test_tree_sample_sort --release -n 2 --features "mpi" && \
+cargo run --example mpi_test_p2m --release && \
 echo "
-================================================
-Running mpi_test_tree_sample_sort on 4 processes
-================================================
+================
+Running mpi_tree
+================
 " && \
-cargo mpirun --example mpi_test_tree_sample_sort --release -n 4 --features "mpi" && \
+cargo run --example mpi_tree --release && \
 echo "
-=================================================
-Running mpi_test_hyksort_redundant on 2 processes
-=================================================
+==================================
+Running laplace_variable_expansion
+==================================
 " && \
-cargo mpirun --example mpi_test_hyksort_redundant --release -n 2 --features "mpi" && \
+cargo run --example laplace_variable_expansion --release && \
 echo "
-=================================================
-Running mpi_test_hyksort_redundant on 4 processes
-=================================================
+=================
+Running helmholtz
+=================
 " && \
-cargo mpirun --example mpi_test_hyksort_redundant --release -n 4 --features "mpi" && \
+cargo run --example helmholtz --release && \
 echo "
 ============================
 Running mpi_test_upward_pass
 ============================
 " && \
-cargo run --example mpi_test_upward_pass --release
+cargo run --example mpi_test_upward_pass --release && \
+echo "
+======================
+Running mpi_test_trees
+======================
+" && \
+cargo run --example mpi_test_trees --release
