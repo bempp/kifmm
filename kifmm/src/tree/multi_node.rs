@@ -309,8 +309,7 @@ where
     ///
     /// # Arguments
     /// * `communicator` - The MPI communicator corresponding to the world group.
-    /// * `coordinates_row_major` - A slice of point coordinates, expected in row major order.
-    /// [x_1, y_1, z_1,...x_N, y_N, z_N]
+    /// * `coordinates` - A slice of point coordinates [x_1, y_1, z_1,...x_N, y_N, z_N].
     /// * `local_depth` - The maximum depth of the local trees, defines the level of recursion.
     /// * `global_depth` - The maximum depth of the global tree, defines the level of recursion.
     /// * `domain` - The physical domain with which Morton Keys are being constructed with respect to.
@@ -318,7 +317,7 @@ where
     /// * `prune_empty` - Optionally prune the local trees of empty leaves and their associated branches.
     pub fn new(
         communicator: &SimpleCommunicator,
-        coordinates_row_major: &[T],
+        coordinates: &[T],
         local_depth: u64,
         global_depth: u64,
         domain: Option<Domain<T>>,
@@ -326,20 +325,17 @@ where
         prune_empty: bool,
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         let dim = 3;
-        let coords_len = coordinates_row_major.len();
+        let coords_len = coordinates.len();
 
-        if !coordinates_row_major.is_empty() && coords_len & dim == 0 {
-            let domain = domain.unwrap_or(Domain::from_global_points(
-                coordinates_row_major,
-                communicator,
-            ));
+        if !coordinates.is_empty() && coords_len % dim == 0 {
+            let domain = domain.unwrap_or(Domain::from_global_points(coordinates, communicator));
             let n_coords = coords_len / dim;
 
             // Assign global indices
             let global_indices = global_indices(n_coords, communicator);
 
             return MultiNodeTree::uniform_tree(
-                coordinates_row_major,
+                coordinates,
                 &domain,
                 local_depth,
                 global_depth,
@@ -352,7 +348,7 @@ where
 
         Err(std::io::Error::new(
             std::io::ErrorKind::InvalidInput,
-            "Invalid points format",
+            "Invalid points format. Coordinates array either empty or not evenly divisible by dimension.",
         ))
     }
 }
