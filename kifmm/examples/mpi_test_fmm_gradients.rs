@@ -35,7 +35,7 @@ fn main() {
     let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
     // Fmm Parameters
-    let expansion_order = 4;
+    let expansion_order = 5;
     let kernel = Laplace3dKernel::<f32>::new();
 
     ThreadPoolBuilder::new()
