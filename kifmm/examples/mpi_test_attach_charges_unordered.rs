@@ -67,6 +67,7 @@ fn main() {
                 charges.data(),
                 expansion_order,
                 kernel.clone(),
+                GreenKernelEvalType::Value,
                 source_to_target,
             )
             .unwrap()

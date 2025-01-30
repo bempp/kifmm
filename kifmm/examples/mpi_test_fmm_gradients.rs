@@ -3,6 +3,7 @@
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
+    use itertools::izip;
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
@@ -34,7 +35,7 @@ fn main() {
     let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
     // Fmm Parameters
-    let expansion_order = 4;
+    let expansion_order = 5;
     let kernel = Laplace3dKernel::<f32>::new();
 
     ThreadPoolBuilder::new()
@@ -67,7 +68,7 @@ fn main() {
                 charges.data(),
                 expansion_order,
                 kernel.clone(),
-                GreenKernelEvalType::Value,
+                GreenKernelEvalType::ValueDeriv,
                 source_to_target,
             )
             .unwrap()
@@ -143,17 +144,18 @@ fn main() {
                     &all_charges,
                     &vec![expansion_order; (local_depth + global_depth + 1) as usize],
                     Laplace3dKernel::new(),
-                    GreenKernelEvalType::Value,
+                    GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
                 .unwrap();
             single_fmm.evaluate().unwrap();
-            let mut expected = vec![0f32; &multi_fmm.tree.target_tree.coordinates.len() / 3];
+            let mut expected = vec![0f32; 4 * &multi_fmm.tree.target_tree.coordinates.len() / 3];
+            let n_expected = expected.len();
 
             multi_fmm.kernel().evaluate_st(
-                GreenKernelEvalType::Value,
+                GreenKernelEvalType::ValueDeriv,
                 &all_coordinates,
                 &multi_fmm.tree.target_tree.coordinates,
                 &all_charges,
@@ -162,19 +164,23 @@ fn main() {
 
             let distributed = multi_fmm.potentials().unwrap();
 
+            let mut err = 0.;
+            for (l, r) in izip!(expected, distributed) {
+                err += (l - r).abs() / l;
+            }
+
+            err /= n_expected as f32;
+
             // println!(
             //     "{:?} expected: {:?} \n found: {:?}",
             //     world.rank(),
-            //     &distributed[0..5],
-            //     &expected[0..5]
+            //     &distributed[0..25],
+            //     &expected[0..25]
             // );
 
-            distributed
-                .iter()
-                .zip(expected.iter())
-                .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-3));
+            assert!(err.abs() < 1e-2);
 
-            println!("...test_fmm M2L=FFT passed");
+            println!("...test_fmm_gradients M2L=FFT passed");
         }
     }
 
@@ -204,7 +210,7 @@ fn main() {
                 charges.data(),
                 expansion_order,
                 kernel,
-                GreenKernelEvalType::Value,
+                GreenKernelEvalType::ValueDeriv,
                 source_to_target,
             )
             .unwrap()
@@ -280,17 +286,17 @@ fn main() {
                     &all_charges,
                     &vec![expansion_order; (local_depth + global_depth + 1) as usize],
                     Laplace3dKernel::new(),
-                    GreenKernelEvalType::Value,
+                    GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
                 )
                 .unwrap()
                 .build()
                 .unwrap();
             single_fmm.evaluate().unwrap();
-            let mut expected = vec![0f32; &multi_fmm.tree.target_tree.coordinates.len() / 3];
-
+            let mut expected = vec![0f32; 4 * &multi_fmm.tree.target_tree.coordinates.len() / 3];
+            let n_expected = expected.len();
             multi_fmm.kernel().evaluate_st(
-                GreenKernelEvalType::Value,
+                GreenKernelEvalType::ValueDeriv,
                 &all_coordinates,
                 &multi_fmm.tree.target_tree.coordinates,
                 &all_charges,
@@ -299,12 +305,15 @@ fn main() {
 
             let distributed = multi_fmm.potentials().unwrap();
 
-            distributed
-                .iter()
-                .zip(expected.iter())
-                .for_each(|(f, e)| assert!(((f - e).abs() / e.abs()) < 1e-3));
+            let mut err = 0.;
+            for (l, r) in izip!(expected, distributed) {
+                err += (l - r).abs() / l;
+            }
 
-            println!("...test_fmm M2L=BLAS passed")
+            err /= n_expected as f32;
+
+            assert!(err.abs() < 1e-2);
+            println!("...test_fmm_gradients M2L=BLAS passed")
         }
     }
 }

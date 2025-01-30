@@ -97,7 +97,13 @@ fn main() {
             sort_kind.clone(),
         )
         .unwrap()
-        .parameters(&charges, expansion_order, kernel.clone(), source_to_target)
+        .parameters(
+            &charges,
+            expansion_order,
+            kernel.clone(),
+            green_kernels::types::GreenKernelEvalType::Value,
+            source_to_target,
+        )
         .unwrap()
         .build()
         .unwrap();

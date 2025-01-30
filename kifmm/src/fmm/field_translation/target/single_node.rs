@@ -215,14 +215,14 @@ where
                             let target_coordinates_row_major = &coordinates[charge_index_pointer.0
                                 * self.dim
                                 ..charge_index_pointer.1 * self.dim];
-                            let ntargets = target_coordinates_row_major.len() / self.dim;
+                            let n_targets = target_coordinates_row_major.len() / self.dim;
 
                             // Compute direct
-                            if ntargets > 0 {
+                            if n_targets > 0 {
                                 let result = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         potential_send_ptr.raw,
-                                        ntargets * self.kernel_eval_size,
+                                        n_targets * self.kernel_eval_size,
                                     )
                                 };
 
@@ -264,9 +264,9 @@ where
                                 let target_coordinates_row_major =
                                     &coordinates[charge_index_pointer.0 * self.dim
                                         ..charge_index_pointer.1 * self.dim];
-                                let ntargets = target_coordinates_row_major.len() / self.dim;
+                                let n_targets = target_coordinates_row_major.len() / self.dim;
 
-                                if ntargets > 0 {
+                                if n_targets > 0 {
                                     let local_expansion_ptr = leaf_locals[i].raw;
                                     let local_expansion = unsafe {
                                         std::slice::from_raw_parts(
@@ -278,7 +278,7 @@ where
                                     let result = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             potential_send_ptr.raw,
-                                            ntargets * self.kernel_eval_size,
+                                            n_targets * self.kernel_eval_size,
                                         )
                                     };
 
@@ -320,9 +320,9 @@ where
                             let target_coordinates_row_major = &all_target_coordinates
                                 [charge_index_pointer_targets.0 * self.dim
                                     ..charge_index_pointer_targets.1 * self.dim];
-                            let ntargets = target_coordinates_row_major.len() / self.dim;
+                            let n_targets = target_coordinates_row_major.len() / self.dim;
 
-                            if ntargets > 0 {
+                            if n_targets > 0 {
                                 let mut u_list = leaf.neighbors().into_iter().collect_vec();
                                 u_list.push(*leaf);
 
@@ -352,13 +352,13 @@ where
                                 for (&charges, source_coordinates_row_major) in
                                     charges.iter().zip(sources_coordinates)
                                 {
-                                    let nsources = source_coordinates_row_major.len() / self.dim;
+                                    let n_sources = source_coordinates_row_major.len() / self.dim;
 
-                                    if nsources > 0 {
+                                    if n_sources > 0 {
                                         let result = unsafe {
                                             std::slice::from_raw_parts_mut(
                                                 potential_send_pointer.raw,
-                                                ntargets * self.kernel_eval_size,
+                                                n_targets * self.kernel_eval_size,
                                             )
                                         };
 
@@ -389,9 +389,9 @@ where
                             let target_coordinates_row_major = &all_target_coordinates
                                 [charge_index_pointer.0 * self.dim
                                     ..charge_index_pointer.1 * self.dim];
-                            let ntargets = target_coordinates_row_major.len() / self.dim;
+                            let n_targets = target_coordinates_row_major.len() / self.dim;
 
-                            if ntargets > 0 {
+                            if n_targets > 0 {
                                 let mut u_list = leaf.neighbors().into_iter().collect_vec();
                                 u_list.push(*leaf);
 
@@ -423,13 +423,13 @@ where
                                 for (&charges, source_coordinates_row_major) in
                                     charges.iter().zip(sources_coordinates)
                                 {
-                                    let nsources = source_coordinates_row_major.len() / self.dim;
+                                    let n_sources = source_coordinates_row_major.len() / self.dim;
 
-                                    if nsources > 0 {
+                                    if n_sources > 0 {
                                         let result = unsafe {
                                             std::slice::from_raw_parts_mut(
                                                 potential_send_ptr.raw,
-                                                ntargets * self.kernel_eval_size,
+                                                n_targets * self.kernel_eval_size,
                                             )
                                         };
 

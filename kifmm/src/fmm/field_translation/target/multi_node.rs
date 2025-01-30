@@ -192,8 +192,7 @@ where
 
                     FmmEvalType::Matrix(_) => {
                         return Err(FmmError::Unimplemented(
-                            "M2L unimplemented for matrix input with BLAS field translations"
-                                .to_string(),
+                            "Multinode Matrix input currently unimplemented".to_string(),
                         ))
                     }
                 }
