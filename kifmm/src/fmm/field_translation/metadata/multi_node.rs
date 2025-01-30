@@ -942,12 +942,6 @@ where
 
     fn metadata(&mut self, eval_type: GreenKernelEvalType, charges: &[Self::Scalar]) {
         // Check if computing potentials, or potentials and derivatives
-        match eval_type {
-            GreenKernelEvalType::Value => {}
-            GreenKernelEvalType::ValueDeriv => {
-                panic!("Only potential computation supported for now")
-            }
-        }
         let kernel_eval_size = match eval_type {
             GreenKernelEvalType::Value => 1,
             GreenKernelEvalType::ValueDeriv => 4,

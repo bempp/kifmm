@@ -67,6 +67,7 @@ fn main() {
                 charges.data(),
                 expansion_order,
                 kernel.clone(),
+                GreenKernelEvalType::Value,
                 source_to_target,
             )
             .unwrap()
@@ -199,7 +200,13 @@ fn main() {
                 sort_kind,
             )
             .unwrap()
-            .parameters(charges.data(), expansion_order, kernel, source_to_target)
+            .parameters(
+                charges.data(),
+                expansion_order,
+                kernel,
+                GreenKernelEvalType::Value,
+                source_to_target,
+            )
             .unwrap()
             .build()
             .unwrap();

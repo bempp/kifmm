@@ -209,6 +209,7 @@ where
         charges: &[Scalar],
         expansion_order: usize,
         kernel: Kernel,
+        eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
@@ -221,7 +222,7 @@ where
             self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
             self.kernel = Some(kernel);
             self.fmm_eval_type = Some(FmmEvalType::Vector);
-            self.kernel_eval_type = Some(GreenKernelEvalType::Value);
+            self.kernel_eval_type = Some(eval_type);
             self.isa = Some(Isa::new());
             self.source_to_target = Some(source_to_target);
             self.equivalent_surface_order = Some(expansion_order);

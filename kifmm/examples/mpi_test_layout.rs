@@ -61,7 +61,13 @@ fn main() {
                 sort_kind,
             )
             .unwrap()
-            .parameters(&charges, expansion_order, kernel, source_to_target)
+            .parameters(
+                &charges,
+                expansion_order,
+                kernel,
+                green_kernels::types::GreenKernelEvalType::Value,
+                source_to_target,
+            )
             .unwrap()
             .build()
             .unwrap();
