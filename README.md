@@ -3,7 +3,7 @@
 ## Install
 
 
-We currently only support Unix distributions. The current head can be built from source by adding the following to your `Cargo.toml` file.
+We currently only support Unix distributions.
 
 ```toml
 
@@ -24,7 +24,14 @@ The current release version can be installed using the deployment on `crates.io`
 cargo add kifmm
 ```
 
-Though we note that MPI functionality is not supported in the current release, and users must install from source.
+Alternatively, add as a dependency to your `Cargo.toml` file from the current head.
+
+```toml
+# Optionally build with MPI
+kifmm = { git = "https://github.com/bempp/kifmm.git", features = ["mpi"] }
+```
+
+Though we note that MPI functionality is not supported in the current release version on `crates.io`, and users must install from source in order to use the MPI variant.
 
 ## Dependencies
 
