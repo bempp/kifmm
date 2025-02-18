@@ -1,8 +1,10 @@
+use itertools::Itertools;
 use mpi::{
     topology::{Communicator, SimpleCommunicator},
     traits::Equivalence,
 };
 use num::Float;
+use num::ToPrimitive;
 use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
 use std::collections::HashMap;
 
@@ -21,6 +23,7 @@ use crate::{
         },
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::{multi_node::GlobalFmmMetadata, single_node::Epsilon},
+        tree::{MultiFmmTree, MultiTree},
         types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
     },
     tree::{
@@ -68,6 +71,7 @@ where
             kernel_eval_type: None,
             fmm_eval_type: None,
             communication_times: None,
+            variable_expansion_order: None,
         }
     }
 
@@ -208,6 +212,7 @@ where
         mut self,
         charges: &[Scalar],
         expansion_order: usize,
+        expansion_order_scale: Option<<Scalar as RlstScalar>::Real>,
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
@@ -218,15 +223,48 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-            self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
-            self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
+            let depth = self.tree.as_ref().unwrap().source_tree().total_depth();
+            let expansion_order_vec;
+
+            if let Some(scale) = expansion_order_scale {
+                self.variable_expansion_order = Some(true);
+                let mut curr = Scalar::real(expansion_order);
+                let mut tmp = vec![curr];
+                for _level in 1..=depth {
+                    curr = num::traits::real::Real::floor(curr * scale);
+                    tmp.push(curr);
+                }
+                expansion_order_vec = tmp
+                    .into_iter()
+                    .map(|t| t.to_usize().unwrap())
+                    .rev()
+                    .collect_vec();
+            } else {
+                self.variable_expansion_order = Some(false);
+                expansion_order_vec = vec![expansion_order; (depth + 1) as usize];
+            }
+
+            self.n_coeffs_equivalent_surface = Some(
+                expansion_order_vec
+                    .iter()
+                    .map(|&e| ncoeffs_kifmm(e))
+                    .collect_vec(),
+            );
+
+            self.n_coeffs_check_surface = Some(
+                expansion_order_vec
+                    .iter()
+                    .map(|&c| ncoeffs_kifmm(c))
+                    .collect_vec(),
+            );
+
             self.kernel = Some(kernel);
             self.fmm_eval_type = Some(FmmEvalType::Vector);
             self.kernel_eval_type = Some(eval_type);
             self.isa = Some(Isa::new());
             self.source_to_target = Some(source_to_target);
-            self.equivalent_surface_order = Some(expansion_order);
-            self.check_surface_order = Some(expansion_order);
+            self.equivalent_surface_order = Some(expansion_order_vec.to_vec());
+            self.check_surface_order = Some(expansion_order_vec.to_vec());
             self.charges = Some(charges.to_vec()); // un-ordered charges
             Ok(self)
         }
@@ -260,11 +298,11 @@ where
             let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
             let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: vec![equivalent_surface_order],
-                check_surface_order: vec![check_surface_order],
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
                 variable_expansion_order: false,
-                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                n_coeffs_equivalent_surface: n_coeffs_check_surface.to_vec(),
+                n_coeffs_check_surface: n_coeffs_equivalent_surface.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -275,11 +313,11 @@ where
 
             let ghost_fmm_v: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: vec![equivalent_surface_order],
-                check_surface_order: vec![check_surface_order],
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
                 variable_expansion_order: false,
-                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                n_coeffs_equivalent_surface: n_coeffs_check_surface.to_vec(),
+                n_coeffs_check_surface: n_coeffs_equivalent_surface.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -290,11 +328,11 @@ where
 
             let ghost_fmm_u: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: vec![equivalent_surface_order],
-                check_surface_order: vec![check_surface_order],
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
                 variable_expansion_order: false,
-                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                n_coeffs_equivalent_surface: n_coeffs_check_surface.to_vec(),
+                n_coeffs_check_surface: n_coeffs_equivalent_surface.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -305,6 +343,7 @@ where
 
             let mut result = KiFmmMulti {
                 timed,
+                variable_expansion_order: self.variable_expansion_order.unwrap(),
                 dim: 3,
                 communication_times,
                 isa: self.isa.unwrap(),

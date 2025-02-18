@@ -91,18 +91,51 @@ where
         let mut uc2e_inv_1 = Vec::new();
         let mut uc2e_inv_2 = Vec::new();
 
-        for (&equivalent_surface_order, &check_surface_order) in self
-            .equivalent_surface_order
-            .iter()
-            .zip(self.check_surface_order.iter())
-        {
+        if self.variable_expansion_order {
+            for (&equivalent_surface_order, &check_surface_order) in self
+                .equivalent_surface_order
+                .iter()
+                .zip(self.check_surface_order.iter())
+            {
+                // Compute required surfaces
+                let upward_equivalent_surface =
+                    root.surface_grid(equivalent_surface_order, domain, alpha_inner);
+                let upward_check_surface =
+                    root.surface_grid(check_surface_order, domain, alpha_outer);
+
+                let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
+                let ncheck_surface = ncoeffs_kifmm(check_surface_order);
+
+                // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+                // As well as estimating their inverses using SVD
+                let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+                self.kernel.assemble_st(
+                    GreenKernelEvalType::Value,
+                    &upward_check_surface[..],
+                    &upward_equivalent_surface[..],
+                    uc2e.data_mut(),
+                );
+
+                let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+
+                let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+                for i in 0..s.len() {
+                    mat_s[[i, i]] = Scalar::from_real(s[i]);
+                }
+
+                uc2e_inv_1
+                    .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
+                uc2e_inv_2.push(ut);
+            }
+        } else {
             // Compute required surfaces
             let upward_equivalent_surface =
-                root.surface_grid(equivalent_surface_order, domain, alpha_inner);
-            let upward_check_surface = root.surface_grid(check_surface_order, domain, alpha_outer);
+                root.surface_grid(self.equivalent_surface_order[0], domain, alpha_inner);
+            let upward_check_surface =
+                root.surface_grid(self.check_surface_order[0], domain, alpha_outer);
 
-            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
-            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
+            let nequiv_surface = ncoeffs_kifmm(self.equivalent_surface_order[0]);
+            let ncheck_surface = ncoeffs_kifmm(self.check_surface_order[0]);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
@@ -125,8 +158,9 @@ where
             uc2e_inv_2.push(ut);
         }
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
-            0..self.equivalent_surface_order.len() - 1
+        let depth = self.tree.source_tree().depth();
+        let iterator = if self.variable_expansion_order {
+            0..depth
         } else {
             0..1
         };

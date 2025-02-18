@@ -66,6 +66,7 @@ fn main() {
             .parameters(
                 charges.data(),
                 expansion_order,
+                None,
                 kernel.clone(),
                 GreenKernelEvalType::Value,
                 source_to_target,

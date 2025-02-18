@@ -446,16 +446,16 @@ where
     pub source_to_target: Option<FieldTranslation>,
 
     /// Equivalent surface order, variable expansion order not supported
-    pub equivalent_surface_order: Option<usize>,
+    pub equivalent_surface_order: Option<Vec<usize>>,
 
     /// Check surface order, variable expansion order not supported
-    pub check_surface_order: Option<usize>,
+    pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub n_coeffs_equivalent_surface: Option<usize>,
+    pub n_coeffs_equivalent_surface: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub n_coeffs_check_surface: Option<usize>,
+    pub n_coeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<GreenKernelEvalType>,
@@ -468,6 +468,9 @@ where
 
     /// Communication runtimes
     pub communication_times: Option<Vec<CommunicationTime>>,
+
+    /// Variable expansion order by level
+    pub variable_expansion_order: Option<bool>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -992,17 +995,20 @@ where
     /// Charges associated with each source tree
     pub(crate) charges: Vec<Scalar>,
 
+    /// Set to true if expansion order varies by level
+    pub(crate) variable_expansion_order: bool,
+
     /// The expansion order used to construct check surfaces
-    pub(crate) check_surface_order: usize,
+    pub(crate) check_surface_order: Vec<usize>,
 
     /// The expansion order of the FMM, used to construct equivalent surfaces.
-    pub(crate) equivalent_surface_order: usize,
+    pub(crate) equivalent_surface_order: Vec<usize>,
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub(crate) n_coeffs_equivalent_surface: usize,
+    pub(crate) n_coeffs_equivalent_surface: Vec<usize>,
 
     /// The number of coefficients, corresponding to points discretising the check surface
-    pub(crate) n_coeffs_check_surface: usize,
+    pub(crate) n_coeffs_check_surface: Vec<usize>,
 
     /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub(crate) kernel_eval_type: GreenKernelEvalType,

@@ -67,6 +67,7 @@ fn main() {
             .parameters(
                 charges.data(),
                 expansion_order,
+                None,
                 kernel.clone(),
                 GreenKernelEvalType::ValueDeriv,
                 source_to_target,
@@ -210,6 +211,7 @@ fn main() {
             .parameters(
                 charges.data(),
                 expansion_order,
+                None,
                 kernel,
                 GreenKernelEvalType::ValueDeriv,
                 source_to_target,

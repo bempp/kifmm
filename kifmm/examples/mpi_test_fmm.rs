@@ -66,7 +66,8 @@ fn main() {
             .parameters(
                 charges.data(),
                 expansion_order,
-                kernel.clone(),
+                None,
+                kernel,
                 GreenKernelEvalType::Value,
                 source_to_target,
             )
@@ -204,7 +205,8 @@ fn main() {
             .parameters(
                 charges.data(),
                 expansion_order,
-                kernel,
+                None,
+                Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 source_to_target,
             )

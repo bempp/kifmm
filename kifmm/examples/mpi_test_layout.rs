@@ -64,6 +64,7 @@ fn main() {
             .parameters(
                 &charges,
                 expansion_order,
+                None,
                 kernel,
                 green_kernels::types::GreenKernelEvalType::Value,
                 source_to_target,

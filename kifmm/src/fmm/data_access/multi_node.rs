@@ -47,20 +47,20 @@ where
         false
     }
 
-    fn equivalent_surface_order(&self, _level: u64) -> usize {
-        self.equivalent_surface_order
+    fn equivalent_surface_order(&self, level: u64) -> usize {
+        self.equivalent_surface_order[self.expansion_index(level)]
     }
 
-    fn check_surface_order(&self, _level: u64) -> usize {
-        self.check_surface_order
+    fn check_surface_order(&self, level: u64) -> usize {
+        self.check_surface_order[self.expansion_index(level)]
     }
 
-    fn n_coeffs_equivalent_surface(&self, _level: u64) -> usize {
-        self.n_coeffs_equivalent_surface
+    fn n_coeffs_equivalent_surface(&self, level: u64) -> usize {
+        self.n_coeffs_equivalent_surface[self.expansion_index(level)]
     }
 
-    fn n_coeffs_check_surface(&self, _level: u64) -> usize {
-        self.n_coeffs_check_surface
+    fn n_coeffs_check_surface(&self, level: u64) -> usize {
+        self.n_coeffs_check_surface[self.expansion_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -101,7 +101,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.n_coeffs_equivalent_surface * n_sources,
+                        self.n_coeffs_equivalent_surface(level) * n_sources,
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -119,7 +119,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.n_coeffs_equivalent_surface * n_targets,
+                        self.n_coeffs_equivalent_surface(level) * n_targets,
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -140,7 +140,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -161,7 +161,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts_mut(
                         multipole_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -182,7 +182,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -203,7 +203,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts_mut(
                         local_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }

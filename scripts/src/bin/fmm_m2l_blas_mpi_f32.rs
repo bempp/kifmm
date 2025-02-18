@@ -101,6 +101,7 @@ fn main() {
         .parameters(
             &charges,
             expansion_order,
+            None,
             kernel.clone(),
             green_kernels::types::GreenKernelEvalType::Value,
             source_to_target,
