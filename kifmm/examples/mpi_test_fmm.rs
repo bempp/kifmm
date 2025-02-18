@@ -141,7 +141,8 @@ fn main() {
                 .unwrap()
                 .parameters(
                     &all_charges,
-                    &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
@@ -278,7 +279,8 @@ fn main() {
                 .unwrap()
                 .parameters(
                     &all_charges,
-                    &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),

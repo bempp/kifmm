@@ -41,8 +41,7 @@ fn main() {
     let timed = true; // Optionally time the operators
 
     // Set FMM Parameters
-    // Can either set globally for whole tree, or level-by-level
-    let expansion_order = &[6];
+    let expansion_order = 6;
     // Parameters which control speed and accuracy of BLAS based field translation
     let singular_value_threshold = Some(1e-5);
     let check_surface_diff = Some(2);
@@ -55,7 +54,8 @@ fn main() {
         .unwrap()
         .parameters(
             &charges,
-            expansion_order, // Set expansion order, by tree level or globally
+            expansion_order, // Set expansion order
+            None,
             Laplace3dKernel::new(), // Choose kernel,
             GreenKernelEvalType::Value, // Choose potential or potential + deriv evaluation
             BlasFieldTranslationSaRcmp::new(

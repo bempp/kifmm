@@ -387,20 +387,33 @@ class KiFmm:
         tree,
         field_translation,
         timed=False,
+        expansion_order_scale=1,
     ):
         """Constructor for Single Node FMMss.
 
         Args:
-            expansion_order (list[int], int): The expansion order of the FMM, if specifying a depth expansion order must be specified for each tree level in a list
+            expansion_order (int): The expansion order of the FMM at the leaf level, applied to all levels if `expansion_order_scale` unspecified
+
             tree (obj): Currently only 'SingleNodeTree' supported
             field_translation (obj): Either 'FftFieldTranslation' or 'BlasFieldTranslation'.
             timed (bool): Optionally return operator runtimes.
+            expansion_order_scale (float): By default set to 1, must be set to greater than or equal to 1. Increases expansion order as floor(scale * expansion_order)
+                with decreasing tree level.
         """
 
         self._evaluated = False
-        self._expansion_order = expansion_order
-        self._n_coeffs = 6 * (expansion_order - 1) ** 2 + 2
         self._tree = tree
+        self._expansion_order_leaf = expansion_order
+        self._expansion_order_scale = expansion_order_scale
+        self._expansion_order = np.ones(self._tree.depth) * expansion_order
+        curr = expansion_order
+        tmp = [curr]
+        for e in self._expansion_order[::-1]:
+            curr = np.floor(curr * expansion_order_scale)
+            tmp.push(curr)
+        self._expansion_order = np.array(list(reversed(tmp)))
+
+        self._n_coeffs = 6 * (self._expansion_order - 1) ** 2 + 2
         self._n_evals = self._tree.n_charges // (self._tree.n_sources // 3)
         self._field_translation = field_translation
         self._timed = timed
@@ -414,20 +427,6 @@ class KiFmm:
                 "Multiple charge vectors only supported with BlasFieldTranslation"
             )
 
-        try:
-            if self._tree.depth is None:
-                assert len(expansion_order) == 1
-            else:
-                assert len(expansion_order) == (self._tree.depth + 1)
-        except:
-            raise TypeError(
-                "expansion_order length must be depth + 1 if specified, otherwise of length 1 if n_crit specified"
-            )
-
-        self._n_expansion_order = len(self._expansion_order)
-        self._expansion_order_c = ffi.cast(
-            "uintptr_t*", self._expansion_order.ctypes.data
-        )
         self.all_potentials = []
         self._morton_keys_refs = set()
 
@@ -448,8 +447,8 @@ class KiFmm:
                 if self._field_translation.kernel.dtype == np.float32:
                     self._fmm = lib.laplace_fft_f32_alloc(
                         self._timed,
-                        self._expansion_order_c,
-                        self._n_expansion_order,
+                        self._expansion_order_leaf,
+                        self._expansion_order_scale,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
                         self._tree.n_sources,
@@ -467,8 +466,8 @@ class KiFmm:
                 elif self._field_translation.kernel.dtype == np.float64:
                     self._fmm = lib.laplace_fft_f64_alloc(
                         self._timed,
-                        self._expansion_order_c,
-                        self._n_expansion_order,
+                        self._expansion_order_leaf,
+                        self._expansion_order_scale,
                         self._field_translation.kernel.eval_type,
                         self._tree.sources_c,
                         self._tree.n_sources,
@@ -490,8 +489,8 @@ class KiFmm:
                 if self._field_translation.kernel.dtype == np.float32:
                     self._fmm = lib.helmholtz_fft_f32_alloc(
                         self._timed,
-                        self._expansion_order_c,
-                        self._n_expansion_order,
+                        self._expansion_order_leaf,
+                        self._expansion_order_scale,
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
@@ -510,8 +509,8 @@ class KiFmm:
                 elif self._field_translation.kernel.dtype == np.float64:
                     self._fmm = lib.helmholtz_fft_f64_alloc(
                         self._timed,
-                        self._expansion_order_c,
-                        self._n_expansion_order,
+                        self._expansion_order_leaf,
+                        self._expansion_order_scale,
                         self._field_translation.kernel.eval_type,
                         self._field_translation.kernel.wavenumber,
                         self._tree.sources_c,
@@ -541,8 +540,8 @@ class KiFmm:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.laplace_blas_rsvd_f32_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -564,8 +563,8 @@ class KiFmm:
 
                         self._fmm = lib.laplace_blas_rsvd_f64_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -591,8 +590,8 @@ class KiFmm:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.laplace_blas_svd_f32_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -611,8 +610,8 @@ class KiFmm:
                     elif self._field_translation.kernel.dtype == np.float64:
                         self._fmm = lib.laplace_blas_svd_f64_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._tree.sources_c,
                             self._tree.n_sources,
@@ -637,8 +636,8 @@ class KiFmm:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.helmholtz_blas_rsvd_f32_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -660,8 +659,8 @@ class KiFmm:
                     elif self._field_translation.kernel.dtype == np.float64:
                         self._fmm = lib.helmholtz_blas_rsvd_f64_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -684,8 +683,8 @@ class KiFmm:
                     if self._field_translation.kernel.dtype == np.float32:
                         self._fmm = lib.helmholtz_blas_svd_f32_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,
@@ -705,8 +704,8 @@ class KiFmm:
                     elif self._field_translation.kernel.dtype == np.float64:
                         self._fmm = lib.helmholtz_blas_svd_f64_alloc(
                             self._timed,
-                            self._expansion_order_c,
-                            self._n_expansion_order,
+                            self._expansion_order_leaf,
+                            self._expansion_order_scale,
                             self._field_translation.kernel.eval_type,
                             self._field_translation.kernel.wavenumber,
                             self._tree.sources_c,

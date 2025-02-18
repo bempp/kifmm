@@ -4,8 +4,7 @@ use std::{collections::HashMap, sync::RwLock};
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use num::traits::Float;
 use rlst::{
-    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
-    SliceContainer, VectorContainer,
+    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
 };
 
 use crate::{
@@ -35,17 +34,6 @@ use mpi::{
     Count, Rank,
 };
 
-/// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
-/// organized in row-major order.
-pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
-
-/// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
-/// stored in row-major order.
-pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
-
-/// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
-/// stored in row-major order.
-pub type CoordinatesSlice<'slc, T> = Array<T, BaseArray<T, SliceContainer<'slc, T>, 2>, 2>;
 
 /// Represents a threadsafe mutable raw pointer to`T`.
 ///
@@ -328,7 +316,8 @@ pub enum FmmEvalType {
 /// // FMM parameters
 /// let n_crit = Some(150); // Constructed from data, using `n_crit` parameter
 /// let depth = None; // Must not specify a depth in this case
-/// let expansion_order = [10]; // Constructed with `n_crit`, therefore can only use a single expansion order.
+/// let expansion_order = 10;
+/// let expansion_order_scale = None;
 /// let prune_empty = true;
 ///
 /// /// Charge data
@@ -346,7 +335,8 @@ pub enum FmmEvalType {
 /// let mut fmm = fmm
 ///     .parameters(
 ///         charges.data(),
-///         &expansion_order,
+///         expansion_order,
+///         expansion_order_scale,
 ///         Laplace3dKernel::new(),
 ///         GreenKernelEvalType::Value,
 ///         FftFieldTranslation::new(None),
@@ -419,9 +409,6 @@ where
 
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
-
-    /// Has depth or ncrit been set
-    pub depth_set: Option<bool>,
 
     /// Communication runtimes
     pub communication_times: Option<Vec<CommunicationTime>>,

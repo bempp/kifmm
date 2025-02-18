@@ -16,7 +16,7 @@ fn main() {
     // FMM parameters
     let n_crit = Some(150);
     let depth = None;
-    let expansion_order = [5];
+    let expansion_order = 5;
     let prune_empty = true;
 
     // Kernel parameter
@@ -34,7 +34,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -67,7 +68,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(
@@ -100,7 +102,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(

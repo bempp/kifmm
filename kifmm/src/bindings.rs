@@ -316,7 +316,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
@@ -338,8 +338,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_svd_f32_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f32,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
@@ -363,10 +363,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -387,6 +385,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
@@ -417,7 +416,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
@@ -439,8 +438,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_svd_f64_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f64,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
@@ -464,10 +463,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -488,6 +485,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
@@ -518,7 +516,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
@@ -542,8 +540,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_rsvd_f32_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f32,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
@@ -569,10 +567,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -605,6 +601,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
@@ -635,7 +632,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
@@ -659,8 +656,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn laplace_blas_rsvd_f64_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f64,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
@@ -686,10 +683,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -722,6 +717,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
@@ -751,7 +747,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
@@ -772,8 +768,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn laplace_fft_f32_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f32,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
@@ -796,8 +792,7 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -812,6 +807,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 eval_type,
                 FftFieldTranslation::new(block_size),
@@ -841,7 +837,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `sources`: A pointer to the source points.
     /// - `n_sources`: The length of the source points buffer
     /// - `targets`: A pointer to the target points.
@@ -861,8 +857,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn laplace_fft_f64_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f64,
         eval_type: bool,
         sources: *const c_void,
         n_sources: usize,
@@ -885,8 +881,7 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -901,6 +896,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 eval_type,
                 FftFieldTranslation::new(block_size),
@@ -931,7 +927,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -956,8 +952,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_blas_rsvd_f32_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f32,
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
@@ -984,10 +980,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1020,6 +1014,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
@@ -1050,7 +1045,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1075,8 +1070,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_blas_rsvd_f64_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f64,
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
@@ -1104,10 +1099,8 @@ pub mod constructors {
 
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1139,6 +1132,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
@@ -1169,7 +1163,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1192,8 +1186,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_blas_svd_f32_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f32,
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
@@ -1218,10 +1212,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1242,6 +1234,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
@@ -1272,7 +1265,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1295,8 +1288,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_blas_svd_f64_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f64,
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
@@ -1322,10 +1315,8 @@ pub mod constructors {
 
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1346,6 +1337,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
@@ -1375,7 +1367,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1397,8 +1389,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_fft_f32_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f32,
         eval_type: bool,
         wavenumber: f32,
         sources: *const c_void,
@@ -1422,9 +1414,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
             Some(block_size)
@@ -1438,6 +1429,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 FftFieldTranslation::new(block_size),
@@ -1467,7 +1459,7 @@ pub mod constructors {
     /// # Parameters
     /// - `timed`: Modulates whether operators and metadata are timed.
     /// - `expansion_order`: A pointer to an array of expansion orders.
-    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `expansion_order_scale`: The number of expansion orders.
     /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
     /// - `wavenumber`: The wavenumber.
     /// - `sources`: A pointer to the source points.
@@ -1489,8 +1481,8 @@ pub mod constructors {
     #[no_mangle]
     pub unsafe extern "C" fn helmholtz_fft_f64_alloc(
         timed: bool,
-        expansion_order: *const usize,
-        n_expansion_order: usize,
+        expansion_order: usize,
+        expansion_order_scale: f64,
         eval_type: bool,
         wavenumber: f64,
         sources: *const c_void,
@@ -1514,9 +1506,8 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
-        let expansion_order =
-            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
             Some(block_size)
@@ -1530,6 +1521,7 @@ pub mod constructors {
             .parameters(
                 charges,
                 expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 FftFieldTranslation::new(block_size),
@@ -6024,15 +6016,14 @@ mod test {
             let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
 
-            let expansion_order = [6usize];
-            let expansion_order_p = expansion_order.as_ptr();
-            let n_expansion_order = 1;
+            let expansion_order = 6usize;
+            let expansion_order_scale = 1f32;
 
             let laplace_blas_rsvd_f32 = unsafe {
                 laplace_blas_rsvd_f32_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     sources_p,
                     n_sources,
@@ -6053,8 +6044,8 @@ mod test {
             let laplace_blas_svd_f32 = unsafe {
                 laplace_blas_svd_f32_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     sources_p,
                     n_sources,
@@ -6073,8 +6064,8 @@ mod test {
             let laplace_fft_f32 = unsafe {
                 laplace_fft_f32_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     sources_p,
                     n_sources,
@@ -6114,15 +6105,14 @@ mod test {
             let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
 
-            let expansion_order = [6usize];
-            let expansion_order_p = expansion_order.as_ptr();
-            let n_expansion_order = 1;
+            let expansion_order = 6usize;
+            let expansion_order_scale = 0f64;
 
             let laplace_blas_rsvd_f64 = unsafe {
                 laplace_blas_rsvd_f64_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     sources_p,
                     n_sources,
@@ -6143,8 +6133,8 @@ mod test {
             let laplace_blas_svd_f64 = unsafe {
                 laplace_blas_svd_f64_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     sources_p,
                     n_sources,
@@ -6163,8 +6153,8 @@ mod test {
             let laplace_fft_f64 = unsafe {
                 laplace_fft_f64_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     sources_p,
                     n_sources,
@@ -6209,15 +6199,14 @@ mod test {
             let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
 
-            let expansion_order = [6usize];
-            let expansion_order_p = expansion_order.as_ptr();
-            let n_expansion_order = 1;
+            let expansion_order = 6usize;
+            let expansion_order_scale = 0f32;
 
             let helmholtz_blas_svd_f32 = unsafe {
                 helmholtz_blas_svd_f32_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     wavenumber,
                     sources_p,
@@ -6237,8 +6226,8 @@ mod test {
             let helmholtz_fft_f32 = unsafe {
                 helmholtz_fft_f32_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     wavenumber,
                     sources_p,
@@ -6278,15 +6267,14 @@ mod test {
             let n_charges = n_points * 2;
             let charges_p = charges.as_ptr() as *const c_void;
 
-            let expansion_order = [6usize];
-            let expansion_order_p = expansion_order.as_ptr();
-            let n_expansion_order = 1;
+            let expansion_order = 6usize;
+            let expansion_order_scale = 1f64;
 
             let helmholtz_blas_svd_f64 = unsafe {
                 helmholtz_blas_svd_f64_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     wavenumber,
                     sources_p,
@@ -6306,8 +6294,8 @@ mod test {
             let helmholtz_fft_f64 = unsafe {
                 helmholtz_fft_f64_alloc(
                     timed,
-                    expansion_order_p,
-                    n_expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     true,
                     wavenumber,
                     sources_p,

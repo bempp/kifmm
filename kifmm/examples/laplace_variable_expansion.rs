@@ -13,8 +13,9 @@ fn main() {
 
     // FMM parameters
     let n_crit = None;
-    let depth = Some(2); // If explicitly specifying depth, FMMs support variable expansion order for each level
-    let expansion_order = [6, 5, 4]; // Must match depth + 1, indexed by tree level
+    let depth = Some(2);
+    let expansion_order = 4;
+    let expansion_order_scale = Some(1.3);
     let prune_empty = true;
 
     // FFT based M2L for a vector of charges
@@ -29,7 +30,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -58,7 +60,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
@@ -87,7 +90,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                expansion_order_scale,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(

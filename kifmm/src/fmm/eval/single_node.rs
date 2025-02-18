@@ -477,12 +477,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
-
-        // let n_crit = None;
-        // let depth = Some(3);
-        // let expansion_order = [5, 6, 5, 6];
-
+        let expansion_order = 6;
         let prune_empty = true;
 
         // Charge data
@@ -496,7 +491,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -507,12 +503,13 @@ mod test {
         fmm_fft.evaluate().unwrap();
 
         let svd_threshold = Some(1e-5);
-        let mut fmm_svd = SingleNodeBuilder::new(false)
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
@@ -524,12 +521,12 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate().unwrap();
+        fmm_blas.evaluate().unwrap();
 
         let fmm_fft = Box::new(fmm_fft);
-        let fmm_svd = Box::new(fmm_svd);
+        let fmm_blas = Box::new(fmm_blas);
         test_root_multipole_laplace_single_node::<f64>(fmm_fft, &sources, &charges, 1e-5);
-        test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
+        test_root_multipole_laplace_single_node::<f64>(fmm_blas, &sources, &charges, 1e-5);
     }
 
     #[test]
@@ -541,13 +538,9 @@ mod test {
         let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
-        // let n_crit = Some(100);
-        // let depth = None;
-        // let expansion_order = [6];
-
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [6, 6, 6, 6];
+        let expansion_order = 6;
 
         let prune_empty = true;
 
@@ -558,12 +551,13 @@ mod test {
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
-        let mut fmm_svd = SingleNodeBuilder::new(false)
+        let mut fmm_blas = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
@@ -575,10 +569,10 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        fmm_svd.evaluate().unwrap();
+        fmm_blas.evaluate().unwrap();
 
-        let fmm_svd = Box::new(fmm_svd);
-        test_root_multipole_laplace_single_node::<f64>(fmm_svd, &sources, &charges, 1e-5);
+        let fmm_blas = Box::new(fmm_blas);
+        test_root_multipole_laplace_single_node::<f64>(fmm_blas, &sources, &charges, 1e-5);
     }
 
     #[test]
@@ -595,7 +589,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
         let prune_empty = true;
         let threshold_pot = 1e-5;
 
@@ -611,7 +605,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
@@ -652,7 +647,8 @@ mod test {
         // FMM parameters
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [5, 6, 5, 6];
+        let expansion_order = 6;
+        let expansion_order_scale = Some(1.2);
 
         let prune_empty = true;
         let threshold_pot = 1e-3;
@@ -674,7 +670,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
@@ -699,7 +696,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
@@ -729,7 +727,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -758,7 +757,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -796,7 +796,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(150);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
         let surface_diff = Some(1);
         let prune_empty = true;
         let threshold_pot = 1e-6;
@@ -818,7 +818,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -848,7 +849,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -886,7 +888,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(150);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
         let surface_diff = Some(1);
         let prune_empty = true;
         let threshold_pot = 1e-6;
@@ -907,7 +909,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -946,7 +949,8 @@ mod test {
         // FMM parameters
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [6, 5, 6, 5];
+        let expansion_order = 5;
+        let expansion_order_scale = Some(1.2);
         let surface_diff = Some(1);
         let prune_empty = true;
         let threshold_pot = 1e-5;
@@ -968,7 +972,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -998,7 +1003,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -1037,7 +1043,8 @@ mod test {
 
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [6, 6, 5, 6];
+        let expansion_order = 5;
+        let expansion_order_scale = Some(1.2);
 
         let prune_empty = true;
         // Charge data
@@ -1053,7 +1060,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                expansion_order_scale,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -1080,7 +1088,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
 
         let prune_empty = true;
         let wavenumber = 2.5;
@@ -1099,7 +1107,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
@@ -1121,7 +1130,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
@@ -1149,7 +1159,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
@@ -1171,7 +1182,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
@@ -1205,7 +1217,8 @@ mod test {
         // FMM parameters
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [5, 6, 5, 6];
+        let expansion_order = 6;
+        let expansion_order_scale = Some(1.2);
 
         let prune_empty = true;
         let wavenumber = 2.5;
@@ -1224,7 +1237,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
@@ -1246,7 +1260,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
@@ -1274,7 +1289,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
@@ -1296,7 +1312,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
@@ -1331,7 +1348,7 @@ mod test {
         let n_crit = Some(100);
         let depth = None;
         let surface_diff = Some(1);
-        let expansion_order = [6];
+        let expansion_order = 6;
 
         let prune_empty = true;
         let wavenumber = 2.5;
@@ -1350,7 +1367,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
@@ -1373,7 +1391,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
@@ -1407,7 +1426,7 @@ mod test {
         let n_crit = Some(100);
         let depth = None;
         let surface_diff = Some(1);
-        let expansion_order = [6];
+        let expansion_order = 6;
 
         let prune_empty = true;
         let wavenumber = 2.5;
@@ -1426,7 +1445,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
@@ -1459,7 +1479,8 @@ mod test {
         // FMM parameters
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [6, 5, 6, 5];
+        let expansion_order = 5;
+        let expansion_order_scale = Some(1.2);
 
         let prune_empty = true;
         let threshold = 1e-5;
@@ -1484,7 +1505,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -1510,7 +1532,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    expansion_order_scale,
                     Laplace3dKernel::new(),
                     eval_type,
                     BlasFieldTranslationSaRcmp::new(
@@ -1548,7 +1571,7 @@ mod test {
         // FMM parameters
         let n_crit = None;
         let depth = Some(3);
-        let expansion_order = [6, 6, 6, 6];
+        let expansion_order = 6;
 
         let prune_empty = true;
         let threshold = 1e-5;
@@ -1574,7 +1597,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
                     BlasFieldTranslationIa::new(
@@ -1600,7 +1624,8 @@ mod test {
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
                     BlasFieldTranslationIa::new(

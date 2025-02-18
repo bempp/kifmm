@@ -621,15 +621,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
@@ -871,15 +863,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
@@ -1254,15 +1238,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let targets = self.tree.target_tree().keys(level).unwrap();
@@ -1818,16 +1794,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
@@ -2329,16 +2296,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
@@ -2714,19 +2672,11 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
-            (level - 2) as usize
-        } else {
-            0
-        }
+        (level - 2) as usize
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
-            level as usize
-        } else {
-            0
-        }
+        level as usize
     }
 
     fn c2e_operator_index(&self, level: u64) -> usize {
@@ -3037,7 +2987,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
         let prune_empty = true;
 
         // Charge data
@@ -3051,7 +3001,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(Some(1e-5), None, FmmSvdMode::Deterministic),
@@ -3141,7 +3092,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
         let prune_empty = true;
         let wavenumber = 2.5;
 
@@ -3156,7 +3107,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
@@ -3306,7 +3258,7 @@ mod test {
         // FMM parameters
         let n_crit = Some(100);
         let depth = None;
-        let expansion_order = [6];
+        let expansion_order = 6;
         let prune_empty = true;
 
         // Charge data
@@ -3320,7 +3272,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -3330,7 +3283,7 @@ mod test {
             .unwrap();
 
         let level = 3;
-        let coeff_idx = fmm.c2e_operator_index(level);
+        let coeff_idx = fmm.m2l_operator_index(level);
 
         let mut multipole = rlst_dynamic_array2!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
@@ -3347,7 +3300,7 @@ mod test {
 
         // Compute FFT of the representative signal
         let mut signal = fmm.evaluate_charges_convolution_grid(
-            expansion_order[coeff_idx],
+            expansion_order,
             coeff_idx,
             multipole.data(),
         );
@@ -3359,12 +3312,12 @@ mod test {
         let _ = f64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
 
         let source_equivalent_surface = transfer_vector.source.surface_grid(
-            expansion_order[coeff_idx],
+            expansion_order,
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
         let target_check_surface = transfer_vector.target.surface_grid(
-            expansion_order[coeff_idx],
+            expansion_order,
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
@@ -3380,7 +3333,7 @@ mod test {
         ];
 
         let (conv_grid, _) = transfer_vector.source.convolution_grid(
-            expansion_order[coeff_idx],
+            expansion_order,
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -3396,7 +3349,7 @@ mod test {
 
         // Compute kernel
         let kernel = fmm.evaluate_greens_fct_convolution_grid(
-            expansion_order[coeff_idx],
+            expansion_order,
             &conv_grid,
             kernel_point,
         );
@@ -3472,9 +3425,9 @@ mod test {
         let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
-        let n_crit = Some(100);
-        let depth = None;
-        let expansion_order = [6];
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = 6;
         let prune_empty = true;
         let wavenumber = 1.0;
 
@@ -3489,7 +3442,8 @@ mod test {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -3498,8 +3452,9 @@ mod test {
             .build()
             .unwrap();
 
+
         let level = 2;
-        let coeff_index = fmm.expansion_index(level);
+        let coeff_index = fmm.m2l_operator_index(level);
         let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
@@ -3523,10 +3478,11 @@ mod test {
 
         // Compute FFT of the representative signal
         let mut signal = fmm.evaluate_charges_convolution_grid(
-            expansion_order[coeff_index],
+            expansion_order,
             coeff_index,
             multipole.data(),
         );
+
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
 
@@ -3535,12 +3491,12 @@ mod test {
         let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
 
         let source_equivalent_surface = source.surface_grid(
-            expansion_order[coeff_index],
+            expansion_order,
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
         let target_check_surface = target.surface_grid(
-            expansion_order[coeff_index],
+            expansion_order,
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
@@ -3556,7 +3512,7 @@ mod test {
         ];
 
         let (conv_grid, _) = source.convolution_grid(
-            expansion_order[coeff_index],
+            expansion_order,
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -3570,9 +3526,9 @@ mod test {
             target_check_surface[fmm.dim() * kernel_point_index + 2],
         ];
 
-        // Compute kernel
-        let kernel = fmm.evaluate_greens_fct_convolution_grid(
-            expansion_order[coeff_index],
+        // // Compute kernel
+        let kernel: Array<Complex<f64>, BaseArray<Complex<f64>, VectorContainer<Complex<f64>>, 3>, 3> = fmm.evaluate_greens_fct_convolution_grid(
+            expansion_order,
             &conv_grid,
             kernel_point,
         );
@@ -3610,6 +3566,7 @@ mod test {
             &[m, n, o],
             &plan,
         );
+
 
         let mut result = vec![c64::zero(); n_targets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_index]

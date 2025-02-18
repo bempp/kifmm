@@ -32,7 +32,8 @@
 //! // FMM parameters
 //! let n_crit = Some(150); // Threshold for number of particles in a leaf box
 //! let depth = None; //
-//! let expansion_order = [5]; // Expansion order of multipole/local expansions
+//! let expansion_order = 5; // Expansion order of multipole/local expansions at leaf level
+//! let expansion_order_scale = None; // Optionally scale expansion order with decreasing tree level
 //! let prune_empty = true; // Whether to exclude empty boxes in octrees
 //!
 //! // FFT based Field Translation
@@ -48,7 +49,8 @@
 //!         .unwrap()
 //!         .parameters(
 //!             charges.data(),
-//!             &expansion_order,
+//!             expansion_order,
+//!             expansion_order_scale,
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             GreenKernelEvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
 //!             FftFieldTranslation::new(None), // Choose a field translation method, could replace with BLAS field translation

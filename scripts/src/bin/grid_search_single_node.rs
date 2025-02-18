@@ -75,8 +75,6 @@ fn grid_search_laplace_blas<T>(
     let s = Instant::now();
     parameters.into_iter().enumerate().for_each(
         |(i, (surface_diff, svd_threshold, depth, expansion_order, rsvd_settings))| {
-            let expansion_order = vec![expansion_order; (depth + 1) as usize];
-
             let s = Instant::now();
             let fmm = SingleNodeBuilder::new(true)
                 .tree(
@@ -89,7 +87,8 @@ fn grid_search_laplace_blas<T>(
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationSaRcmp::new(
@@ -279,7 +278,6 @@ fn grid_search_laplace_fft<T>(
         .into_iter()
         .enumerate()
         .for_each(|(i, (depth, expansion_order, block_size))| {
-            let expansion_order = vec![expansion_order; (depth + 1) as usize];
             // Setup random sources and targets
             let n_sources = n_points;
             let n_targets = n_points;
@@ -302,7 +300,8 @@ fn grid_search_laplace_fft<T>(
                 .unwrap()
                 .parameters(
                     charges.data(),
-                    &expansion_order,
+                    expansion_order,
+                    None,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(Some(block_size)),

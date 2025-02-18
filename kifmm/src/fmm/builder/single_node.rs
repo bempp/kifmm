@@ -1,5 +1,6 @@
 //! Builder objects to construct FMMs
-use std::collections::HashSet;
+use num::ToPrimitive;
+use num::traits::real::Real;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
@@ -52,7 +53,6 @@ where
             n_coeffs_check_surface: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
-            depth_set: None,
         }
     }
 
@@ -121,7 +121,6 @@ where
             if depth.is_some() && n_crit.is_none() {
                 source_depth = depth.unwrap();
                 target_depth = depth.unwrap();
-                self.depth_set = Some(true);
             } else if depth.is_none() && n_crit.is_some() {
                 // Estimate depth based on a uniform distribution
                 source_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
@@ -132,7 +131,6 @@ where
                     n_targets as u64,
                     n_crit.unwrap(),
                 );
-                self.depth_set = Some(false);
             } else {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -191,7 +189,8 @@ where
     pub fn parameters(
         mut self,
         charges: &[Scalar],
-        expansion_order: &[usize],
+        expansion_order: usize,
+        expansion_order_scale:Option< <Scalar as RlstScalar>::Real>,
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
@@ -229,36 +228,35 @@ where
             }
 
             let depth = self.tree.as_ref().unwrap().source_tree().depth();
-            let depth_set = self.depth_set.unwrap();
 
-            let expected_len = if depth_set { (depth + 1) as usize } else { 1 };
+            let expansion_order_vec;
+            if let Some(scale) = expansion_order_scale {
+                self.variable_expansion_order = Some(true);
 
-            if expansion_order.len() != expected_len {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Number of expansion orders must either be 1, or match the depth of the tree",
-                ));
-            }
+                let mut curr = Scalar::real(expansion_order);
+                let mut tmp = vec![curr];
+                for _level in 1..=depth {
+                    curr = (curr * scale).floor();
+                    tmp.push(curr);
+                }
+                expansion_order_vec = tmp.into_iter().map(|t| t.to_usize().unwrap()).rev().collect_vec();
 
-            let unique_expansion_orders: HashSet<_> = expansion_order.iter().cloned().collect();
-
-            if unique_expansion_orders.len() > 1 {
-                self.variable_expansion_order = Some(true)
             } else {
-                self.variable_expansion_order = Some(false)
+                expansion_order_vec = vec![expansion_order; (depth + 1) as usize];
+                self.variable_expansion_order = Some(false);
             }
 
             let check_surface_order = if source_to_target.overdetermined() {
-                expansion_order
+                expansion_order_vec
                     .iter()
                     .map(|&e| e + source_to_target.surface_diff())
                     .collect_vec()
             } else {
-                expansion_order.to_vec()
+                expansion_order_vec.to_vec()
             };
 
             self.n_coeffs_equivalent_surface = Some(
-                expansion_order
+                expansion_order_vec
                     .iter()
                     .map(|&e| ncoeffs_kifmm(e))
                     .collect_vec(),
@@ -272,7 +270,7 @@ where
             );
 
             self.isa = Some(Isa::new());
-            self.equivalent_surface_order = Some(expansion_order.to_vec());
+            self.equivalent_surface_order = Some(expansion_order_vec.to_vec());
             self.check_surface_order = Some(check_surface_order.to_vec());
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);

@@ -354,7 +354,7 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
@@ -375,8 +375,8 @@ void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_svd_f32_alloc(bool timed,
-                                                const uintptr_t *expansion_order,
-                                                uintptr_t n_expansion_order,
+                                                uintptr_t expansion_order,
+                                                float expansion_order_scale,
                                                 bool eval_type,
                                                 const void *sources,
                                                 uintptr_t n_sources,
@@ -402,7 +402,7 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
@@ -423,8 +423,8 @@ struct FmmEvaluator *laplace_blas_svd_f32_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_svd_f64_alloc(bool timed,
-                                                const uintptr_t *expansion_order,
-                                                uintptr_t n_expansion_order,
+                                                uintptr_t expansion_order,
+                                                double expansion_order_scale,
                                                 bool eval_type,
                                                 const void *sources,
                                                 uintptr_t n_sources,
@@ -450,7 +450,7 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
@@ -473,8 +473,8 @@ struct FmmEvaluator *laplace_blas_svd_f64_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(bool timed,
-                                                 const uintptr_t *expansion_order,
-                                                 uintptr_t n_expansion_order,
+                                                 uintptr_t expansion_order,
+                                                 float expansion_order_scale,
                                                  bool eval_type,
                                                  const void *sources,
                                                  uintptr_t n_sources,
@@ -502,7 +502,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
@@ -525,8 +525,8 @@ struct FmmEvaluator *laplace_blas_rsvd_f32_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(bool timed,
-                                                 const uintptr_t *expansion_order,
-                                                 uintptr_t n_expansion_order,
+                                                 uintptr_t expansion_order,
+                                                 double expansion_order_scale,
                                                  bool eval_type,
                                                  const void *sources,
                                                  uintptr_t n_sources,
@@ -553,7 +553,7 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
@@ -573,8 +573,8 @@ struct FmmEvaluator *laplace_blas_rsvd_f64_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_fft_f32_alloc(bool timed,
-                                           const uintptr_t *expansion_order,
-                                           uintptr_t n_expansion_order,
+                                           uintptr_t expansion_order,
+                                           float expansion_order_scale,
                                            bool eval_type,
                                            const void *sources,
                                            uintptr_t n_sources,
@@ -598,7 +598,7 @@ struct FmmEvaluator *laplace_fft_f32_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `sources`: A pointer to the source points.
  * - `n_sources`: The length of the source points buffer
  * - `targets`: A pointer to the target points.
@@ -617,8 +617,8 @@ struct FmmEvaluator *laplace_fft_f32_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *laplace_fft_f64_alloc(bool timed,
-                                           const uintptr_t *expansion_order,
-                                           uintptr_t n_expansion_order,
+                                           uintptr_t expansion_order,
+                                           double expansion_order_scale,
                                            bool eval_type,
                                            const void *sources,
                                            uintptr_t n_sources,
@@ -643,7 +643,7 @@ struct FmmEvaluator *laplace_fft_f64_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -667,8 +667,8 @@ struct FmmEvaluator *laplace_fft_f64_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_blas_rsvd_f32_alloc(bool timed,
-                                                   const uintptr_t *expansion_order,
-                                                   uintptr_t n_expansion_order,
+                                                   uintptr_t expansion_order,
+                                                   float expansion_order_scale,
                                                    bool eval_type,
                                                    float wavenumber,
                                                    const void *sources,
@@ -697,7 +697,7 @@ struct FmmEvaluator *helmholtz_blas_rsvd_f32_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -721,8 +721,8 @@ struct FmmEvaluator *helmholtz_blas_rsvd_f32_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_blas_rsvd_f64_alloc(bool timed,
-                                                   const uintptr_t *expansion_order,
-                                                   uintptr_t n_expansion_order,
+                                                   uintptr_t expansion_order,
+                                                   double expansion_order_scale,
                                                    bool eval_type,
                                                    double wavenumber,
                                                    const void *sources,
@@ -751,7 +751,7 @@ struct FmmEvaluator *helmholtz_blas_rsvd_f64_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -773,8 +773,8 @@ struct FmmEvaluator *helmholtz_blas_rsvd_f64_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(bool timed,
-                                                  const uintptr_t *expansion_order,
-                                                  uintptr_t n_expansion_order,
+                                                  uintptr_t expansion_order,
+                                                  float expansion_order_scale,
                                                   bool eval_type,
                                                   float wavenumber,
                                                   const void *sources,
@@ -801,7 +801,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -823,8 +823,8 @@ struct FmmEvaluator *helmholtz_blas_svd_f32_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(bool timed,
-                                                  const uintptr_t *expansion_order,
-                                                  uintptr_t n_expansion_order,
+                                                  uintptr_t expansion_order,
+                                                  double expansion_order_scale,
                                                   bool eval_type,
                                                   double wavenumber,
                                                   const void *sources,
@@ -850,7 +850,7 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -871,8 +871,8 @@ struct FmmEvaluator *helmholtz_blas_svd_f64_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_fft_f32_alloc(bool timed,
-                                             const uintptr_t *expansion_order,
-                                             uintptr_t n_expansion_order,
+                                             uintptr_t expansion_order,
+                                             float expansion_order_scale,
                                              bool eval_type,
                                              float wavenumber,
                                              const void *sources,
@@ -897,7 +897,7 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(bool timed,
  * # Parameters
  * - `timed`: Modulates whether operators and metadata are timed.
  * - `expansion_order`: A pointer to an array of expansion orders.
- * - `n_expansion_order`: The number of expansion orders.
+ * - `expansion_order_scale`: The number of expansion orders.
  * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
  * - `wavenumber`: The wavenumber.
  * - `sources`: A pointer to the source points.
@@ -918,8 +918,8 @@ struct FmmEvaluator *helmholtz_fft_f32_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct FmmEvaluator *helmholtz_fft_f64_alloc(bool timed,
-                                             const uintptr_t *expansion_order,
-                                             uintptr_t n_expansion_order,
+                                             uintptr_t expansion_order,
+                                             double expansion_order_scale,
                                              bool eval_type,
                                              double wavenumber,
                                              const void *sources,

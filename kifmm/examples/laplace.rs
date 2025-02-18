@@ -14,7 +14,7 @@ fn main() {
     // FMM parameters
     let n_crit = Some(150);
     let depth = None;
-    let expansion_order = [5];
+    let expansion_order = 5;
     let prune_empty = true;
 
     // FFT based M2L for a vector of charges
@@ -29,7 +29,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -58,7 +59,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
@@ -87,7 +89,8 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                &expansion_order,
+                expansion_order,
+                None,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(
