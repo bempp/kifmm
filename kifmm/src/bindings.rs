@@ -364,7 +364,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -464,7 +468,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -568,7 +576,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -684,7 +696,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -792,7 +808,11 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
 
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -881,7 +901,11 @@ pub mod constructors {
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
         let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
 
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
@@ -981,7 +1005,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1100,7 +1128,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1213,7 +1245,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1316,7 +1352,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let singular_value_threshold = Some(singular_value_threshold);
         let surface_diff = if surface_diff > 0 {
@@ -1415,7 +1455,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
             Some(block_size)
@@ -1507,7 +1551,11 @@ pub mod constructors {
         let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
 
         let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
-        let expansion_order_scale = if expansion_order_scale > 0. { Some(expansion_order_scale) } else { None };
+        let expansion_order_scale = if expansion_order_scale > 0. {
+            Some(expansion_order_scale)
+        } else {
+            None
+        };
         let depth = if depth > 0 { Some(depth) } else { None };
         let block_size = if block_size > 0 {
             Some(block_size)

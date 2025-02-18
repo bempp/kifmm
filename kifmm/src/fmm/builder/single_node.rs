@@ -1,6 +1,6 @@
 //! Builder objects to construct FMMs
-use num::ToPrimitive;
 use num::traits::real::Real;
+use num::ToPrimitive;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
@@ -190,7 +190,7 @@ where
         mut self,
         charges: &[Scalar],
         expansion_order: usize,
-        expansion_order_scale:Option< <Scalar as RlstScalar>::Real>,
+        expansion_order_scale: Option<<Scalar as RlstScalar>::Real>,
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
@@ -239,8 +239,11 @@ where
                     curr = (curr * scale).floor();
                     tmp.push(curr);
                 }
-                expansion_order_vec = tmp.into_iter().map(|t| t.to_usize().unwrap()).rev().collect_vec();
-
+                expansion_order_vec = tmp
+                    .into_iter()
+                    .map(|t| t.to_usize().unwrap())
+                    .rev()
+                    .collect_vec();
             } else {
                 expansion_order_vec = vec![expansion_order; (depth + 1) as usize];
                 self.variable_expansion_order = Some(false);

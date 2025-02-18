@@ -4,7 +4,8 @@ use std::{collections::HashMap, sync::RwLock};
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use num::traits::Float;
 use rlst::{
-    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape, VectorContainer,
+    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
+    VectorContainer,
 };
 
 use crate::{
@@ -33,7 +34,6 @@ use mpi::{
     traits::{Communicator, Equivalence},
     Count, Rank,
 };
-
 
 /// Represents a threadsafe mutable raw pointer to`T`.
 ///

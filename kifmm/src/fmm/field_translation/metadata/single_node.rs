@@ -3299,11 +3299,8 @@ mod test {
         let transfer_vector = &all_transfer_vectors[idx];
 
         // Compute FFT of the representative signal
-        let mut signal = fmm.evaluate_charges_convolution_grid(
-            expansion_order,
-            coeff_idx,
-            multipole.data(),
-        );
+        let mut signal =
+            fmm.evaluate_charges_convolution_grid(expansion_order, coeff_idx, multipole.data());
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
 
@@ -3348,11 +3345,8 @@ mod test {
         ];
 
         // Compute kernel
-        let kernel = fmm.evaluate_greens_fct_convolution_grid(
-            expansion_order,
-            &conv_grid,
-            kernel_point,
-        );
+        let kernel =
+            fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
         let [m, n, o] = kernel.shape();
 
         let mut kernel = flip3(&kernel);
@@ -3452,7 +3446,6 @@ mod test {
             .build()
             .unwrap();
 
-
         let level = 2;
         let coeff_index = fmm.m2l_operator_index(level);
         let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
@@ -3477,11 +3470,8 @@ mod test {
         let target = v_list[0];
 
         // Compute FFT of the representative signal
-        let mut signal = fmm.evaluate_charges_convolution_grid(
-            expansion_order,
-            coeff_index,
-            multipole.data(),
-        );
+        let mut signal =
+            fmm.evaluate_charges_convolution_grid(expansion_order, coeff_index, multipole.data());
 
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
@@ -3490,16 +3480,10 @@ mod test {
             c64::plan_forward(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
         let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
 
-        let source_equivalent_surface = source.surface_grid(
-            expansion_order,
-            &fmm.tree.source_tree.domain,
-            ALPHA_INNER,
-        );
-        let target_check_surface = target.surface_grid(
-            expansion_order,
-            &fmm.tree.source_tree.domain,
-            ALPHA_INNER,
-        );
+        let source_equivalent_surface =
+            source.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
+        let target_check_surface =
+            target.surface_grid(expansion_order, &fmm.tree.source_tree.domain, ALPHA_INNER);
         let n_targets = target_check_surface.len() / 3;
 
         // Compute conv grid
@@ -3527,11 +3511,11 @@ mod test {
         ];
 
         // // Compute kernel
-        let kernel: Array<Complex<f64>, BaseArray<Complex<f64>, VectorContainer<Complex<f64>>, 3>, 3> = fmm.evaluate_greens_fct_convolution_grid(
-            expansion_order,
-            &conv_grid,
-            kernel_point,
-        );
+        let kernel: Array<
+            Complex<f64>,
+            BaseArray<Complex<f64>, VectorContainer<Complex<f64>>, 3>,
+            3,
+        > = fmm.evaluate_greens_fct_convolution_grid(expansion_order, &conv_grid, kernel_point);
         let [m, n, o] = kernel.shape();
 
         let mut kernel = flip3(&kernel);
@@ -3566,7 +3550,6 @@ mod test {
             &[m, n, o],
             &plan,
         );
-
 
         let mut result = vec![c64::zero(); n_targets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_index]

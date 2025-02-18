@@ -196,4 +196,4 @@
 
 // criterion_group!(laplace_p_f32, laplace_potentials_f32);
 // criterion_main!(laplace_p_f32);
-fn main () {}
+fn main() {}
