@@ -437,6 +437,7 @@ where
     /// Whether construction and operators are timed
     pub timed: Option<bool>,
 
+    /// Variable expansion order by level
     pub variable_expansion_order: Option<bool>,
 
     /// Kernel
@@ -971,6 +972,9 @@ where
     /// Metadata runtimes
     pub metadata_times: Vec<MetadataTime>,
 
+    /// Set to true if expansion order varies by level
+    pub(crate) variable_expansion_order: bool,
+
     /// Dimension
     pub(crate) dim: usize,
 
@@ -1005,16 +1009,16 @@ where
     pub(crate) charges: Vec<Scalar>,
 
     /// The expansion order used to construct check surfaces
-    pub(crate) check_surface_order: usize,
+    pub(crate) check_surface_order: Vec<usize>,
 
     /// The expansion order of the FMM, used to construct equivalent surfaces.
-    pub(crate) equivalent_surface_order: usize,
+    pub(crate) equivalent_surface_order: Vec<usize>,
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub(crate) n_coeffs_equivalent_surface: usize,
+    pub(crate) n_coeffs_equivalent_surface: Vec<usize>,
 
     /// The number of coefficients, corresponding to points discretising the check surface
-    pub(crate) n_coeffs_check_surface: usize,
+    pub(crate) n_coeffs_check_surface: Vec<usize>,
 
     /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub(crate) kernel_eval_type: GreenKernelEvalType,

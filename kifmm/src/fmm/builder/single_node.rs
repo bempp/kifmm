@@ -241,7 +241,6 @@ where
 
                 equivalent_surface_order = expansion_order.to_vec();
             } else {
-
                 self.variable_expansion_order = Some(false);
                 equivalent_surface_order = vec![expansion_order[0]];
             }

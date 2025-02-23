@@ -1,8 +1,8 @@
+use itertools::Itertools;
 use mpi::{
     topology::{Communicator, SimpleCommunicator},
     traits::Equivalence,
 };
-use itertools::Itertools;
 use num::Float;
 use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
 use std::collections::HashMap;
@@ -69,7 +69,7 @@ where
             kernel_eval_type: None,
             fmm_eval_type: None,
             communication_times: None,
-            variable_expansion_order: None
+            variable_expansion_order: None,
         }
     }
 
@@ -220,7 +220,6 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-
             let total_depth = self.tree.as_ref().unwrap().source_tree.total_depth;
 
             let equivalent_surface_order;
@@ -237,11 +236,10 @@ where
                     ));
                 }
 
-
                 equivalent_surface_order = expansion_order.to_vec();
             } else {
                 self.variable_expansion_order = Some(false);
-                equivalent_surface_order = vec![expansion_order[0]; (total_depth+1) as usize];
+                equivalent_surface_order = vec![expansion_order[0]; (total_depth + 1) as usize];
             }
 
             let check_surface_order = if source_to_target.overdetermined() {
@@ -306,16 +304,57 @@ where
             let timed = self.timed.unwrap();
             let global_depth = self.tree.as_ref().unwrap().source_tree.global_depth;
             let total_depth = self.tree.as_ref().unwrap().source_tree.total_depth;
+            let variable_expansion_order = self.variable_expansion_order.unwrap();
 
-            let global_equivalent_surface_order = equivalent_surface_order[0..(global_depth as usize)].to_vec();
-            let global_check_surface_order = check_surface_order[0..(global_depth as usize)].to_vec();
-            let global_n_coeffs_equivalent_surface = n_coeffs_equivalent_surface[0..(global_depth as usize)].to_vec();
-            let global_n_coeffs_check_surface = n_coeffs_check_surface[0..(global_depth as usize)].to_vec();
+            let global_equivalent_surface_order =
+                equivalent_surface_order[0..=(global_depth as usize)].to_vec();
+            let global_check_surface_order =
+                check_surface_order[0..=(global_depth as usize)].to_vec();
+            let global_n_coeffs_equivalent_surface =
+                n_coeffs_equivalent_surface[0..=(global_depth as usize)].to_vec();
+            let global_n_coeffs_check_surface =
+                n_coeffs_check_surface[0..=(global_depth as usize)].to_vec();
 
-            let local_equivalent_surface_order = equivalent_surface_order[(global_depth as usize)..=(total_depth as usize)].to_vec();
-            let local_check_surface_order = check_surface_order[(global_depth as usize)..=(total_depth as usize)].to_vec();
-            let local_n_coeffs_equivalent_surface = n_coeffs_equivalent_surface[(global_depth as usize)..=(total_depth as usize)].to_vec();
-            let local_n_coeffs_check_surface = n_coeffs_check_surface[(global_depth as usize)..=(total_depth as usize)].to_vec();
+            let local_equivalent_surface_order =
+                equivalent_surface_order[(global_depth as usize)..=(total_depth as usize)].to_vec();
+            let local_check_surface_order =
+                check_surface_order[(global_depth as usize)..=(total_depth as usize)].to_vec();
+            let local_n_coeffs_equivalent_surface = n_coeffs_equivalent_surface
+                [(global_depth as usize)..=(total_depth as usize)]
+                .to_vec();
+            let local_n_coeffs_check_surface =
+                n_coeffs_check_surface[(global_depth as usize)..=(total_depth as usize)].to_vec();
+
+            println!(
+                "global_equivalent_surface_order: {:?}",
+                global_equivalent_surface_order
+            );
+            println!(
+                "global_check_surface_order: {:?}",
+                global_check_surface_order
+            );
+            println!(
+                "global_n_coeffs_equivalent_surface: {:?}",
+                global_n_coeffs_equivalent_surface
+            );
+            println!(
+                "global_n_coeffs_check_surface: {:?}",
+                global_n_coeffs_check_surface
+            );
+
+            println!(
+                "local_equivalent_surface_order: {:?}",
+                local_equivalent_surface_order
+            );
+            println!("local_check_surface_order: {:?}", local_check_surface_order);
+            println!(
+                "local_n_coeffs_equivalent_surface: {:?}",
+                local_n_coeffs_equivalent_surface
+            );
+            println!(
+                "local_n_coeffs_check_surface: {:?}",
+                local_n_coeffs_check_surface
+            );
 
             let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
             let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
@@ -366,6 +405,7 @@ where
             let mut result = KiFmmMulti {
                 timed,
                 dim: 3,
+                variable_expansion_order,
                 communication_times,
                 isa: self.isa.unwrap(),
                 communicator,
@@ -375,10 +415,10 @@ where
                 rank,
                 kernel,
                 tree: self.tree.unwrap(),
-                equivalent_surface_order: equivalent_surface_order[0],
-                check_surface_order: check_surface_order[0],
-                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface[0],
-                n_coeffs_check_surface: n_coeffs_check_surface[0],
+                equivalent_surface_order,
+                check_surface_order,
+                n_coeffs_equivalent_surface,
+                n_coeffs_check_surface,
                 source_to_target,
                 fmm_eval_type,
                 kernel_eval_type,
