@@ -420,9 +420,6 @@ where
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
 
-    /// Has depth or ncrit been set
-    pub depth_set: Option<bool>,
-
     /// Communication runtimes
     pub communication_times: Option<Vec<CommunicationTime>>,
 }
