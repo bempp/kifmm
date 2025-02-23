@@ -1,6 +1,4 @@
 //! Builder objects to construct FMMs
-use std::collections::HashSet;
-
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
 use rlst::{MatrixSvd, RlstScalar};
@@ -229,36 +227,39 @@ where
             }
 
             let depth = self.tree.as_ref().unwrap().source_tree().depth();
-            let depth_set = self.depth_set.unwrap();
 
-            let expected_len = if depth_set { (depth + 1) as usize } else { 1 };
+            let equivalent_surface_order;
 
-            if expansion_order.len() != expected_len {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Number of expansion orders must either be 1, or match the depth of the tree",
-                ));
-            }
+            if expansion_order.len() > 1 {
+                self.variable_expansion_order = Some(true);
 
-            let unique_expansion_orders: HashSet<_> = expansion_order.iter().cloned().collect();
+                let expected_len = (depth as usize) + 1;
 
-            if unique_expansion_orders.len() > 1 {
-                self.variable_expansion_order = Some(true)
+                if expansion_order.len() != expected_len {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Number of expansion orders must either be 1, or match the depth of the tree",
+                    ));
+                }
+
+                equivalent_surface_order = expansion_order.to_vec();
             } else {
-                self.variable_expansion_order = Some(false)
+
+                self.variable_expansion_order = Some(false);
+                equivalent_surface_order = vec![expansion_order[0]];
             }
 
             let check_surface_order = if source_to_target.overdetermined() {
-                expansion_order
+                equivalent_surface_order
                     .iter()
                     .map(|&e| e + source_to_target.surface_diff())
                     .collect_vec()
             } else {
-                expansion_order.to_vec()
+                equivalent_surface_order.to_vec()
             };
 
             self.n_coeffs_equivalent_surface = Some(
-                expansion_order
+                equivalent_surface_order
                     .iter()
                     .map(|&e| ncoeffs_kifmm(e))
                     .collect_vec(),
@@ -272,7 +273,7 @@ where
             );
 
             self.isa = Some(Isa::new());
-            self.equivalent_surface_order = Some(expansion_order.to_vec());
+            self.equivalent_surface_order = Some(equivalent_surface_order.to_vec());
             self.check_surface_order = Some(check_surface_order.to_vec());
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);

@@ -440,6 +440,8 @@ where
     /// Whether construction and operators are timed
     pub timed: Option<bool>,
 
+    pub variable_expansion_order: Option<bool>,
+
     /// Kernel
     pub kernel: Option<Kernel>,
 
@@ -459,16 +461,16 @@ where
     pub source_to_target: Option<FieldTranslation>,
 
     /// Equivalent surface order, variable expansion order not supported
-    pub equivalent_surface_order: Option<usize>,
+    pub equivalent_surface_order: Option<Vec<usize>>,
 
     /// Check surface order, variable expansion order not supported
-    pub check_surface_order: Option<usize>,
+    pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub n_coeffs_equivalent_surface: Option<usize>,
+    pub n_coeffs_equivalent_surface: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub n_coeffs_check_surface: Option<usize>,
+    pub n_coeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<GreenKernelEvalType>,
