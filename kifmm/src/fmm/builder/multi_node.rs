@@ -464,30 +464,30 @@ where
             //     ))
             // }
 
-            // // Metadata for global FMM and FMM
+            // Metadata for global FMM and FMM
 
-            // // On nominated node only
-            // if result.communicator.rank() == 0 {
-            //     result.global_fmm.set_source_tree(
-            //         &result.tree.domain,
-            //         result.tree.source_tree.global_depth,
-            //         result.tree.source_tree.all_roots.clone(),
-            //     );
+            // On nominated node only
+            if result.communicator.rank() == 0 {
+                result.global_fmm.set_source_tree(
+                    &result.tree.domain,
+                    result.tree.source_tree.global_depth,
+                    result.tree.source_tree.all_roots.clone(),
+                );
 
-            //     result.global_fmm.set_target_tree(
-            //         &result.tree.domain,
-            //         result.tree.source_tree.global_depth,
-            //         result.tree.source_tree.all_roots.clone(),
-            //     );
+                result.global_fmm.set_target_tree(
+                    &result.tree.domain,
+                    result.tree.source_tree.global_depth,
+                    result.tree.source_tree.all_roots.clone(),
+                );
 
-            //     result.global_fmm.level_index_pointer_multipoles =
-            //         level_index_pointer_single_node(&result.global_fmm.tree.source_tree);
-            //     result.global_fmm.global_fmm_local_metadata();
-            //     result.global_fmm.displacements(None);
-            // }
+                result.global_fmm.level_index_pointer_multipoles =
+                    level_index_pointer_single_node(&result.global_fmm.tree.source_tree);
+                result.global_fmm.global_fmm_local_metadata();
+                result.global_fmm.displacements(None);
+            }
 
-            // result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            // result.displacements(None);
+            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
+            result.displacements(None);
 
             Ok(result)
         }

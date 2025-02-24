@@ -1139,21 +1139,27 @@ where
     /// All global indices to send new (unordered) charge data to
     pub(crate) ghost_received_queries_charge: Vec<u64>,
 
+    // TODO: Replaec with u64
     /// Counts of all global indices to send new (unordered) charge data to
     pub(crate) ghost_received_queries_charge_counts: Vec<i32>,
 
+    // TODO: Replaec with u64
     /// Displacements of all global indices to send new (unordered) charge data to
     pub(crate) ghost_received_queries_charge_displacements: Vec<i32>,
 
+    // TODO: Replaec with u64
     /// Store charge queries counts to send
     pub(crate) charge_send_queries_counts: Vec<Count>,
 
+    // TODO: Replaec with u64
     /// Store charge queries displacments to send
     pub(crate) charge_send_queries_displacements: Vec<Count>,
 
+    // TODO: Replaec with u64
     /// Store charge queries counts to receive
     pub(crate) charge_receive_queries_counts: Vec<Count>,
 
+    // TODO: Replaec with u64
     /// Store charge queries displacments to receive
     pub(crate) charge_receive_queries_displacements: Vec<Count>,
 }

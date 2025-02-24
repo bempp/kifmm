@@ -904,51 +904,65 @@ where
         leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         multipoles: Vec<Self::Scalar>,
     ) {
-        // Find mapping between received leaves and their index
-        // for mapping multipole data
-        let mut old_leaf_to_index = HashMap::new();
-        for (i, &root) in leaves.iter().enumerate() {
-            old_leaf_to_index.insert(root, i);
-        }
+        // TODO Fix for variable expansion order
 
-        // Global multipole data with missing siblings if they don't exist globally with zeros for coefficients
-        let mut multipoles_with_ancestors = vec![
-            Scalar::zero();
-            self.tree.source_tree.keys.len()
-                * self.n_coeffs_equivalent_surface[0]
-        ];
+        // // Find mapping between received leaves and their index
+        // // for mapping multipole data
+        // let mut old_leaf_to_index = HashMap::new();
+        // for (i, &root) in leaves.iter().enumerate() {
+        //     old_leaf_to_index.insert(root, i);
+        // }
 
-        for (new_idx, key) in self.tree.source_tree.keys.iter().enumerate() {
-            if let Some(old_idx) = old_leaf_to_index.get(key) {
-                let multipole = &multipoles[old_idx * self.n_coeffs_equivalent_surface[0]
-                    ..(old_idx + 1) * self.n_coeffs_equivalent_surface[0]];
-                multipoles_with_ancestors[new_idx * self.n_coeffs_equivalent_surface[0]
-                    ..(new_idx + 1) * self.n_coeffs_equivalent_surface[0]]
-                    .copy_from_slice(multipole);
-            }
-        }
+        // // Global multipole data with missing siblings if they don't exist globally with zeros for coefficients
+        // let mut multipoles_with_ancestors = vec![
+        //     Scalar::zero();
+        //     self.tree.source_tree.keys.len()
+        //         * self.n_coeffs_equivalent_surface[0]
+        // ];
 
-        // Set metadata for FMM
-        self.multipoles = multipoles_with_ancestors;
-        self.level_multipoles = level_expansion_pointers_single_node(
-            &self.tree.source_tree,
-            &self.n_coeffs_equivalent_surface,
-            1,
-            &self.multipoles,
-        );
-        self.leaf_multipoles = leaf_expansion_pointers_single_node(
-            &self.tree.source_tree,
-            &self.n_coeffs_equivalent_surface,
-            1,
-            &self.multipoles,
-        );
+        // for (new_idx, key) in self.tree.source_tree.keys.iter().enumerate() {
+        //     if let Some(old_idx) = old_leaf_to_index.get(key) {
+        //         let multipole = &multipoles[old_idx * self.n_coeffs_equivalent_surface[0]
+        //             ..(old_idx + 1) * self.n_coeffs_equivalent_surface[0]];
+        //         multipoles_with_ancestors[new_idx * self.n_coeffs_equivalent_surface[0]
+        //             ..(new_idx + 1) * self.n_coeffs_equivalent_surface[0]]
+        //             .copy_from_slice(multipole);
+        //     }
+        // }
+
+        // // Set metadata for FMM
+        // self.multipoles = multipoles_with_ancestors;
+        // self.level_multipoles = level_expansion_pointers_single_node(
+        //     &self.tree.source_tree,
+        //     &self.n_coeffs_equivalent_surface,
+        //     1,
+        //     &self.multipoles,
+        // );
+        // self.leaf_multipoles = leaf_expansion_pointers_single_node(
+        //     &self.tree.source_tree,
+        //     &self.n_coeffs_equivalent_surface,
+        //     1,
+        //     &self.multipoles,
+        // );
     }
 
     fn global_fmm_local_metadata(&mut self) {
-        let locals = vec![
-            Scalar::default();
-            self.tree.target_tree.keys.len() * self.n_coeffs_equivalent_surface[0]
-        ];
+        // TODO: Add real matvecs
+        let n_matvecs = 1;
+
+        let n_target_keys = self.tree.target_tree.n_keys_tot().unwrap();
+        let n_local_coeffs;
+        if self.equivalent_surface_order.len() > 1 {
+            n_local_coeffs = (0..=self.tree.target_tree().depth())
+                .zip(self.n_coeffs_equivalent_surface.iter())
+                .fold(0usize, |acc, (level, &ncoeffs)| {
+                    acc + self.tree.target_tree().n_keys(level).unwrap() * ncoeffs
+                })
+        } else {
+            n_local_coeffs = n_target_keys * self.n_coeffs_equivalent_surface.last().unwrap();
+        }
+
+        let locals = vec![Scalar::default(); n_local_coeffs * n_matvecs];
 
         // Set metadata for FMM
         self.locals = locals;
@@ -956,14 +970,14 @@ where
         self.level_locals = level_expansion_pointers_single_node(
             &self.tree.target_tree,
             &self.n_coeffs_equivalent_surface,
-            1,
+            n_matvecs,
             &self.locals,
         );
 
         self.leaf_locals = leaf_expansion_pointers_single_node(
             &self.tree.target_tree,
             &self.n_coeffs_equivalent_surface,
-            1,
+            n_matvecs,
             &self.locals,
         );
 
