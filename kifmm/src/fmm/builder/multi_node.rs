@@ -325,37 +325,6 @@ where
             let local_n_coeffs_check_surface =
                 n_coeffs_check_surface[(global_depth as usize)..=(total_depth as usize)].to_vec();
 
-            println!(
-                "global_equivalent_surface_order: {:?}",
-                global_equivalent_surface_order
-            );
-            println!(
-                "global_check_surface_order: {:?}",
-                global_check_surface_order
-            );
-            println!(
-                "global_n_coeffs_equivalent_surface: {:?}",
-                global_n_coeffs_equivalent_surface
-            );
-            println!(
-                "global_n_coeffs_check_surface: {:?}",
-                global_n_coeffs_check_surface
-            );
-
-            println!(
-                "local_equivalent_surface_order: {:?}",
-                local_equivalent_surface_order
-            );
-            println!("local_check_surface_order: {:?}", local_check_surface_order);
-            println!(
-                "local_n_coeffs_equivalent_surface: {:?}",
-                local_n_coeffs_equivalent_surface
-            );
-            println!(
-                "local_n_coeffs_check_surface: {:?}",
-                local_n_coeffs_check_surface
-            );
-
             let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
             let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
@@ -426,7 +395,7 @@ where
                 ghost_fmm_v,
                 ghost_fmm_u,
                 kernel_eval_size: 1,
-                source: tmp_arr,
+                source: Vec::default(),
                 operator_times: Vec::default(),
                 charges: Vec::default(),
                 charge_index_pointer_sources: Vec::default(),
@@ -477,47 +446,48 @@ where
                     .push(MetadataTime::from_duration(MetadataType::SourceData, d))
             }
 
-            let (_, duration) = optionally_time(timed, || result.target());
+            // TODO
+            // let (_, duration) = optionally_time(timed, || result.target());
 
-            if let Some(d) = duration {
-                result
-                    .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
-            }
+            // if let Some(d) = duration {
+            //     result
+            //         .metadata_times
+            //         .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+            // }
 
-            let (_, duration) = optionally_time(timed, || result.source_to_target());
+            // let (_, duration) = optionally_time(timed, || result.source_to_target());
 
-            if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
-                    MetadataType::SourceToTargetData,
-                    d,
-                ))
-            }
+            // if let Some(d) = duration {
+            //     result.metadata_times.push(MetadataTime::from_duration(
+            //         MetadataType::SourceToTargetData,
+            //         d,
+            //     ))
+            // }
 
-            // Metadata for global FMM and FMM
+            // // Metadata for global FMM and FMM
 
-            // On nominated node only
-            if result.communicator.rank() == 0 {
-                result.global_fmm.set_source_tree(
-                    &result.tree.domain,
-                    result.tree.source_tree.global_depth,
-                    result.tree.source_tree.all_roots.clone(),
-                );
+            // // On nominated node only
+            // if result.communicator.rank() == 0 {
+            //     result.global_fmm.set_source_tree(
+            //         &result.tree.domain,
+            //         result.tree.source_tree.global_depth,
+            //         result.tree.source_tree.all_roots.clone(),
+            //     );
 
-                result.global_fmm.set_target_tree(
-                    &result.tree.domain,
-                    result.tree.source_tree.global_depth,
-                    result.tree.source_tree.all_roots.clone(),
-                );
+            //     result.global_fmm.set_target_tree(
+            //         &result.tree.domain,
+            //         result.tree.source_tree.global_depth,
+            //         result.tree.source_tree.all_roots.clone(),
+            //     );
 
-                result.global_fmm.level_index_pointer_multipoles =
-                    level_index_pointer_single_node(&result.global_fmm.tree.source_tree);
-                result.global_fmm.global_fmm_local_metadata();
-                result.global_fmm.displacements(None);
-            }
+            //     result.global_fmm.level_index_pointer_multipoles =
+            //         level_index_pointer_single_node(&result.global_fmm.tree.source_tree);
+            //     result.global_fmm.global_fmm_local_metadata();
+            //     result.global_fmm.displacements(None);
+            // }
 
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            result.displacements(None);
+            // result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
+            // result.displacements(None);
 
             Ok(result)
         }

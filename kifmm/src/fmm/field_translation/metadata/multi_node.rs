@@ -23,6 +23,7 @@ use crate::fmm::helpers::multi_node::{
     leaf_scales_multi_node, leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
     level_index_pointer_multi_node, potential_pointers_multi_node,
 };
+use crate::fmm::helpers::single_node::ncoeffs_kifmm;
 use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale, optionally_time};
 use crate::fmm::types::{BlasMetadataSaRcmp, FftMetadata};
 use crate::linalg::pinv::pinv;
@@ -60,112 +61,346 @@ impl<Scalar, FieldTranslation> SourceTranslationMetadata
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    FieldTranslation: FieldTranslationTrait + Send + Sync,
+    FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
+    Self: DataAccessMulti + MetadataAccess,
 {
     fn source(&mut self) {
+        let root = MortonKey::<Scalar::Real>::root();
+        let size = self.communicator.size(); // Number of processors available
+        let rank = self.communicator.rank();
 
-        // TODO
+        // Cast surface parameters
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
+        let domain = self.tree.domain();
 
-        // let root = MortonKey::<Scalar::Real>::root();
-        // let equivalent_surface_order = self.equivalent_surface_order;
-        // let check_surface_order = self.check_surface_order;
-        // let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
-        // let n_coeffs_check_surface = self.n_coeffs_check_surface;
+        // Local buffers
+        let mut local_uc2e_inv_1 = Vec::new();
+        let mut local_uc2e_inv_2 = Vec::new();
 
-        // // Cast surface parameters
-        // let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
-        // let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
-        // let domain = self.tree.domain();
+        // Distribute pseudo-inverse calculation, if have variable expansion order by level
+        // Number of pre-computations
+        let n_precomputations = if self.variable_expansion_order {
+            self.equivalent_surface_order.len() as i32
+        } else {
+            1
+        };
 
-        // let mut m2m = rlst_dynamic_array2!(
-        //     Scalar,
-        //     [n_coeffs_equivalent_surface, 8 * n_coeffs_equivalent_surface]
-        // );
-        // let mut m2m_vec = Vec::new();
+        // Vector characterising load of pre-computation at each rank (denoted by index)
+        let mut load;
 
-        // let mut m2m_global = vec![rlst_dynamic_array2!(
-        //     Scalar,
-        //     [n_coeffs_equivalent_surface, 8 * n_coeffs_equivalent_surface]
-        // )];
-        // let mut m2m_vec_global = vec![Vec::new()];
+        if n_precomputations > 1 {
+            // Distributed pre-computation
+            let q = n_precomputations / size; // Base number of calculations per processor
+            let r = n_precomputations % size; // Extra calculations to distribute evenly among ranks
 
-        // // Compute required surfaces
-        // let upward_equivalent_surface =
-        //     root.surface_grid(equivalent_surface_order, domain, alpha_inner);
+            // Block distribution strategy
+            load = (0..size)
+                .map(|i| if i < r { q + 1 } else { q })
+                .collect_vec();
+        } else {
+            // If only have one pre-computation, carry out on a single rank (root rank)
+            let size = self.communicator.size(); // Number of processors available
+            load = vec![0; size as usize];
+            load[0] = n_precomputations;
+        }
 
-        // let upward_check_surface = root.surface_grid(check_surface_order, domain, alpha_outer);
+        let mut curr = 0;
+        let mut load_displacement = Vec::new();
+        for &count in load.iter() {
+            load_displacement.push(curr);
+            curr += count;
+        }
 
-        // // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
-        // // As well as estimating their inverses using SVD
-        // let mut uc2e = rlst_dynamic_array2!(
-        //     Scalar,
-        //     [n_coeffs_check_surface, n_coeffs_equivalent_surface]
-        // );
+        // Compute mandated local portion
+        let local_load_count = load[rank as usize];
+        let local_load_displacement = load_displacement[rank as usize];
+        let equivalent_surface_order = &self.equivalent_surface_order[(local_load_displacement
+            as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+        let check_surface_order = &self.check_surface_order[(local_load_displacement as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+        let mut local_shared_dim = Vec::new();
 
-        // self.kernel.assemble_st(
-        //     GreenKernelEvalType::Value,
-        //     &upward_check_surface,
-        //     &upward_equivalent_surface,
-        //     uc2e.data_mut(),
-        // );
+        for (&equivalent_surface_order, &check_surface_order) in equivalent_surface_order
+            .iter()
+            .zip(check_surface_order.iter())
+        {
+            // Compute required surfaces
+            let upward_equivalent_surface =
+                root.surface_grid(equivalent_surface_order, domain, alpha_inner);
+            let upward_check_surface = root.surface_grid(check_surface_order, domain, alpha_outer);
 
-        // let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
+            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
 
-        // let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
-        // for i in 0..s.len() {
-        //     mat_s[[i, i]] = Scalar::from_real(s[i]);
-        // }
+            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+            // As well as estimating their inverses using SVD
+            let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            self.kernel.assemble_st(
+                GreenKernelEvalType::Value,
+                &upward_check_surface[..],
+                &upward_equivalent_surface[..],
+                uc2e.data_mut(),
+            );
 
-        // let uc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r())];
+            let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+            local_shared_dim.push(s.len());
 
-        // let uc2e_inv_2 = vec![ut];
+            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            for i in 0..s.len() {
+                mat_s[[i, i]] = Scalar::from_real(s[i]);
+            }
 
-        // let parent_upward_check_surface =
-        //     root.surface_grid(check_surface_order, domain, alpha_outer);
-        // let children = root.children();
+            local_uc2e_inv_1
+                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
+            local_uc2e_inv_2.push(ut);
+        }
 
-        // for (i, child) in children.iter().enumerate() {
-        //     let child_upward_equivalent_surface =
-        //         child.surface_grid(equivalent_surface_order, domain, alpha_inner);
+        // Need to gather results at all ranks
 
-        //     let mut ce2pc = rlst_dynamic_array2!(
-        //         Scalar,
-        //         [n_coeffs_check_surface, n_coeffs_equivalent_surface]
-        //     );
+        // Gather shared dimension of uc2e_inv_1 and uc2e_inv_2
+        let mut shared_dim = vec![0usize; n_precomputations as usize];
+        {
+            let mut partition =
+                PartitionMut::new(&mut shared_dim, &load[..], &load_displacement[..]);
+            self.communicator
+                .all_gather_varcount_into(&local_shared_dim[..], &mut partition);
+        }
 
-        //     self.kernel.assemble_st(
-        //         GreenKernelEvalType::Value,
-        //         &parent_upward_check_surface,
-        //         &child_upward_equivalent_surface,
-        //         ce2pc.data_mut(),
-        //     );
+        // If only a single precomputation have to update shared dim to match size of equivalent/check surface order vecs for buffer calcs
+        if n_precomputations == 1 {
+            shared_dim = vec![shared_dim[0]; self.equivalent_surface_order.len()]
+        }
 
-        //     let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //         uc2e_inv_1[0].r(),
-        //         empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].r(), ce2pc.r()),
-        //     );
+        let mut local_msg_size_uc2e_inv_1 = 0;
+        let mut local_msg_size_uc2e_inv_2 = 0;
 
-        //     let tmp1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //         uc2e_inv_1[0].r(),
-        //         empty_array::<Scalar, 2>().simple_mult_into_resize(uc2e_inv_2[0].r(), ce2pc.r()),
-        //     );
+        for (mat_1, mat_2) in izip!(local_uc2e_inv_1.iter(), local_uc2e_inv_2.iter()) {
+            local_msg_size_uc2e_inv_1 += mat_1.shape()[0] * mat_1.shape()[1];
+            local_msg_size_uc2e_inv_2 += mat_2.shape()[0] * mat_2.shape()[1];
+        }
 
-        //     let l = i * n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
-        //     let r = l + n_coeffs_equivalent_surface * n_coeffs_equivalent_surface;
+        // Flatten buffers for sending
+        let mut local_msg_uc2e_inv_1 = vec![Scalar::zero(); local_msg_size_uc2e_inv_1];
+        let mut local_msg_uc2e_inv_2 = vec![Scalar::zero(); local_msg_size_uc2e_inv_2];
 
-        //     m2m.data_mut()[l..r].copy_from_slice(tmp.data());
-        //     m2m_vec.push(tmp);
+        let mut curr1 = 0;
+        let mut curr2 = 0;
+        for (mat_1, mat_2) in izip!(local_uc2e_inv_1.iter(), local_uc2e_inv_2.iter()) {
+            let mat_1_size = mat_1.shape()[0] * mat_1.shape()[1];
+            local_msg_uc2e_inv_1[curr1..(curr1 + mat_1_size)].copy_from_slice(mat_1.data());
+            curr1 = mat_1_size;
 
-        //     m2m_global[0].data_mut()[l..r].copy_from_slice(tmp1.data());
-        //     m2m_vec_global[0].push(tmp1);
-        // }
+            let mat_2_size = mat_1.shape()[0] * mat_1.shape()[1];
+            local_msg_uc2e_inv_2[curr2..(curr2 + mat_2_size)].copy_from_slice(mat_2.data());
+            curr2 = mat_1_size;
+        }
 
-        // self.global_fmm.source = m2m_global;
-        // self.global_fmm.source_vec = m2m_vec_global;
-        // self.source = m2m;
-        // self.source_vec = m2m_vec;
-        // self.uc2e_inv_1 = uc2e_inv_1;
-        // self.uc2e_inv_2 = uc2e_inv_2;
+        // Setup buffers to receive data
+        let mut msg_size_uc2e_inv_1 = 0;
+        let mut msg_size_uc2e_inv_2 = 0;
+        let mut msg_counts_uc2e_inv_1 = Vec::new();
+        let mut msg_counts_uc2e_inv_2 = Vec::new();
+
+        for (_rank, &load_r, &load_displacement_r) in
+            izip!((0..size), load.iter(), load_displacement.iter())
+        {
+            let equivalent_surface_order = &self.equivalent_surface_order
+                [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
+            let check_surface_order = &self.check_surface_order
+                [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
+            let shared_dim = &shared_dim
+                [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
+
+            let mut count_uc2e_inv_1 = 0;
+            let mut count_uc2e_inv_2 = 0;
+
+            for (&e_order, &c_order, &shared_dim) in
+                izip!(equivalent_surface_order, check_surface_order, shared_dim)
+            {
+                count_uc2e_inv_1 += ncoeffs_kifmm(c_order) * shared_dim;
+                count_uc2e_inv_2 += ncoeffs_kifmm(e_order) * shared_dim;
+            }
+
+            msg_counts_uc2e_inv_1.push(count_uc2e_inv_1 as Count);
+            msg_counts_uc2e_inv_2.push(count_uc2e_inv_2 as Count);
+
+            msg_size_uc2e_inv_1 += count_uc2e_inv_1;
+            msg_size_uc2e_inv_2 += count_uc2e_inv_2;
+        }
+
+        let msg_displs_uc2e_inv_1 = msg_counts_uc2e_inv_1
+            .iter()
+            .scan(0, |acc, &x| {
+                let tmp = *acc;
+                *acc += x;
+                Some(tmp)
+            })
+            .collect_vec();
+
+        let msg_displs_uc2e_inv_2 = msg_counts_uc2e_inv_2
+            .iter()
+            .scan(0, |acc, &x| {
+                let tmp = *acc;
+                *acc += x;
+                Some(tmp)
+            })
+            .collect_vec();
+
+        let mut buf_uc2e_inv_1 = vec![Scalar::zero(); msg_size_uc2e_inv_1];
+        let mut buf_uc2e_inv_2 = vec![Scalar::zero(); msg_size_uc2e_inv_2];
+
+        // Communicate pre-computations
+        {
+            let mut partition = PartitionMut::new(
+                &mut buf_uc2e_inv_1,
+                &msg_counts_uc2e_inv_1[..],
+                &msg_displs_uc2e_inv_1[..],
+            );
+            self.communicator
+                .all_gather_varcount_into(&local_msg_uc2e_inv_1, &mut partition);
+
+            let mut partition = PartitionMut::new(
+                &mut buf_uc2e_inv_2,
+                &msg_counts_uc2e_inv_2[..],
+                &msg_displs_uc2e_inv_2[..],
+            );
+            self.communicator
+                .all_gather_varcount_into(&local_msg_uc2e_inv_2, &mut partition);
+        }
+
+        // Re-structure messages using shared dimensions
+        let mut uc2e_inv_1_vec = Vec::new();
+        let mut uc2e_inv_2_vec = Vec::new();
+
+        if n_precomputations > 1 {
+            let mut curr1 = 0;
+            let mut curr2 = 0;
+            for (&e_order, &c_order, &shared_dim) in izip!(
+                &self.equivalent_surface_order,
+                &self.check_surface_order,
+                shared_dim.iter()
+            ) {
+                let l = curr1;
+                let r = curr1 + ncoeffs_kifmm(c_order) * shared_dim;
+                let mut uc2e_inv_1 =
+                    rlst_dynamic_array2!(Scalar, [ncoeffs_kifmm(c_order), shared_dim]);
+                uc2e_inv_1.data_mut().copy_from_slice(&buf_uc2e_inv_1[l..r]);
+                curr1 = r;
+
+                let l = curr2;
+                let r = curr2 + ncoeffs_kifmm(e_order) * shared_dim;
+                let mut uc2e_inv_2 =
+                    rlst_dynamic_array2!(Scalar, [shared_dim, ncoeffs_kifmm(e_order)]);
+                uc2e_inv_2.data_mut().copy_from_slice(&buf_uc2e_inv_2[l..r]);
+                curr2 = r;
+
+                uc2e_inv_1_vec.push(uc2e_inv_1);
+                uc2e_inv_2_vec.push(uc2e_inv_2);
+            }
+        } else {
+            let c_order = self.check_surface_order[0];
+            let e_order = self.equivalent_surface_order[0];
+            let shared_dim = shared_dim[0];
+            let l = 0;
+            let r = ncoeffs_kifmm(c_order) * shared_dim;
+            let mut uc2e_inv_1 = rlst_dynamic_array2!(Scalar, [ncoeffs_kifmm(c_order), shared_dim]);
+            uc2e_inv_1.data_mut().copy_from_slice(&buf_uc2e_inv_1[l..r]);
+
+            let l = 0;
+            let r = ncoeffs_kifmm(e_order) * shared_dim;
+            let mut uc2e_inv_2 = rlst_dynamic_array2!(Scalar, [shared_dim, ncoeffs_kifmm(e_order)]);
+            uc2e_inv_2.data_mut().copy_from_slice(&buf_uc2e_inv_2[l..r]);
+
+            uc2e_inv_1_vec.push(uc2e_inv_1);
+            uc2e_inv_2_vec.push(uc2e_inv_2);
+        }
+
+        // Calculate all M2M operator matrices
+        let level_iterator = if self.equivalent_surface_order.len() > 1 {
+            0..self.equivalent_surface_order.len() - 1
+        } else {
+            0..1
+        };
+
+        let mut m2m = Vec::new();
+        let mut m2m_vec = Vec::new();
+        let mut m2m_global = Vec::new();
+        let mut m2m_global_vec = Vec::new();
+
+        // Calculate M2M operator matrices on each level, if required
+        for parent_level in level_iterator {
+            let check_surface_order_parent = self.check_surface_order(parent_level as u64);
+            let equivalent_surface_order_parent =
+                self.equivalent_surface_order(parent_level as u64);
+            let equivalent_surface_order_child =
+                self.equivalent_surface_order((parent_level + 1) as u64);
+
+            let parent_upward_check_surface =
+                root.surface_grid(check_surface_order_parent, domain, alpha_outer);
+
+            let children = root.children();
+            let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+
+            let mut m2m_level_1 =
+                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
+            let mut m2m_vec_level_1 = Vec::new();
+
+            let mut m2m_level_2 =
+                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
+            let mut m2m_vec_level_2 = Vec::new();
+
+            for (i, child) in children.iter().enumerate() {
+                let child_upward_equivalent_surface =
+                    child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
+
+                let mut ce2pc =
+                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
+
+                // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
+                self.kernel.assemble_st(
+                    GreenKernelEvalType::Value,
+                    &parent_upward_check_surface,
+                    &child_upward_equivalent_surface,
+                    ce2pc.data_mut(),
+                );
+
+                let tmp_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    uc2e_inv_1_vec[self.expansion_index(parent_level as u64)].r(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                        uc2e_inv_2_vec[self.expansion_index(parent_level as u64)].r(),
+                        ce2pc.r(),
+                    ),
+                );
+
+                let mut tmp_2 = rlst_dynamic_array2!(Scalar, tmp_1.shape());
+                tmp_2.data_mut().copy_from_slice(tmp_1.data());
+
+                let l = i * n_equiv_surface_child * n_equiv_surface_parent;
+                let r = l + n_equiv_surface_child * n_equiv_surface_parent;
+
+                m2m_level_1.data_mut()[l..r].copy_from_slice(tmp_1.data());
+                m2m_vec_level_1.push(tmp_1);
+
+                m2m_level_2.data_mut()[l..r].copy_from_slice(tmp_2.data());
+                m2m_vec_level_2.push(tmp_2);
+            }
+
+            m2m_vec.push(m2m_vec_level_1);
+            m2m.push(m2m_level_1);
+            m2m_global_vec.push(m2m_vec_level_2);
+            m2m_global.push(m2m_level_2);
+        }
+
+        self.global_fmm.source = m2m_global;
+        self.global_fmm.source_vec = m2m_global_vec;
+        self.source = m2m;
+        self.source_vec = m2m_vec;
+        self.uc2e_inv_1 = uc2e_inv_1_vec;
+        self.uc2e_inv_2 = uc2e_inv_2_vec;
     }
 }
 
@@ -1507,41 +1742,36 @@ where
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        let local_level = level - self.tree.source_tree.global_depth();
-        local_level as usize
+        level as usize
     }
 
     fn c2e_operator_index(&self, level: u64) -> usize {
-        let local_level = level - self.tree.source_tree.global_depth();
         if self.variable_expansion_order {
-            local_level as usize
+            level as usize
         } else {
             0
         }
     }
 
     fn m2m_operator_index(&self, level: u64) -> usize {
-        let local_level = level - self.tree.source_tree.global_depth();
         if self.variable_expansion_order {
-            (local_level - 1) as usize
+            (level - 1) as usize
         } else {
             0
         }
     }
 
     fn l2l_operator_index(&self, level: u64) -> usize {
-        let local_level = level - self.tree.source_tree.global_depth();
         if self.variable_expansion_order {
-            (local_level - 1) as usize
+            (level - 1) as usize
         } else {
             0
         }
     }
 
     fn m2l_operator_index(&self, level: u64) -> usize {
-        let local_level = level - self.tree.source_tree.global_depth();
         if self.variable_expansion_order {
-            (local_level - 2) as usize
+            (level - 2) as usize
         } else {
             0
         }

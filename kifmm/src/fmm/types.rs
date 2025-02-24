@@ -1067,10 +1067,11 @@ where
     pub(crate) source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub(crate) source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub(crate) source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The metadata required for source to source translation
-    pub(crate) source_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) source_vec:
+        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
     pub(crate) target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,

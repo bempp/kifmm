@@ -35,6 +35,7 @@ fn main() {
 
     // Fmm Parameters
     let expansion_order = [6, 5, 4, 3, 2, 2];
+    let expansion_order = [6];
     let kernel = Laplace3dKernel::<f32>::new();
 
     ThreadPoolBuilder::new()
@@ -73,7 +74,11 @@ fn main() {
             .build()
             .unwrap();
 
-        multi_fmm.evaluate().unwrap();
+        // for level in 0..=(local_depth + global_depth) {
+
+        //     println!("level {:?} equivalent order {:?}", level, multi_fmm.equivalent_surface_order(level));
+        //     println!("level {:?} equivalent order {:?}", level, multi_fmm.n_coeffs_equivalent_surface(level))
+        // }
     }
 }
 

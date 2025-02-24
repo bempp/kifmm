@@ -80,6 +80,7 @@ where
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
+        let depth = self.tree.source_tree.depth();
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -125,14 +126,14 @@ where
             uc2e_inv_2.push(ut);
         }
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
-            0..self.equivalent_surface_order.len() - 1
+        let level_iterator = if self.variable_expansion_order {
+            0..depth
         } else {
             0..1
         };
 
         // Calculate M2M operator matrices on each level, if required
-        for parent_level in iterator {
+        for parent_level in level_iterator {
             let check_surface_order_parent = self.check_surface_order(parent_level as u64);
             let equivalent_surface_order_parent =
                 self.equivalent_surface_order(parent_level as u64);
@@ -143,12 +144,12 @@ where
                 root.surface_grid(check_surface_order_parent, domain, alpha_outer);
 
             let children = root.children();
-            let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
-            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut m2m_level =
-                rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, 8 * nequiv_surface_child]);
+                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
             let mut m2m_vec_level = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -156,7 +157,7 @@ where
                     child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
+                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 self.kernel.assemble_st(
@@ -174,8 +175,8 @@ where
                     ),
                 );
 
-                let l = i * nequiv_surface_child * nequiv_surface_parent;
-                let r = l + nequiv_surface_child * nequiv_surface_parent;
+                let l = i * n_equiv_surface_child * n_equiv_surface_parent;
+                let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
                 m2m_level.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec_level.push(tmp);
@@ -202,6 +203,7 @@ where
 {
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
+        let depth = self.tree.target_tree.depth();
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -247,15 +249,13 @@ where
             dc2e_inv_2.push(ut);
         }
 
-        let depth = self.tree.target_tree().depth();
-
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let level_iterator = if self.equivalent_surface_order.len() > 1 {
             0..depth
         } else {
             0..1
         };
 
-        for parent_level in iterator {
+        for parent_level in level_iterator {
             let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
             let check_surface_order_child = self.check_surface_order(parent_level + 1);
 
@@ -265,7 +265,7 @@ where
             // Calculate L2L operator matrices
             let children = root.children();
             let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut l2l_level = Vec::new();
 
@@ -275,7 +275,7 @@ where
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
@@ -419,13 +419,13 @@ where
 
             let equivalent_surface_order_parent = self.equivalent_surface_order(level);
 
-            let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
-            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let children = curr.children();
             let mut m2m =
-                rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, 8 * nequiv_surface_child]);
+                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
             let mut m2m_vec = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -433,7 +433,7 @@ where
                     child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
+                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
@@ -447,8 +447,8 @@ where
                     empty_array::<Scalar, 2>()
                         .simple_mult_into_resize(uc2e_inv_2[level as usize].r(), ce2pc.r()),
                 );
-                let l = i * nequiv_surface_child * nequiv_surface_parent;
-                let r = l + nequiv_surface_child * nequiv_surface_parent;
+                let l = i * n_equiv_surface_child * n_equiv_surface_parent;
+                let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
                 m2m.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec.push(tmp);
@@ -575,7 +575,7 @@ where
                 curr.surface_grid(equivalent_surface_order_parent, domain, alpha_outer);
 
             let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             // Calculate l2l operator matrices on each level
             let children = curr.children();
@@ -586,7 +586,7 @@ where
                     child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
