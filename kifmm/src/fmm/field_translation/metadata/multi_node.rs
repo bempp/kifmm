@@ -318,7 +318,7 @@ where
         }
 
         // Calculate all M2M operator matrices
-        let level_iterator = if self.equivalent_surface_order.len() > 1 {
+        let level_iterator = if self.variable_expansion_order {
             0..self.equivalent_surface_order.len() - 1
         } else {
             0..1
@@ -1223,13 +1223,13 @@ where
             n_multipole_coeffs = (global_depth..=total_depth)
                 .zip(local_ncoeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
-                    acc + self.tree.source_tree().n_keys(level).unwrap() * ncoeffs
+                    acc + self.tree.source_tree().n_keys(level).unwrap_or(0) * ncoeffs
                 });
 
             n_local_coeffs = (global_depth..=total_depth)
                 .zip(local_ncoeffs_equivalent_surface.iter())
                 .fold(0usize, |acc, (level, &ncoeffs)| {
-                    acc + self.tree.target_tree().n_keys(level).unwrap() * ncoeffs
+                    acc + self.tree.target_tree().n_keys(level).unwrap_or(0) * ncoeffs
                 })
         } else {
             n_multipole_coeffs = n_source_keys * self.n_coeffs_equivalent_surface.last().unwrap();
@@ -1771,7 +1771,11 @@ where
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        level as usize
+        if self.variable_expansion_order {
+            level as usize
+        } else {
+            0
+        }
     }
 
     fn c2e_operator_index(&self, level: u64) -> usize {

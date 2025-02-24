@@ -2,70 +2,70 @@
 
 #[cfg(feature = "mpi")]
 fn main() {
-    // use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
-    // use kifmm::traits::general::multi_node::GhostExchange;
-    // use kifmm::{
-    //     fmm::types::MultiNodeBuilder,
-    //     traits::{
-    //         fmm::{DataAccess, DataAccessMulti, EvaluateMulti},
-    //         tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
-    //     },
-    //     tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},
-    //     Evaluate,
-    //     // FftFieldTranslation,
-    // };
-    // use kifmm::{BlasFieldTranslationSaRcmp, FmmSvdMode};
-    // use mpi::{
-    //     datatype::PartitionMut,
-    //     traits::{Communicator, Root},
-    // };
-    // use rlst::{RawAccess, RlstScalar};
+    use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
+    use kifmm::traits::general::multi_node::GhostExchange;
+    use kifmm::{
+        fmm::types::MultiNodeBuilder,
+        traits::{
+            fmm::{DataAccess, DataAccessMulti, EvaluateMulti},
+            tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
+        },
+        tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},
+        Evaluate,
+        // FftFieldTranslation,
+    };
+    use kifmm::{BlasFieldTranslationSaRcmp, FmmSvdMode};
+    use mpi::{
+        datatype::PartitionMut,
+        traits::{Communicator, Root},
+    };
+    use rlst::{RawAccess, RlstScalar};
 
-    // let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
-    // let world = universe.world();
-    // let comm = world.duplicate();
+    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
+    let world = universe.world();
+    let comm = world.duplicate();
 
-    // // Tree parameters
-    // let prune_empty = true;
-    // let n_points = 10000;
-    // let local_depth = 3;
-    // let global_depth = 1;
-    // let sort_kind = SortKind::Samplesort { n_samples: 100 };
+    // Tree parameters
+    let prune_empty = true;
+    let n_points = 10000;
+    let local_depth = 3;
+    let global_depth = 1;
+    let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
-    // // Fmm Parameters
-    // let expansion_order = 4;
-    // let kernel = Laplace3dKernel::<f32>::new();
-    // let source_to_target =
-    //     BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
+    // Fmm Parameters
+    let expansion_order = [4];
+    let kernel = Laplace3dKernel::<f32>::new();
+    let source_to_target =
+        BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
 
-    // // Generate some random test data local to each process
-    // let points = points_fixture::<f32>(n_points, None, None, None);
-    // let charges = vec![1f32; n_points];
+    // Generate some random test data local to each process
+    let points = points_fixture::<f32>(n_points, None, None, None);
+    let charges = vec![1f32; n_points];
 
-    // let mut fmm = MultiNodeBuilder::new(false)
-    //     .tree(
-    //         &comm,
-    //         points.data(),
-    //         points.data(),
-    //         local_depth,
-    //         global_depth,
-    //         prune_empty,
-    //         sort_kind,
-    //     )
-    //     .unwrap()
-    //     .parameters(
-    //         &charges,
-    //         expansion_order,
-    //         kernel,
-    //         GreenKernelEvalType::Value,
-    //         source_to_target,
-    //     )
-    //     .unwrap()
-    //     .build()
-    //     .unwrap();
+    let mut fmm = MultiNodeBuilder::new(false)
+        .tree(
+            &comm,
+            points.data(),
+            points.data(),
+            local_depth,
+            global_depth,
+            prune_empty,
+            sort_kind,
+        )
+        .unwrap()
+        .parameters(
+            &charges,
+            &expansion_order,
+            kernel,
+            GreenKernelEvalType::Value,
+            source_to_target,
+        )
+        .unwrap()
+        .build()
+        .unwrap();
 
-    // // Perform partial upward pass on each rank
-    // fmm.evaluate_leaf_sources().unwrap();
+    // Perform partial upward pass on each rank
+    fmm.evaluate_leaf_sources().unwrap();
     // fmm.evaluate_upward_pass().unwrap();
 
     // // Test at roots of local trees for result of partial upward passes

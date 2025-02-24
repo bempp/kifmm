@@ -46,7 +46,7 @@ where
         let check_surface_size = n_coeffs_check_surface * self.dim;
 
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
-        let ncoordinates = coordinates.len() / self.dim;
+        let n_coordinates = coordinates.len() / self.dim;
         let depth = self.tree.source_tree().depth();
         let operator_index = self.c2e_operator_index(depth);
 
@@ -169,7 +169,7 @@ where
 
                             if n_sources > 0 {
                                 for i in 0..n_matvecs {
-                                    let charge_vec_displacement = i * ncoordinates;
+                                    let charge_vec_displacement = i * n_coordinates;
                                     let charges_i = &self.charges[charge_vec_displacement
                                         + charge_index_pointer.0
                                         ..charge_vec_displacement + charge_index_pointer.1];
@@ -269,7 +269,7 @@ where
         let mut parent_targets = parent_targets.into_iter().collect_vec();
 
         parent_targets.sort();
-        let nparents = parent_targets.len();
+        let n_parents = parent_targets.len();
         let child_multipoles = self.multipoles(level).unwrap();
 
         match self.fmm_eval_type {
@@ -285,13 +285,13 @@ where
                     parent_multipoles.push(parent_multipole);
                 }
 
-                let max_chunk_size = if nparents > M2M_MAX_BLOCK_SIZE {
+                let max_chunk_size = if n_parents > M2M_MAX_BLOCK_SIZE {
                     M2M_MAX_BLOCK_SIZE
                 } else {
-                    nparents
+                    n_parents
                 };
 
-                let chunk_size = chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(n_parents, max_chunk_size);
 
                 child_multipoles
                     .par_chunks_exact(NSIBLINGS * n_coeffs_equivalent_surface * chunk_size)
@@ -338,7 +338,7 @@ where
             }
 
             FmmEvalType::Matrix(n_matvecs) => {
-                let mut parent_multipoles = vec![Vec::new(); nparents];
+                let mut parent_multipoles = vec![Vec::new(); n_parents];
 
                 for (parent_idx, parent) in parent_targets.iter().enumerate() {
                     for charge_vec_idx in 0..n_matvecs {

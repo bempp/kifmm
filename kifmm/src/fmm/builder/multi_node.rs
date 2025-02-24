@@ -466,7 +466,7 @@ where
 
             // Metadata for global FMM and FMM
 
-            // On nominated node only
+            // // On nominated node only
             if result.communicator.rank() == 0 {
                 result.global_fmm.set_source_tree(
                     &result.tree.domain,
