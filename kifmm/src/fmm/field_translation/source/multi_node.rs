@@ -88,7 +88,7 @@ where
                     let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
 
                     let scale = if self.kernel.is_homogenous() {
-                        homogenous_kernel_scale(total_depth + 1)
+                        homogenous_kernel_scale(total_depth)
                     } else {
                         Scalar::one()
                     };
@@ -139,25 +139,6 @@ where
                                         n_coeffs_equivalent_surface,
                                     )
                                 };
-                                multipole
-                                    .iter_mut()
-                                    .zip(
-                                        &tmp.data()[i * n_coeffs_equivalent_surface
-                                            ..(i + 1) * n_coeffs_equivalent_surface],
-                                    )
-                                    .for_each(|(m, t)| *m += *t);
-                            }
-
-                            for (i, multipole_ptr) in
-                                multipole_ptrs.iter().enumerate().take(chunk_size)
-                            {
-                                let multipole = unsafe {
-                                    std::slice::from_raw_parts_mut(
-                                        multipole_ptr.raw,
-                                        n_coeffs_equivalent_surface,
-                                    )
-                                };
-
                                 multipole
                                     .iter_mut()
                                     .zip(
