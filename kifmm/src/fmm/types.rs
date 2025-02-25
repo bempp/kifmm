@@ -160,9 +160,6 @@ where
     /// Upward surfaces associated with target leaves
     pub(crate) leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
 
-    /// Scales of each source leaf box
-    pub(crate) leaf_scales_sources: Vec<Scalar>,
-
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub(crate) uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
@@ -273,7 +270,6 @@ where
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),
-            leaf_scales_sources: Vec::default(),
         }
     }
 }
@@ -1043,9 +1039,6 @@ where
 
     /// Upward surfaces associated with target leaves
     pub(crate) leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
-
-    /// Scales of each source leaf box
-    pub(crate) leaf_scales_sources: Vec<Scalar>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse

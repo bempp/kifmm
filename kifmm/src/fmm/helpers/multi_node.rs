@@ -31,32 +31,6 @@ where
     result
 }
 
-/// Compute the scaling for each leaf box in a tree
-///
-/// # Arguments
-/// * `tree`- Multi node tree
-/// * `ncoeffs`- Number of interpolation points on leaf box
-pub(crate) fn leaf_scales_multi_node<T>(
-    tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
-    n_coeffs_leaf: usize,
-) -> Vec<T>
-where
-    T: RlstScalar + Float + Equivalence,
-    <T as RlstScalar>::Real: Float + Equivalence,
-{
-    let mut result = vec![T::default(); tree.n_leaves().unwrap() * n_coeffs_leaf];
-
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        // Assign scales
-        let l = i * n_coeffs_leaf;
-        let r = l + n_coeffs_leaf;
-
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); n_coeffs_leaf].as_slice());
-    }
-    result
-}
-
 /// Compute surfaces for each leaf box
 pub(crate) fn leaf_surfaces_multi_node<T>(
     tree: &MultiNodeTree<T, SimpleCommunicator>,
@@ -143,6 +117,7 @@ where
             .zip(vec![*n_coeffs.last().unwrap(); tree.total_depth() as usize])
             .collect_vec()
     };
+
 
     let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
         if let Some(n_keys) = tree.n_keys(level) {

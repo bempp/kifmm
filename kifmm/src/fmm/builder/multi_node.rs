@@ -77,7 +77,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn tree(
         mut self,
-        comm: &SimpleCommunicator,
+        global_communicator: &SimpleCommunicator,
         sources: &[Scalar::Real],
         targets: &[Scalar::Real],
         local_depth: u64,
@@ -109,7 +109,7 @@ where
 
             // Source and target trees calculated over the same domain
             let (source_domain, d) =
-                optionally_time(timed, || Domain::from_global_points(sources, comm));
+                optionally_time(timed, || Domain::from_global_points(sources, global_communicator));
 
             if let Some(d) = d {
                 communication_times.push(CommunicationTime::from_duration(
@@ -119,7 +119,7 @@ where
             }
 
             let (target_domain, d) =
-                optionally_time(timed, || Domain::from_global_points(targets, comm));
+                optionally_time(timed, || Domain::from_global_points(targets, global_communicator));
 
             if let Some(d) = d {
                 communication_times.push(CommunicationTime::from_duration(
@@ -133,7 +133,7 @@ where
 
             let (source_tree, d) = optionally_time(timed, || {
                 MultiNodeTree::new(
-                    comm,
+                    global_communicator,
                     sources,
                     local_depth,
                     global_depth,
@@ -154,7 +154,7 @@ where
 
             let (target_tree, d) = optionally_time(timed, || {
                 MultiNodeTree::new(
-                    comm,
+                    global_communicator,
                     targets,
                     local_depth,
                     global_depth,
@@ -198,7 +198,7 @@ where
             fmm_tree.set_queries(true);
             fmm_tree.set_queries(false);
 
-            self.communicator = Some(comm.duplicate());
+            self.communicator = Some(global_communicator.duplicate());
             self.tree = Some(fmm_tree);
             self.communication_times = Some(communication_times);
             Ok(self)
@@ -227,9 +227,7 @@ where
             if expansion_order.len() > 1 {
                 self.variable_expansion_order = Some(true);
 
-                let expected_len = (total_depth as usize) + 1;
-
-                if expansion_order.len() != expected_len {
+                if expansion_order.len() !=  (total_depth as usize) + 1 {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "Number of expansion orders must either be 1, or match the depth of the tree",
@@ -325,12 +323,11 @@ where
             let local_n_coeffs_check_surface =
                 n_coeffs_check_surface[(global_depth as usize)..=(total_depth as usize)].to_vec();
 
-            let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
             let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
                 equivalent_surface_order: global_equivalent_surface_order,
                 check_surface_order: global_check_surface_order,
-                variable_expansion_order: false,
+                variable_expansion_order,
                 n_coeffs_equivalent_surface: global_n_coeffs_equivalent_surface,
                 n_coeffs_check_surface: global_n_coeffs_check_surface,
                 fmm_eval_type,
@@ -345,7 +342,7 @@ where
                 isa: self.isa.unwrap(),
                 equivalent_surface_order: local_equivalent_surface_order.to_vec(),
                 check_surface_order: local_check_surface_order.to_vec(),
-                variable_expansion_order: false,
+                variable_expansion_order,
                 n_coeffs_equivalent_surface: local_n_coeffs_equivalent_surface.to_vec(),
                 n_coeffs_check_surface: local_check_surface_order.to_vec(),
                 fmm_eval_type,
@@ -360,7 +357,7 @@ where
                 isa: self.isa.unwrap(),
                 equivalent_surface_order: local_equivalent_surface_order.to_vec(),
                 check_surface_order: local_check_surface_order.to_vec(),
-                variable_expansion_order: false,
+                variable_expansion_order,
                 n_coeffs_equivalent_surface: local_n_coeffs_equivalent_surface,
                 n_coeffs_check_surface: local_n_coeffs_check_surface,
                 fmm_eval_type,
@@ -403,7 +400,6 @@ where
                 leaf_upward_check_surfaces_sources: Vec::default(),
                 leaf_downward_equivalent_surfaces_targets: Vec::default(),
                 leaf_upward_equivalent_surfaces_sources: Vec::default(),
-                leaf_scales_sources: Vec::default(),
                 uc2e_inv_1: Vec::default(),
                 uc2e_inv_2: Vec::default(),
                 dc2e_inv_1: Vec::default(),

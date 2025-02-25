@@ -92,31 +92,6 @@ pub(crate) fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> 
     }
 }
 
-/// Compute the scaling for each leaf box in a tree
-///
-/// # Arguments
-/// * `tree`- Single node tree
-/// * `n_coeffs`- Number of interpolation points on leaf box
-pub(crate) fn leaf_scales_single_node<T>(
-    tree: &SingleNodeTree<T::Real>,
-    n_coeffs_leaf: usize,
-) -> Vec<T>
-where
-    T: RlstScalar + Default,
-{
-    let mut result = vec![T::default(); tree.n_leaves().unwrap() * n_coeffs_leaf];
-
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        // Assign scales
-        let l = i * n_coeffs_leaf;
-        let r = l + n_coeffs_leaf;
-
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); n_coeffs_leaf].as_slice());
-    }
-    result
-}
-
 /// Compute the surfaces for each leaf box
 ///
 /// # Arguments

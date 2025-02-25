@@ -20,7 +20,7 @@ use std::sync::{Mutex, RwLock};
 
 use crate::fmm::helpers::multi_node::{
     coordinate_index_pointer_multi_node, leaf_expansion_pointers_multi_node,
-    leaf_scales_multi_node, leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
+    leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
     level_index_pointer_multi_node, potential_pointers_multi_node,
 };
 use crate::fmm::helpers::single_node::ncoeffs_kifmm;
@@ -1198,9 +1198,8 @@ where
         };
 
         // TODO Add real matrix input
-        let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
-        let n_source_points = self.tree.source_tree.n_coordinates_tot().unwrap();
         let n_matvecs = 1;
+        let n_target_points = self.tree.target_tree.n_coordinates_tot().unwrap();
         let n_source_keys = self.tree.source_tree.n_keys_tot().unwrap();
         let n_target_keys = self.tree.target_tree.n_keys_tot().unwrap();
 
@@ -1212,7 +1211,7 @@ where
         let local_ncoeffs_equivalent_surface: Vec<usize> = self
             .n_coeffs_equivalent_surface
             .iter()
-            .skip((global_depth + 1) as usize)
+            .skip(global_depth as usize)
             .cloned()
             .collect_vec();
 
@@ -1243,14 +1242,11 @@ where
         let level_index_pointer_multipoles = level_index_pointer_multi_node(&self.tree.source_tree);
         let level_index_pointer_locals = level_index_pointer_multi_node(&self.tree.target_tree);
 
+        // println!("HERE global depth {:?} local depth {:?} n_coeffs {:?} ncoefss_local {:?}", global_depth, local_depth, self.n_coeffs_equivalent_surface, local_ncoeffs_equivalent_surface);
+        // assert!(false);
+
         // Allocate buffers for local potential data
         let potentials = vec![Scalar::default(); n_target_points * kernel_eval_size];
-
-        // Kernel scale at each target and source leaf
-        let leaf_scales_sources = leaf_scales_multi_node::<Scalar>(
-            &self.tree.source_tree,
-            *self.n_coeffs_equivalent_surface.last().unwrap(),
-        );
 
         // Pre compute check surfaces
         let leaf_upward_equivalent_surfaces_sources = leaf_surfaces_multi_node(
@@ -1593,7 +1589,6 @@ where
         self.leaf_downward_equivalent_surfaces_targets = leaf_downward_equivalent_surfaces_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
         self.charge_index_pointer_targets = charge_index_pointer_targets;
-        self.leaf_scales_sources = leaf_scales_sources;
         self.kernel_eval_size = kernel_eval_size;
         self.charges = requested_queries;
 

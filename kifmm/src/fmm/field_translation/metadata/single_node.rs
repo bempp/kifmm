@@ -23,7 +23,7 @@ use crate::{
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::single_node::{
             coordinate_index_pointer_single_node, flip3, homogenous_kernel_scale,
-            leaf_expansion_pointers_single_node, leaf_scales_single_node,
+            leaf_expansion_pointers_single_node,
             leaf_surfaces_single_node, level_expansion_pointers_single_node,
             level_index_pointer_single_node, ncoeffs_kifmm, potential_pointers_single_node,
         },
@@ -2764,12 +2764,6 @@ where
         // Buffer to store evaluated potentials and/or gradients at target points
         let potentials = vec![Scalar::default(); n_target_points * kernel_eval_size * n_matvecs];
 
-        // Kernel scale at each target and source leaf
-        let leaf_scales_sources = leaf_scales_single_node::<Scalar>(
-            &self.tree.source_tree,
-            *self.n_coeffs_check_surface.last().unwrap(),
-        );
-
         // Pre compute check surfaces
         let leaf_upward_equivalent_surfaces_sources = leaf_surfaces_single_node(
             &self.tree.source_tree,
@@ -2853,7 +2847,6 @@ where
         self.charges = charges.to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
-        self.leaf_scales_sources = leaf_scales_sources;
         self.kernel_eval_size = kernel_eval_size;
     }
 }

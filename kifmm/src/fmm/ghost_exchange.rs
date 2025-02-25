@@ -49,75 +49,75 @@ where
         + SourceToTargetTranslationMetadata,
 {
     fn gather_global_fmm_at_root(&mut self) {
+        // Nominated rank chosen to run the global upward pass
+        let root_rank = 0;
+        let root_process = self.communicator.process_at_rank(root_rank);
 
-        // TODO
+        // Number of coefficients of equivalent surfaces at leaf level of global tree
+        let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(self.tree.source_tree.global_depth());
 
-        // let rank = self.communicator.rank();
+        // Gather multipole data
+        if self.rank == root_rank {
 
-        // // Nominated rank chosen to run the global upward pass
-        // let root_rank = 0;
-        // let root_process = self.communicator.process_at_rank(root_rank);
+            // Allocate memory for locally contained data that will be communicated
+            let n_roots = self.tree.source_tree().n_trees() as Count;
+            let mut multipoles =
+                vec![Scalar::default(); (n_roots as usize) * n_coeffs_equivalent_surface];
 
-        // // Gather multipole data
-        // if rank == root_rank {
-        //     // Allocate memory for locally contained data that will be communicated
-        //     let n_roots = self.tree.source_tree().n_trees() as Count;
-        //     let mut multipoles =
-        //         vec![Scalar::default(); (n_roots as usize) * self.n_coeffs_equivalent_surface];
+            for (i, tree) in self.tree.source_tree().trees().iter().enumerate() {
+                let tmp = self.multipole(&tree.root()).unwrap();
+                multipoles[i * n_coeffs_equivalent_surface
+                    ..(i + 1) * n_coeffs_equivalent_surface]
+                    .copy_from_slice(tmp);
+            }
 
-        //     for (i, tree) in self.tree.source_tree().trees().iter().enumerate() {
-        //         let tmp = self.multipole(&tree.root()).unwrap();
-        //         multipoles[i * self.n_coeffs_equivalent_surface
-        //             ..(i + 1) * self.n_coeffs_equivalent_surface]
-        //             .copy_from_slice(tmp);
-        //     }
+            let counts_buffers = self
+                .tree
+                .source_tree
+                .all_roots_counts
+                .iter()
+                .map(|c| c * n_coeffs_equivalent_surface as i32)
+                .collect_vec();
 
-        //     let counts_buffers = self
-        //         .tree
-        //         .source_tree
-        //         .all_roots_counts
-        //         .iter()
-        //         .map(|c| c * self.n_coeffs_equivalent_surface as i32)
-        //         .collect_vec();
+            let mut displacements_buffers = Vec::new();
+            let mut displacement = 0;
+            for &count in counts_buffers.iter() {
+                displacements_buffers.push(displacement);
+                displacement += count
+            }
 
-        //     let mut displacements_buffers = Vec::new();
-        //     let mut displacement = 0;
-        //     for &count in counts_buffers.iter() {
-        //         displacements_buffers.push(displacement);
-        //         displacement += count
-        //     }
+            // Allocate memory to store received multipoles
+            let total_receive_buffers = counts_buffers.iter().sum::<i32>() as usize;
+            let mut global_multipoles = vec![Scalar::default(); total_receive_buffers];
 
-        //     // Allocate memory to store received multipoles
-        //     let total_receive_buffers = counts_buffers.iter().sum::<i32>() as usize;
-        //     let mut global_multipoles = vec![Scalar::default(); total_receive_buffers];
+            // Gather all multipole data
+            let mut partition = PartitionMut::new(
+                &mut global_multipoles,
+                &counts_buffers[..],
+                &displacements_buffers[..],
+            );
 
-        //     // Gather all multipole data
-        //     let mut partition = PartitionMut::new(
-        //         &mut global_multipoles,
-        //         &counts_buffers[..],
-        //         &displacements_buffers[..],
-        //     );
+            root_process.gather_varcount_into_root(&multipoles, &mut partition);
 
-        //     root_process.gather_varcount_into_root(&multipoles, &mut partition);
+            self.global_fmm.global_fmm_multipole_metadata(
+                self.tree.source_tree.all_roots.clone(),
+                global_multipoles,
+                self.tree.source_tree().global_depth()
+            );
+        } else {
+            // Create buffers of multipole data to be sent
+            let n_roots = self.tree.source_tree().n_trees() as Count;
+            let mut multipoles =
+                vec![Scalar::default(); (n_roots as usize) * n_coeffs_equivalent_surface];
+            for (i, tree) in self.tree.source_tree().trees().iter().enumerate() {
+                let tmp = self.multipole(&tree.root()).unwrap();
+                multipoles[i * n_coeffs_equivalent_surface
+                    ..(i + 1) * n_coeffs_equivalent_surface]
+                    .copy_from_slice(tmp);
+            }
 
-        //     self.global_fmm.global_fmm_multipole_metadata(
-        //         self.tree.source_tree.all_roots.clone(),
-        //         global_multipoles,
-        //     );
-        // } else {
-        //     // Create buffers of multipole data to be sent
-        //     let n_roots = self.tree.source_tree().n_trees() as Count;
-        //     let mut multipoles =
-        //         vec![Scalar::default(); (n_roots as usize) * self.n_coeffs_equivalent_surface];
-        //     for (i, tree) in self.tree.source_tree().trees().iter().enumerate() {
-        //         let tmp = self.multipole(&tree.root()).unwrap();
-        //         multipoles[i * self.n_coeffs_equivalent_surface
-        //             ..(i + 1) * self.n_coeffs_equivalent_surface]
-        //             .copy_from_slice(tmp);
-        //     }
-
-        //     root_process.gather_varcount_into(&multipoles);
-        // }
+            root_process.gather_varcount_into(&multipoles);
+        }
     }
 
     fn scatter_global_fmm_from_root(&mut self) {
@@ -901,49 +901,83 @@ where
 
     fn global_fmm_multipole_metadata(
         &mut self,
-        leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
+        local_roots: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         multipoles: Vec<Self::Scalar>,
+        global_depth: u64
     ) {
-        // TODO Fix for variable expansion order
 
-        // // Find mapping between received leaves and their index
-        // // for mapping multipole data
-        // let mut old_leaf_to_index = HashMap::new();
-        // for (i, &root) in leaves.iter().enumerate() {
-        //     old_leaf_to_index.insert(root, i);
+        // TODO: Add real matvecs
+        let n_matvecs = 1;
+
+        // Find mapping between received leaves of global tree, which are roots of the local trees, and their index
+        // for mapping multipole data
+
+        // for level in 0..=global_depth {
+        //     println!("level {:?} {:?} {:?}",  level, self.n_coeffs_equivalent_surface, self.n_coeffs_equivalent_surface(level))
         // }
 
-        // // Global multipole data with missing siblings if they don't exist globally with zeros for coefficients
-        // let mut multipoles_with_ancestors = vec![
-        //     Scalar::zero();
-        //     self.tree.source_tree.keys.len()
-        //         * self.n_coeffs_equivalent_surface[0]
-        // ];
+        // assert!(false);
 
-        // for (new_idx, key) in self.tree.source_tree.keys.iter().enumerate() {
-        //     if let Some(old_idx) = old_leaf_to_index.get(key) {
-        //         let multipole = &multipoles[old_idx * self.n_coeffs_equivalent_surface[0]
-        //             ..(old_idx + 1) * self.n_coeffs_equivalent_surface[0]];
-        //         multipoles_with_ancestors[new_idx * self.n_coeffs_equivalent_surface[0]
-        //             ..(new_idx + 1) * self.n_coeffs_equivalent_surface[0]]
-        //             .copy_from_slice(multipole);
-        //     }
-        // }
+        let n_multipole_coeffs = (0..=global_depth)
+            .fold(0usize, |acc, level| {
+                acc + self.tree.source_tree().n_keys(level).unwrap() * self.n_coeffs_equivalent_surface(level)
+            });
 
-        // // Set metadata for FMM
-        // self.multipoles = multipoles_with_ancestors;
-        // self.level_multipoles = level_expansion_pointers_single_node(
-        //     &self.tree.source_tree,
-        //     &self.n_coeffs_equivalent_surface,
-        //     1,
-        //     &self.multipoles,
-        // );
-        // self.leaf_multipoles = leaf_expansion_pointers_single_node(
-        //     &self.tree.source_tree,
-        //     &self.n_coeffs_equivalent_surface,
-        //     1,
-        //     &self.multipoles,
-        // );
+
+        let mut old_leaf_to_index = HashMap::new();
+        for (i, &root) in local_roots.iter().enumerate() {
+            old_leaf_to_index.insert(root, i);
+        }
+
+
+        // Global multipole data with missing siblings if they don't exist globally with zeros for coefficients
+        let mut multipoles_with_ancestors = vec![Scalar::default(); n_multipole_coeffs * n_matvecs];
+
+        let mut level_displacement = 0;
+
+        for level in 0..=global_depth {
+            let n_coeffs = self.n_coeffs_equivalent_surface(level);
+
+            if let Some(keys) = self.tree.source_tree.keys(level) {
+                let n_keys_level = keys.len();
+
+                for (key_idx, key) in keys.iter().enumerate() {
+
+                    if let Some(old_idx) = old_leaf_to_index.get(key) {
+                        let key_displacement = level_displacement + n_coeffs * key_idx;
+
+                        // lookup received (local root) multipole data
+                        // println!("HERE {:?} {:?} {:?} {:?} ROOTS", key.morton, level, n_coeffs,  self.n_coeffs_equivalent_surface);
+                        // println!("level {:?} keys {:?} {:?}", level, n_keys_level, multipoles.len());
+
+                        let multipole = &multipoles[old_idx * n_coeffs
+                            ..(old_idx + 1) * n_coeffs];
+
+                        multipoles_with_ancestors[key_displacement
+                            ..key_displacement+n_coeffs]
+                            .copy_from_slice(multipole);
+
+                    }
+                }
+                level_displacement += n_keys_level * n_coeffs;
+            }
+        }
+
+        // Set metadata for FMM
+        self.multipoles = multipoles_with_ancestors;
+        self.level_multipoles = level_expansion_pointers_single_node(
+            &self.tree.source_tree,
+            &self.n_coeffs_equivalent_surface,
+            n_matvecs,
+            &self.multipoles,
+        );
+
+        self.leaf_multipoles = leaf_expansion_pointers_single_node(
+            &self.tree.source_tree,
+            &self.n_coeffs_equivalent_surface,
+            n_matvecs,
+            &self.multipoles,
+        );
     }
 
     fn global_fmm_local_metadata(&mut self) {

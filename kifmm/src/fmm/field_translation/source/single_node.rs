@@ -13,7 +13,7 @@ use rlst::{
 use crate::{
     fmm::{
         constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
-        helpers::single_node::chunk_size,
+        helpers::single_node::{homogenous_kernel_scale, chunk_size},
         types::{FmmEvalType, KiFmm},
     },
     traits::{
@@ -86,17 +86,21 @@ where
                         },
                     );
 
-                // Use check potentials to compute the multipole expansion
+                let depth = self.tree.source_tree().depth();
                 let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
+
+                let scale = if self.kernel.is_homogenous() {
+                    homogenous_kernel_scale(depth)
+                } else {
+                    Scalar::one()
+                };
+
+                // Use check potentials to compute the multipole expansion
                 check_potentials
                     .data()
                     .par_chunks_exact(n_coeffs_check_surface * chunk_size)
                     .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
-                    .zip(
-                        self.leaf_scales_sources
-                            .par_chunks_exact(n_coeffs_check_surface * chunk_size),
-                    )
-                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                    .for_each(|(check_potential, multipole_ptrs)| {
                         let check_potential = rlst_array_from_slice2!(
                             check_potential,
                             [n_coeffs_check_surface, chunk_size]
@@ -106,7 +110,7 @@ where
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, chunk_size]);
                             scaled_check_potential.fill_from(check_potential);
-                            scaled_check_potential.scale_inplace(scale[0]);
+                            scaled_check_potential.scale_inplace(scale);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].r(),
@@ -190,16 +194,19 @@ where
                         },
                     );
 
+                let depth = self.tree.source_tree().depth();
+                let scale = if self.kernel.is_homogenous() {
+                    homogenous_kernel_scale(depth)
+                } else {
+                    Scalar::one()
+                };
+
                 // Compute multipole expansions
                 check_potentials
                     .data()
                     .par_chunks_exact(n_coeffs_check_surface * n_matvecs)
                     .zip(self.leaf_multipoles.par_iter())
-                    .zip(
-                        self.leaf_scales_sources
-                            .par_chunks_exact(n_coeffs_check_surface),
-                    )
-                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                    .for_each(|(check_potential, multipole_ptrs)| {
                         let check_potential = rlst_array_from_slice2!(
                             check_potential,
                             [n_coeffs_check_surface, n_matvecs]
@@ -210,7 +217,7 @@ where
                                 rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_matvecs]);
 
                             scaled_check_potential.fill_from(check_potential);
-                            scaled_check_potential.scale_inplace(scale[0]);
+                            scaled_check_potential.scale_inplace(scale);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].r(),
@@ -261,7 +268,7 @@ where
 
         let operator_index = self.m2m_operator_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
-        let ncoeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
+        let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -318,7 +325,7 @@ where
                                 let parent_multipole = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_multipole_pointer.raw,
-                                        ncoeffs_equivalent_surface_parent,
+                                        n_coeffs_equivalent_surface_parent,
                                     )
                                 };
 
@@ -326,8 +333,8 @@ where
                                     .iter_mut()
                                     .zip(
                                         &parent_multipoles_chunk.data()[chunk_idx
-                                            * ncoeffs_equivalent_surface_parent
-                                            ..(chunk_idx + 1) * ncoeffs_equivalent_surface_parent],
+                                            * n_coeffs_equivalent_surface_parent
+                                            ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent],
                                     )
                                     .for_each(|(p, t)| *p += *t);
                             }
@@ -378,12 +385,12 @@ where
                                 let parent_multipole_j = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         raw,
-                                        ncoeffs_equivalent_surface_parent,
+                                        n_coeffs_equivalent_surface_parent,
                                     )
                                 };
                                 let result_ij = &result_i.data()[j
-                                    * ncoeffs_equivalent_surface_parent
-                                    ..(j + 1) * ncoeffs_equivalent_surface_parent];
+                                    * n_coeffs_equivalent_surface_parent
+                                    ..(j + 1) * n_coeffs_equivalent_surface_parent];
                                 parent_multipole_j
                                     .iter_mut()
                                     .zip(result_ij.iter())
