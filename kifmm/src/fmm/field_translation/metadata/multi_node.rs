@@ -20,8 +20,8 @@ use std::sync::{Mutex, RwLock};
 
 use crate::fmm::helpers::multi_node::{
     coordinate_index_pointer_multi_node, leaf_expansion_pointers_multi_node,
-    leaf_surfaces_multi_node, level_expansion_pointers_multi_node,
-    level_index_pointer_multi_node, potential_pointers_multi_node,
+    leaf_surfaces_multi_node, level_expansion_pointers_multi_node, level_index_pointer_multi_node,
+    potential_pointers_multi_node,
 };
 use crate::fmm::helpers::single_node::ncoeffs_kifmm;
 use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale, optionally_time};

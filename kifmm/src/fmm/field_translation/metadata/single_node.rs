@@ -23,9 +23,9 @@ use crate::{
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::single_node::{
             coordinate_index_pointer_single_node, flip3, homogenous_kernel_scale,
-            leaf_expansion_pointers_single_node,
-            leaf_surfaces_single_node, level_expansion_pointers_single_node,
-            level_index_pointer_single_node, ncoeffs_kifmm, potential_pointers_single_node,
+            leaf_expansion_pointers_single_node, leaf_surfaces_single_node,
+            level_expansion_pointers_single_node, level_index_pointer_single_node, ncoeffs_kifmm,
+            potential_pointers_single_node,
         },
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,

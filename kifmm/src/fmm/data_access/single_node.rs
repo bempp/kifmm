@@ -106,7 +106,6 @@ where
 
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
         if let Some(n_sources) = self.tree().source_tree().n_keys(level) {
-
             let multipole_ptr = &self.level_multipoles[level as usize][0][0];
             unsafe {
                 match self.fmm_eval_type {

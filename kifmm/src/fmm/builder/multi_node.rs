@@ -108,8 +108,9 @@ where
             let mut communication_times = Vec::new();
 
             // Source and target trees calculated over the same domain
-            let (source_domain, d) =
-                optionally_time(timed, || Domain::from_global_points(sources, global_communicator));
+            let (source_domain, d) = optionally_time(timed, || {
+                Domain::from_global_points(sources, global_communicator)
+            });
 
             if let Some(d) = d {
                 communication_times.push(CommunicationTime::from_duration(
@@ -118,8 +119,9 @@ where
                 ))
             }
 
-            let (target_domain, d) =
-                optionally_time(timed, || Domain::from_global_points(targets, global_communicator));
+            let (target_domain, d) = optionally_time(timed, || {
+                Domain::from_global_points(targets, global_communicator)
+            });
 
             if let Some(d) = d {
                 communication_times.push(CommunicationTime::from_duration(
@@ -227,7 +229,7 @@ where
             if expansion_order.len() > 1 {
                 self.variable_expansion_order = Some(true);
 
-                if expansion_order.len() !=  (total_depth as usize) + 1 {
+                if expansion_order.len() != (total_depth as usize) + 1 {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidInput,
                         "Number of expansion orders must either be 1, or match the depth of the tree",

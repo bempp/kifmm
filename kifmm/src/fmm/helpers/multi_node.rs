@@ -118,7 +118,6 @@ where
             .collect_vec()
     };
 
-
     let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
         if let Some(n_keys) = tree.n_keys(level) {
             acc + n_keys * ncoeffs

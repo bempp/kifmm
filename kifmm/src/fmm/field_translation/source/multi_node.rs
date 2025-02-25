@@ -39,7 +39,6 @@ where
 {
     fn p2m(&self) -> Result<(), crate::traits::types::FmmError> {
         if let Some(_leaves) = self.tree.source_tree().all_leaves() {
-
             let &n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface.last().unwrap();
             let &n_coeffs_check_surface = self.n_coeffs_check_surface.last().unwrap();
             let n_leaves = self.tree.source_tree().n_leaves().unwrap();
@@ -150,7 +149,6 @@ where
                                     )
                                     .for_each(|(m, t)| *m += *t);
                             }
-
                         });
                 }
 
@@ -167,7 +165,6 @@ where
 
     fn m2m(&self, level: u64) -> Result<(), crate::traits::types::FmmError> {
         if let Some(child_sources) = self.tree.source_tree.keys(level) {
-
             let operator_index = self.m2m_operator_index(level);
             let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
             let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
@@ -237,7 +234,8 @@ where
                                         .zip(
                                             &parent_multipoles_chunk.data()[chunk_idx
                                                 * n_coeffs_equivalent_surface_parent
-                                                ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent],
+                                                ..(chunk_idx + 1)
+                                                    * n_coeffs_equivalent_surface_parent],
                                         )
                                         .for_each(|(p, t)| *p += *t);
                                 }
