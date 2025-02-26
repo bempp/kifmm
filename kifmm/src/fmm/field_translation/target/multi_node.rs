@@ -37,96 +37,96 @@ where
         >,
 {
     fn l2l(&self, level: u64) -> Result<(), crate::traits::types::FmmError> {
-        if let Some(child_targets) = self.tree.target_tree().keys(level) {
-            let parent_sources: HashSet<MortonKey<_>> =
-                child_targets.iter().map(|source| source.parent()).collect();
+        // if let Some(child_targets) = self.tree.target_tree().keys(level) {
+        //     let parent_sources: HashSet<MortonKey<_>> =
+        //         child_targets.iter().map(|source| source.parent()).collect();
 
-            let mut parent_sources = parent_sources.into_iter().collect_vec();
-            parent_sources.sort();
-            let n_parents = parent_sources.len();
-            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
-            let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
+        //     let mut parent_sources = parent_sources.into_iter().collect_vec();
+        //     parent_sources.sort();
+        //     let n_parents = parent_sources.len();
+        //     let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+        //     let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => {
-                    let mut parent_locals = Vec::new();
-                    for parent in parent_sources.iter() {
-                        let parent_index_pointer = *self.level_index_pointer_locals
-                            [(level - 1) as usize]
-                            .get(parent)
-                            .unwrap();
-                        let parent_local =
-                            &self.level_locals[(level - 1) as usize][parent_index_pointer];
-                        parent_locals.push(parent_local);
-                    }
+        //     match self.fmm_eval_type {
+        //         FmmEvalType::Vector => {
+        //             let mut parent_locals = Vec::new();
+        //             for parent in parent_sources.iter() {
+        //                 let parent_index_pointer = *self.level_index_pointer_locals
+        //                     [(level - 1) as usize]
+        //                     .get(parent)
+        //                     .unwrap();
+        //                 let parent_local =
+        //                     &self.level_locals[(level - 1) as usize][parent_index_pointer];
+        //                 parent_locals.push(parent_local);
+        //             }
 
-                    let mut max_chunk_size = n_parents;
-                    if max_chunk_size > L2L_MAX_BLOCK_SIZE {
-                        max_chunk_size = L2L_MAX_BLOCK_SIZE
-                    }
-                    let chunk_size = chunk_size(n_parents, max_chunk_size);
+        //             let mut max_chunk_size = n_parents;
+        //             if max_chunk_size > L2L_MAX_BLOCK_SIZE {
+        //                 max_chunk_size = L2L_MAX_BLOCK_SIZE
+        //             }
+        //             let chunk_size = chunk_size(n_parents, max_chunk_size);
 
-                    let child_locals = &self.level_locals[level as usize];
+        //             let child_locals = &self.level_locals[level as usize];
 
-                    let target_vec = &self.target_vec;
+        //             let target_vec = &self.target_vec;
 
-                    parent_locals
-                        .par_chunks_exact(chunk_size)
-                        .zip(child_locals.par_chunks_exact(NSIBLINGS * chunk_size))
-                        .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-                            let mut parent_locals = rlst_dynamic_array2!(
-                                Scalar,
-                                [n_coeffs_equivalent_surface_parent, chunk_size]
-                            );
-                            for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
-                                .iter()
-                                .enumerate()
-                                .take(chunk_size)
-                            {
-                                parent_locals.data_mut()[chunk_idx
-                                    * n_coeffs_equivalent_surface_parent
-                                    ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent]
-                                    .copy_from_slice(unsafe {
-                                        std::slice::from_raw_parts_mut(
-                                            parent_local_pointer.raw,
-                                            n_coeffs_equivalent_surface_parent,
-                                        )
-                                    });
-                            }
+        //             parent_locals
+        //                 .par_chunks_exact(chunk_size)
+        //                 .zip(child_locals.par_chunks_exact(NSIBLINGS * chunk_size))
+        //                 .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
+        //                     let mut parent_locals = rlst_dynamic_array2!(
+        //                         Scalar,
+        //                         [n_coeffs_equivalent_surface_parent, chunk_size]
+        //                     );
+        //                     for (chunk_idx, parent_local_pointer) in parent_local_pointer_chunk
+        //                         .iter()
+        //                         .enumerate()
+        //                         .take(chunk_size)
+        //                     {
+        //                         parent_locals.data_mut()[chunk_idx
+        //                             * n_coeffs_equivalent_surface_parent
+        //                             ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent]
+        //                             .copy_from_slice(unsafe {
+        //                                 std::slice::from_raw_parts_mut(
+        //                                     parent_local_pointer.raw,
+        //                                     n_coeffs_equivalent_surface_parent,
+        //                                 )
+        //                             });
+        //                     }
 
-                            for (i, target_vec_i) in target_vec.iter().enumerate().take(NSIBLINGS) {
-                                let tmp = empty_array::<Scalar, 2>()
-                                    .simple_mult_into_resize(target_vec_i.r(), parent_locals.r());
+        //                     for (i, target_vec_i) in target_vec.iter().enumerate().take(NSIBLINGS) {
+        //                         let tmp = empty_array::<Scalar, 2>()
+        //                             .simple_mult_into_resize(target_vec_i.r(), parent_locals.r());
 
-                                for j in 0..chunk_size {
-                                    let chunk_displacement = j * NSIBLINGS;
-                                    let child_displacement = chunk_displacement + i;
-                                    let child_local = unsafe {
-                                        std::slice::from_raw_parts_mut(
-                                            child_local_pointers_chunk[child_displacement].raw,
-                                            n_coeffs_equivalent_surface,
-                                        )
-                                    };
-                                    child_local
-                                        .iter_mut()
-                                        .zip(
-                                            &tmp.data()[j * n_coeffs_equivalent_surface
-                                                ..(j + 1) * n_coeffs_equivalent_surface],
-                                        )
-                                        .for_each(|(l, t)| *l += *t);
-                                }
-                            }
-                        });
-                }
+        //                         for j in 0..chunk_size {
+        //                             let chunk_displacement = j * NSIBLINGS;
+        //                             let child_displacement = chunk_displacement + i;
+        //                             let child_local = unsafe {
+        //                                 std::slice::from_raw_parts_mut(
+        //                                     child_local_pointers_chunk[child_displacement].raw,
+        //                                     n_coeffs_equivalent_surface,
+        //                                 )
+        //                             };
+        //                             child_local
+        //                                 .iter_mut()
+        //                                 .zip(
+        //                                     &tmp.data()[j * n_coeffs_equivalent_surface
+        //                                         ..(j + 1) * n_coeffs_equivalent_surface],
+        //                                 )
+        //                                 .for_each(|(l, t)| *l += *t);
+        //                         }
+        //                     }
+        //                 });
+        //         }
 
-                FmmEvalType::Matrix(_) => {
-                    return Err(FmmError::Unimplemented(
-                        "M2L unimplemented for matrix input with BLAS field translations"
-                            .to_string(),
-                    ))
-                }
-            }
-        }
+        //         FmmEvalType::Matrix(_) => {
+        //             return Err(FmmError::Unimplemented(
+        //                 "M2L unimplemented for matrix input with BLAS field translations"
+        //                     .to_string(),
+        //             ))
+        //         }
+        //     }
+        // }
 
         Ok(())
     }

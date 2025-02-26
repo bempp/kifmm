@@ -1,6 +1,7 @@
 //! Helper functions for MPI setting
 use std::collections::HashMap;
 
+use itertools::Itertools;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
 use rlst::RlstScalar;
@@ -26,32 +27,6 @@ where
                 result[level as usize].insert(*key, level_idx);
             }
         }
-    }
-    result
-}
-
-/// Compute the scaling for each leaf box in a tree
-///
-/// # Arguments
-/// * `tree`- Multi node tree
-/// * `ncoeffs`- Number of interpolation points on leaf box
-pub(crate) fn leaf_scales_multi_node<T>(
-    tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
-    n_coeffs_leaf: usize,
-) -> Vec<T>
-where
-    T: RlstScalar + Float + Equivalence,
-    <T as RlstScalar>::Real: Float + Equivalence,
-{
-    let mut result = vec![T::default(); tree.n_leaves().unwrap() * n_coeffs_leaf];
-
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        // Assign scales
-        let l = i * n_coeffs_leaf;
-        let r = l + n_coeffs_leaf;
-
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); n_coeffs_leaf].as_slice());
     }
     result
 }
@@ -84,7 +59,8 @@ where
 /// Create mutable pointers corresponding to each multipole expansion at each level of an octree
 pub(crate) fn level_expansion_pointers_multi_node<T>(
     tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
-    n_coeffs: usize,
+    n_coeffs: &[usize],
+    _n_matvecs: usize,
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
@@ -96,6 +72,12 @@ where
     let mut level_displacement = 0;
     for level in 0..=tree.total_depth() {
         let mut tmp_multipoles = Vec::new();
+
+        let n_coeffs = if n_coeffs.len() > 1 {
+            n_coeffs[level as usize]
+        } else {
+            n_coeffs[0]
+        };
 
         if let Some(keys) = tree.keys(level) {
             let n_keys_level = keys.len();
@@ -117,7 +99,8 @@ where
 /// Create mutable pointers for leaf expansions in a tree
 pub(crate) fn leaf_expansion_pointers_multi_node<T>(
     tree: &MultiNodeTree<T::Real, SimpleCommunicator>,
-    n_coeffs: usize,
+    n_coeffs: &[usize],
+    _n_matvecs: usize,
     expansions: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
@@ -127,9 +110,15 @@ where
     let n_leaves = tree.n_leaves().unwrap();
     let mut result = vec![SendPtrMut::default(); n_leaves];
 
-    let iterator = (0..tree.total_depth()).zip(vec![n_coeffs; tree.total_depth() as usize]);
+    let iterator = if n_coeffs.len() > 1 {
+        (0..tree.total_depth()).zip(n_coeffs.to_vec()).collect_vec()
+    } else {
+        (0..tree.total_depth())
+            .zip(vec![*n_coeffs.last().unwrap(); tree.total_depth() as usize])
+            .collect_vec()
+    };
 
-    let level_displacement = iterator.fold(0usize, |acc, (level, ncoeffs)| {
+    let level_displacement = iterator.iter().fold(0usize, |acc, &(level, ncoeffs)| {
         if let Some(n_keys) = tree.n_keys(level) {
             acc + n_keys * ncoeffs
         } else {
@@ -137,8 +126,9 @@ where
         }
     });
 
+    let &n_coeffs_leaf = n_coeffs.last().unwrap();
     for (leaf_idx, result_i) in result.iter_mut().enumerate().take(n_leaves) {
-        let key_displacement = level_displacement + (leaf_idx * n_coeffs);
+        let key_displacement = level_displacement + (leaf_idx * n_coeffs_leaf);
         let raw = unsafe { expansions.as_ptr().add(key_displacement) as *mut T };
         *result_i = SendPtrMut { raw };
     }
