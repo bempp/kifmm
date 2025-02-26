@@ -1067,7 +1067,8 @@ where
         Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub(crate) target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) target_vec:
+        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// Multipoles associated with locally owned data
     pub(crate) multipoles: Vec<Scalar>,

@@ -264,8 +264,8 @@ where
 
             // Calculate L2L operator matrices
             let children = root.children();
-            let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
-            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_coeffs_check_surface_child = ncoeffs_kifmm(check_surface_order_child);
+            let n_coeffs_equivalent_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut l2l_level = Vec::new();
 
@@ -274,8 +274,13 @@ where
                     child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
-                let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
+                let mut pe2cc = rlst_dynamic_array2!(
+                    Scalar,
+                    [
+                        n_coeffs_check_surface_child,
+                        n_coeffs_equivalent_surface_parent
+                    ]
+                );
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,

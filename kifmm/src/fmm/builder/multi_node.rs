@@ -445,13 +445,13 @@ where
             }
 
             // TODO
-            // let (_, duration) = optionally_time(timed, || result.target());
+            let (_, duration) = optionally_time(timed, || result.target());
 
-            // if let Some(d) = duration {
-            //     result
-            //         .metadata_times
-            //         .push(MetadataTime::from_duration(MetadataType::TargetData, d))
-            // }
+            if let Some(d) = duration {
+                result
+                    .metadata_times
+                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+            }
 
             // let (_, duration) = optionally_time(timed, || result.source_to_target());
 

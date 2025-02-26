@@ -24,8 +24,11 @@ fn main() {
     };
     use rlst::{RawAccess, RlstScalar};
 
-    fn test_upward_pass(name: String, expansion_order: &[usize], world: &mpi::topology::SimpleCommunicator) {
-
+    fn test_upward_pass(
+        name: String,
+        expansion_order: &[usize],
+        world: &mpi::topology::SimpleCommunicator,
+    ) {
         let comm = world.duplicate();
 
         // Tree parameters
@@ -215,8 +218,7 @@ fn main() {
         }
     }
 
-    let (universe, _threading) =
-    mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
+    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
 
     let expansion_order = [5, 4, 5, 4, 5, 4];

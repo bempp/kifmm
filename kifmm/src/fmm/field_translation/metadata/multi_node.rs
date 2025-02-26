@@ -56,6 +56,42 @@ use crate::{FftFieldTranslation, FmmSvdMode, SingleNodeFmmTree};
 
 use super::single_node::find_cutoff_rank;
 
+/// Calculate load for precomputation based on a block distribution strategy
+pub(crate) fn calculate_precomputation_load(
+    n_precomputations: i32,
+    size: i32,
+) -> Option<(Vec<Count>, Vec<Count>)> {
+    if n_precomputations > 0 {
+        let mut counts;
+
+        if n_precomputations > 1 {
+            // Distributed pre-computation
+            let q = n_precomputations / size; // Base number of calculations per processor
+            let r = n_precomputations % size; // Extra calculations to distribute evenly among ranks
+
+            // Block distribution strategy
+            counts = (0..size)
+                .map(|i| if i < r { q + 1 } else { q })
+                .collect_vec();
+        } else {
+            // If only have one pre-computation, carry out on a single rank (root rank)
+            counts = vec![0; size as usize];
+            counts[0] = n_precomputations;
+        }
+
+        let mut curr = 0;
+        let mut displacements = Vec::new();
+        for &count in counts.iter() {
+            displacements.push(curr);
+            curr += count;
+        }
+
+        Some((counts, displacements))
+    } else {
+        None
+    }
+}
+
 impl<Scalar, FieldTranslation> SourceTranslationMetadata
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
@@ -86,34 +122,11 @@ where
             1
         };
 
-        // Vector characterising load of pre-computation at each rank (denoted by index)
-        let mut load;
-
-        if n_precomputations > 1 {
-            // Distributed pre-computation
-            let q = n_precomputations / size; // Base number of calculations per processor
-            let r = n_precomputations % size; // Extra calculations to distribute evenly among ranks
-
-            // Block distribution strategy
-            load = (0..size)
-                .map(|i| if i < r { q + 1 } else { q })
-                .collect_vec();
-        } else {
-            // If only have one pre-computation, carry out on a single rank (root rank)
-            let size = self.communicator.size(); // Number of processors available
-            load = vec![0; size as usize];
-            load[0] = n_precomputations;
-        }
-
-        let mut curr = 0;
-        let mut load_displacement = Vec::new();
-        for &count in load.iter() {
-            load_displacement.push(curr);
-            curr += count;
-        }
+        let (load_counts, load_displacement) =
+            calculate_precomputation_load(n_precomputations, size).unwrap();
 
         // Compute mandated local portion
-        let local_load_count = load[rank as usize];
+        let local_load_count = load_counts[rank as usize];
         let local_load_displacement = load_displacement[rank as usize];
         let equivalent_surface_order = &self.equivalent_surface_order[(local_load_displacement
             as usize)
@@ -163,7 +176,7 @@ where
         let mut shared_dim = vec![0usize; n_precomputations as usize];
         {
             let mut partition =
-                PartitionMut::new(&mut shared_dim, &load[..], &load_displacement[..]);
+                PartitionMut::new(&mut shared_dim, &load_counts[..], &load_displacement[..]);
             self.communicator
                 .all_gather_varcount_into(&local_shared_dim[..], &mut partition);
         }
@@ -173,6 +186,7 @@ where
             shared_dim = vec![shared_dim[0]; self.equivalent_surface_order.len()]
         }
 
+        // Compute message sizes of local buffers
         let mut local_msg_size_uc2e_inv_1 = 0;
         let mut local_msg_size_uc2e_inv_2 = 0;
 
@@ -204,7 +218,7 @@ where
         let mut msg_counts_uc2e_inv_2 = Vec::new();
 
         for (_rank, &load_r, &load_displacement_r) in
-            izip!((0..size), load.iter(), load_displacement.iter())
+            izip!((0..size), load_counts.iter(), load_displacement.iter())
         {
             let equivalent_surface_order = &self.equivalent_surface_order
                 [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
@@ -319,7 +333,7 @@ where
 
         // Calculate all M2M operator matrices
         let level_iterator = if self.variable_expansion_order {
-            0..self.equivalent_surface_order.len() - 1
+            0..self.tree.source_tree().total_depth()
         } else {
             0..1
         };
@@ -332,10 +346,8 @@ where
         // Calculate M2M operator matrices on each level, if required
         for parent_level in level_iterator {
             let check_surface_order_parent = self.check_surface_order(parent_level as u64);
-            let equivalent_surface_order_parent =
-                self.equivalent_surface_order(parent_level as u64);
-            let equivalent_surface_order_child =
-                self.equivalent_surface_order((parent_level + 1) as u64);
+            let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
+            let equivalent_surface_order_child = self.equivalent_surface_order(parent_level + 1);
 
             let parent_upward_check_surface =
                 root.surface_grid(check_surface_order_parent, domain, alpha_outer);
@@ -410,112 +422,336 @@ where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
+    Self: MetadataAccess,
 {
     fn target(&mut self) {
+        let root = MortonKey::<Scalar::Real>::root();
+        let size = self.communicator.size();
+        let rank = self.communicator.rank();
 
-        // TODO
+        // Cast surface parameters
+        let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
+        let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
+        let domain = self.tree.domain();
 
-        // let root = MortonKey::<Scalar::Real>::root();
-        // let equivalent_surface_order = self.equivalent_surface_order;
-        // let check_surface_order = self.check_surface_order;
-        // let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
-        // let n_coeffs_check_surface = self.n_coeffs_check_surface;
+        // Local buffers
+        let mut local_dc2e_inv_1 = Vec::new();
+        let mut local_dc2e_inv_2 = Vec::new();
 
-        // // Cast surface parameters
-        // let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
-        // let alpha_inner = Scalar::from(ALPHA_INNER).unwrap().re();
-        // let domain = self.tree.domain();
+        // Distribute pseudo-inverse calculation, if have variable expansion order by level
+        // Number of pre-computations
+        let n_precomputations = if self.variable_expansion_order {
+            self.equivalent_surface_order.len() as i32
+        } else {
+            1
+        };
 
-        // let mut l2l = Vec::new();
-        // let mut l2l_global = Vec::new();
+        let (load_counts, load_displacement) =
+            calculate_precomputation_load(n_precomputations, size).unwrap();
 
-        // let downward_equivalent_surface =
-        //     root.surface_grid(equivalent_surface_order, domain, alpha_outer);
-        // let downward_check_surface = root.surface_grid(check_surface_order, domain, alpha_inner);
+        // Compute mandated local portion
+        let local_load_count = load_counts[rank as usize];
+        let local_load_displacement = load_displacement[rank as usize];
+        let equivalent_surface_order = &self.equivalent_surface_order[(local_load_displacement
+            as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+        let check_surface_order = &self.check_surface_order[(local_load_displacement as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+        let mut local_shared_dim = Vec::new();
 
-        // let mut dc2e = rlst_dynamic_array2!(
-        //     Scalar,
-        //     [n_coeffs_check_surface, n_coeffs_equivalent_surface]
-        // );
-        // self.kernel.assemble_st(
-        //     GreenKernelEvalType::Value,
-        //     &downward_check_surface[..],
-        //     &downward_equivalent_surface[..],
-        //     dc2e.data_mut(),
-        // );
+        for (&equivalent_surface_order, &check_surface_order) in equivalent_surface_order
+            .iter()
+            .zip(check_surface_order.iter())
+        {
+            // Compute required surfaces
+            let downward_equivalent_surface =
+                root.surface_grid(equivalent_surface_order, domain, alpha_outer);
+            let downward_check_surface =
+                root.surface_grid(check_surface_order, domain, alpha_inner);
 
-        // let (s, ut, v) = pinv::<Scalar>(&dc2e, None, None).unwrap();
+            let n_coeffs_equivalent_surface = ncoeffs_kifmm(equivalent_surface_order);
+            let n_coeffs_check_surface = ncoeffs_kifmm(check_surface_order);
 
-        // let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
-        // for i in 0..s.len() {
-        //     mat_s[[i, i]] = Scalar::from_real(s[i]);
-        // }
+            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
+            // As well as estimating their inverses using SVD
+            let mut dc2e = rlst_dynamic_array2!(
+                Scalar,
+                [n_coeffs_check_surface, n_coeffs_equivalent_surface]
+            );
+            self.kernel.assemble_st(
+                GreenKernelEvalType::Value,
+                &downward_check_surface[..],
+                &downward_equivalent_surface[..],
+                dc2e.data_mut(),
+            );
 
-        // let dc2e_inv_1 = vec![empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r())];
-        // let dc2e_inv_2 = vec![ut];
+            let (s, ut, v) = pinv(&dc2e, None, None).unwrap();
+            local_shared_dim.push(s.len());
 
-        // let mut dc2e_inv_1_global = dc2e_inv_1
-        //     .iter()
-        //     .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
-        //     .collect_vec();
-        // let mut dc2e_inv_2_global = dc2e_inv_2
-        //     .iter()
-        //     .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
-        //     .collect_vec();
+            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            for i in 0..s.len() {
+                mat_s[[i, i]] = Scalar::from_real(s[i]);
+            }
 
-        // dc2e_inv_1_global
-        //     .iter_mut()
-        //     .enumerate()
-        //     .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_1[i].data()));
-        // dc2e_inv_2_global
-        //     .iter_mut()
-        //     .enumerate()
-        //     .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_2[i].data()));
+            local_dc2e_inv_1
+                .push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
+            local_dc2e_inv_2.push(ut);
+        }
 
-        // let parent_downward_equivalent_surface =
-        //     root.surface_grid(equivalent_surface_order, domain, alpha_outer);
+        // Need to gather results at all ranks
 
-        // let children = root.children();
+        // Gather shared dimension of dc2e_inv_1 and dc2e_inv_2
+        let mut shared_dim = vec![0usize; n_precomputations as usize];
+        {
+            let mut partition =
+                PartitionMut::new(&mut shared_dim, &load_counts[..], &load_displacement[..]);
+            self.communicator
+                .all_gather_varcount_into(&local_shared_dim[..], &mut partition);
+        }
 
-        // for child in children.iter() {
-        //     let child_downward_check_surface =
-        //         child.surface_grid(check_surface_order, domain, alpha_inner);
+        // If only a single precomputation have to update shared dim to match size of equivalent/check surface order vecs for buffer calcs
+        if n_precomputations == 1 {
+            shared_dim = vec![shared_dim[0]; self.equivalent_surface_order.len()]
+        }
 
-        //     // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
-        //     let mut pe2cc = rlst_dynamic_array2!(
-        //         Scalar,
-        //         [n_coeffs_check_surface, n_coeffs_equivalent_surface]
-        //     );
-        //     self.kernel.assemble_st(
-        //         GreenKernelEvalType::Value,
-        //         &child_downward_check_surface,
-        //         &parent_downward_equivalent_surface,
-        //         pe2cc.data_mut(),
-        //     );
+        // Compute message sizes of local buffers
+        let mut local_msg_size_dc2e_inv_1 = 0;
+        let mut local_msg_size_dc2e_inv_2 = 0;
 
-        //     let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
-        //         dc2e_inv_1[0].r(),
-        //         empty_array::<Scalar, 2>().simple_mult_into_resize(dc2e_inv_2[0].r(), pe2cc.r()),
-        //     );
+        for (mat_1, mat_2) in izip!(local_dc2e_inv_1.iter(), local_dc2e_inv_2.iter()) {
+            local_msg_size_dc2e_inv_1 += mat_1.shape()[0] * mat_1.shape()[1];
+            local_msg_size_dc2e_inv_2 += mat_2.shape()[0] * mat_2.shape()[1];
+        }
 
-        //     tmp.data_mut()
-        //         .iter_mut()
-        //         .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+        // Flatten buffers for sending
+        let mut local_msg_dc2e_inv_1 = vec![Scalar::zero(); local_msg_size_dc2e_inv_1];
+        let mut local_msg_dc2e_inv_2 = vec![Scalar::zero(); local_msg_size_dc2e_inv_2];
 
-        //     let mut tmp2 = rlst_dynamic_array2!(Scalar, tmp.shape());
-        //     tmp2.data_mut().copy_from_slice(tmp.data());
+        let mut curr1 = 0;
+        let mut curr2 = 0;
+        for (mat_1, mat_2) in izip!(local_dc2e_inv_1.iter(), local_dc2e_inv_2.iter()) {
+            let mat_1_size = mat_1.shape()[0] * mat_1.shape()[1];
+            local_msg_dc2e_inv_1[curr1..(curr1 + mat_1_size)].copy_from_slice(mat_1.data());
+            curr1 = mat_1_size;
 
-        //     l2l.push(tmp);
-        //     l2l_global.push(tmp2);
-        // }
+            let mat_2_size = mat_1.shape()[0] * mat_1.shape()[1];
+            local_msg_dc2e_inv_2[curr2..(curr2 + mat_2_size)].copy_from_slice(mat_2.data());
+            curr2 = mat_1_size;
+        }
 
-        // self.global_fmm.target_vec = vec![l2l_global];
-        // self.global_fmm.dc2e_inv_1 = dc2e_inv_1_global;
-        // self.global_fmm.dc2e_inv_2 = dc2e_inv_2_global;
+        // Setup buffers to receive data
+        let mut msg_size_dc2e_inv_1 = 0;
+        let mut msg_size_dc2e_inv_2 = 0;
+        let mut msg_counts_dc2e_inv_1 = Vec::new();
+        let mut msg_counts_dc2e_inv_2 = Vec::new();
 
-        // self.target_vec = l2l;
-        // self.dc2e_inv_1 = dc2e_inv_1;
-        // self.dc2e_inv_2 = dc2e_inv_2;
+        for (_rank, &load_r, &load_displacement_r) in
+            izip!((0..size), load_counts.iter(), load_displacement.iter())
+        {
+            let equivalent_surface_order = &self.equivalent_surface_order
+                [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
+            let check_surface_order = &self.check_surface_order
+                [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
+            let shared_dim = &shared_dim
+                [(load_displacement_r as usize)..((load_displacement_r + load_r) as usize)];
+
+            let mut count_dc2e_inv_1 = 0;
+            let mut count_dc2e_inv_2 = 0;
+
+            for (&e_order, &c_order, &shared_dim) in
+                izip!(equivalent_surface_order, check_surface_order, shared_dim)
+            {
+                count_dc2e_inv_1 += ncoeffs_kifmm(c_order) * shared_dim;
+                count_dc2e_inv_2 += ncoeffs_kifmm(e_order) * shared_dim;
+            }
+
+            msg_counts_dc2e_inv_1.push(count_dc2e_inv_1 as Count);
+            msg_counts_dc2e_inv_2.push(count_dc2e_inv_2 as Count);
+
+            msg_size_dc2e_inv_1 += count_dc2e_inv_1;
+            msg_size_dc2e_inv_2 += count_dc2e_inv_2;
+        }
+
+        let msg_displs_dc2e_inv_1 = msg_counts_dc2e_inv_1
+            .iter()
+            .scan(0, |acc, &x| {
+                let tmp = *acc;
+                *acc += x;
+                Some(tmp)
+            })
+            .collect_vec();
+
+        let msg_displs_dc2e_inv_2 = msg_counts_dc2e_inv_2
+            .iter()
+            .scan(0, |acc, &x| {
+                let tmp = *acc;
+                *acc += x;
+                Some(tmp)
+            })
+            .collect_vec();
+
+        let mut buf_dc2e_inv_1 = vec![Scalar::zero(); msg_size_dc2e_inv_1];
+        let mut buf_dc2e_inv_2 = vec![Scalar::zero(); msg_size_dc2e_inv_2];
+
+        // Communicate pre-computations
+        {
+            let mut partition = PartitionMut::new(
+                &mut buf_dc2e_inv_1,
+                &msg_counts_dc2e_inv_1[..],
+                &msg_displs_dc2e_inv_1[..],
+            );
+            self.communicator
+                .all_gather_varcount_into(&local_msg_dc2e_inv_1, &mut partition);
+
+            let mut partition = PartitionMut::new(
+                &mut buf_dc2e_inv_2,
+                &msg_counts_dc2e_inv_2[..],
+                &msg_displs_dc2e_inv_2[..],
+            );
+            self.communicator
+                .all_gather_varcount_into(&local_msg_dc2e_inv_2, &mut partition);
+        }
+
+        // Re-structure messages using shared dimensions
+        let mut dc2e_inv_1_vec = Vec::new();
+        let mut dc2e_inv_2_vec = Vec::new();
+
+        if n_precomputations > 1 {
+            let mut curr1 = 0;
+            let mut curr2 = 0;
+            for (&e_order, &c_order, &shared_dim) in izip!(
+                &self.equivalent_surface_order,
+                &self.check_surface_order,
+                shared_dim.iter()
+            ) {
+                let l = curr1;
+                let r = curr1 + ncoeffs_kifmm(c_order) * shared_dim;
+                let mut dc2e_inv_1 =
+                    rlst_dynamic_array2!(Scalar, [ncoeffs_kifmm(c_order), shared_dim]);
+                dc2e_inv_1.data_mut().copy_from_slice(&buf_dc2e_inv_1[l..r]);
+                curr1 = r;
+
+                let l = curr2;
+                let r = curr2 + ncoeffs_kifmm(e_order) * shared_dim;
+                let mut dc2e_inv_2 =
+                    rlst_dynamic_array2!(Scalar, [shared_dim, ncoeffs_kifmm(e_order)]);
+                dc2e_inv_2.data_mut().copy_from_slice(&buf_dc2e_inv_2[l..r]);
+                curr2 = r;
+
+                dc2e_inv_1_vec.push(dc2e_inv_1);
+                dc2e_inv_2_vec.push(dc2e_inv_2);
+            }
+        } else {
+            let c_order = self.check_surface_order[0];
+            let e_order = self.equivalent_surface_order[0];
+            let shared_dim = shared_dim[0];
+            let l = 0;
+            let r = ncoeffs_kifmm(c_order) * shared_dim;
+            let mut dc2e_inv_1 = rlst_dynamic_array2!(Scalar, [ncoeffs_kifmm(c_order), shared_dim]);
+            dc2e_inv_1.data_mut().copy_from_slice(&buf_dc2e_inv_1[l..r]);
+
+            let l = 0;
+            let r = ncoeffs_kifmm(e_order) * shared_dim;
+            let mut dc2e_inv_2 = rlst_dynamic_array2!(Scalar, [shared_dim, ncoeffs_kifmm(e_order)]);
+            dc2e_inv_2.data_mut().copy_from_slice(&buf_dc2e_inv_2[l..r]);
+
+            dc2e_inv_1_vec.push(dc2e_inv_1);
+            dc2e_inv_2_vec.push(dc2e_inv_2);
+        }
+
+        // Calculate all L2L operator matrices
+        let level_iterator = if self.variable_expansion_order {
+            0..self.tree.target_tree().total_depth()
+        } else {
+            0..1
+        };
+
+        let mut l2l_vec = Vec::new();
+        let mut l2l_global_vec = Vec::new();
+
+        for parent_level in level_iterator {
+            let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
+            let check_surface_order_child = self.check_surface_order(parent_level + 1);
+
+            let parent_downward_equivalent_surface =
+                root.surface_grid(equivalent_surface_order_parent, domain, alpha_outer);
+
+            // Calculate L2L operator matrices
+            let children = root.children();
+            let n_coeffs_check_surface_child = ncoeffs_kifmm(check_surface_order_child);
+            let n_coeffs_equivalent_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+
+            let mut l2l_level_1 = Vec::new();
+            let mut l2l_level_2 = Vec::new();
+
+            for child in children.iter() {
+                let child_downward_check_surface =
+                    child.surface_grid(check_surface_order_child, domain, alpha_inner);
+
+                // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
+                let mut pe2cc = rlst_dynamic_array2!(
+                    Scalar,
+                    [
+                        n_coeffs_check_surface_child,
+                        n_coeffs_equivalent_surface_parent
+                    ]
+                );
+                self.kernel.assemble_st(
+                    GreenKernelEvalType::Value,
+                    &child_downward_check_surface,
+                    &parent_downward_equivalent_surface,
+                    pe2cc.data_mut(),
+                );
+
+                let mut tmp_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    dc2e_inv_1_vec[self.expansion_index(parent_level + 1)].r(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(
+                        dc2e_inv_2_vec[self.expansion_index(parent_level + 1)].r(),
+                        pe2cc.r(),
+                    ),
+                );
+
+                tmp_1
+                    .data_mut()
+                    .iter_mut()
+                    .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
+
+                let mut tmp_2 = rlst_dynamic_array2!(Scalar, tmp_1.shape());
+                tmp_2.data_mut().copy_from_slice(tmp_1.data());
+
+                l2l_level_1.push(tmp_1);
+                l2l_level_2.push(tmp_2);
+            }
+
+            l2l_vec.push(l2l_level_1);
+            l2l_global_vec.push(l2l_level_2);
+        }
+
+        let mut dc2e_inv_1_global = dc2e_inv_1_vec
+            .iter()
+            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .collect_vec();
+        let mut dc2e_inv_2_global = dc2e_inv_2_vec
+            .iter()
+            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .collect_vec();
+
+        dc2e_inv_1_global
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_1_vec[i].data()));
+        dc2e_inv_2_global
+            .iter_mut()
+            .enumerate()
+            .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_2_vec[i].data()));
+
+        self.global_fmm.target_vec = l2l_global_vec;
+        self.global_fmm.dc2e_inv_1 = dc2e_inv_1_global;
+        self.global_fmm.dc2e_inv_2 = dc2e_inv_2_global;
+
+        self.target_vec = l2l_vec;
+        self.dc2e_inv_1 = dc2e_inv_1_vec;
+        self.dc2e_inv_2 = dc2e_inv_2_vec;
     }
 }
 
@@ -1241,9 +1477,6 @@ where
         // Index pointers of multipole and local data, indexed by level
         let level_index_pointer_multipoles = level_index_pointer_multi_node(&self.tree.source_tree);
         let level_index_pointer_locals = level_index_pointer_multi_node(&self.tree.target_tree);
-
-        // println!("HERE global depth {:?} local depth {:?} n_coeffs {:?} ncoefss_local {:?}", global_depth, local_depth, self.n_coeffs_equivalent_surface, local_ncoeffs_equivalent_surface);
-        // assert!(false);
 
         // Allocate buffers for local potential data
         let potentials = vec![Scalar::default(); n_target_points * kernel_eval_size];
