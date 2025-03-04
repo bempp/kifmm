@@ -852,7 +852,13 @@ where
             ..((local_load_displacement + local_load_count) as usize)];
         let check_surface_order = &self.check_surface_order[(local_load_displacement as usize)
             ..((local_load_displacement + local_load_count) as usize)];
-        // let mut local_shared_dim = Vec::new();
+
+        let mut u_r = Vec::new();
+        let mut st_r = Vec::new();
+        let mut c_u_r = Vec::new();
+        let mut c_vt_r = Vec::new();
+        let mut cutoff_rank_r = Vec::new();
+        let mut directional_cutoff_ranks_r = Vec::new();
 
         for (&equivalent_surface_order, &check_surface_order, level) in izip!(equivalent_surface_order, check_surface_order, 0..=total_depth)
         {
@@ -970,10 +976,158 @@ where
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
             let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
 
-            
+            // Store compressed M2L operators
+            let thin_nrows = se2tc_thin.shape()[0];
+            let nst = se2tc_thin.shape()[1];
+            let k = std::cmp::min(thin_nrows, nst);
+            let mut st;
+            let mut _gamma;
+            let mut _r;
+
+            if self.source_to_target.surface_diff() == 0 {
+                st = rlst_dynamic_array2!(Scalar, u_big.r().transpose().shape());
+                st.fill_from(u_big.r().transpose())
+            } else {
+                match &self.source_to_target.svd_mode {
+                    &FmmSvdMode::Random {
+                        n_components,
+                        normaliser,
+                        n_oversamples,
+                        random_state,
+                    } => {
+                        let target_rank;
+                        if let Some(n_components) = n_components {
+                            target_rank = n_components
+                        } else {
+                            // Estimate target rank
+                            let max_equivalent_surface_ncoeffs =
+                                self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                            let max_check_surface_ncoeffs =
+                                self.n_coeffs_check_surface.iter().max().unwrap();
+                            target_rank =
+                                max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                        }
+
+                        (_gamma, _r, st) = Scalar::rsvd_fixed_rank(
+                            &se2tc_thin,
+                            target_rank,
+                            n_oversamples,
+                            normaliser,
+                            random_state,
+                        )
+                        .unwrap();
+                    }
+                    FmmSvdMode::Deterministic => {
+                        _r = rlst_dynamic_array2!(Scalar, [thin_nrows, k]);
+                        _gamma = vec![Scalar::zero().re(); k];
+                        st = rlst_dynamic_array2!(Scalar, [k, nst]);
+                        se2tc_thin
+                            .into_svd_alloc(
+                                _r.r_mut(),
+                                st.r_mut(),
+                                &mut _gamma[..],
+                                SvdMode::Reduced,
+                            )
+                            .unwrap();
+                    }
+                }
+            }
+
+            u.fill_from(u_big.into_subview([0, 0], [mu, cutoff_rank]));
+            vt.fill_from(vt_big.into_subview([0, 0], [cutoff_rank, nvt]));
+            for (j, s) in sigma.iter().enumerate().take(cutoff_rank) {
+                unsafe {
+                    *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                }
+            }
+
+            let mut s_trunc = rlst_dynamic_array2!(Scalar, [nst, cutoff_rank]);
+            for j in 0..cutoff_rank {
+                for i in 0..nst {
+                    unsafe { *s_trunc.get_unchecked_mut([i, j]) = *st.get_unchecked([j, i]) }
+                }
+            }
+
+            let c_u = Mutex::new(Vec::new());
+            let c_vt = Mutex::new(Vec::new());
+            let directional_cutoff_ranks =
+                Mutex::new(vec![0usize; self.source_to_target.transfer_vectors.len()]);
+
+            for _ in 0..NTRANSFER_VECTORS_KIFMM {
+                c_u.lock()
+                    .unwrap()
+                    .push(rlst_dynamic_array2!(Scalar, [1, 1]));
+                c_vt.lock()
+                    .unwrap()
+                    .push(rlst_dynamic_array2!(Scalar, [1, 1]));
+            }
+
+            (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
+                let vt_block = vt.r().into_subview([0, i * n_cols], [cutoff_rank, n_cols]);
+
+                let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                    sigma_mat.r(),
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(vt_block.r(), s_trunc.r()),
+                );
+
+                let mut u_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+                let mut sigma_i = vec![Scalar::zero().re(); cutoff_rank];
+                let mut vt_i = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+
+                tmp.into_svd_alloc(u_i.r_mut(), vt_i.r_mut(), &mut sigma_i, SvdMode::Full)
+                    .unwrap();
+
+                let directional_cutoff_rank =
+                    find_cutoff_rank(&sigma_i, self.source_to_target.threshold, cutoff_rank);
+
+                let mut u_i_compressed =
+                    rlst_dynamic_array2!(Scalar, [cutoff_rank, directional_cutoff_rank]);
+                let mut vt_i_compressed_ =
+                    rlst_dynamic_array2!(Scalar, [directional_cutoff_rank, cutoff_rank]);
+
+                let mut sigma_mat_i_compressed = rlst_dynamic_array2!(
+                    Scalar,
+                    [directional_cutoff_rank, directional_cutoff_rank]
+                );
+
+                u_i_compressed
+                    .fill_from(u_i.into_subview([0, 0], [cutoff_rank, directional_cutoff_rank]));
+                vt_i_compressed_
+                    .fill_from(vt_i.into_subview([0, 0], [directional_cutoff_rank, cutoff_rank]));
+
+                for (j, s) in sigma_i.iter().enumerate().take(directional_cutoff_rank) {
+                    unsafe {
+                        *sigma_mat_i_compressed.get_unchecked_mut([j, j]) =
+                            Scalar::from(*s).unwrap();
+                    }
+                }
+
+                let vt_i_compressed = empty_array::<Scalar, 2>()
+                    .simple_mult_into_resize(sigma_mat_i_compressed.r(), vt_i_compressed_.r());
+
+                directional_cutoff_ranks.lock().unwrap()[i] = directional_cutoff_rank;
+                c_u.lock().unwrap()[i] = u_i_compressed;
+                c_vt.lock().unwrap()[i] = vt_i_compressed;
+            });
+
+            let mut st_trunc = rlst_dynamic_array2!(Scalar, [cutoff_rank, nst]);
+            st_trunc.fill_from(s_trunc.transpose());
+
+            let c_vt = std::mem::take(&mut *c_vt.lock().unwrap());
+            let c_u = std::mem::take(&mut *c_u.lock().unwrap());
+            let directional_cutoff_ranks =
+                std::mem::take(&mut *directional_cutoff_ranks.lock().unwrap());
+
+            u_r.push(u);
+            st_r.push(st_trunc);
+            c_u_r.push(c_u);
+            c_vt_r.push(c_vt);
+            cutoff_rank_r.push(cutoff_rank);
+            directional_cutoff_ranks_r.push(directional_cutoff_ranks);
         }
 
-        // TODO
+        // TODO Communicate local results back
+
 
         // // Compute unique M2L interactions at level 3, shallowest level which contains them all
         // // Compute interaction matrices between source and unique targets, defined by unique transfer vectors

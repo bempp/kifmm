@@ -1228,8 +1228,6 @@ where
                 .directional_cutoff_ranks
                 .push(directional_cutoff_ranks);
         }
-
-        // self.source_to_target = result;
     }
 }
 
