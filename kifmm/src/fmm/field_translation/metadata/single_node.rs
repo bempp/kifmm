@@ -55,21 +55,28 @@ use crate::{
 
 /// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
 /// using a specified `threshold` as a tolerance parameter
-pub fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
+pub(crate) fn find_cutoff_rank<T: Float + RlstScalar + Gemm>(
     singular_values: &[T],
     threshold: T,
-    max_rank: usize,
+    max_rank: usize
 ) -> usize {
+
     let len = singular_values.len().min(max_rank);
+    let mut frob_k: Vec<T> = singular_values.iter()
+        .rev() // Reverse order
+        .map(|&x| x * x) // Square each element
+        .scan(T::zero(), |acc, x| {
+            *acc += x;
+            Some(*acc)
+        }) // Compute cumulative sum
+        .map(<T as RlstScalar>::sqrt) // Take the square root
+        .collect();
 
-    for (i, &s) in singular_values.iter().take(len).enumerate() {
-        if s <= threshold {
-            return i;
-        }
-    }
-
-    len - 1
+    frob_k.reverse(); // Reverse back to original order
+    frob_k.iter().position(|&x| x < threshold).unwrap_or(len - 1)
 }
+
+
 impl<Scalar, FieldTranslation> SourceTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
