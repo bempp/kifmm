@@ -937,8 +937,9 @@ where
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let depth = self.tree.source_tree().depth();
+        let alpha = Scalar::real(ALPHA_INNER);
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let iterator = if self.variable_expansion_order {
             (2..=depth)
                 .zip(self.equivalent_surface_order.iter().skip(2).cloned())
                 .zip(self.check_surface_order.iter().skip(2).cloned())
@@ -960,14 +961,13 @@ where
             let transfer_vectors =
                 compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
 
-            let nrows = ncoeffs_kifmm(check_surface_order);
-            let ncols = ncoeffs_kifmm(equivalent_surface_order);
+            let n_rows = ncoeffs_kifmm(check_surface_order);
+            let n_cols = ncoeffs_kifmm(equivalent_surface_order);
 
             let mut se2tc_fat =
-                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+                rlst_dynamic_array2!(Scalar, [n_rows, n_cols * NTRANSFER_VECTORS_KIFMM]);
             let mut se2tc_thin =
-                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
-            let alpha = Scalar::real(ALPHA_INNER);
+                rlst_dynamic_array2!(Scalar, [n_rows * NTRANSFER_VECTORS_KIFMM, n_cols]);
 
             transfer_vectors.iter().enumerate().for_each(|(i, t)| {
                 let source_equivalent_surface = t.source.surface_grid(
@@ -981,7 +981,7 @@ where
                     alpha,
                 );
 
-                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
@@ -992,12 +992,12 @@ where
 
                 let mut block = se2tc_fat
                     .r_mut()
-                    .into_subview([0, i * ncols], [nrows, ncols]);
+                    .into_subview([0, i * n_cols], [n_rows, n_cols]);
                 block.fill_from(tmp_gram.r());
 
                 let mut block_column = se2tc_thin
                     .r_mut()
-                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                    .into_subview([i * n_rows, 0], [n_rows, n_cols]);
                 block_column.fill_from(tmp_gram.r());
             });
 
@@ -1064,9 +1064,10 @@ where
                 }
             }
 
+            // TODO Make more stable by taking norm of approximation error wrt to true matrix
             // Cutoff rank is the minimum of the target rank and the value found by user threshold
             let cutoff_rank =
-                find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, n_cols).min(target_rank);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
@@ -1159,7 +1160,7 @@ where
             }
 
             (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-                let vt_block = vt.r().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+                let vt_block = vt.r().into_subview([0, i * n_cols], [cutoff_rank, n_cols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     sigma_mat.r(),
@@ -1888,13 +1889,13 @@ where
         };
 
         for (equivalent_surface_order, check_surface_order) in iterator {
-            let nrows = ncoeffs_kifmm(check_surface_order);
-            let ncols = ncoeffs_kifmm(equivalent_surface_order);
+            let n_rows = ncoeffs_kifmm(check_surface_order);
+            let n_cols = ncoeffs_kifmm(equivalent_surface_order);
 
             let mut se2tc_fat =
-                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+                rlst_dynamic_array2!(Scalar, [n_rows, n_cols * NTRANSFER_VECTORS_KIFMM]);
             let mut se2tc_thin =
-                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+                rlst_dynamic_array2!(Scalar, [n_rows * NTRANSFER_VECTORS_KIFMM, n_cols]);
             let alpha = Scalar::real(ALPHA_INNER);
 
             for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
@@ -1910,7 +1911,7 @@ where
                     alpha,
                 );
 
-                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
@@ -1921,12 +1922,12 @@ where
 
                 let mut block = se2tc_fat
                     .r_mut()
-                    .into_subview([0, i * ncols], [nrows, ncols]);
+                    .into_subview([0, i * n_cols], [n_rows, n_cols]);
                 block.fill_from(tmp_gram.r());
 
                 let mut block_column = se2tc_thin
                     .r_mut()
-                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                    .into_subview([i * n_rows, 0], [n_rows, n_cols]);
                 block_column.fill_from(tmp_gram.r());
             }
 
@@ -1995,7 +1996,7 @@ where
 
             // Cutoff rank is the minimum of the target rank and the value found by user threshold
             let cutoff_rank =
-                find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, n_cols).min(target_rank);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
@@ -2088,7 +2089,7 @@ where
             }
 
             (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-                let vt_block = vt.r().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+                let vt_block = vt.r().into_subview([0, i * n_cols], [cutoff_rank, n_cols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     sigma_mat.r(),

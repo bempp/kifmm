@@ -906,15 +906,6 @@ where
         // TODO: Add real matvecs
         let n_matvecs = 1;
 
-        // Find mapping between received leaves of global tree, which are roots of the local trees, and their index
-        // for mapping multipole data
-
-        // for level in 0..=global_depth {
-        //     println!("level {:?} {:?} {:?}",  level, self.n_coeffs_equivalent_surface, self.n_coeffs_equivalent_surface(level))
-        // }
-
-        // assert!(false);
-
         let n_multipole_coeffs = (0..=global_depth).fold(0usize, |acc, level| {
             acc + self.tree.source_tree().n_keys(level).unwrap()
                 * self.n_coeffs_equivalent_surface(level)

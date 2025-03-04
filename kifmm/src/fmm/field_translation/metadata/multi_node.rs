@@ -18,6 +18,7 @@ use rlst::{
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, RwLock};
 
+use crate::fmm::field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level;
 use crate::fmm::helpers::multi_node::{
     coordinate_index_pointer_multi_node, leaf_expansion_pointers_multi_node,
     leaf_surfaces_multi_node, level_expansion_pointers_multi_node, level_index_pointer_multi_node,
@@ -102,7 +103,7 @@ where
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
-        let size = self.communicator.size(); // Number of processors available
+        let size = self.communicator.size();
         let rank = self.communicator.rank();
 
         // Cast surface parameters
@@ -827,6 +828,150 @@ where
     }
 
     fn source_to_target(&mut self) {
+        let size = self.communicator.size();
+        let rank = self.communicator.rank();
+        let total_depth = self.tree.source_tree().total_depth();
+        let alpha = Scalar::real(ALPHA_INNER);
+
+        // Distribute SVD by level
+        // Number of pre-computations
+        let n_precomputations = if self.variable_expansion_order {
+            self.equivalent_surface_order.len() as i32
+        } else {
+            1
+        };
+
+        let (load_counts, load_displacement) =
+            calculate_precomputation_load(n_precomputations, size).unwrap();
+
+        // Compute mandated local portion
+        let local_load_count = load_counts[rank as usize];
+        let local_load_displacement = load_displacement[rank as usize];
+        let equivalent_surface_order = &self.equivalent_surface_order[(local_load_displacement
+            as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+        let check_surface_order = &self.check_surface_order[(local_load_displacement as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+        // let mut local_shared_dim = Vec::new();
+
+        for (&equivalent_surface_order, &check_surface_order, level) in izip!(equivalent_surface_order, check_surface_order, 0..=total_depth)
+        {
+            let transfer_vectors =
+                compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
+
+            let n_rows = ncoeffs_kifmm(check_surface_order);
+            let n_cols = ncoeffs_kifmm(equivalent_surface_order);
+
+            let mut se2tc_fat =
+                rlst_dynamic_array2!(Scalar, [n_rows, n_cols * NTRANSFER_VECTORS_KIFMM]);
+            let mut se2tc_thin =
+                rlst_dynamic_array2!(Scalar, [n_rows * NTRANSFER_VECTORS_KIFMM, n_cols]);
+
+            transfer_vectors.iter().enumerate().for_each(|(i, t)| {
+                let source_equivalent_surface = t.source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+                let target_check_surface = t.target.surface_grid(
+                    check_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
+
+                self.kernel.assemble_st(
+                    GreenKernelEvalType::Value,
+                    &target_check_surface[..],
+                    &source_equivalent_surface[..],
+                    tmp_gram.data_mut(),
+                );
+
+                let mut block = se2tc_fat
+                    .r_mut()
+                    .into_subview([0, i * n_cols], [n_rows, n_cols]);
+                block.fill_from(tmp_gram.r());
+
+                let mut block_column = se2tc_thin
+                    .r_mut()
+                    .into_subview([i * n_rows, 0], [n_rows, n_cols]);
+                block_column.fill_from(tmp_gram.r());
+            });
+
+            let mu = se2tc_fat.shape()[0];
+            let nvt = se2tc_fat.shape()[1];
+            let k = std::cmp::min(mu, nvt);
+
+            let mut u_big = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut sigma = vec![Scalar::zero().re(); k];
+            let mut vt_big = rlst_dynamic_array2!(Scalar, [k, nvt]);
+
+            // Target rank defined by max dimension before cutoff
+            let mut target_rank = k;
+
+            match &self.source_to_target.svd_mode {
+                &FmmSvdMode::Random {
+                    n_components,
+                    normaliser,
+                    n_oversamples,
+                    random_state,
+                } => {
+                    // Estimate target rank if unspecified by user
+                    if let Some(n_components) = n_components {
+                        target_rank = n_components
+                    } else {
+                        let max_equivalent_surface_ncoeffs =
+                            self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                        let max_check_surface_ncoeffs =
+                            self.n_coeffs_check_surface.iter().max().unwrap();
+                        target_rank =
+                            max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs) / 2;
+                    }
+
+                    let mut se2tc_fat_transpose =
+                        rlst_dynamic_array2!(Scalar, se2tc_fat.r().transpose().shape());
+                    se2tc_fat_transpose
+                        .r_mut()
+                        .fill_from(se2tc_fat.r().transpose());
+
+                    let (sigma_t, u_big_t, vt_big_t) = Scalar::rsvd_fixed_rank(
+                        &se2tc_fat_transpose,
+                        target_rank,
+                        n_oversamples,
+                        normaliser,
+                        random_state,
+                    )
+                    .unwrap();
+                    u_big = rlst_dynamic_array2!(Scalar, [mu, sigma_t.len()]);
+                    vt_big = rlst_dynamic_array2!(Scalar, [sigma_t.len(), nvt]);
+
+                    vt_big.fill_from(u_big_t.transpose());
+                    u_big.fill_from(vt_big_t.transpose());
+                    sigma = sigma_t;
+                }
+                FmmSvdMode::Deterministic => {
+                    se2tc_fat
+                        .into_svd_alloc(
+                            u_big.r_mut(),
+                            vt_big.r_mut(),
+                            &mut sigma[..],
+                            SvdMode::Reduced,
+                        )
+                        .unwrap();
+                }
+            }
+
+            // Cutoff rank is the minimum of the target rank and the value found by user threshold
+            let cutoff_rank =
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, n_cols).min(target_rank);
+
+            let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
+            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
+            let mut vt = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+
+            
+        }
 
         // TODO
 
