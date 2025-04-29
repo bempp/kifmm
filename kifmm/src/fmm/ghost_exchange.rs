@@ -120,77 +120,79 @@ where
 
     fn scatter_global_fmm_from_root(&mut self) {
 
-        // TODO
+        let rank = self.communicator.rank();
+        let n_roots = self.tree.target_tree.trees.len();
 
-        // let rank = self.communicator.rank();
-        // let n_roots = self.tree.target_tree.trees.len();
+        let mut expected_roots = vec![MortonKey::<Scalar::Real>::default(); n_roots];
 
-        // let mut expected_roots = vec![MortonKey::<Scalar::Real>::default(); n_roots];
+        // Number of coefficients of eqyuivalent surfaces at leaf level of global tree
+        let n_coeffs_equivalent_surface =
+            self.n_coeffs_equivalent_surface(self.tree.source_tree.global_depth());
 
-        // // Allocate buffers to receive local data
-        // let receive_buffer_size = n_roots * self.n_coeffs_equivalent_surface;
-        // let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
+        // Allocate buffers to receive local data
+        let receive_buffer_size = n_roots * n_coeffs_equivalent_surface;
+        let mut receive_buffer = vec![Scalar::default(); receive_buffer_size];
 
-        // // Nominated rank chosen to run global upward pass
-        // let root_rank = 0;
-        // let root_process = self.communicator.process_at_rank(root_rank);
+        // Nominated rank chosen to run global upward pass
+        let root_rank = 0;
+        let root_process = self.communicator.process_at_rank(root_rank);
 
-        // if rank == root_rank {
-        //     // Lookup local data to be sent back from global FMM
-        //     // let send_buffer_size = self.local_roots.len() * self.n_coeffs_equivalent_surface;
-        //     let send_buffer_size =
-        //         self.tree.target_tree.all_roots.len() * self.n_coeffs_equivalent_surface;
-        //     let mut send_buffer = vec![Scalar::default(); send_buffer_size];
+        if rank == root_rank {
+            // Lookup local data to be sent back from global FMM
+            let send_buffer_size =
+                self.tree.target_tree.all_roots.len() * n_coeffs_equivalent_surface;
+            let mut send_buffer = vec![Scalar::default(); send_buffer_size];
 
-        //     for (root_idx, root) in self.tree.target_tree.all_roots.iter().enumerate() {
-        //         if let Some(local) = self.global_fmm.local(root) {
-        //             send_buffer[root_idx * self.n_coeffs_equivalent_surface
-        //                 ..(root_idx + 1) * self.n_coeffs_equivalent_surface]
-        //                 .copy_from_slice(local);
-        //         }
-        //     }
+            for (root_idx, root) in self.tree.target_tree.all_roots.iter().enumerate() {
+                if let Some(local) = self.global_fmm.local(root) {
+                    send_buffer[root_idx * n_coeffs_equivalent_surface
+                        ..(root_idx + 1) * n_coeffs_equivalent_surface]
+                        .copy_from_slice(local);
+                }
+            }
 
-        //     // Displace items to send back by number of coefficients
-        //     let counts = self
-        //         .tree
-        //         .target_tree
-        //         .all_roots_counts
-        //         .iter()
-        //         .map(|&c| c * (self.n_coeffs_equivalent_surface as i32))
-        //         .collect_vec();
+            // Displace items to send back by number of coefficients
+            let counts = self
+                .tree
+                .target_tree
+                .all_roots_counts
+                .iter()
+                .map(|&c| c * (n_coeffs_equivalent_surface as i32))
+                .collect_vec();
 
-        //     let displacements = self
-        //         .tree
-        //         .target_tree
-        //         .all_roots_displacements
-        //         .iter()
-        //         .map(|&d| d * (self.n_coeffs_equivalent_surface as i32))
-        //         .collect_vec();
+            let displacements = self
+                .tree
+                .target_tree
+                .all_roots_displacements
+                .iter()
+                .map(|&d| d * (n_coeffs_equivalent_surface as i32))
+                .collect_vec();
 
-        //     // Send back coefficient data
-        //     let partition = Partition::new(&send_buffer, counts, &displacements[..]);
-        //     root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
+            // Send back coefficient data
+            let partition = Partition::new(&send_buffer, counts, &displacements[..]);
+            root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
 
-        //     // Send back associated keys
-        //     let partition = Partition::new(
-        //         &self.tree.target_tree.all_roots,
-        //         &self.tree.target_tree.all_roots_counts[..],
-        //         &self.tree.target_tree.all_roots_displacements[..],
-        //     );
-        //     root_process.scatter_varcount_into_root(&partition, &mut expected_roots);
-        // } else {
-        //     root_process.scatter_varcount_into(&mut receive_buffer);
-        //     root_process.scatter_varcount_into(&mut expected_roots);
-        // }
+            // Send back associated keys
+            let partition = Partition::new(
+                &self.tree.target_tree.all_roots,
+                &self.tree.target_tree.all_roots_counts[..],
+                &self.tree.target_tree.all_roots_displacements[..],
+            );
+            root_process.scatter_varcount_into_root(&partition, &mut expected_roots);
+        } else {
+            root_process.scatter_varcount_into(&mut receive_buffer);
+            root_process.scatter_varcount_into(&mut expected_roots);
+        }
 
-        // // Insert received local data into target tree
-        // for (i, root) in expected_roots.iter().enumerate() {
-        //     let l = i * self.n_coeffs_equivalent_surface;
-        //     let r = l + self.n_coeffs_equivalent_surface;
-        //     self.local_mut(root)
-        //         .unwrap()
-        //         .copy_from_slice(&receive_buffer[l..r]);
-        // }
+        // TODO might be broken if level locals is incorrectly set
+        // Insert received local data into target tree
+        for (i, root) in expected_roots.iter().enumerate() {
+            let l = i * self.n_coeffs_equivalent_surface;
+            let r = l + self.n_coeffs_equivalent_surface;
+            self.local_mut(root)
+                .unwrap()
+                .copy_from_slice(&receive_buffer[l..r]);
+        }
     }
 
     fn u_list_exchange(&mut self) {

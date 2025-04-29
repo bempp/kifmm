@@ -762,7 +762,6 @@ where
     Scalar: RlstScalar + Default + MatrixRsvd + Equivalence + Float,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
 {
-    // TODO even this can be parallelized with MPI
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
 
@@ -1499,7 +1498,6 @@ where
 
         // Repeat for c_vt_r
         let n_cols_c_u_r = c_u_r.iter().map(|x| x.shape()[1]).collect_vec();
-
         let n_rows_c_u_r = c_u_r.iter().map(|x| x.shape()[0]).collect_vec();
 
         // Setup buffers to receive c_u_r sizes from all ranks
@@ -1624,7 +1622,6 @@ where
 
         // Repeat for c_vt_r
         let n_cols_c_vt_r = c_vt_r.iter().map(|x| x.shape()[1]).collect_vec();
-
         let n_rows_c_vt_r = c_vt_r.iter().map(|x| x.shape()[0]).collect_vec();
 
         // Setup buffers to receive c_vt_r sizes from all ranks
