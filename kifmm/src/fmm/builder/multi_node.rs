@@ -419,6 +419,7 @@ where
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
                 metadata_times: Vec::default(),
+                ghost_requested_queries_v: Vec::default(),
                 ghost_requested_queries_key_to_index_v: HashMap::default(),
                 ghost_requested_queries_counts_v: Vec::default(),
                 ghost_received_queries_displacements_v: Vec::default(),

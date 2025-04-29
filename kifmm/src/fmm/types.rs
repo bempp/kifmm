@@ -1118,6 +1118,9 @@ where
     /// Store received V list queries displacements
     pub(crate) ghost_received_queries_displacements_v: Vec<Count>,
 
+    /// Store requsted V List queries that have actually been found
+    pub(crate) ghost_requested_queries_v: Vec<u64>,
+
     /// Store requested V list queries counts
     pub(crate) ghost_requested_queries_counts_v: Vec<Count>,
 

@@ -187,8 +187,8 @@ where
         // TODO might be broken if level locals is incorrectly set
         // Insert received local data into target tree
         for (i, root) in expected_roots.iter().enumerate() {
-            let l = i * self.n_coeffs_equivalent_surface;
-            let r = l + self.n_coeffs_equivalent_surface;
+            let l = i * n_coeffs_equivalent_surface;
+            let r = l + n_coeffs_equivalent_surface;
             self.local_mut(root)
                 .unwrap()
                 .copy_from_slice(&receive_buffer[l..r]);
@@ -686,6 +686,8 @@ where
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
         }
 
+        self.ghost_requested_queries_v = requested_queries.clone();
+
         // Store original ordering of received data temporarily
         let ghost_keys = requested_queries
             .into_iter()
@@ -750,115 +752,172 @@ where
         );
     }
 
+    // TODO the hard one
+    // Maybe need to re-think how I send back multipoles as I now need to keep a track of the buffer sizes which I don't
+    // do explicitl.y
     fn v_list_exchange_runtime(&mut self) {
-        // TODO
 
-        // // Available multipole data from received requests
-        // let mut available_multipoles = Vec::new();
+        // Available multipole data from received requests
+        let mut available_multipoles = Vec::new();
         // let mut available_multipoles_counts = Vec::new();
+        let mut available_multipoles_buffer_sizes_counts = Vec::new();
         // let mut available_multipoles_displacements = Vec::new();
 
-        // {
-        //     let mut counter = 0;
+        {
+            let mut counter = 0;
 
-        //     // Iterate over received data rank by rank
-        //     for (count, displacement) in self
-        //         .ghost_received_queries_counts_v
-        //         .iter()
-        //         .zip(self.ghost_received_queries_displacements_v.iter())
-        //     {
-        //         let l = *displacement as usize;
-        //         let r = l + (*count as usize);
+            // Iterate over received data rank by rank
+            for (count, displacement) in self
+                .ghost_received_queries_counts_v
+                .iter()
+                .zip(self.ghost_received_queries_displacements_v.iter())
+            {
+                let l = *displacement as usize;
+                let r = l + (*count as usize);
 
-        //         // Received queries from this rank
-        //         let received_queries_rank = &self.ghost_received_queries_v[l..r]; // received queries from this rank
+                // Received queries from this rank
+                let received_queries_rank = &self.ghost_received_queries_v[l..r]; // received queries from this rank
 
-        //         // Filter for available data corresponding to this request
-        //         let mut available_multipoles_rank = Vec::new();
+                // Filter for available data corresponding to this request
+                let mut available_multipoles_rank = Vec::new();
 
-        //         let mut counter_rank = 0i32;
+                // Associate each with expected buffer sizes for multipole data
+                let mut available_multipoles_rank_buffer_size = Vec::new();
 
-        //         // Only communicate back queries and associated data if multipole data is found
-        //         for &query in received_queries_rank.iter() {
-        //             let key = MortonKey::from_morton(query);
-        //             if let Some(multipole) = self.multipole(&key) {
-        //                 available_multipoles_rank.push(multipole);
-        //                 counter_rank += 1;
-        //             }
-        //         }
+                let mut counter_rank = 0i32;
 
-        //         // Update return buffers
-        //         let available_multipoles_rank = available_multipoles_rank.concat();
-        //         available_multipoles.extend(available_multipoles_rank);
-        //         available_multipoles_counts
-        //             .push(counter_rank * (self.n_coeffs_equivalent_surface as i32));
-        //         available_multipoles_displacements
-        //             .push(counter * (self.n_coeffs_equivalent_surface as i32));
+                // Only communicate back queries and associated data if multipole data is found
+                for &query in received_queries_rank.iter() {
+                    let key = MortonKey::from_morton(query);
+                    if let Some(multipole) = self.multipole(&key) {
+                        available_multipoles_rank.push(multipole);
+                        available_multipoles_rank_buffer_size.push(
+                            self.n_coeffs_equivalent_surface(key.level()) as i32
+                        );
+                        counter_rank += 1;
+                    }
+                }
 
-        //         counter += counter_rank;
-        //     }
-        // }
+                // Update return buffers
+                let available_multipoles_rank = available_multipoles_rank.concat();
+                available_multipoles.extend(available_multipoles_rank);
 
-        // // Create buffers to receive multipole data
-        // let total_receive_count_requested_queries =
-        //     self.ghost_requested_queries_counts_v.iter().sum::<i32>() as usize;
-        // let total_receive_count_requested_multipoles =
-        //     total_receive_count_requested_queries * self.n_coeffs_equivalent_surface;
-        // let mut requested_multipoles =
-        //     vec![Scalar::default(); total_receive_count_requested_multipoles];
+                available_multipoles_buffer_sizes_counts.push(available_multipoles_rank_buffer_size);
 
-        // // Calculate counts for requested multipoles
-        // let mut requested_multipoles_counts = Vec::new();
-        // for &count in self.ghost_requested_queries_counts_v.iter() {
-        //     requested_multipoles_counts.push(count * (self.n_coeffs_equivalent_surface as i32));
-        // }
+                // These should now just count number of available queries as this will be needed for associating
+                // each query with the correct buffer sizes of multipole data
+                available_keys_counts
+                    .push(counter_rank);
 
-        // // Calculate displacements for query and multipole data from expected count
-        // let mut requested_multipoles_displacements = Vec::new();
+                available_keys_displacements
+                    .push(counter);
 
-        // let mut counter = 0;
-        // for &count in self.ghost_requested_queries_counts_v.iter() {
-        //     requested_multipoles_displacements
-        //         .push(counter * (self.n_coeffs_equivalent_surface as i32));
-        //     counter += count
-        // }
+                counter += counter_rank;
+            }
+        }
 
-        // // Communicate ghost multipoles
-        // {
-        //     let partition_send = Partition::new(
-        //         &available_multipoles,
-        //         &available_multipoles_counts[..],
-        //         &available_multipoles_displacements[..],
-        //     );
+        // Calculate counts and displacements for query to return to each rank
+        let mut available_multipoles_buffers_counts = Vec::new();
 
-        //     let mut partition_receive = PartitionMut::new(
-        //         &mut requested_multipoles,
-        //         &requested_multipoles_counts[..],
-        //         &requested_multipoles_displacements[..],
-        //     );
+        {
+            for buffer_sizes in available_multipoles_buffer_sizes_counts.iter() {
+                // Each vec of buffer sizes are those for a particular rank's messages
+                let count_rank = buffer_sizes.iter().sum();
+                available_multipoles_buffers_counts.push(count_rank);
+            }
+        }
 
-        //     self.neighbourhood_communicator_v
-        //         .all_to_all_varcount_into(&partition_send, &mut partition_receive);
-        // }
+        // Should be sending back sizes of each individual query as well to each rank
+        // Have to first send back number of sizes to expect which should be easy
+        // then the sizes themselves, not just the total buffer sizes idk why this is so confusing
+        // despite having written it!
 
-        // // Allocate ghost multipoles including sibling data, ordering dictated by tree construction
-        // let mut ghost_multipoles_with_siblings = vec![
-        //     Scalar::default();
-        //     self.ghost_fmm_v.tree.source_tree.keys.len()
-        //         * self.n_coeffs_equivalent_surface
-        // ];
 
-        // // Re-order with zeros added for sibling data that isn't included in the request
-        // for (new_idx, key) in self.ghost_fmm_v.tree.source_tree.keys.iter().enumerate() {
-        //     if let Some(&old_idx) = self.ghost_requested_queries_key_to_index_v.get(key) {
-        //         let tmp = &requested_multipoles[old_idx * self.n_coeffs_equivalent_surface
-        //             ..(old_idx + 1) * self.n_coeffs_equivalent_surface];
+        let available_multipoles_buffers_displacements =
+            available_multipoles_buffers_counts
+                .iter()
+                .scan(0, |acc, &x| {
+                    let tmp = *acc;
+                    *acc += x;
+                    Some(tmp)
+                })
+                .collect_vec();
 
-        //         ghost_multipoles_with_siblings[new_idx * self.n_coeffs_equivalent_surface
-        //             ..(new_idx + 1) * self.n_coeffs_equivalent_surface]
-        //             .copy_from_slice(tmp);
-        //     }
-        // }
+        // Create buffers to receive multipole data
+        // Calculate counts for requested multipoles
+        let mut requested_multipoles_counts = Vec::new();
+
+        // At runtime we have already checked for existence of keys, so can create receive buffers
+        // from request packet directly
+
+        let mut idx = 0;
+        for &count in self.ghost_requested_queries_counts_v.iter() {
+            let queries_from_rank = &self.ghost_requested_queries_v[idx..idx + (count as usize)];
+            let mut rank_total_buffer_size = 0;
+
+            for &query in queries_from_rank {
+                let key = MortonKey::<Scalar>::from_morton(query);
+                rank_total_buffer_size += self.n_coeffs_equivalent_surface(key.level()) as i32;
+            }
+
+            requested_multipoles_counts.push(rank_total_buffer_size);
+
+            idx += count as usize;
+        }
+
+        let requested_multipoles_displacements = requested_multipoles_counts
+            .iter()
+            .scan(0i32, |acc, &count| {
+                let curr = *acc;
+                *acc += count;
+                Some(curr)
+            })
+            .collect_vec();
+
+        let total_receive_count_requested_multipoles = requested_multipoles_counts
+            .iter()
+            .map(|&x| x as usize)
+            .sum::<usize>();
+
+        let mut requested_multipoles = vec![Scalar::default(); total_receive_count_requested_multipoles];
+
+        // Communicate ghost multipoles
+        {
+            let partition_send = Partition::new(
+                &available_multipoles,
+                &available_multipoles_buffers_counts[..],
+                &available_multipoles_buffers_displacements[..],
+            );
+
+            let mut partition_receive = PartitionMut::new(
+                &mut requested_multipoles,
+                &requested_multipoles_counts[..],
+                &requested_multipoles_displacements[..],
+            );
+
+            self.neighbourhood_communicator_v
+                .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+        }
+
+        // Allocate ghost multipoles including sibling data, ordering dictated by tree construction
+        let mut tmp = 0;
+        for key in self.ghost_fmm_v.tree.source_tree.keys.iter() {
+            tmp += self.n_coeffs_equivalent_surface(key.level());
+        }
+        let mut ghost_multipoles_with_siblings = vec![Scalar::default(); tmp];
+
+        // Re-order with zeros added for sibling data that isn't included in the request
+        for (new_idx, key) in self.ghost_fmm_v.tree.source_tree.keys.iter().enumerate() {
+            if let Some(&old_idx) = self.ghost_requested_queries_key_to_index_v.get(key) {
+
+                let tmp = &requested_multipoles[old_idx * self.n_coeffs_equivalent_surface
+                    ..(old_idx + 1) * self.n_coeffs_equivalent_surface];
+
+                ghost_multipoles_with_siblings[new_idx * self.n_coeffs_equivalent_surface
+                    ..(new_idx + 1) * self.n_coeffs_equivalent_surface]
+                    .copy_from_slice(tmp);
+            }
+        }
 
         // self.ghost_fmm_v.multipoles = ghost_multipoles_with_siblings;
 
