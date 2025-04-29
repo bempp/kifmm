@@ -444,7 +444,6 @@ where
                     .push(MetadataTime::from_duration(MetadataType::SourceData, d))
             }
 
-            // TODO
             let (_, duration) = optionally_time(timed, || result.target());
 
             if let Some(d) = duration {
@@ -453,14 +452,15 @@ where
                     .push(MetadataTime::from_duration(MetadataType::TargetData, d))
             }
 
-            // let (_, duration) = optionally_time(timed, || result.source_to_target());
+            // TODO
+            let (_, duration) = optionally_time(timed, || result.source_to_target());
 
-            // if let Some(d) = duration {
-            //     result.metadata_times.push(MetadataTime::from_duration(
-            //         MetadataType::SourceToTargetData,
-            //         d,
-            //     ))
-            // }
+            if let Some(d) = duration {
+                result.metadata_times.push(MetadataTime::from_duration(
+                    MetadataType::SourceToTargetData,
+                    d,
+                ))
+            }
 
             // Metadata for global FMM and FMM
 

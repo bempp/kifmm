@@ -10,7 +10,8 @@ fn main() {
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{helpers::points_fixture, types::SortKind},
-        ChargeHandler, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        BlasFieldTranslationSaRcmp, ChargeHandler, Evaluate, FftFieldTranslation, FmmSvdMode,
+        SingleNodeBuilder,
     };
 
     use rand::{rngs::StdRng, Rng, SeedableRng};
@@ -44,7 +45,8 @@ fn main() {
         .unwrap();
 
     {
-        let source_to_target = FftFieldTranslation::<f32>::new(None);
+        let source_to_target =
+            BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
 
         // Generate some random test data local to each process
         let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
