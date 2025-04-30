@@ -506,9 +506,6 @@ where
     }
 
     /// Construct a tree form specified leaves.
-    /// TODO: add index maps for coordinate data, used in experimental distributed FMM, where at
-    /// present unit charges are assigned to all nodes, in a future release this function will be
-    /// updated to also include coordinate and associated charge data for each leaf.
     ///
     /// # Arguments
     /// * `leaves` - The leaves being used to construct the tree.

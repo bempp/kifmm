@@ -23,9 +23,9 @@ use crate::{
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::single_node::{
             coordinate_index_pointer_single_node, flip3, homogenous_kernel_scale,
-            leaf_expansion_pointers_single_node, leaf_scales_single_node,
-            leaf_surfaces_single_node, level_expansion_pointers_single_node,
-            level_index_pointer_single_node, ncoeffs_kifmm, potential_pointers_single_node,
+            leaf_expansion_pointers_single_node, leaf_surfaces_single_node,
+            level_expansion_pointers_single_node, level_index_pointer_single_node, ncoeffs_kifmm,
+            potential_pointers_single_node,
         },
         types::{
             BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataIa, BlasMetadataSaRcmp,
@@ -80,6 +80,7 @@ where
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
+        let depth = self.tree.source_tree.depth();
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -125,14 +126,14 @@ where
             uc2e_inv_2.push(ut);
         }
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
-            0..self.equivalent_surface_order.len() - 1
+        let level_iterator = if self.variable_expansion_order {
+            0..depth
         } else {
             0..1
         };
 
         // Calculate M2M operator matrices on each level, if required
-        for parent_level in iterator {
+        for parent_level in level_iterator {
             let check_surface_order_parent = self.check_surface_order(parent_level as u64);
             let equivalent_surface_order_parent =
                 self.equivalent_surface_order(parent_level as u64);
@@ -143,12 +144,12 @@ where
                 root.surface_grid(check_surface_order_parent, domain, alpha_outer);
 
             let children = root.children();
-            let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
-            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut m2m_level =
-                rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, 8 * nequiv_surface_child]);
+                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
             let mut m2m_vec_level = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -156,7 +157,7 @@ where
                     child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
+                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 self.kernel.assemble_st(
@@ -174,8 +175,8 @@ where
                     ),
                 );
 
-                let l = i * nequiv_surface_child * nequiv_surface_parent;
-                let r = l + nequiv_surface_child * nequiv_surface_parent;
+                let l = i * n_equiv_surface_child * n_equiv_surface_parent;
+                let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
                 m2m_level.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec_level.push(tmp);
@@ -202,6 +203,7 @@ where
 {
     fn target(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
+        let depth = self.tree.target_tree.depth();
 
         // Cast surface parameters
         let alpha_outer = Scalar::from(ALPHA_OUTER).unwrap().re();
@@ -247,15 +249,13 @@ where
             dc2e_inv_2.push(ut);
         }
 
-        let depth = self.tree.target_tree().depth();
-
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let level_iterator = if self.equivalent_surface_order.len() > 1 {
             0..depth
         } else {
             0..1
         };
 
-        for parent_level in iterator {
+        for parent_level in level_iterator {
             let equivalent_surface_order_parent = self.equivalent_surface_order(parent_level);
             let check_surface_order_child = self.check_surface_order(parent_level + 1);
 
@@ -264,8 +264,8 @@ where
 
             // Calculate L2L operator matrices
             let children = root.children();
-            let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_coeffs_check_surface_child = ncoeffs_kifmm(check_surface_order_child);
+            let n_coeffs_equivalent_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut l2l_level = Vec::new();
 
@@ -274,8 +274,13 @@ where
                     child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
-                let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
+                let mut pe2cc = rlst_dynamic_array2!(
+                    Scalar,
+                    [
+                        n_coeffs_check_surface_child,
+                        n_coeffs_equivalent_surface_parent
+                    ]
+                );
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
@@ -419,13 +424,13 @@ where
 
             let equivalent_surface_order_parent = self.equivalent_surface_order(level);
 
-            let ncheck_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
-            let nequiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
+            let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let children = curr.children();
             let mut m2m =
-                rlst_dynamic_array2!(Scalar, [nequiv_surface_parent, 8 * nequiv_surface_child]);
+                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
             let mut m2m_vec = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -433,7 +438,7 @@ where
                     child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_parent, nequiv_surface_child]);
+                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
@@ -447,8 +452,8 @@ where
                     empty_array::<Scalar, 2>()
                         .simple_mult_into_resize(uc2e_inv_2[level as usize].r(), ce2pc.r()),
                 );
-                let l = i * nequiv_surface_child * nequiv_surface_parent;
-                let r = l + nequiv_surface_child * nequiv_surface_parent;
+                let l = i * n_equiv_surface_child * n_equiv_surface_parent;
+                let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
                 m2m.data_mut()[l..r].copy_from_slice(tmp.data());
                 m2m_vec.push(tmp);
@@ -575,7 +580,7 @@ where
                 curr.surface_grid(equivalent_surface_order_parent, domain, alpha_outer);
 
             let ncheck_surface_child = ncoeffs_kifmm(check_surface_order_child);
-            let nequiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
+            let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             // Calculate l2l operator matrices on each level
             let children = curr.children();
@@ -586,7 +591,7 @@ where
                     child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, nequiv_surface_parent]);
+                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
@@ -621,15 +626,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
@@ -871,15 +868,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
@@ -948,8 +937,9 @@ where
         // Compute unique M2L interactions at Level 3 (smallest choice with all vectors)
         // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
         let depth = self.tree.source_tree().depth();
+        let alpha = Scalar::real(ALPHA_INNER);
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let iterator = if self.variable_expansion_order {
             (2..=depth)
                 .zip(self.equivalent_surface_order.iter().skip(2).cloned())
                 .zip(self.check_surface_order.iter().skip(2).cloned())
@@ -971,14 +961,13 @@ where
             let transfer_vectors =
                 compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
 
-            let nrows = ncoeffs_kifmm(check_surface_order);
-            let ncols = ncoeffs_kifmm(equivalent_surface_order);
+            let n_rows = ncoeffs_kifmm(check_surface_order);
+            let n_cols = ncoeffs_kifmm(equivalent_surface_order);
 
             let mut se2tc_fat =
-                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+                rlst_dynamic_array2!(Scalar, [n_rows, n_cols * NTRANSFER_VECTORS_KIFMM]);
             let mut se2tc_thin =
-                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
-            let alpha = Scalar::real(ALPHA_INNER);
+                rlst_dynamic_array2!(Scalar, [n_rows * NTRANSFER_VECTORS_KIFMM, n_cols]);
 
             transfer_vectors.iter().enumerate().for_each(|(i, t)| {
                 let source_equivalent_surface = t.source.surface_grid(
@@ -992,7 +981,7 @@ where
                     alpha,
                 );
 
-                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
@@ -1003,12 +992,12 @@ where
 
                 let mut block = se2tc_fat
                     .r_mut()
-                    .into_subview([0, i * ncols], [nrows, ncols]);
+                    .into_subview([0, i * n_cols], [n_rows, n_cols]);
                 block.fill_from(tmp_gram.r());
 
                 let mut block_column = se2tc_thin
                     .r_mut()
-                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                    .into_subview([i * n_rows, 0], [n_rows, n_cols]);
                 block_column.fill_from(tmp_gram.r());
             });
 
@@ -1075,9 +1064,10 @@ where
                 }
             }
 
+            // TODO Make more stable by taking norm of approximation error wrt to true matrix
             // Cutoff rank is the minimum of the target rank and the value found by user threshold
             let cutoff_rank =
-                find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, n_cols).min(target_rank);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
@@ -1170,7 +1160,7 @@ where
             }
 
             (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-                let vt_block = vt.r().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+                let vt_block = vt.r().into_subview([0, i * n_cols], [cutoff_rank, n_cols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     sigma_mat.r(),
@@ -1238,8 +1228,6 @@ where
                 .directional_cutoff_ranks
                 .push(directional_cutoff_ranks);
         }
-
-        // self.source_to_target = result;
     }
 }
 
@@ -1254,15 +1242,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let targets = self.tree.target_tree().keys(level).unwrap();
@@ -1818,23 +1798,14 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
 
             if let Some(sources) = self.tree.source_tree().keys(level) {
                 let n_sources = sources.len();
-                let sentinel = -1_i32;
+                let sentinel = -1i32;
 
                 let tmp = vec![vec![sentinel; n_sources]; 316];
                 result = tmp.into_iter().map(RwLock::new).collect_vec();
@@ -1916,13 +1887,13 @@ where
         };
 
         for (equivalent_surface_order, check_surface_order) in iterator {
-            let nrows = ncoeffs_kifmm(check_surface_order);
-            let ncols = ncoeffs_kifmm(equivalent_surface_order);
+            let n_rows = ncoeffs_kifmm(check_surface_order);
+            let n_cols = ncoeffs_kifmm(equivalent_surface_order);
 
             let mut se2tc_fat =
-                rlst_dynamic_array2!(Scalar, [nrows, ncols * NTRANSFER_VECTORS_KIFMM]);
+                rlst_dynamic_array2!(Scalar, [n_rows, n_cols * NTRANSFER_VECTORS_KIFMM]);
             let mut se2tc_thin =
-                rlst_dynamic_array2!(Scalar, [nrows * NTRANSFER_VECTORS_KIFMM, ncols]);
+                rlst_dynamic_array2!(Scalar, [n_rows * NTRANSFER_VECTORS_KIFMM, n_cols]);
             let alpha = Scalar::real(ALPHA_INNER);
 
             for (i, t) in self.source_to_target.transfer_vectors.iter().enumerate() {
@@ -1938,7 +1909,7 @@ where
                     alpha,
                 );
 
-                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [nrows, ncols]);
+                let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
@@ -1949,12 +1920,12 @@ where
 
                 let mut block = se2tc_fat
                     .r_mut()
-                    .into_subview([0, i * ncols], [nrows, ncols]);
+                    .into_subview([0, i * n_cols], [n_rows, n_cols]);
                 block.fill_from(tmp_gram.r());
 
                 let mut block_column = se2tc_thin
                     .r_mut()
-                    .into_subview([i * nrows, 0], [nrows, ncols]);
+                    .into_subview([i * n_rows, 0], [n_rows, n_cols]);
                 block_column.fill_from(tmp_gram.r());
             }
 
@@ -2023,7 +1994,7 @@ where
 
             // Cutoff rank is the minimum of the target rank and the value found by user threshold
             let cutoff_rank =
-                find_cutoff_rank(&sigma, self.source_to_target.threshold, ncols).min(target_rank);
+                find_cutoff_rank(&sigma, self.source_to_target.threshold, n_cols).min(target_rank);
 
             let mut u = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
             let mut sigma_mat = rlst_dynamic_array2!(Scalar, [cutoff_rank, cutoff_rank]);
@@ -2116,7 +2087,7 @@ where
             }
 
             (0..NTRANSFER_VECTORS_KIFMM).into_par_iter().for_each(|i| {
-                let vt_block = vt.r().into_subview([0, i * ncols], [cutoff_rank, ncols]);
+                let vt_block = vt.r().into_subview([0, i * n_cols], [cutoff_rank, n_cols]);
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
                     sigma_mat.r(),
@@ -2329,16 +2300,7 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-
-        let start_level = if let Some(start_level) = start_level {
-            if start_level >= 2 {
-                start_level
-            } else {
-                2
-            }
-        } else {
-            2
-        };
+        let start_level = start_level.unwrap_or(2).max(2);
 
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
@@ -2806,12 +2768,6 @@ where
         // Buffer to store evaluated potentials and/or gradients at target points
         let potentials = vec![Scalar::default(); n_target_points * kernel_eval_size * n_matvecs];
 
-        // Kernel scale at each target and source leaf
-        let leaf_scales_sources = leaf_scales_single_node::<Scalar>(
-            &self.tree.source_tree,
-            *self.n_coeffs_check_surface.last().unwrap(),
-        );
-
         // Pre compute check surfaces
         let leaf_upward_equivalent_surfaces_sources = leaf_surfaces_single_node(
             &self.tree.source_tree,
@@ -2895,7 +2851,6 @@ where
         self.charges = charges.to_vec();
         self.charge_index_pointer_targets = charge_index_pointer_targets;
         self.charge_index_pointer_sources = charge_index_pointer_sources;
-        self.leaf_scales_sources = leaf_scales_sources;
         self.kernel_eval_size = kernel_eval_size;
     }
 }
@@ -3330,7 +3285,7 @@ mod test {
             .unwrap();
 
         let level = 3;
-        let coeff_idx = fmm.c2e_operator_index(level);
+        let coeff_idx = fmm.expansion_index(level);
 
         let mut multipole = rlst_dynamic_array2!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
@@ -3499,7 +3454,7 @@ mod test {
             .unwrap();
 
         let level = 2;
-        let coeff_index = fmm.expansion_index(level);
+        let coeff_idx = fmm.expansion_index(level);
         let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
@@ -3523,8 +3478,8 @@ mod test {
 
         // Compute FFT of the representative signal
         let mut signal = fmm.evaluate_charges_convolution_grid(
-            expansion_order[coeff_index],
-            coeff_index,
+            expansion_order[coeff_idx],
+            coeff_idx,
             multipole.data(),
         );
         let [m, n, o] = signal.shape();
@@ -3535,12 +3490,12 @@ mod test {
         let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
 
         let source_equivalent_surface = source.surface_grid(
-            expansion_order[coeff_index],
+            expansion_order[coeff_idx],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
         let target_check_surface = target.surface_grid(
-            expansion_order[coeff_index],
+            expansion_order[coeff_idx],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
         );
@@ -3556,7 +3511,7 @@ mod test {
         ];
 
         let (conv_grid, _) = source.convolution_grid(
-            expansion_order[coeff_index],
+            expansion_order[coeff_idx],
             &fmm.tree.source_tree.domain,
             ALPHA_INNER,
             &conv_point_corner,
@@ -3572,7 +3527,7 @@ mod test {
 
         // Compute kernel
         let kernel = fmm.evaluate_greens_fct_convolution_grid(
-            expansion_order[coeff_index],
+            expansion_order[coeff_idx],
             &conv_grid,
             kernel_point,
         );
@@ -3612,7 +3567,7 @@ mod test {
         );
 
         let mut result = vec![c64::zero(); n_targets];
-        for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_index]
+        for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_idx]
             .iter()
             .enumerate()
         {
