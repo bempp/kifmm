@@ -1124,8 +1124,17 @@ where
     /// Store requested V list queries counts
     pub(crate) ghost_requested_queries_counts_v: Vec<Count>,
 
+    /// Store requested V list queries displacements
+    pub(crate) ghost_requested_queries_displacements_v: Vec<Count>,
+
     /// Requested V list queries index map of ghost keys from V list queries
     pub(crate) ghost_requested_queries_key_to_index_v: HashMap<MortonKey<Scalar::Real>, usize>,
+
+    /// The requested multipole data buffer sizes by request
+    pub(crate) ghost_requested_queries_v_buffer_sizes_counts: Vec<usize>,
+
+    /// The displacements of requested multipole data buffer sizes by request
+    pub(crate) ghost_requested_queries_v_buffer_sizes_displacements: Vec<usize>,
 
     /// Number of input charges (initial input, unordered by Morton sort)
     pub(crate) local_count_charges: u64,
