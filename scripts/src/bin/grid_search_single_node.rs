@@ -125,6 +125,7 @@ fn grid_search_laplace_blas<T>(
             "min_rel_err".to_string(),
             "mean_rel_err".to_string(),
             "max_rel_err".to_string(),
+            "rel_l2_err".to_string(),
             "n_iter".to_string(),
             "n_oversamples".to_string(),
             "setup_time".to_string(),
@@ -170,6 +171,19 @@ fn grid_search_laplace_blas<T>(
             charges.data(),
             &mut direct,
         );
+
+
+        let mut num = T::zero();
+        let mut denom = T::zero();
+
+        for (&d, &p) in direct.iter().zip(potential) {
+            let abs_diff = RlstScalar::abs(d - p);
+            let abs_true = RlstScalar::abs(d);
+            num += abs_diff * abs_diff;
+            denom += abs_true * abs_true;
+        }
+
+        let rel_l2_error = RlstScalar::sqrt(num / denom);
 
         let rel_error = direct
             .iter()
@@ -228,6 +242,7 @@ fn grid_search_laplace_blas<T>(
                 min_rel_err.to_string(),
                 mean_rel_err.to_string(),
                 max_rel_err.to_string(),
+                rel_l2_error.to_string(),
                 n_iter_.to_string(),
                 n_oversamples_.to_string(),
                 (setup_time.as_millis() as f32).to_string(),
@@ -337,6 +352,7 @@ fn grid_search_laplace_fft<T>(
             "min_rel_err".to_string(),
             "mean_rel_err".to_string(),
             "max_rel_err".to_string(),
+            "rel_l2_err".to_string(),
             "setup_time".to_string(),
         ])
         .unwrap();
@@ -372,6 +388,18 @@ fn grid_search_laplace_fft<T>(
             &mut direct,
         );
 
+        let mut num = T::zero();
+        let mut denom = T::zero();
+
+        for (&d, &p) in direct.iter().zip(potential) {
+            let abs_diff = RlstScalar::abs(d - p);
+            let abs_true = RlstScalar::abs(d);
+            num += abs_diff * abs_diff;
+            denom += abs_true * abs_true;
+        }
+
+        let rel_l2_error = RlstScalar::sqrt(num / denom);
+
         let rel_error = direct
             .iter()
             .zip(potential)
@@ -406,6 +434,7 @@ fn grid_search_laplace_fft<T>(
                 min_rel_err.to_string(),
                 mean_rel_err.to_string(),
                 max_rel_err.to_string(),
+                rel_l2_error.to_string(),
                 (setup_time.as_millis() as f32).to_string(),
             ])
             .unwrap();
