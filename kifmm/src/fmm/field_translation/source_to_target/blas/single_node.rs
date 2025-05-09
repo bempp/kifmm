@@ -9,21 +9,15 @@ use rlst::{
     RawAccessMut, RlstScalar,
 };
 
-use green_kernels::traits::Kernel as KernelTrait;
+use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
 
 use crate::{
     fmm::{
         helpers::single_node::{homogenous_kernel_scale, m2l_scale},
         types::{BlasFieldTranslationIa, FmmEvalType, SendPtrMut},
-    },
-    traits::{
-        field::SourceToTargetTranslation,
-        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
-        tree::{SingleFmmTree, SingleTree},
-        types::FmmError,
-    },
-    tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationSaRcmp, KiFmm,
+    }, linalg::rsvd::MatrixRsvd, traits::{
+        field::SourceToTargetTranslation, fmm::{DataAccess, HomogenousKernel, MetadataAccess}, general::single_node::GetCutoffRank, tree::{SingleFmmTree, SingleTree}, types::FmmError
+    }, tree::constants::NTRANSFER_VECTORS_KIFMM, BlasFieldTranslationSaRcmp, KiFmm
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -766,5 +760,17 @@ where
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
         Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
+    }
+}
+
+
+impl<Scalar> GetCutoffRank
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>
+where
+    Scalar: RlstScalar + Default + MatrixRsvd + Clone,
+    <Scalar as RlstScalar>::Real: Default + Clone,
+{
+    fn get_cutoff_rank(&self) -> &[usize] {
+        &self.source_to_target.cutoff_rank[..]
     }
 }

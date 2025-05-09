@@ -1,0 +1,216 @@
+warning: missing documentation for a trait
+  --> kifmm/src/traits/general/single_node.rs:74:1
+   |
+74 | pub trait GetCutoffRank {
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+  --> kifmm/src/lib.rs:76:9
+   |
+76 | #![warn(missing_docs)]
+   |         ^^^^^^^^^^^^
+
+warning: missing documentation for a method
+  --> kifmm/src/traits/general/single_node.rs:75:5
+   |
+75 |     fn get_cutoff_rank(&self) -> &[usize];
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `kifmm` (lib) generated 2 warnings
+warning: unused import: `FftFieldTranslation`
+ --> kifmm/benches/laplace_f64.rs:6:53
+  |
+6 | use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
+  |                                                     ^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: `kifmm` (bench "laplace_f64") generated 1 warning (run `cargo fix --bench "laplace_f64"` to apply 1 suggestion)
+    Finished `bench` profile [optimized] target(s) in 0.78s
+     Running benches/laplace_f64.rs (target/release/deps/laplace_f64-c33a369a6d31f58b)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 18.3s.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6: Collecting 10 samples in estimated 18.268 s (10 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6: Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=6
+                        time:   [1.8185 s 1.8224 s 1.8263 s]
+                        change: [-0.3428% -0.0034% +0.3210%] (p = 0.97 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, M2L
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, M2L : Warming up for 3.0000 s
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, M2L : Collecting 10 samples in estimated 18.166 s (30 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, M2L : Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=6, M2L
+                        time:   [602.16 ms 603.32 ms 604.50 ms]
+                        change: [-0.2534% +0.0179% +0.2957%] (p = 0.90 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, P2P
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, P2P : Warming up for 3.0000 s
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, P2P : Collecting 10 samples in estimated 22.315 s (20 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=6, P2P : Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=6, P2P
+                        time:   [1.1247 s 1.1261 s 1.1276 s]
+                        change: [+0.9416% +1.1118% +1.2749%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 26.9s.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8: Collecting 10 samples in estimated 26.894 s (10 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8: Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=8
+                        time:   [2.6626 s 2.6678 s 2.6735 s]
+                        change: [+0.0682% +0.3243% +0.6096%] (p = 0.04 < 0.05)
+                        Change within noise threshold.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, M2L
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, M2L : Warming up for 3.0000 s
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, M2L : Collecting 10 samples in estimated 26.209 s (20 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, M2L : Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=8, M2L
+                        time:   [1.3052 s 1.3094 s 1.3131 s]
+                        change: [-0.2859% +0.1334% +0.5321%] (p = 0.52 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, P2P
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, P2P : Warming up for 3.0000 s
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, P2P : Collecting 10 samples in estimated 22.305 s (20 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=8, P2P : Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=8, P2P
+                        time:   [1.1199 s 1.1216 s 1.1232 s]
+                        change: [+0.6271% +0.8430% +1.0562%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 3 outliers among 10 measurements (30.00%)
+  1 (10.00%) low severe
+  2 (20.00%) high mild
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 50.2s.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10: Collecting 10 samples in estimated 50.222 s (10 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10: Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=10
+                        time:   [4.8650 s 4.8769 s 4.8894 s]
+                        change: [+0.2334% +0.6712% +1.1045%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, M2L
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, M2L : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 32.8s.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, M2L : Collecting 10 samples in estimated 32.805 s (10 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, M2L : Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=10, M2L
+                        time:   [3.2446 s 3.2625 s 3.2812 s]
+                        change: [+0.4173% +1.0219% +1.7224%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, P2P
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, P2P : Warming up for 3.0000 s
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, P2P : Collecting 10 samples in estimated 22.093 s (20 iterations)
+Benchmarking F64 Potentials/N=1e6, M2L=BLAS digits=10, P2P : Analyzing
+F64 Potentials/N=1e6, M2L=BLAS digits=10, P2P
+                        time:   [1.1135 s 1.1151 s 1.1163 s]
+                        change: [+0.0126% +0.1938% +0.3974%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 175.7s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6: Collecting 10 samples in estimated 175.69 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6: Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=6
+                        time:   [17.535 s 17.589 s 17.642 s]
+                        change: [-0.1819% +0.2618% +0.6939%] (p = 0.27 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high mild
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, M2L
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, M2L : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 73.2s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, M2L : Collecting 10 samples in estimated 73.210 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, M2L : Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=6, M2L
+                        time:   [7.2752 s 7.3314 s 7.3867 s]
+                        change: [-0.4091% +0.4390% +1.2821%] (p = 0.37 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, P2P
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, P2P : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 95.0s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, P2P : Collecting 10 samples in estimated 95.010 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=6, P2P : Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=6, P2P
+                        time:   [9.5844 s 9.6079 s 9.6348 s]
+                        change: [+0.1487% +0.4268% +0.7034%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 282.5s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8: Collecting 10 samples in estimated 282.51 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8: Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=8
+                        time:   [27.376 s 27.460 s 27.535 s]
+                        change: [-0.2278% +0.3186% +0.8367%] (p = 0.28 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, M2L
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, M2L : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 163.0s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, M2L : Collecting 10 samples in estimated 163.03 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, M2L : Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=8, M2L
+                        time:   [15.981 s 16.138 s 16.306 s]
+                        change: [-0.6093% +0.7288% +2.0373%] (p = 0.31 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, P2P
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, P2P : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 94.7s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, P2P : Collecting 10 samples in estimated 94.663 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=8, P2P : Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=8, P2P
+                        time:   [9.5656 s 9.5799 s 9.5925 s]
+                        change: [-0.1261% +0.0941% +0.3132%] (p = 0.43 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10: Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 507.5s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10: Collecting 10 samples in estimated 507.46 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10: Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=10
+                        time:   [49.294 s 49.590 s 49.903 s]
+                        change: [-0.4517% +0.2478% +0.9859%] (p = 0.53 > 0.05)
+                        No change in performance detected.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, M2L
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, M2L : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 357.4s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, M2L : Collecting 10 samples in estimated 357.43 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, M2L : Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=10, M2L
+                        time:   [36.307 s 36.549 s 36.842 s]
+                        change: [-0.5977% +0.4943% +1.6552%] (p = 0.43 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 10 measurements (20.00%)
+  2 (20.00%) high mild
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, P2P
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, P2P : Warming up for 3.0000 s
+
+Warning: Unable to complete 10 samples in 15.0s. You may wish to increase target time to 94.7s.
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, P2P : Collecting 10 samples in estimated 94.671 s (10 iterations)
+Benchmarking F64 Potentials/N=8e6, M2L=BLAS digits=10, P2P : Analyzing
+F64 Potentials/N=8e6, M2L=BLAS digits=10, P2P
+                        time:   [9.5661 s 9.5852 s 9.6017 s]
+                        change: [+0.0215% +0.2574% +0.5098%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+

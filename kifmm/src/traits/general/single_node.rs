@@ -70,3 +70,7 @@ pub trait Hadamard8x8 {
         scale: Self::Scalar,
     );
 }
+
+pub trait GetCutoffRank {
+    fn get_cutoff_rank(&self) -> &[usize];
+}
