@@ -9,8 +9,53 @@ use num::Float;
 use rlst::{RawAccess, RlstScalar, Shape};
 use serde_yaml::Value;
 
+use std::time::Instant;
 use std::{fs, mem};
 use std::path::PathBuf;
+
+
+fn calculate_compression<Scalar: RlstScalar + Float + AsComplex + Dft>(
+    fmm: &KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>,
+    fmm_full: &KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>,
+) -> f64 {
+
+    // M2L
+    let data = &fmm.source_to_target.metadata;
+    let mut size_m2l_compressed = 0;
+
+    for metadata in data {
+        let u = &metadata.u;
+        let st = &metadata.st;
+        let c_u = &metadata.c_u;
+        let c_vt = &metadata.c_vt;
+
+        let mut size: usize = u.shape()[0] * u.shape()[1] + st.shape()[0] + st.shape()[1];
+        for (l, r) in c_u.iter().zip(c_vt.iter()) {
+            size += l.shape()[0] + l.shape()[1] + r.shape()[0] * r.shape()[1];
+        }
+        size_m2l_compressed += size;
+    }
+
+    let data = &fmm_full.source_to_target.metadata;
+    let mut size_m2l = 0;
+
+    for metadata in data {
+        let u = &metadata.u;
+        let st = &metadata.st;
+        let c_u = &metadata.c_u;
+        let c_vt = &metadata.c_vt;
+
+        let mut size: usize = u.shape()[0] * u.shape()[1] + st.shape()[0] + st.shape()[1];
+        for (l, r) in c_u.iter().zip(c_vt.iter()) {
+            size += l.shape()[0] + l.shape()[1] + r.shape()[0] * r.shape()[1];
+        }
+        size_m2l += size;
+    }
+
+    let compression = f64::abs(100. - 100. * ((size_m2l_compressed as f64) / (size_m2l as f64)));
+    compression
+}
+
 
 fn calculate_fmm_storage_fft_m2l<Scalar: RlstScalar + Float + AsComplex + Dft>(
     fmm: &KiFmm<Scalar, Laplace3dKernel<Scalar>, FftFieldTranslation<Scalar>>,
@@ -182,9 +227,11 @@ fn main() {
                     let expansion_order = vec![e as usize; depth as usize + 1];
 
                     let storage;
+                    let setup_time;
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
+                        let s = Instant::now();
                         let fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
@@ -198,11 +245,13 @@ fn main() {
                             .unwrap()
                             .build()
                             .unwrap();
+                        setup_time = s.elapsed().as_millis();
 
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
                     } else {
                         let sources = points_fixture::<f64>(n_points, None, None, None);
                         let charges = vec![1.0f64; n_points];
+                        let s = Instant::now();
                         let fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
@@ -216,11 +265,12 @@ fn main() {
                             .unwrap()
                             .build()
                             .unwrap();
+                        setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB");
+                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time}");
                 }
             }
         }
@@ -260,9 +310,12 @@ fn main() {
                     let expansion_order = vec![e as usize; depth as usize + 1];
 
                     let storage;
+                    let setup_time;
+                    let compression;
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
+                        let s = Instant::now();
                         let fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
@@ -280,11 +333,32 @@ fn main() {
                             .unwrap()
                             .build()
                             .unwrap();
-
+                        setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_blas_m2l(&fmm);
+
+                        let fmm_full = SingleNodeBuilder::new(false)
+                            .tree(sources.data(), sources.data(), None, Some(depth), true)
+                            .unwrap()
+                            .parameters(
+                                &charges,
+                                &expansion_order,
+                                Laplace3dKernel::new(),
+                                GreenKernelEvalType::Value,
+                                BlasFieldTranslationSaRcmp::new(
+                                    None,
+                                    Some(surface_diff),
+                                    FmmSvdMode::new(true, None, None, Some(n_oversamples), None),
+                                ),
+                            )
+                            .unwrap()
+                            .build()
+                            .unwrap();
+
+                        compression = calculate_compression(&fmm, &fmm_full);
                     } else {
                         let sources = points_fixture::<f64>(n_points, None, None, None);
                         let charges = vec![1.0f64; n_points];
+                        let s = Instant::now();
                         let fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
@@ -302,12 +376,31 @@ fn main() {
                             .unwrap()
                             .build()
                             .unwrap();
-
+                        setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_blas_m2l(&fmm);
+
+                        let fmm_full = SingleNodeBuilder::new(false)
+                            .tree(sources.data(), sources.data(), None, Some(depth), true)
+                            .unwrap()
+                            .parameters(
+                                &charges,
+                                &expansion_order,
+                                Laplace3dKernel::new(),
+                                GreenKernelEvalType::Value,
+                                BlasFieldTranslationSaRcmp::new(
+                                    None,
+                                    Some(surface_diff),
+                                    FmmSvdMode::new(true, None, None, Some(n_oversamples), None),
+                                ),
+                            )
+                            .unwrap()
+                            .build()
+                            .unwrap();
+                        compression = calculate_compression(&fmm, &fmm_full);
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB");
+                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} compression: {compression}");
                 }
             }
         }

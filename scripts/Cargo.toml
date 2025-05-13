@@ -29,8 +29,8 @@ path = "src/bin/count_flops.rs"
 required-features = []
 
 [[bin]]
-name = "count_storage"
-path = "src/bin/count_storage.rs"
+name = "count_storage_setup"
+path = "src/bin/count_storage_setup.rs"
 required-features = []
 
 [[bin]]
