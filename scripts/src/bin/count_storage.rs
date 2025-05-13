@@ -2,16 +2,11 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fftw::Dft;
-use kifmm::traits::field::{SourceToTargetTranslation, TargetTranslation};
-use kifmm::traits::fmm::{DataAccess, Evaluate};
 use kifmm::traits::general::single_node::AsComplex;
-use kifmm::traits::tree::{SingleFmmTree, SingleTree};
 use kifmm::tree::helpers::points_fixture;
-use kifmm::{fmm, KiFmm};
+use kifmm::{KiFmm};
 use num::Float;
-use rlst::dense::linalg::svd;
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar, Shape};
-use serde::de;
+use rlst::{RawAccess, RlstScalar, Shape};
 use serde_yaml::Value;
 
 use std::{fs, mem};
@@ -23,48 +18,43 @@ fn calculate_fmm_storage_fft_m2l<Scalar: RlstScalar + Float + AsComplex + Dft>(
     let element_size = mem::size_of::<Scalar>(); // Assuming f32 is the element type
 
     // UC2E_INV_1
-    let mut storage_uc2e_inv_1 = 0;
     let mut size_uc2e_inv_1 = 0;
     for mat in &fmm.uc2e_inv_1 {
         size_uc2e_inv_1 += mat.shape()[0] * mat.shape()[1];
     }
-    storage_uc2e_inv_1 = size_uc2e_inv_1 * element_size;
+    let storage_uc2e_inv_1 = size_uc2e_inv_1 * element_size;
 
     // UC2E_INV_2
-    let mut storage_uc2e_inv_2 = 0;
     let mut size_uc2e_inv_2 = 0;
     for mat in &fmm.uc2e_inv_2 {
         size_uc2e_inv_2 += mat.shape()[0] * mat.shape()[1];
     }
-    storage_uc2e_inv_2 = size_uc2e_inv_2 * element_size;
+    let storage_uc2e_inv_2 = size_uc2e_inv_2 * element_size;
 
     // M2M
-    let mut storage_m2m = 0;
     let mut size_m2m = 0;
     for mat in &fmm.source {
         size_m2m += mat.shape()[0] * mat.shape()[1];
     }
-    storage_m2m = size_m2m * element_size;
+    let storage_m2m = size_m2m * element_size;
 
     // L2L
-    let mut storage_l2l = 0;
     let mut size_l2l = 0;
     for vec in &fmm.target_vec {
         for mat in vec.iter() {
             size_l2l += mat.shape()[0] * mat.shape()[1];
         }
     }
-    storage_l2l = size_l2l * element_size;
+    let storage_l2l = size_l2l * element_size;
 
     // M2L
     let kernel_data = &fmm.source_to_target.metadata[0].kernel_data;
     let mut size_m2l = 0;
-    let mut storage_m2l = 0;
     for vec in kernel_data {
         size_m2l += vec.len();
     }
     size_m2l *= 2; // need it twice, freq re-ordered
-    storage_m2l = size_m2l * element_size * 2; // complex numbers
+    let storage_m2l = size_m2l * element_size * 2; // complex numbers
 
     // Convert storage to megabytes
     (
@@ -80,43 +70,38 @@ fn calculate_fmm_storage_blas_m2l<Scalar: RlstScalar + Float + AsComplex + Dft>(
     let element_size = mem::size_of::<Scalar>(); // Assuming f32 is the element type
 
     // UC2E_INV_1
-    let mut storage_uc2e_inv_1 = 0;
     let mut size_uc2e_inv_1 = 0;
     for mat in &fmm.uc2e_inv_1 {
         size_uc2e_inv_1 += mat.shape()[0] * mat.shape()[1];
     }
-    storage_uc2e_inv_1 = size_uc2e_inv_1 * element_size;
+    let storage_uc2e_inv_1 = size_uc2e_inv_1 * element_size;
 
     // UC2E_INV_2
-    let mut storage_uc2e_inv_2 = 0;
     let mut size_uc2e_inv_2 = 0;
     for mat in &fmm.uc2e_inv_2 {
         size_uc2e_inv_2 += mat.shape()[0] * mat.shape()[1];
     }
-    storage_uc2e_inv_2 = size_uc2e_inv_2 * element_size;
+    let storage_uc2e_inv_2 = size_uc2e_inv_2 * element_size;
 
     // M2M
-    let mut storage_m2m = 0;
     let mut size_m2m = 0;
     for mat in &fmm.source {
         size_m2m += mat.shape()[0] * mat.shape()[1];
     }
-    storage_m2m = size_m2m * element_size;
+    let storage_m2m = size_m2m * element_size;
 
     // L2L
-    let mut storage_l2l = 0;
     let mut size_l2l = 0;
     for vec in &fmm.target_vec {
         for mat in vec.iter() {
             size_l2l += mat.shape()[0] * mat.shape()[1];
         }
     }
-    storage_l2l = size_l2l * element_size;
+    let storage_l2l = size_l2l * element_size;
 
     // M2L
     let data = &fmm.source_to_target.metadata;
     let mut size_m2l = 0;
-    let mut storage_m2l = 0;
 
     for metadata in data {
         let u = &metadata.u;
@@ -131,7 +116,7 @@ fn calculate_fmm_storage_blas_m2l<Scalar: RlstScalar + Float + AsComplex + Dft>(
         size_m2l += size;
     }
 
-    storage_m2l = size_m2l * element_size;
+    let storage_m2l = size_m2l * element_size;
 
     // Convert storage to megabytes
     (
