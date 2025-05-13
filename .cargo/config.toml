@@ -9,6 +9,7 @@ rrustflags = ["-C", "target-feature=+neon,+fp-armv8,+fma"]
 
 [env]
 OPENBLAS_NUM_THREADS = "1"
+ARCH ="APPLE_M1"
 
 [profile.release]
 opt-level = 3
@@ -19,3 +20,4 @@ lto = true
 opt-level = 3
 codegen-units = 1
 lto = true
+

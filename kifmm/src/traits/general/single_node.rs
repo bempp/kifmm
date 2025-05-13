@@ -71,6 +71,8 @@ pub trait Hadamard8x8 {
     );
 }
 
+/// Get the cutoff rank for a given BLAS Field Translations (used in benchmarking)
 pub trait GetCutoffRank {
+    /// Get the cutoff ranks
     fn get_cutoff_rank(&self) -> &[usize];
 }

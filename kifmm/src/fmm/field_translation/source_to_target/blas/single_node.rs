@@ -153,7 +153,7 @@ where
                 nflops += (m * n_sources * (2 * n - 1)) as u64;
 
                 // 2. Apply BLAS operation
-                let mut tmp1 = Mutex::new(0);
+                let tmp1 = Mutex::new(0);
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()

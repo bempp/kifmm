@@ -16,9 +16,17 @@ csv = "1.3.0"
 mpi = { version = "0.8.*", optional = true}
 rayon = "1.9"
 clap = { version = "4.5.4", features = ["derive"] }
+serde_yaml = "0.9.34"
+serde = "1.0.219"
+rand_distr = "0.5.1"
 
 [features]
 mpi = ["kifmm/mpi", "dep:mpi"]
+
+[[bin]]
+name = "count_flops"
+path = "src/bin/count_flops.rs"
+required-features = []
 
 [[bin]]
 name = "grid_search_single_node"
