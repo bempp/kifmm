@@ -4,6 +4,10 @@ use std::{
     time::{Duration, Instant},
 };
 
+
+/// Number of floating point operations
+pub type NumberOfFlops = u64;
+
 /// Type to handle FMM related errors
 #[derive(Debug)]
 pub enum FmmError {

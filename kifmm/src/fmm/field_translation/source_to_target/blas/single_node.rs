@@ -1,12 +1,12 @@
 //! Multipole to local field translation trait implementation using BLAS.
 
-use std::sync::Mutex;
+use std::{ops::DerefMut, sync::Mutex};
 
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    RawAccessMut, RlstScalar, Shape
 };
 
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
@@ -22,7 +22,7 @@ use crate::{
         fmm::{DataAccess, HomogenousKernel, MetadataAccess},
         general::single_node::GetCutoffRank,
         tree::{SingleFmmTree, SingleTree},
-        types::FmmError,
+        types::{FmmError, NumberOfFlops},
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
     BlasFieldTranslationSaRcmp, KiFmm,
@@ -36,7 +36,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<NumberOfFlops, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(
                 "No target boxes at this level".to_string(),
@@ -52,6 +52,7 @@ where
         let c2e_operator_index = self.c2e_operator_index(level);
         let displacement_index = self.displacement_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+        let mut nflops = 0;
 
         // let sentinel = sources.len();
         let sentinel = -1i32;
@@ -139,20 +140,32 @@ where
                             *d *= homogenous_kernel_scale::<Scalar>(level)
                                 * m2l_scale::<Scalar>(level).unwrap()
                         });
+
+                        // Count flops for applying scale
+                        nflops += (compressed_multipoles.data().len()) as u64;
                     }
                 }
 
+
+                // Count flops for compressed check potentials
+                let [m, n] = self.source_to_target.metadata[m2l_operator_index].st.shape();
+                nflops += (m * n_sources * (2 * n - 1)) as u64;
+
                 // 2. Apply BLAS operation
+                let mut tmp1 = Mutex::new(0);
                 {
                     (0..NTRANSFER_VECTORS_KIFMM)
                         .into_par_iter()
                         .zip(multipole_idxs)
                         .zip(local_idxs)
                         .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                            let mut tmp2 = 0;
+
                             let c_u_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_u[c_idx];
                             let c_vt_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
+
 
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
@@ -161,6 +174,8 @@ where
                                     multipole_idxs.len()
                                 ]
                             );
+
+
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
@@ -177,6 +192,9 @@ where
                                     );
                             }
 
+                            // Count flops for copying subset of data
+                            tmp2 += (compressed_multipoles_subset.data().len()) as u64;
+
                             let compressed_check_potential = empty_array::<Scalar, 2>()
                                 .simple_mult_into_resize(
                                     c_u_sub.r(),
@@ -185,6 +203,12 @@ where
                                         compressed_multipoles_subset.r(),
                                     ),
                                 );
+
+                            // Count flops for convolution
+                            let [m, n] = c_vt_sub.shape();
+                            tmp2 += (m * multipole_idxs.len() * (2 * n - 1)) as u64;
+                            let [m, n] = c_u_sub.shape();
+                            tmp2 += (m * multipole_idxs.len() * (2 * n - 1)) as u64;
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
                                 let check_potential_lock =
@@ -205,8 +229,13 @@ where
                                     .zip(tmp)
                                     .for_each(|(l, r)| *l += *r);
                             }
+                            // Count flops for check potentials
+                            tmp2 += (local_idxs.len() * self.source_to_target.cutoff_rank[m2l_operator_index]) as u64;
+                            *tmp1.lock().unwrap().deref_mut() += tmp2;
                         });
                 }
+
+                nflops += *tmp1.lock().unwrap().deref_mut();
 
                 // 3. Compute local expansions from compressed check potentials
                 {
@@ -221,6 +250,17 @@ where
                         ),
                     );
 
+                    // Count flops for evaluating locals
+                    let [m, n] = self.dc2e_inv_2[c2e_operator_index].shape();
+                    nflops += (m * n * n_targets) as u64; // Real multiplications
+                    nflops += (m * n_targets * (n - 1)) as u64; // Real additions
+                    let [m, n] = self.dc2e_inv_1[c2e_operator_index].shape();
+                    nflops += (m * n * n_targets) as u64; // Real multiplications
+                    nflops += (m * n_targets * (n - 1)) as u64; // Real additions
+                    let [m, n] = self.source_to_target.metadata[m2l_operator_index].u.shape();
+                    nflops += (m * n * n_targets) as u64; // Real multiplications
+                    nflops += (m * n_targets * (n - 1)) as u64; // Real additions
+
                     let ptr = self.level_locals[level as usize][0][0].raw;
                     let all_locals = unsafe {
                         std::slice::from_raw_parts_mut(ptr, n_targets * n_coeffs_equivalent_surface)
@@ -231,7 +271,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(nflops);
             }
             FmmEvalType::Matrix(n_matvecs) => {
                 let multipoles = rlst_array_from_slice2!(
@@ -418,7 +458,7 @@ where
             }
         }
 
-        Ok(())
+        Ok(0)
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {
@@ -434,7 +474,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: MetadataAccess,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<NumberOfFlops, FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(format!(
                 "M2L failed at level {:?}, no targets found",
@@ -609,7 +649,7 @@ where
                         .for_each(|(l, r)| *l += *r);
                 }
 
-                return Ok(());
+                return Ok(0);
             }
             FmmEvalType::Matrix(n_matvecs) => {
                 // Lookup multipole data from source tree
@@ -763,7 +803,7 @@ where
                 }
             }
         }
-        Ok(())
+        Ok(0)
     }
 
     fn p2l(&self, _level: u64) -> Result<(), FmmError> {

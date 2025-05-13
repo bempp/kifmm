@@ -74,7 +74,8 @@ where
 
             let (result, duration) = optionally_time(self.timed, || self.m2l(level));
 
-            result?;
+            let nflops = result?;
+            self.nflops += nflops;
 
             if let Some(d) = duration {
                 self.operator_times.push(FmmOperatorTime::from_duration(

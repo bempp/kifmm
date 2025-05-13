@@ -94,6 +94,10 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+
+    /// Number of flops in M2L operation
+    pub nflops: u64,
+
     /// Operator runtimes
     pub operator_times: Vec<FmmOperatorTime>,
 
@@ -233,6 +237,7 @@ where
 {
     fn default() -> Self {
         KiFmm {
+            nflops: 0,
             timed: false,
             operator_times: Vec::default(),
             communication_times: Vec::default(),

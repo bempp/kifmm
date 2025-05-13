@@ -27,7 +27,7 @@ use crate::{
         fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
         general::single_node::{AsComplex, Hadamard8x8},
         tree::{MultiFmmTree, MultiTree, SingleTree},
-        types::FmmError,
+        types::{FmmError, NumberOfFlops},
     },
     tree::{
         constants::{NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
@@ -60,7 +60,8 @@ where
     KiFmm<Scalar, Kernel, FftFieldTranslation<Scalar>>:
         DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
-    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+    fn m2l(&self, level: u64) -> Result<NumberOfFlops, FmmError> {
+
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 if let Some(targets) = self.tree().target_tree().keys(level) {
@@ -95,7 +96,7 @@ where
                     // Pad amount
                     let n_zeros = 8;
 
-                    // Amount to scale the application of the kernel by
+                    // Amount to scale the application of the kernel by:151
                     let scale = if self.kernel.is_homogenous() {
                         m2l_scale::<<Scalar as AsComplex>::ComplexType>(level).unwrap()
                             * homogenous_kernel_scale(level)
@@ -221,6 +222,7 @@ where
                         let mut out = AlignedVec::new(size_out);
                         let plan =
                             Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
+
 
                         let chunk_size_pre_proc = 1;
                         let multipoles = all_multipoles[i];
@@ -459,7 +461,7 @@ where
                     }
                 }
 
-                Ok(())
+                Ok(0)
             }
             FmmEvalType::Matrix(_) => Err(FmmError::Unimplemented(
                 "M2L unimplemented for matrix input with FFT field translations".to_string(),

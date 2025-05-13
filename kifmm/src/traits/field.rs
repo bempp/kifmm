@@ -1,6 +1,7 @@
 //! Field Traits
 
-use super::types::FmmError;
+use super::types::{NumberOfFlops, FmmError};
+
 /// Marker trait for field translations
 pub trait FieldTranslation {
     /// Metadata for applying each to source to target translation, depends on both the kernel
@@ -76,7 +77,7 @@ pub trait SourceToTargetTranslation {
     ///
     /// # Arguments
     /// * `level` - The level of the tree at which this translation is being applied.
-    fn m2l(&self, level: u64) -> Result<(), FmmError>;
+    fn m2l(&self, level: u64) -> Result<NumberOfFlops, FmmError>;
 
     /// Particle to local translations, applies to leaf boxes when a source box is within
     /// the far field of a target box, but is too large for the multipole expansion to converge

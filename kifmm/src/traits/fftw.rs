@@ -257,6 +257,9 @@ where
     /// Associated Plan type
     type Plan;
 
+    /// Count the number of flops
+    fn count_flops(plan: &Self::Plan, add: &mut f64, mul: &mut f64, fmas: &mut f64);
+
     /// Create a forward FFT Plan
     fn plan_forward(
         in_: &mut [<Self as DftType>::InputType],
