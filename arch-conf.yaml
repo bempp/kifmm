@@ -131,7 +131,7 @@ arch:
                 surface_diff: 2
                 n_oversamples: 20
                 svd_threshold: 1e-7
-  AMD_3290X:
+  AMD_3790X:
     fp32:
       blas:
         n_points:
