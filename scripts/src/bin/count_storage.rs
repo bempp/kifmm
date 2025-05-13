@@ -307,7 +307,7 @@ fn main() {
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB");
+                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB");
                 }
             }
         }
