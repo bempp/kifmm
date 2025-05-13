@@ -1,6 +1,6 @@
 //! Field Traits
 
-use super::types::{NumberOfFlops, FmmError};
+use super::types::{FmmError, NumberOfFlops};
 
 /// Marker trait for field translations
 pub trait FieldTranslation {

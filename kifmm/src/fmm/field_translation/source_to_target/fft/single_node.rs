@@ -6,7 +6,7 @@ use num::{One, Zero};
 
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar, Shape
+    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar, Shape,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -49,7 +49,6 @@ where
     <Scalar as Dft>::Plan: Sync,
 {
     fn m2l(&self, level: u64) -> Result<NumberOfFlops, FmmError> {
-
         let mut nflops = 0;
 
         match self.fmm_eval_type {
@@ -153,12 +152,7 @@ where
                     let mut fmas = 0.;
                     let mut add = 0.;
                     let mut mul = 0.;
-                    Scalar::count_flops(
-                        &plan,
-                        &mut add,
-                        &mut mul,
-                        &mut fmas,
-                    );
+                    Scalar::count_flops(&plan, &mut add, &mut mul, &mut fmas);
 
                     add = add * n_sources as f64;
                     mul = mul * n_sources as f64;
@@ -170,7 +164,6 @@ where
 
                     // Count flops for frequency based re-ordering 1 mul and 1 add (real data)
                     nflops += (2 * multipoles.len()) as u64;
-
 
                     multipoles
                         .par_chunks_exact(
@@ -329,7 +322,6 @@ where
                 nflops += (26 * 64 * 4 * n_parents * size_out) as u64; // Real multiplications for 64 complex multiplications
                 nflops += (26 * (64 * 2 + 8 * 2) * n_parents * size_out) as u64; // Real additions
 
-
                 // 3. Post process to find local expansions at target boxes
                 {
                     check_potential_hat_c
@@ -358,7 +350,6 @@ where
                     fmas = fmas * n_targets as f64;
 
                     nflops += (add + mul + fmas) as u64;
-
 
                     let _ = Scalar::backward_dft_batch_par(
                         &mut check_potential_hat_c,

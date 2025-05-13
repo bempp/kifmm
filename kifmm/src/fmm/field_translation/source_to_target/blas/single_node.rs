@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar, Shape
+    RawAccessMut, RlstScalar, Shape,
 };
 
 use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait};
@@ -146,9 +146,10 @@ where
                     }
                 }
 
-
                 // Count flops for compressed check potentials
-                let [m, n] = self.source_to_target.metadata[m2l_operator_index].st.shape();
+                let [m, n] = self.source_to_target.metadata[m2l_operator_index]
+                    .st
+                    .shape();
                 nflops += (m * n_sources * (2 * n - 1)) as u64;
 
                 // 2. Apply BLAS operation
@@ -166,7 +167,6 @@ where
                             let c_vt_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
-
                             let mut compressed_multipoles_subset = rlst_dynamic_array2!(
                                 Scalar,
                                 [
@@ -174,8 +174,6 @@ where
                                     multipole_idxs.len()
                                 ]
                             );
-
-
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
                                 compressed_multipoles_subset.data_mut()[i * self
@@ -230,7 +228,9 @@ where
                                     .for_each(|(l, r)| *l += *r);
                             }
                             // Count flops for check potentials
-                            tmp2 += (local_idxs.len() * self.source_to_target.cutoff_rank[m2l_operator_index]) as u64;
+                            tmp2 += (local_idxs.len()
+                                * self.source_to_target.cutoff_rank[m2l_operator_index])
+                                as u64;
                             *tmp1.lock().unwrap().deref_mut() += tmp2;
                         });
                 }

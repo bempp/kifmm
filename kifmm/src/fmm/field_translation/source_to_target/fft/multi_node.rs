@@ -61,7 +61,6 @@ where
         DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
     fn m2l(&self, level: u64) -> Result<NumberOfFlops, FmmError> {
-
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 if let Some(targets) = self.tree().target_tree().keys(level) {
@@ -222,7 +221,6 @@ where
                         let mut out = AlignedVec::new(size_out);
                         let plan =
                             Scalar::plan_forward(&mut in_, &mut out, &shape_in, None).unwrap();
-
 
                         let chunk_size_pre_proc = 1;
                         let multipoles = all_multipoles[i];

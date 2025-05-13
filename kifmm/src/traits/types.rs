@@ -4,7 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-
 /// Number of floating point operations
 pub type NumberOfFlops = u64;
 

@@ -94,7 +94,6 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
-
     /// Number of flops in M2L operation
     pub nflops: u64,
 
