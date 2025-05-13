@@ -133,7 +133,6 @@ fn main() {
         .expect("Expected 'arch' to be a mapping");
 
     for precision in ["fp32", "fp64"] {
-
         let data = arch
             .get(precision)
             .and_then(Value::as_mapping)
