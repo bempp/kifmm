@@ -2,6 +2,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::fmm::types::FmmSvdMode;
 use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder};
 use kifmm::traits::fftw::Dft;
+use kifmm::traits::field::SourceToTargetTranslationMetadata;
 use kifmm::traits::general::single_node::AsComplex;
 use kifmm::tree::helpers::points_fixture;
 use kifmm::{KiFmm};
@@ -228,11 +229,13 @@ fn main() {
 
                     let storage;
                     let setup_time;
+                    let displacement_time;
+
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
                         let s = Instant::now();
-                        let fmm = SingleNodeBuilder::new(false)
+                        let mut fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
                             .parameters(
@@ -246,13 +249,18 @@ fn main() {
                             .build()
                             .unwrap();
                         setup_time = s.elapsed().as_millis();
+
+                        let s = Instant::now();
+                        fmm.displacements(None);
+                        displacement_time = s.elapsed().as_millis();
+
 
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
                     } else {
                         let sources = points_fixture::<f64>(n_points, None, None, None);
                         let charges = vec![1.0f64; n_points];
                         let s = Instant::now();
-                        let fmm = SingleNodeBuilder::new(false)
+                        let mut fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
                             .parameters(
@@ -267,10 +275,14 @@ fn main() {
                             .unwrap();
                         setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
+
+                        let s = Instant::now();
+                        fmm.displacements(None);
+                        displacement_time = s.elapsed().as_millis();
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time}");
+                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time}");
                 }
             }
         }
@@ -312,11 +324,12 @@ fn main() {
                     let storage;
                     let setup_time;
                     let compression;
+                    let displacement_time;
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
                         let s = Instant::now();
-                        let fmm = SingleNodeBuilder::new(false)
+                        let mut fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
                             .parameters(
@@ -335,6 +348,10 @@ fn main() {
                             .unwrap();
                         setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_blas_m2l(&fmm);
+
+                        let s = Instant::now();
+                        fmm.displacements(None);
+                        displacement_time = s.elapsed().as_millis();
 
                         let fmm_full = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
@@ -359,7 +376,7 @@ fn main() {
                         let sources = points_fixture::<f64>(n_points, None, None, None);
                         let charges = vec![1.0f64; n_points];
                         let s = Instant::now();
-                        let fmm = SingleNodeBuilder::new(false)
+                        let mut fmm = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
                             .parameters(
@@ -378,6 +395,10 @@ fn main() {
                             .unwrap();
                         setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_blas_m2l(&fmm);
+
+                        let s = Instant::now();
+                        fmm.displacements(None);
+                        displacement_time = s.elapsed().as_millis();
 
                         let fmm_full = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
@@ -400,7 +421,7 @@ fn main() {
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} compression: {compression}");
+                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} compression: {compression}");
                 }
             }
         }
