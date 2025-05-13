@@ -230,6 +230,7 @@ fn main() {
                     let storage;
                     let setup_time;
                     let displacement_time;
+                    let m2l_precomputation;
 
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
@@ -253,6 +254,10 @@ fn main() {
                         let s = Instant::now();
                         fmm.displacements(None);
                         displacement_time = s.elapsed().as_millis();
+
+                        let s = Instant::now();
+                        fmm.source_to_target();
+                        m2l_precomputation = s.elapsed().as_millis();
 
 
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
@@ -279,10 +284,14 @@ fn main() {
                         let s = Instant::now();
                         fmm.displacements(None);
                         displacement_time = s.elapsed().as_millis();
+
+                        let s = Instant::now();
+                        fmm.source_to_target();
+                        m2l_precomputation = s.elapsed().as_millis();
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time}");
+                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} m2l_precomputation: {m2l_precomputation}");
                 }
             }
         }
@@ -325,6 +334,8 @@ fn main() {
                     let setup_time;
                     let compression;
                     let displacement_time;
+                    let mut m2l_precomputation;
+
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
@@ -352,6 +363,10 @@ fn main() {
                         let s = Instant::now();
                         fmm.displacements(None);
                         displacement_time = s.elapsed().as_millis();
+
+                        let s = Instant::now();
+                        fmm.source_to_target();
+                        m2l_precomputation = s.elapsed().as_millis();
 
                         let fmm_full = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
@@ -400,6 +415,10 @@ fn main() {
                         fmm.displacements(None);
                         displacement_time = s.elapsed().as_millis();
 
+                        let s = Instant::now();
+                        fmm.source_to_target();
+                        m2l_precomputation = s.elapsed().as_millis();
+
                         let fmm_full = SingleNodeBuilder::new(false)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
@@ -421,7 +440,7 @@ fn main() {
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} compression: {compression}");
+                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} compression: {compression} m2l_precomputation: {m2l_precomputation}");
                 }
             }
         }
