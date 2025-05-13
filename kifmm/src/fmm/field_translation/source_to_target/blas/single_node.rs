@@ -15,9 +15,17 @@ use crate::{
     fmm::{
         helpers::single_node::{homogenous_kernel_scale, m2l_scale},
         types::{BlasFieldTranslationIa, FmmEvalType, SendPtrMut},
-    }, linalg::rsvd::MatrixRsvd, traits::{
-        field::SourceToTargetTranslation, fmm::{DataAccess, HomogenousKernel, MetadataAccess}, general::single_node::GetCutoffRank, tree::{SingleFmmTree, SingleTree}, types::FmmError
-    }, tree::constants::NTRANSFER_VECTORS_KIFMM, BlasFieldTranslationSaRcmp, KiFmm
+    },
+    linalg::rsvd::MatrixRsvd,
+    traits::{
+        field::SourceToTargetTranslation,
+        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
+        general::single_node::GetCutoffRank,
+        tree::{SingleFmmTree, SingleTree},
+        types::FmmError,
+    },
+    tree::constants::NTRANSFER_VECTORS_KIFMM,
+    BlasFieldTranslationSaRcmp, KiFmm,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -762,7 +770,6 @@ where
         Err(FmmError::Unimplemented("P2L unimplemented".to_string()))
     }
 }
-
 
 impl<Scalar> GetCutoffRank
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>

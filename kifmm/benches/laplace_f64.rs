@@ -276,7 +276,6 @@ fn laplace_potentials_f64_1e6(c: &mut Criterion) {
     }
 }
 
-
 fn laplace_potentials_f64_8e6(c: &mut Criterion) {
     let mut group = c.benchmark_group("F64 Potentials");
 
@@ -543,6 +542,9 @@ fn laplace_potentials_f64_8e6(c: &mut Criterion) {
     }
 }
 
-
-criterion_group!(laplace_p_f64, laplace_potentials_f64_1e6, laplace_potentials_f64_8e6);
+criterion_group!(
+    laplace_p_f64,
+    laplace_potentials_f64_1e6,
+    laplace_potentials_f64_8e6
+);
 criterion_main!(laplace_p_f64);

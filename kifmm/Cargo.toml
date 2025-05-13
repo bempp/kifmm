@@ -56,6 +56,10 @@ name = "laplace_f32_m1"
 harness = false
 
 [[bench]]
+name = "laplace_f64_m1"
+harness = false
+
+[[bench]]
 name = "laplace_f64"
 harness = false
 

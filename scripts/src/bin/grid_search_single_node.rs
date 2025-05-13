@@ -524,61 +524,79 @@ fn grid_search_laplace_fft<T>(
 fn main() {
     let n_points = 8000000;
     let geometries = ["uniform"];
-    let arch = "amd"; // change on each arch
+    let arch = "m1"; // change on each arch
 
     // FFT Grid Search
     // {
-    //     // for geometry in geometries.iter() {
-    //     //         let precision = "f32";
-    //     //         let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
-    //     //         // let depth_vec: Vec<u64> = vec![4, 5];
-    //     //         let depth_vec: Vec<u64> = vec![5, 6];
-    //     //         let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
-
-    //     //         grid_search_laplace_fft::<f32>(
-    //     //             format!("grid_search_laplace_fft_{}_{}_{}_{}", precision, arch, geometry, n_points).to_string(),
-    //     //             &geometry,
-    //     //             n_points,
-    //     //             &expansion_order_vec,
-    //     //             &depth_vec,
-    //     //             &max_m2l_fft_block_size_vec,
-    //     //         );
-    //     //     }
-
     //     for geometry in geometries.iter() {
-    //         let precision = "f64";
-    //         // let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9, 10, 11];
-    //         // let expansion_order_vec: Vec<usize> = vec![6, 7, 8, 9];
-    //         let expansion_order_vec: Vec<usize> = vec![10, 11];
-    //         // let depth_vec: Vec<u64> = vec![4, 5];
-    //         // let depth_vec: Vec<u64> = vec![5];
-    //         let depth_vec: Vec<u64> = vec![6];
-    //         let max_m2l_fft_block_size_vec = vec![16, 32, 64];
 
-    //         grid_search_laplace_fft::<f64>(
-    //             format!(
-    //                 "grid_search_laplace_fft_high_2_{}_{}_{}_{}",
-    //                 precision, arch, geometry, n_points
-    //             )
-    //             .to_string(),
-    //             &geometry,
-    //             n_points,
-    //             &expansion_order_vec,
-    //             &depth_vec,
-    //             &max_m2l_fft_block_size_vec,
-    //         );
-    //     }
+    //             for (i,( blocksize, depth, expansion_order)) in
+    //                 iproduct!(vec![32], vec![5], vec![4]).enumerate()
+    //             {
+    //                 let precision = "f32";
+    //                 grid_search_laplace_fft::<f32>(
+    //                     format!(
+    //                         "grid_search_laplace_fft_{}_{}_{}_{}_{}_{}_{}",
+    //                         i, precision, arch, expansion_order, depth, blocksize, n_points
+    //                     )
+    //                     .to_string(),
+    //                     &geometry,
+    //                     n_points,
+    //                     &[expansion_order],
+    //                     &[depth],
+    //                     &[blocksize],
+    //                 );
+    //             }
+
+    //             // for (i,( blocksize, depth, expansion_order)) in
+    //             //     iproduct!(vec![16, 32, 64, 128], vec![5], vec![3, 4, 5]).enumerate()
+    //             // {
+    //             //     let precision = "f32";
+    //             //     grid_search_laplace_fft::<f32>(
+    //             //         format!(
+    //             //             "grid_search_laplace_fft_{}_{}_{}_{}_{}_{}_{}",
+    //             //             i, precision, arch, expansion_order, depth, blocksize, blocksize
+    //             //         )
+    //             //         .to_string(),
+    //             //         &geometry,
+    //             //         n_points,
+    //             //         &[expansion_order],
+    //             //         &[depth],
+    //             //         &[blocksize],
+    //             //     );
+    //             // }
+
+    //         }
+
+    for geometry in geometries.iter() {
+        for (i, (blocksize, depth, expansion_order)) in
+            iproduct!(vec![16, 32, 64, 128], vec![5, 6], vec![5]).enumerate()
+        {
+            let precision = "f64";
+            grid_search_laplace_fft::<f64>(
+                format!(
+                    "grid_search_laplace_fft_{}_{}_{}_{}_{}_{}_{}",
+                    i, precision, arch, expansion_order, depth, blocksize, n_points
+                )
+                .to_string(),
+                &geometry,
+                n_points,
+                &[expansion_order],
+                &[depth],
+                &[blocksize],
+            );
+        }
+    }
     // }
 
     // BLAS Grid Search
     {
         // for geometry in geometries.iter() {
         //     let precision = "f32";
-        //     let expansion_order_vec: Vec<usize> = vec![2, 3, 4, 5];
-        //     let depth_vec: Vec<u64> = vec![5];
+        //     let expansion_order_vec: Vec<usize> = vec![3, 4];
+        //     let depth_vec: Vec<u64> = vec![6]; // then same for 8e6
 
         //     let rsvd_settings_vec = [
-        //         FmmSvdMode::new(false, None, None, None, None),
         //         FmmSvdMode::new(true, None, None, Some(5), None),
         //         FmmSvdMode::new(true, None, None, Some(10), None),
         //         FmmSvdMode::new(true, None, None, Some(20), None),
@@ -587,62 +605,58 @@ fn main() {
         //     let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3), Some(1e-1)];
         //     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
 
-        //     for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
+        //     for (i, (rsvd_settings, depth, expansion_order, surface_diff)) in
+        //         iproduct!(rsvd_settings_vec.iter(), depth_vec.iter(), expansion_order_vec.iter(), surface_diff_vec.iter()).enumerate()
+        //     {
         //         grid_search_laplace_blas::<f32>(
-        //             format!("grid_search_laplace_blas_{}_{}_{}_{}_{}", geometry, precision, arch, n_points, i).to_string(),
+        //             format!(
+        //                 "grid_search_laplace_blas_{}_{}_{}_{}_{}_{}_{}_{}",
+        //                 geometry, precision, arch, n_points, expansion_order, surface_diff, depth, i
+        //             )
+        //             .to_string(),
         //             &geometry,
         //             n_points,
-        //             &expansion_order_vec,
+        //             &[*expansion_order],
         //             &svd_threshold_vec,
-        //             &surface_diff_vec,
-        //             &depth_vec,
-        //             &[rsvd_settings],
+        //             &[*surface_diff],
+        //             &[*depth],
+        //             &[*rsvd_settings],
         //         );
         //     }
         // }
 
-        // TODL
-        // f64 max on m1 blas
-        // f32 max on m1 fft
-        // overnight did f64 high 4, need high 5 as well on m1
+        // for geometry in geometries.iter() {
+        //     let precision = "f64";
+        //     let expansion_order_vec: Vec<usize> = vec![3, 4];
+        //     let depth_vec: Vec<u64> = vec![5, 6]; // then same for 8e6
 
-        for geometry in geometries.iter() {
-            let precision = "f64_2";
-            // let expansion_order_vec: Vec<usize> = vec![5, 6, 7, 8, 9, 10, 11];
-            // let expansion_order_vec: Vec<usize> = vec![5, 6, 7, 8];
-            // let expansion_order_vec = vec![8, 9];
-            // let expansion_order_vec = vec![9];
-            let expansion_order_vec = vec![10, 11];
-            // let expansion_order_vec = vec![11];
+        //     let rsvd_settings_vec = [
+        //         FmmSvdMode::new(true, None, None, Some(5), None),
+        //         FmmSvdMode::new(true, None, None, Some(10), None),
+        //         FmmSvdMode::new(true, None, None, Some(20), None),
+        //     ];
 
-            let depth_vec: Vec<u64> = vec![5];
+        //     let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3), Some(1e-1)];
+        //     let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
 
-            let rsvd_settings_vec = [
-                FmmSvdMode::new(false, None, None, None, None),
-                FmmSvdMode::new(true, None, None, Some(5), None),
-                FmmSvdMode::new(true, None, None, Some(10), None),
-                FmmSvdMode::new(true, None, None, Some(20), None),
-            ];
-
-            let svd_threshold_vec = vec![None, Some(1e-11), Some(1e-9), Some(1e-7), Some(1e-5)];
-            let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
-
-            for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
-                grid_search_laplace_blas::<f64>(
-                    format!(
-                        "grid_search_laplace_blas_{}_{}_{}_{}_{}",
-                        geometry, precision, arch, n_points, i
-                    )
-                    .to_string(),
-                    &geometry,
-                    n_points,
-                    &expansion_order_vec,
-                    &svd_threshold_vec,
-                    &surface_diff_vec,
-                    &depth_vec,
-                    &[rsvd_settings],
-                );
-            }
-        }
+        //     for (i, (rsvd_settings, depth, expansion_order, surface_diff)) in
+        //         iproduct!(rsvd_settings_vec.iter(), depth_vec.iter(), expansion_order_vec.iter(), surface_diff_vec.iter()).enumerate()
+        //     {
+        //         grid_search_laplace_blas::<f64>(
+        //             format!(
+        //                 "grid_search_laplace_blas_{}_{}_{}_{}_{}_{}_{}_{}",
+        //                 geometry, precision, arch, n_points, expansion_order, surface_diff, depth, i
+        //             )
+        //             .to_string(),
+        //             &geometry,
+        //             n_points,
+        //             &[*expansion_order],
+        //             &svd_threshold_vec,
+        //             &[*surface_diff],
+        //             &[*depth],
+        //             &[*rsvd_settings],
+        //         );
+        //     }
+        // }
     }
 }

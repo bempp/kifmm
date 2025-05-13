@@ -194,8 +194,6 @@ fn laplace_potentials_f32_1e6(c: &mut Criterion) {
     }
 }
 
-
-
 fn laplace_potentials_f32_8e6(c: &mut Criterion) {
     let mut group = c.benchmark_group("F32 Potentials");
 
@@ -380,9 +378,10 @@ fn laplace_potentials_f32_8e6(c: &mut Criterion) {
     }
 }
 
-
-
-
-criterion_group!(laplace_p_f32, laplace_potentials_f32_1e6, laplace_potentials_f32_8e6);
+criterion_group!(
+    laplace_p_f32,
+    laplace_potentials_f32_1e6,
+    laplace_potentials_f32_8e6
+);
 // criterion_group!(laplace_p_f32, laplace_potentials_f32_8e6);
 criterion_main!(laplace_p_f32);
