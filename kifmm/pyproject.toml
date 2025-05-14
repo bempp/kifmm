@@ -1,10 +1,16 @@
 [build-system]
-requires = ["maturin>=1,<2"]
+requires = [
+    "maturin>=1,<2",
+    "setuptools<69",
+    "wheel",
+    "cffi",
+    "pip"
+]
 build-backend = "maturin"
 
 [project]
 name = "kifmm_py"
-version="2.0.0"
+version = "2.0.0"
 requires-python = "==3.10.*"
 classifiers = [
     "Programming Language :: Rust",
@@ -14,16 +20,16 @@ classifiers = [
 dependencies = [
     "maturin==1.5.1",
     "numpy==1.26.2",
-    "mayavi==4.8.1",
-    "vtk==9.3.0",
-    "pyqt5==5.15.10",
-    "numpy-stl==3.1.1",
     "jupyter",
     "configobj",
     'patchelf; platform_system == "Linux"',
     "cffi",
     "pandas==2.2.2",
-    "seaborn==0.13.2"
+    "seaborn==0.13.2",
+    "mayavi==4.8.1",
+    "vtk==9.3.0",
+    "pyqt5==5.15.10",
+    "numpy-stl==3.1.1"
 ]
 
 [tool.maturin]
