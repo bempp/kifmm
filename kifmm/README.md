@@ -96,7 +96,7 @@ uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
 Note that Maturin must be run from the `kifmm` crate root, not the workspace root.
 
 ```bash
-maturin develop --release
+pip install 'setuptools<69' .
 ```
 
 We provide example usage of the Python API, as well as visualisation, in the `python/examples` directory.
