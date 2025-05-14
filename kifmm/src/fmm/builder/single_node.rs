@@ -3,6 +3,7 @@ use std::collections::HashSet;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
+use rayon::option;
 use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
@@ -318,30 +319,50 @@ where
             let (_, duration) = optionally_time(timed, || result.source());
 
             if let Some(d) = duration {
-                result
-                    .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                // result
+                //     .metadata_times
+                //     .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                result.metadata_times.insert(MetadataType::SourceData,   d.as_millis() as u64);
             }
 
             let (_, duration) = optionally_time(timed, || result.target());
 
             if let Some(d) = duration {
-                result
-                    .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                // result
+                //     .metadata_times
+                //     .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                result.metadata_times.insert(MetadataType::TargetData,   d.as_millis() as u64);
             }
 
             let (_, duration) = optionally_time(timed, || result.source_to_target());
 
             if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
-                    MetadataType::SourceToTargetData,
-                    d,
-                ))
+                // result.metadata_times.push(MetadataTime::from_duration(
+                //     MetadataType::SourceToTargetData,
+                //     d,
+                // ))
+                result.metadata_times.insert(MetadataType::SourceToTargetData,   d.as_millis() as u64);
             }
 
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            SourceToTargetTranslationMetadata::displacements(&mut result, None);
+            let (_, duration) = optionally_time(timed, || result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap()));
+            if let Some(d) = duration {
+                // result.metadata_times.push(MetadataTime::from_duration(
+                //     MetadataType::SourceToTargetData,
+                //     d,
+                // ))
+                result.metadata_times.insert(MetadataType::MetadataCreation,   d.as_millis() as u64);
+            }
+
+            let (_, duration) = optionally_time(timed, || SourceToTargetTranslationMetadata::displacements(&mut result, None));
+
+            if let Some(d) = duration {
+                // result.metadata_times.push(MetadataTime::from_duration(
+                //     MetadataType::SourceToTargetData,
+                //     d,
+                // ))
+                result.metadata_times.insert(MetadataType::DisplacementMap,   d.as_millis() as u64);
+            }
+
             Ok(result)
         }
     }

@@ -1,6 +1,6 @@
 //! Utility types for trait definitions.
 use std::{
-    fmt,
+    fmt::{self, write},
     time::{Duration, Instant},
 };
 
@@ -80,8 +80,15 @@ pub enum CommunicationType {
 
 /// Enumeration of metadata construction for timing
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
 pub enum MetadataType {
+
+    /// Pointer and Buffer Creation
+    MetadataCreation,
+
+    /// Displacement Map Creation
+    DisplacementMap,
+
     /// Field translation data
     SourceToTargetData,
 
@@ -196,6 +203,8 @@ impl fmt::Display for CommunicationType {
 impl fmt::Display for MetadataType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            MetadataType::DisplacementMap => write!(f, "Displacment map"),
+            MetadataType::MetadataCreation => write!(f, "Pointer and buffer"),
             MetadataType::SourceToTargetData => write!(f, "Source To Target Data"),
             MetadataType::SourceData => write!(f, "Source Data"),
             MetadataType::TargetData => write!(f, "Target Data"),

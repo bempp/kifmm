@@ -351,7 +351,8 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                metadata_times: Vec::default(),
+                // metadata_times: Vec::default(),
+                metadata_times: HashMap::default(),
                 ghost_requested_queries_key_to_index_v: HashMap::default(),
                 ghost_requested_queries_counts_v: Vec::default(),
                 ghost_received_queries_displacements_v: Vec::default(),
@@ -372,26 +373,36 @@ where
             let (_, duration) = optionally_time(timed, || result.source());
 
             if let Some(d) = duration {
+                // result
+                //     .metadata_times
+                //     .push(MetadataTime::from_duration(MetadataType::SourceData, d))
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                    .insert(MetadataType::SourceData, d.as_millis() as u64);
+
             }
 
             let (_, duration) = optionally_time(timed, || result.target());
 
             if let Some(d) = duration {
+                // result
+                //     .metadata_times
+                //     .push(MetadataTime::from_duration(MetadataType::TargetData, d))
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                    .insert(MetadataType::TargetData, d.as_millis() as u64);
             }
 
             let (_, duration) = optionally_time(timed, || result.source_to_target());
 
             if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
-                    MetadataType::SourceToTargetData,
-                    d,
-                ))
+                // result.metadata_times.push(MetadataTime::from_duration(
+                //     MetadataType::SourceToTargetData,
+                //     d,
+                // ))
+                result
+                    .metadata_times
+                    .insert(MetadataType::SourceToTargetData, d.as_millis() as u64);
             }
 
             // Metadata for global FMM and FMM

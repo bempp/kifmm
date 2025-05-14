@@ -1701,129 +1701,129 @@ pub mod api {
         }
     }
 
-    /// Get the metadata runtimes
-    ///
-    /// # Parameters
-    ///
-    /// - `fmm`: Pointer to an `FmmEvaluator` instance.
-    ///
-    /// # Safety
-    /// This function is intended to be called from C. The caller must ensure that:
-    /// - Input data corresponds to valid pointers
-    /// - That they remain valid for the duration of the function call
-    #[no_mangle]
-    pub unsafe extern "C" fn metadata_times(fmm: *mut FmmEvaluator) -> *mut MetadataTimes {
-        assert!(!fmm.is_null());
+    // /// Get the metadata runtimes
+    // ///
+    // /// # Parameters
+    // ///
+    // /// - `fmm`: Pointer to an `FmmEvaluator` instance.
+    // ///
+    // /// # Safety
+    // /// This function is intended to be called from C. The caller must ensure that:
+    // /// - Input data corresponds to valid pointers
+    // /// - That they remain valid for the duration of the function call
+    // #[no_mangle]
+    // pub unsafe extern "C" fn metadata_times(fmm: *mut FmmEvaluator) -> *mut MetadataTimes {
+    //     assert!(!fmm.is_null());
 
-        let ctype = unsafe { (*fmm).get_ctype() };
-        let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
-        let pointer = unsafe { (*fmm).get_pointer() };
+    //     let ctype = unsafe { (*fmm).get_ctype() };
+    //     let ctranslation_type = unsafe { (*fmm).get_ctranslation_type() };
+    //     let pointer = unsafe { (*fmm).get_pointer() };
 
-        match ctype {
-            FmmCType::Laplace32 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let fmm =
-                        pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
+    //     match ctype {
+    //         FmmCType::Laplace32 => match ctranslation_type {
+    //             FmmTranslationCType::Fft => {
+    //                 let fmm =
+    //                     pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
+    //                 Box::into_raw(Box::new(times))
+    //             }
 
-                FmmTranslationCType::Blas => {
-                    let fmm = pointer
-                        as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
+    //             FmmTranslationCType::Blas => {
+    //                 let fmm = pointer
+    //                     as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
-            },
+    //                 Box::into_raw(Box::new(times))
+    //             }
+    //         },
 
-            FmmCType::Laplace64 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let fmm =
-                        pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
+    //         FmmCType::Laplace64 => match ctranslation_type {
+    //             FmmTranslationCType::Fft => {
+    //                 let fmm =
+    //                     pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
+    //                 Box::into_raw(Box::new(times))
+    //             }
 
-                FmmTranslationCType::Blas => {
-                    let fmm = pointer
-                        as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
+    //             FmmTranslationCType::Blas => {
+    //                 let fmm = pointer
+    //                     as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
-            },
+    //                 Box::into_raw(Box::new(times))
+    //             }
+    //         },
 
-            FmmCType::Helmholtz32 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let fmm = pointer
-                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
+    //         FmmCType::Helmholtz32 => match ctranslation_type {
+    //             FmmTranslationCType::Fft => {
+    //                 let fmm = pointer
+    //                     as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
+    //                 Box::into_raw(Box::new(times))
+    //             }
 
-                FmmTranslationCType::Blas => {
-                    let fmm = pointer
-                        as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
+    //             FmmTranslationCType::Blas => {
+    //                 let fmm = pointer
+    //                     as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
-            },
+    //                 Box::into_raw(Box::new(times))
+    //             }
+    //         },
 
-            FmmCType::Helmholtz64 => match ctranslation_type {
-                FmmTranslationCType::Fft => {
-                    let fmm = pointer
-                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //         FmmCType::Helmholtz64 => match ctranslation_type {
+    //             FmmTranslationCType::Fft => {
+    //                 let fmm = pointer
+    //                     as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
+    //                 Box::into_raw(Box::new(times))
+    //             }
 
-                FmmTranslationCType::Blas => {
-                    let fmm = pointer
-                        as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
+    //             FmmTranslationCType::Blas => {
+    //                 let fmm = pointer
+    //                     as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+    //                 let length = unsafe { (*fmm).metadata_times.len() };
+    //                 let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+    //                 let times = MetadataTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
-                }
-            },
-        }
-    }
+    //                 Box::into_raw(Box::new(times))
+    //             }
+    //         },
+    //     }
+    // }
 
     /// Get the operator runtimes
     ///

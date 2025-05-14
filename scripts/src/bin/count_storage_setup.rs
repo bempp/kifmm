@@ -4,6 +4,7 @@ use kifmm::fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleN
 use kifmm::traits::fftw::Dft;
 use kifmm::traits::field::SourceToTargetTranslationMetadata;
 use kifmm::traits::general::single_node::AsComplex;
+use kifmm::traits::types::MetadataType;
 use kifmm::tree::helpers::points_fixture;
 use kifmm::{KiFmm};
 use num::Float;
@@ -231,14 +232,20 @@ fn main() {
                     let setup_time;
                     let displacement_time;
                     let m2l_precomputation;
+                    let buffer_time;
+                    let tree_time;
 
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
                         let s = Instant::now();
-                        let mut fmm = SingleNodeBuilder::new(false)
+
+                        let tree = SingleNodeBuilder::new(true)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
-                            .unwrap()
+                            .unwrap();
+                        tree_time = s.elapsed().as_millis();
+
+                        let fmm = tree
                             .parameters(
                                 &charges,
                                 &expansion_order,
@@ -250,24 +257,22 @@ fn main() {
                             .build()
                             .unwrap();
                         setup_time = s.elapsed().as_millis();
-
-                        let s = Instant::now();
-                        fmm.displacements(None);
-                        displacement_time = s.elapsed().as_millis();
-
-                        let s = Instant::now();
-                        fmm.source_to_target();
-                        m2l_precomputation = s.elapsed().as_millis();
-
-
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
+
+                        buffer_time = fmm.metadata_times.get(&MetadataType::MetadataCreation).unwrap().clone();
+                        displacement_time = fmm.metadata_times.get(&MetadataType::DisplacementMap).unwrap().clone();
+                        m2l_precomputation = fmm.metadata_times.get(&MetadataType::SourceToTargetData).unwrap().clone();
+
                     } else {
                         let sources = points_fixture::<f64>(n_points, None, None, None);
                         let charges = vec![1.0f64; n_points];
                         let s = Instant::now();
-                        let mut fmm = SingleNodeBuilder::new(false)
+                        let tree = SingleNodeBuilder::new(true)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
-                            .unwrap()
+                            .unwrap();
+                        tree_time = s.elapsed().as_millis();
+
+                        let fmm = tree
                             .parameters(
                                 &charges,
                                 &expansion_order,
@@ -281,17 +286,13 @@ fn main() {
                         setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_fft_m2l(&fmm);
 
-                        let s = Instant::now();
-                        fmm.displacements(None);
-                        displacement_time = s.elapsed().as_millis();
-
-                        let s = Instant::now();
-                        fmm.source_to_target();
-                        m2l_precomputation = s.elapsed().as_millis();
+                        buffer_time = fmm.metadata_times.get(&MetadataType::MetadataCreation).unwrap().clone();
+                        displacement_time = fmm.metadata_times.get(&MetadataType::DisplacementMap).unwrap().clone();
+                        m2l_precomputation = fmm.metadata_times.get(&MetadataType::SourceToTargetData).unwrap().clone();
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} m2l_precomputation: {m2l_precomputation}");
+                    println!("precision: {precision}, m2l: fft, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} m2l_precomputation: {m2l_precomputation} buffer_time {buffer_time} tree_time {tree_time}");
                 }
             }
         }
@@ -334,15 +335,20 @@ fn main() {
                     let setup_time;
                     let compression;
                     let displacement_time;
-                    let mut m2l_precomputation;
+                    let m2l_precomputation;
+                    let buffer_time;
+                    let tree_time;
 
                     if precision == "fp32" {
                         let sources = points_fixture::<f32>(n_points, None, None, None);
                         let charges = vec![1.0f32; n_points];
                         let s = Instant::now();
-                        let mut fmm = SingleNodeBuilder::new(false)
+                        let tree = SingleNodeBuilder::new(true)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
-                            .unwrap()
+                            .unwrap();
+                        tree_time = s.elapsed().as_millis();
+
+                        let fmm = tree
                             .parameters(
                                 &charges,
                                 &expansion_order,
@@ -360,15 +366,11 @@ fn main() {
                         setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_blas_m2l(&fmm);
 
-                        let s = Instant::now();
-                        fmm.displacements(None);
-                        displacement_time = s.elapsed().as_millis();
+                        buffer_time = fmm.metadata_times.get(&MetadataType::MetadataCreation).unwrap().clone();
+                        displacement_time = fmm.metadata_times.get(&MetadataType::DisplacementMap).unwrap().clone();
+                        m2l_precomputation = fmm.metadata_times.get(&MetadataType::SourceToTargetData).unwrap().clone();
 
-                        let s = Instant::now();
-                        fmm.source_to_target();
-                        m2l_precomputation = s.elapsed().as_millis();
-
-                        let fmm_full = SingleNodeBuilder::new(false)
+                        let fmm_full = SingleNodeBuilder::new(true)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
                             .parameters(
@@ -391,10 +393,13 @@ fn main() {
                         let sources = points_fixture::<f64>(n_points, None, None, None);
                         let charges = vec![1.0f64; n_points];
                         let s = Instant::now();
-                        let mut fmm = SingleNodeBuilder::new(false)
+                        let tree = SingleNodeBuilder::new(true)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
-                            .unwrap()
-                            .parameters(
+                            .unwrap();
+                        tree_time = s.elapsed().as_millis();
+
+                        let fmm = tree.
+                            parameters(
                                 &charges,
                                 &expansion_order,
                                 Laplace3dKernel::new(),
@@ -411,15 +416,11 @@ fn main() {
                         setup_time = s.elapsed().as_millis();
                         storage = calculate_fmm_storage_blas_m2l(&fmm);
 
-                        let s = Instant::now();
-                        fmm.displacements(None);
-                        displacement_time = s.elapsed().as_millis();
+                        buffer_time = fmm.metadata_times.get(&MetadataType::MetadataCreation).unwrap().clone();
+                        displacement_time = fmm.metadata_times.get(&MetadataType::DisplacementMap).unwrap().clone();
+                        m2l_precomputation = fmm.metadata_times.get(&MetadataType::SourceToTargetData).unwrap().clone();
 
-                        let s = Instant::now();
-                        fmm.source_to_target();
-                        m2l_precomputation = s.elapsed().as_millis();
-
-                        let fmm_full = SingleNodeBuilder::new(false)
+                        let fmm_full = SingleNodeBuilder::new(true)
                             .tree(sources.data(), sources.data(), None, Some(depth), true)
                             .unwrap()
                             .parameters(
@@ -440,7 +441,8 @@ fn main() {
                     }
 
                     let m2l_storage = storage.2;
-                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} compression: {compression} m2l_precomputation: {m2l_precomputation}");
+                    println!("precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits} M2L storage: {m2l_storage} MB setup time: {setup_time} displacement_time: {displacement_time} compression: {compression} m2l_precomputation: {m2l_precomputation} buffer_time: {buffer_time} tree_time: {tree_time}");
+
                 }
             }
         }

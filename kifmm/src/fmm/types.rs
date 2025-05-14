@@ -15,7 +15,7 @@ use crate::{
         field::FieldTranslation as FieldTranslationTrait,
         fmm::HomogenousKernel,
         general::single_node::AsComplex,
-        types::{CommunicationTime, FmmOperatorTime, MetadataTime},
+        types::{CommunicationTime, FmmOperatorTime, MetadataTime, MetadataType},
     },
     tree::{Domain, MortonKey, SingleNodeTree},
 };
@@ -104,7 +104,8 @@ where
     pub communication_times: Vec<CommunicationTime>,
 
     /// Metadata runtimes
-    pub metadata_times: Vec<MetadataTime>,
+    // pub metadata_times: Vec<MetadataTime>,
+    pub metadata_times: HashMap<MetadataType, u64>,
 
     /// Whether the object and its methods are timed
     pub(crate) timed: bool,
@@ -238,7 +239,7 @@ where
             timed: false,
             operator_times: Vec::default(),
             communication_times: Vec::default(),
-            metadata_times: Vec::default(),
+            metadata_times: HashMap::default(),
             isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: FieldTranslation::default(),
@@ -972,7 +973,7 @@ where
     pub communication_times: Vec<CommunicationTime>,
 
     /// Metadata runtimes
-    pub metadata_times: Vec<MetadataTime>,
+    pub metadata_times: HashMap<MetadataType, u64>,
 
     /// Dimension
     pub(crate) dim: usize,

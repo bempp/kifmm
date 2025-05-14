@@ -68,36 +68,6 @@ typedef enum FmmTranslationCType {
 } FmmTranslationCType;
 
 /**
- * Enumeration of metadata construction for timing
- */
-typedef enum MetadataType {
-  /**
-   * Field translation data
-   */
-  MetadataType_SourceToTargetData,
-  /**
-   * Source tree translations
-   */
-  MetadataType_SourceData,
-  /**
-   * Target tree translations
-   */
-  MetadataType_TargetData,
-  /**
-   * Global FMM
-   */
-  MetadataType_GlobalFmm,
-  /**
-   * Ghost FMM V
-   */
-  MetadataType_GhostFmmV,
-  /**
-   * Ghost FMM U
-   */
-  MetadataType_GhostFmmU,
-} MetadataType;
-
-/**
  * Scalar type
  */
 typedef enum ScalarType {
@@ -146,25 +116,6 @@ typedef struct CommunicationTimes {
   struct CommunicationTime *times;
   uintptr_t length;
 } CommunicationTimes;
-
-/**
- * C compatible struct for metadata timing
- */
-typedef struct MetadataTime {
-  /**
-   * Operator name
-   */
-  enum MetadataType operator_;
-  /**
-   * Time in milliseconds
-   */
-  uint64_t time;
-} MetadataTime;
-
-typedef struct MetadataTimes {
-  struct MetadataTime *times;
-  uintptr_t length;
-} MetadataTimes;
 
 /**
  * Enumeration of operator types for timing
@@ -946,20 +897,6 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(bool timed,
  * - That they remain valid for the duration of the function call
  */
 struct CommunicationTimes *communication_times(struct FmmEvaluator *fmm);
-
-/**
- * Get the metadata runtimes
- *
- * # Parameters
- *
- * - `fmm`: Pointer to an `FmmEvaluator` instance.
- *
- * # Safety
- * This function is intended to be called from C. The caller must ensure that:
- * - Input data corresponds to valid pointers
- * - That they remain valid for the duration of the function call
- */
-struct MetadataTimes *metadata_times(struct FmmEvaluator *fmm);
 
 /**
  * Get the operator runtimes
