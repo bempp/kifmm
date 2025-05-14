@@ -85,7 +85,7 @@ In order to enable plotting with MayaVi only Python 3.10.* is currently supporte
 
 Dependencies are provided in the associated `pyproject.toml` file.
 
-1. Begin by installing Maturin (and pip) in a new virtual environment.
+1. Begin by installing Maturin and pip in a new virtual environment.
 
 ```bash
 uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
@@ -93,7 +93,7 @@ uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
 
 2. Use the Maturin CLI to install the Python bindings into this virtual environment, which additionally will install all required dependencies.
 
-Note that Maturin must be run from the `kifmm` crate root, not the workspace root.
+Note that Maturin must be run from the `kifmm` crate root, not the workspace root, and that setuptools must be set to a version compatible with Mayavi.
 
 ```bash
 pip install 'setuptools<69' .
