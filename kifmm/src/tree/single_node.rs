@@ -829,7 +829,7 @@ where
     /// - `root` - Optionally specify a root node for the tree, defaults to the global root node.
     ///
     /// - `global_indices` - Optionally specify a set of global indices to map the specified points to,
-    ///    defaults to assigning index based on ordering of input points
+    ///  defaults to assigning index based on ordering of input points
     pub fn new(
         coordinates_row_major: &[T],
         depth: u64,
@@ -1112,7 +1112,7 @@ where
     /// # Arguments
     ///
     /// - `points` - Mutable reference to points, used to count occupancy within blocks, contain
-    ///     Morton encoding.
+    ///  Morton encoding.
     /// - `block_tree` - Initially constructed block_tree, subject to refinement through splitting.
     /// - `n_crit` - Defines the occupancy limit for leaf nodes, triggering splits when exceeded.
     #[allow(unused)]
