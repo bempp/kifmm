@@ -11,10 +11,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use crate::{
     fmm::{constants::L2L_MAX_BLOCK_SIZE, helpers::single_node::chunk_size, types::FmmEvalType},
     traits::{
-        field::{FieldTranslation as FieldTranslationTrait, TargetTranslation},
-        fmm::{DataAccess, HomogenousKernel, MetadataAccess},
-        tree::{SingleFmmTree, SingleTree},
-        types::FmmError,
+        field::{FieldTranslation as FieldTranslationTrait, TargetTranslation}, fmm::{DataAccess, HomogenousKernel, MetadataAccess}, p2p_kernel::P2PKernel, tree::{SingleFmmTree, SingleTree}, types::FmmError
     },
     tree::{constants::NSIBLINGS, types::MortonKey},
     KiFmm,
@@ -26,7 +23,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
+    Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel> + P2PKernel<Scalar = Scalar>,
 {
     fn l2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_targets) = self.tree.target_tree().keys(level) else {
@@ -311,69 +308,78 @@ where
 
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
-                leaves
-                    .par_iter()
-                    .zip(&self.charge_index_pointer_targets)
-                    .zip(&self.potentials_send_pointers)
-                    .for_each(
-                        |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
-                            let target_coordinates_row_major = &all_target_coordinates
-                                [charge_index_pointer_targets.0 * self.dim
-                                    ..charge_index_pointer_targets.1 * self.dim];
-                            let n_targets = target_coordinates_row_major.len() / self.dim;
 
-                            if n_targets > 0 {
-                                let mut u_list = leaf.neighbors().into_iter().collect_vec();
-                                u_list.push(*leaf);
+                let tmp = vec![<Scalar as RlstScalar>::Real::default(); 10];
+                let tmp2 = vec![0usize; 0];
+                let mut tmp3 = vec![Scalar::default(); 10];
+                let tmp4 = vec![Scalar::default(); 10];
+                Self::p2p_kernel(&tmp, &tmp2[..], &tmp2[..], &tmp[..], &tmp2[..], &tmp2[..], &tmp4[..], &mut tmp3[..]);
 
-                                let u_list_indices = u_list
-                                    .iter()
-                                    .filter_map(|k| self.tree.source_tree.leaf_to_index.get(k))
-                                    .collect_vec();
+                // leaves
+                //     .par_iter()
+                //     .zip(&self.charge_index_pointer_targets)
+                //     .zip(&self.potentials_send_pointers)
+                //     .for_each(
+                //         |((leaf, charge_index_pointer_targets), potential_send_pointer)| {
+                //             let target_coordinates_row_major = &all_target_coordinates
+                //                 [charge_index_pointer_targets.0 * self.dim
+                //                     ..charge_index_pointer_targets.1 * self.dim];
+                //             let n_targets = target_coordinates_row_major.len() / self.dim;
 
-                                let charges = u_list_indices
-                                    // .clone()
-                                    .iter()
-                                    .map(|&&idx| {
-                                        let index_pointer = &self.charge_index_pointer_sources[idx];
-                                        &self.charges[index_pointer.0..index_pointer.1]
-                                    })
-                                    .collect_vec();
+                //             if n_targets > 0 {
+                //                 let mut u_list = leaf.neighbors().into_iter().collect_vec();
+                //                 u_list.push(*leaf);
 
-                                let sources_coordinates = u_list_indices
-                                    .into_iter()
-                                    .map(|&idx| {
-                                        let index_pointer = &self.charge_index_pointer_sources[idx];
-                                        &all_source_coordinates
-                                            [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
-                                    })
-                                    .collect_vec();
+                //                 let u_list_indices = u_list
+                //                     .iter()
+                //                     .filter_map(|k| self.tree.source_tree.leaf_to_index.get(k))
+                //                     .collect_vec();
 
-                                for (&charges, source_coordinates_row_major) in
-                                    charges.iter().zip(sources_coordinates)
-                                {
-                                    let n_sources = source_coordinates_row_major.len() / self.dim;
+                //                 let charges = u_list_indices
+                //                     .iter()
+                //                     .map(|&&idx| {
+                //                         let index_pointer = &self.charge_index_pointer_sources[idx];
+                //                         &self.charges[index_pointer.0..index_pointer.1]
+                //                     })
+                //                     .collect_vec();
 
-                                    if n_sources > 0 {
-                                        let result = unsafe {
-                                            std::slice::from_raw_parts_mut(
-                                                potential_send_pointer.raw,
-                                                n_targets * self.kernel_eval_size,
-                                            )
-                                        };
+                //                 let sources_coordinates = u_list_indices
+                //                     .into_iter()
+                //                     .map(|&idx| {
+                //                         let index_pointer = &self.charge_index_pointer_sources[idx];
+                //                         &all_source_coordinates
+                //                             [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
+                //                     })
+                //                     .collect_vec();
 
-                                        self.kernel.evaluate_st(
-                                            self.kernel_eval_type,
-                                            source_coordinates_row_major,
-                                            target_coordinates_row_major,
-                                            charges,
-                                            result,
-                                        )
-                                    }
-                                }
-                            }
-                        },
-                    );
+                //                 for (&charges, source_coordinates_row_major) in
+                //                     charges.iter().zip(sources_coordinates)
+                //                 {
+                //                     let n_sources = source_coordinates_row_major.len() / self.dim;
+
+                //                     if n_sources > 0 {
+                //                         let result = unsafe {
+                //                             std::slice::from_raw_parts_mut(
+                //                                 potential_send_pointer.raw,
+                //                                 n_targets * self.kernel_eval_size,
+                //                             )
+                //                         };
+
+                //                         self.kernel.evaluate_st(
+                //                             self.kernel_eval_type,
+                //                             source_coordinates_row_major,
+                //                             target_coordinates_row_major,
+                //                             charges,
+                //                             result,
+                //                         )
+                //                     }
+                //                 }
+                //             }
+                //         },
+                //     );
+
+
+
                 Ok(())
             }
 

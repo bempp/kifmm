@@ -12,8 +12,7 @@ use crate::{
     },
     traits::{
         field::{
-            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
-            SourceTranslationMetadata, TargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, LeafTranslationMetadata, SourceToTargetTranslationMetadata, SourceTranslationMetadata, TargetTranslationMetadata
         },
         fmm::{HomogenousKernel, Metadata},
         general::single_node::Epsilon,
@@ -32,7 +31,8 @@ where
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
         + SourceTranslationMetadata
         + TargetTranslationMetadata
-        + Metadata<Scalar = Scalar>,
+        + Metadata<Scalar = Scalar>
+        + LeafTranslationMetadata,
 {
     /// Initialise an empty kernel independent FMM builder
     pub fn new(timed: bool) -> Self {
@@ -340,8 +340,13 @@ where
                 ))
             }
 
+
             result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
             SourceToTargetTranslationMetadata::displacements(&mut result, None);
+
+            // Compute U list data
+            let _ = result.leaf();
+
             Ok(result)
         }
     }

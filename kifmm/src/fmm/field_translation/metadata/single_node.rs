@@ -8,7 +8,7 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
     types::GreenKernelEvalType,
 };
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 use num::{Float, Zero};
 use rayon::prelude::*;
 use rlst::{
@@ -36,12 +36,14 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::{
-            FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata,
-            SourceTranslationMetadata, TargetTranslationMetadata,
+            FieldTranslation as FieldTranslationTrait, LeafTranslationMetadata,
+            SourceToTargetTranslationMetadata, SourceTranslationMetadata,
+            TargetTranslationMetadata,
         },
         fmm::{DataAccess, HomogenousKernel, Metadata, MetadataAccess},
         general::single_node::{AsComplex, Epsilon},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
+        types::FmmError,
     },
     tree::{
         constants::{
@@ -463,6 +465,109 @@ where
         self.uc2e_inv_2 = uc2e_inv_2;
         self.source = source;
         self.source_vec = source_vec;
+    }
+}
+
+impl<Scalar, Kernel, FieldTranslation> LeafTranslationMetadata
+    for KiFmm<Scalar, Kernel, FieldTranslation>
+where
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
+    FieldTranslation: FieldTranslationTrait,
+{
+    fn leaf(&mut self) -> Result<(), FmmError> {
+        let Some(leaves) = self.tree.target_tree().all_leaves() else {
+            return Err(FmmError::Failed(
+                "Leaf setup failed, no leaves found in target tree".to_string(),
+            ));
+        };
+
+        // As a precomputation, set buffers to collect potentials for each leaf
+        // and their associated source/target coordinates
+        let mut all_source_coordinates_reordered_counts = Vec::new();
+        let mut all_charges_reordered_counts = Vec::new();
+        let mut all_target_coordinates_reordered =
+            vec![Scalar::default(); self.tree.target_tree().n_coordinates_tot().unwrap()];
+        let mut all_sources_coordinates_reordered = Vec::new();
+        let mut all_charges_reordered = Vec::new();
+
+        let all_target_coordinates = self.tree.target_tree().all_coordinates().unwrap();
+        let all_source_coordinates = self.tree.source_tree().all_coordinates().unwrap();
+
+        // Re-allocate the target coordinate data based on Morton ordering of leaves
+        let target_coordinates_displacements = self
+            .charge_index_pointer_targets
+            .iter()
+            .scan(0usize, |acc, &pointer| {
+                let tmp = pointer.1 - pointer.0; // Add current count
+                *acc += tmp;
+                Some(tmp)
+            })
+            .collect_vec();
+
+        for (leaf, index_pointer, &displacement) in izip!(
+            leaves,
+            &self.charge_index_pointer_targets,
+            target_coordinates_displacements.iter()
+        ) {
+            let target_coordinates_row_major =
+                &all_target_coordinates[index_pointer.0 * self.dim..index_pointer.1 * self.dim];
+            let count = (index_pointer.1 - index_pointer.0) * self.dim;
+
+            if count > 0 {
+                let target_coordinates_reordered = unsafe {
+                    let ptr = all_target_coordinates_reordered
+                        .as_mut_ptr()
+                        .add(displacement)
+                        as *mut <Scalar as RlstScalar>::Real;
+                    std::slice::from_raw_parts_mut(ptr, count)
+                };
+                target_coordinates_reordered.copy_from_slice(target_coordinates_row_major);
+
+                // Compute u-list
+                let mut u_list = leaf.neighbors().into_iter().collect_vec();
+                u_list.push(*leaf);
+
+                let u_list_indices = u_list
+                    .iter()
+                    .filter_map(|k| self.tree.source_tree.leaf_to_index.get(k))
+                    .collect_vec();
+
+                // Compute sources/charges associated with U list
+                let charges = u_list_indices
+                    .iter()
+                    .map(|&&idx| {
+                        let index_pointer = &self.charge_index_pointer_sources[idx];
+                        &self.charges[index_pointer.0..index_pointer.1]
+                    })
+                    .collect_vec();
+
+                let sources_coordinates = u_list_indices
+                    .into_iter()
+                    .map(|&idx| {
+                        let index_pointer = &self.charge_index_pointer_sources[idx];
+                        &all_source_coordinates
+                            [index_pointer.0 * self.dim..index_pointer.1 * self.dim]
+                    })
+                    .collect_vec();
+
+                let mut sources_coordinates = sources_coordinates
+                    .iter()
+                    .flat_map(|slice| slice.iter().copied())
+                    .collect_vec();
+                let mut charges = charges
+                    .iter()
+                    .flat_map(|slice| slice.iter().copied())
+                    .collect_vec();
+
+                all_source_coordinates_reordered_counts.push(sources_coordinates.len());
+                all_charges_reordered_counts.push(charges.len());
+                all_sources_coordinates_reordered.append(&mut sources_coordinates);
+                all_charges_reordered.append(&mut charges);
+            }
+        }
+
+        Ok(())
     }
 }
 

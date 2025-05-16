@@ -26,6 +26,12 @@ pub trait TargetTranslationMetadata {
     fn target(&mut self);
 }
 
+/// Metadata required for leaf level translations
+pub trait LeafTranslationMetadata {
+    /// Constructor
+    fn leaf(&mut self) -> Result<(), FmmError>;
+}
+
 /// Set M2L metadata associated with a kernel
 pub trait SourceToTargetTranslationMetadata {
     /// Constructor

@@ -79,6 +79,7 @@
 pub mod fftw;
 pub mod fmm;
 pub mod linalg;
+pub mod p2p_kernel;
 #[cfg(feature = "mpi")]
 pub mod sorting;
 pub mod traits;

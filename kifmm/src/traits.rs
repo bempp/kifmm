@@ -5,3 +5,4 @@ pub mod fmm;
 pub mod general;
 pub mod tree;
 pub mod types;
+pub mod p2p_kernel;
