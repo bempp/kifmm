@@ -589,7 +589,7 @@ where
                 // Received queries from this rank
                 let received_queries_rank = &received_queries[l..r]; // received queries from this rank
 
-                // Filter for available data corresponding to this request
+                // Filter for available data corresponding to this request from this rank
                 let mut available_queries_rank = Vec::new();
 
                 let mut counter_rank = 0i32;
@@ -603,7 +603,7 @@ where
                     }
                 }
 
-                // Update return buffers
+                // Update return buffers for each rank's request
                 available_queries.extend(available_queries_rank);
                 available_queries_counts.push(counter_rank);
                 available_queries_displacements.push(counter);
@@ -974,6 +974,8 @@ where
             }
         }
 
+        // This is expected to be in Morton and level sorted order
+        // so ghost_fmm_v.tree.source_tree.keys should be sorted in this way, from the setup time v_list function
         self.ghost_fmm_v.multipoles = ghost_multipoles_with_siblings;
 
         self.ghost_fmm_v.level_multipoles = level_expansion_pointers_single_node(

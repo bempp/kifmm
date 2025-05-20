@@ -245,7 +245,7 @@ where
 
                 FmmEvalType::Matrix(_n) => {
                     return Err(FmmError::Unimplemented(
-                        "Unimplemented for matrix input".to_string(),
+                        "M2L unimplemented for matrix input".to_string(),
                     ))
                 }
             }

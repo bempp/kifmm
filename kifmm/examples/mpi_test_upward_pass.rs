@@ -1,9 +1,6 @@
 //? mpirun -n {{NPROCESSES}} --features "mpi"
 
 #[cfg(feature = "mpi")]
-fn test_upward_pass() {}
-
-#[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
     use kifmm::traits::general::multi_node::GhostExchange;
@@ -14,8 +11,7 @@ fn main() {
             tree::{FmmTreeNode, MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
         },
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},
-        Evaluate,
-        // FftFieldTranslation,
+        Evaluate, FftFieldTranslation,
     };
     use kifmm::{BlasFieldTranslationSaRcmp, FmmSvdMode};
     use mpi::{
@@ -41,8 +37,9 @@ fn main() {
         // Fmm Parameters
 
         let kernel = Laplace3dKernel::<f32>::new();
-        let source_to_target =
-            BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
+        // let source_to_target =
+        //     BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
+        let source_to_target = FftFieldTranslation::<f32>::new(None);
 
         // Generate some random test data local to each process
         let points = points_fixture::<f32>(n_points, None, None, None);
@@ -200,16 +197,14 @@ fn main() {
             let abs_error = RlstScalar::abs(expected[0] - found[0]);
             let rel_error = abs_error / expected[0];
 
-            if world.rank() == 0 {
-                println!(
-                    "Global Upward Pass rank {:?} abs {:?} rel {:?} \n expected {:?} found {:?}",
-                    world.rank(),
-                    abs_error,
-                    rel_error,
-                    expected,
-                    found
-                );
-            }
+            println!(
+                "Global Upward Pass rank {:?} abs {:?} rel {:?} \n expected {:?} found {:?}",
+                world.rank(),
+                abs_error,
+                rel_error,
+                expected,
+                found
+            );
 
             let threshold = 1e-3;
             assert!(rel_error <= threshold);

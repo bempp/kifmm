@@ -342,11 +342,11 @@ where
 
             let ghost_fmm_v: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: local_equivalent_surface_order.to_vec(),
-                check_surface_order: local_check_surface_order.to_vec(),
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
                 variable_expansion_order,
-                n_coeffs_equivalent_surface: local_n_coeffs_equivalent_surface.to_vec(),
-                n_coeffs_check_surface: local_check_surface_order.to_vec(),
+                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface.to_vec(),
+                n_coeffs_check_surface: check_surface_order.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -357,11 +357,11 @@ where
 
             let ghost_fmm_u: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: local_equivalent_surface_order.to_vec(),
-                check_surface_order: local_check_surface_order.to_vec(),
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
                 variable_expansion_order,
-                n_coeffs_equivalent_surface: local_n_coeffs_equivalent_surface,
-                n_coeffs_check_surface: local_n_coeffs_check_surface,
+                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface.to_vec(),
+                n_coeffs_check_surface: n_coeffs_check_surface.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
