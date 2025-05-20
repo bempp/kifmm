@@ -37,9 +37,9 @@ fn main() {
         // Fmm Parameters
 
         let kernel = Laplace3dKernel::<f32>::new();
-        // let source_to_target =
-        //     BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
-        let source_to_target = FftFieldTranslation::<f32>::new(None);
+        let source_to_target =
+            BlasFieldTranslationSaRcmp::<f32>::new(None, None, FmmSvdMode::Deterministic);
+        // let source_to_target = FftFieldTranslation::<f32>::new(None);
 
         // Generate some random test data local to each process
         let points = points_fixture::<f32>(n_points, None, None, None);
