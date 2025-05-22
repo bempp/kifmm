@@ -23,13 +23,16 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, RwLock};
 
 use crate::fmm::field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level;
+use crate::fmm::helpers::multi_node::all_gather_v_serialised;
 use crate::fmm::helpers::multi_node::deserialise_nested_vec;
 use crate::fmm::helpers::multi_node::deserialise_vec;
-use crate::fmm::helpers::multi_node::deserialise_vec_blasmetadata_sarcmp;
+use crate::fmm::helpers::multi_node::deserialise_vec_blas_metadata_sarcmp;
+use crate::fmm::helpers::multi_node::deserialise_vec_fft_metadata;
 use crate::fmm::helpers::multi_node::serialise_blas_metadata_sarcmp;
 use crate::fmm::helpers::multi_node::serialise_nested_vec;
 use crate::fmm::helpers::multi_node::serialise_vec;
-use crate::fmm::helpers::multi_node::serialise_vec_blasmetadata_sarcmp;
+use crate::fmm::helpers::multi_node::serialise_vec_blas_metadata_sarcmp;
+use crate::fmm::helpers::multi_node::serialise_vec_fft_metadata;
 use crate::fmm::helpers::multi_node::{
     coordinate_index_pointer_multi_node, leaf_expansion_pointers_multi_node,
     leaf_surfaces_multi_node, level_expansion_pointers_multi_node, level_index_pointer_multi_node,
@@ -1154,7 +1157,7 @@ where
         }
 
         // Communicate metadata
-        let metadata_r_serialised = serialise_vec_blasmetadata_sarcmp(&metadata_r);
+        let metadata_r_serialised = serialise_vec_blas_metadata_sarcmp(&metadata_r);
         let global_metadata_serialised =
             all_gather_v_serialised(&metadata_r_serialised, &self.communicator);
 
@@ -1169,17 +1172,17 @@ where
 
         // Reconstruct metadata
         let (mut global_metadata, mut rest) =
-            deserialise_vec_blasmetadata_sarcmp::<Scalar>(&global_metadata_serialised);
+            deserialise_vec_blas_metadata_sarcmp::<Scalar>(&global_metadata_serialised);
         while rest.len() > 0 {
-            let (mut t1, t2) = deserialise_vec_blasmetadata_sarcmp::<Scalar>(rest);
+            let (mut t1, t2) = deserialise_vec_blas_metadata_sarcmp::<Scalar>(rest);
             global_metadata.append(&mut t1);
             rest = t2;
         }
 
         let (mut global_metadata_clone, mut rest) =
-            deserialise_vec_blasmetadata_sarcmp::<Scalar>(&global_metadata_serialised);
+            deserialise_vec_blas_metadata_sarcmp::<Scalar>(&global_metadata_serialised);
         while rest.len() > 0 {
-            let (mut t1, t2) = deserialise_vec_blasmetadata_sarcmp::<Scalar>(rest);
+            let (mut t1, t2) = deserialise_vec_blas_metadata_sarcmp::<Scalar>(rest);
             global_metadata_clone.append(&mut t1);
             rest = t2;
         }
@@ -1298,8 +1301,9 @@ where
 
     // TODO
     fn source_to_target(&mut self) {
-
         // Compute the field translation operators
+        let size = self.communicator.size();
+        let rank = self.communicator.rank();
 
         // Pick a point in the middle of the domain
         let two = Scalar::real(2.0);
@@ -1336,7 +1340,26 @@ where
             self.equivalent_surface_order.clone()
         };
 
-        for &equivalent_surface_order in &iterator {
+        let n_precomputations;
+        if self.variable_expansion_order {
+            n_precomputations = iterator.len() as i32;
+        } else {
+            n_precomputations = 1;
+        }
+
+        let (load_counts, load_displacement) =
+            calculate_precomputation_load(n_precomputations, size).unwrap();
+
+        // Compute mandated local portion
+        let local_load_count = load_counts[rank as usize];
+        let local_load_displacement = load_displacement[rank as usize];
+
+        let iterator_r = &iterator[(local_load_displacement as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
+
+        let mut metadata_r: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>> = Vec::new();
+
+        for &equivalent_surface_order in iterator_r.iter() {
             // The child boxes in the halo of the sibling set
             let mut sources = vec![];
             // The sibling set
@@ -1529,16 +1552,45 @@ where
                 kernel_data_f: kernel_data_ft,
             };
 
-            // Set operator data
-            self.source_to_target.metadata.push(metadata.clone());
+            // // Set operator data
+            // self.source_to_target.metadata.push(metadata.clone());
 
+            // // Copy for global FMM
+            // self.global_fmm
+            //     .source_to_target
+            //     .metadata
+            //     .push(metadata.clone());
+
+            metadata_r.push(metadata);
+        }
+
+        // Communicate metadata
+        let metadata_r_serialised = serialise_vec_fft_metadata(&metadata_r);
+        let global_metadata_serialised =
+            all_gather_v_serialised(&metadata_r_serialised, &self.communicator);
+
+        // Reconstruct metadata
+        let (mut global_metadata, mut rest) =
+            deserialise_vec_fft_metadata(&global_metadata_serialised);
+        while rest.len() > 0 {
+            let (mut t1, t2) =
+                deserialise_vec_fft_metadata::<<Scalar as AsComplex>::ComplexType>(rest);
+            global_metadata.append(&mut t1);
+            rest = t2;
+        }
+
+        for metadata in global_metadata.iter() {
             // Copy for global FMM
             self.global_fmm
                 .source_to_target
                 .metadata
                 .push(metadata.clone());
+
+            // Set operator data
+            self.source_to_target.metadata.push(metadata.clone());
         }
 
+        // Compute and attach maps
         let mut tmp1 = Vec::new();
         let mut tmp2 = Vec::new();
         for &expansion_order in &iterator {

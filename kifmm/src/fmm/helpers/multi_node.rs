@@ -3,7 +3,11 @@ use std::collections::HashMap;
 
 use bytemuck::{cast_slice, Pod};
 use itertools::Itertools;
-use mpi::{topology::SimpleCommunicator, traits::Equivalence};
+use mpi::{
+    datatype::PartitionMut,
+    topology::SimpleCommunicator,
+    traits::{Communicator, CommunicatorCollectives, Equivalence},
+};
 use num::Float;
 use pulp::Scalar;
 use rlst::{
@@ -15,7 +19,7 @@ use crate::{
     fmm::{
         constants::LEN_BYTES,
         helpers::single_node::homogenous_kernel_scale,
-        types::{BlasMetadataSaRcmp, SendPtrMut},
+        types::{BlasMetadataSaRcmp, FftMetadata, SendPtrMut},
     },
     traits::tree::{FmmTreeNode, MultiTree},
     tree::{types::MortonKey, MultiNodeTree},
@@ -158,7 +162,7 @@ pub(crate) fn deserialise_blas_metadata_sarcmp<T: RlstScalar + Pod>(
     (BlasMetadataSaRcmp { u, st, c_u, c_vt }, rest)
 }
 
-pub(crate) fn serialise_vec_blasmetadata_sarcmp<T: RlstScalar + Pod>(
+pub(crate) fn serialise_vec_blas_metadata_sarcmp<T: RlstScalar + Pod>(
     input: &Vec<BlasMetadataSaRcmp<T>>,
 ) -> Vec<u8> {
     let len = input.len() as u64;
@@ -172,7 +176,7 @@ pub(crate) fn serialise_vec_blasmetadata_sarcmp<T: RlstScalar + Pod>(
     buffer
 }
 
-pub(crate) fn deserialise_vec_blasmetadata_sarcmp<T: RlstScalar + Pod>(
+pub(crate) fn deserialise_vec_blas_metadata_sarcmp<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (Vec<BlasMetadataSaRcmp<T>>, &[u8]) {
     let (len_bytes, mut rest) = input.split_at(LEN_BYTES);
@@ -182,6 +186,57 @@ pub(crate) fn deserialise_vec_blasmetadata_sarcmp<T: RlstScalar + Pod>(
 
     for _ in 0..len {
         let (data, t1) = deserialise_blas_metadata_sarcmp::<T>(rest);
+        rest = &t1;
+        buffer.push(data);
+    }
+
+    (buffer, rest)
+}
+
+pub(crate) fn serialise_fft_metadata<T: RlstScalar + Pod>(input: &FftMetadata<T>) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(&serialise_nested_vec(&input.kernel_data));
+    buffer.extend_from_slice(&serialise_nested_vec(&input.kernel_data_f));
+    buffer
+}
+
+pub(crate) fn deserialise_fft_metadata<T: RlstScalar + Pod>(
+    input: &[u8],
+) -> (FftMetadata<T>, &[u8]) {
+    let (kernel_data, rest) = deserialise_nested_vec(input);
+    let (kernel_data_f, rest) = deserialise_nested_vec(rest);
+
+    (
+        FftMetadata {
+            kernel_data,
+            kernel_data_f,
+        },
+        rest,
+    )
+}
+
+pub fn serialise_vec_fft_metadata<T: RlstScalar + Pod>(input: &Vec<FftMetadata<T>>) -> Vec<u8> {
+    let len = input.len() as u64;
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(&len.to_le_bytes());
+
+    for data in input {
+        buffer.extend_from_slice(&&serialise_fft_metadata(data));
+    }
+
+    buffer
+}
+
+pub(crate) fn deserialise_vec_fft_metadata<T: RlstScalar + Pod>(
+    input: &[u8],
+) -> (Vec<FftMetadata<T>>, &[u8]) {
+    let (len_bytes, mut rest) = input.split_at(LEN_BYTES);
+    let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
+
+    let mut buffer = Vec::new();
+
+    for _ in 0..len {
+        let (data, t1) = deserialise_fft_metadata::<T>(rest);
         rest = &t1;
         buffer.push(data);
     }
