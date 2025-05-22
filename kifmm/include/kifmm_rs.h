@@ -4,6 +4,11 @@
 #include <stdlib.h>
 
 /**
+ * Number of bytes used to encode vector lengths in serialisation
+ */
+#define LEN_BYTES 8
+
+/**
  * Enumeration of communication types for timing
  */
 typedef enum CommunicationType {

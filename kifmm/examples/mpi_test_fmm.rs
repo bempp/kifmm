@@ -144,19 +144,19 @@ fn main() {
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
 
-    let expansion_order = [4];
-    test_fmm(
-        "single expansion order all levels".to_string(),
-        &expansion_order,
-        &world,
-    );
-
-    // let expansion_order = [4, 4, 5, 4, 5, 4];
+    // let expansion_order = [4];
     // test_fmm(
-    //     "variable expansion order per level".to_string(),
+    //     "single expansion order all levels".to_string(),
     //     &expansion_order,
     //     &world,
     // );
+
+    let expansion_order = [4, 4, 5, 4, 5, 4];
+    test_fmm(
+        "variable expansion order per level".to_string(),
+        &expansion_order,
+        &world,
+    );
 
     // // Tree parameters
     // let prune_empty = true;

@@ -41,7 +41,7 @@ where
     }
 
     fn n_coeffs_equivalent_surface(&self, level: u64) -> usize {
-        println!("HERE level {:?} ncoeffs {:?}", level, &self.n_coeffs_equivalent_surface);
+        // println!("HERE level {:?} ncoeffs {:?}", level, &self.n_coeffs_equivalent_surface);
         self.n_coeffs_equivalent_surface[self.expansion_index(level)]
     }
 
