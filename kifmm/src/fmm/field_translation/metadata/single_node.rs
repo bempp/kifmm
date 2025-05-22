@@ -318,7 +318,7 @@ where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
-    Self: Evaluate,
+    Self: DataAccess,
 {
     fn source(&mut self) {
         let root = MortonKey::<Scalar::Real>::root();
@@ -357,12 +357,12 @@ where
                 curr.surface_grid(equivalent_surface_order, domain, alpha_inner);
             let upward_check_surface = curr.surface_grid(check_surface_order, domain, alpha_outer);
 
-            let nequiv_surface = ncoeffs_kifmm(equivalent_surface_order);
-            let ncheck_surface = ncoeffs_kifmm(check_surface_order);
+            let n_cols = ncoeffs_kifmm(equivalent_surface_order);
+            let n_rows = ncoeffs_kifmm(check_surface_order);
 
             // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
             // As well as estimating their inverses using SVD
-            let mut uc2e = rlst_dynamic_array2!(Scalar, [ncheck_surface, nequiv_surface]);
+            let mut uc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
             self.kernel.assemble_st(
                 GreenKernelEvalType::Value,
                 &upward_check_surface[..],
