@@ -1,3 +1,4 @@
+//! Charge handling in a single-node setting
 use green_kernels::traits::Kernel as KernelTrait;
 use rlst::RlstScalar;
 

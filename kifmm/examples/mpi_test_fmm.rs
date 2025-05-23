@@ -11,17 +11,14 @@ fn main() {
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{helpers::points_fixture, types::SortKind},
-        BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder,
+        FftFieldTranslation,
     };
-
-    use rand::{rngs::StdRng, Rng, SeedableRng};
-    use rayon::ThreadPoolBuilder;
 
     use mpi::{
         datatype::PartitionMut,
         traits::{Communicator, Root},
     };
-    use rlst::{rlst_dynamic_array1, RawAccess, RawAccessMut};
+    use rlst::RawAccess;
 
     fn test_fmm(
         name: String,

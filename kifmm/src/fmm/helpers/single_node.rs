@@ -357,6 +357,24 @@ where
     flipped
 }
 
+/// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
+/// using a specified `threshold` as a tolerance parameter
+pub(crate) fn find_cutoff_rank<T: RlstScalar + PartialOrd>(
+    singular_values: &[T],
+    threshold: T,
+    max_rank: usize,
+) -> usize {
+    let len = singular_values.len().min(max_rank);
+
+    for (i, &s) in singular_values.iter().take(len).enumerate() {
+        if s <= threshold {
+            return i;
+        }
+    }
+
+    len - 1
+}
+
 #[cfg(test)]
 mod test {
 

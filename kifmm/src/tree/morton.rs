@@ -804,7 +804,7 @@ where
     ///
     /// # Arguments
     /// * `direction` - A vector describing how many boxes we move along each coordinate direction.
-    ///               Negative values are possible (meaning that we move backwards).
+    ///  Negative values are possible (meaning that we move backwards).
     pub fn find_key_in_direction(&self, direction: &[i64; 3]) -> Option<MortonKey<T>> {
         let level = self.level();
 

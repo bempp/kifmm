@@ -1,11 +1,15 @@
+//! Builder for constructing FMMs on multi-node.
+use std::collections::HashMap;
+
 use itertools::Itertools;
 use mpi::{
     topology::{Communicator, SimpleCommunicator},
     traits::Equivalence,
 };
 use num::Float;
-use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
-use std::collections::HashMap;
+use rlst::{MatrixSvd, RlstScalar};
+
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 use crate::{
     fmm::{
@@ -30,8 +34,6 @@ use crate::{
     },
     KiFmm, MultiNodeFmmTree, SingleNodeFmmTree,
 };
-
-use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 impl<Scalar, Kernel, FieldTranslation> MultiNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
@@ -302,38 +304,13 @@ where
             let check_surface_order = self.check_surface_order.unwrap();
             let communication_times = self.communication_times.unwrap();
             let timed = self.timed.unwrap();
-            let global_depth = self.tree.as_ref().unwrap().source_tree.global_depth;
-            let total_depth = self.tree.as_ref().unwrap().source_tree.total_depth;
             let variable_expansion_order = self.variable_expansion_order.unwrap();
-
-            // let global_equivalent_surface_order =
-            //     equivalent_surface_order[0..=(global_depth as usize)].to_vec();
-            // let global_check_surface_order =
-            //     check_surface_order[0..=(global_depth as usize)].to_vec();
-            // let global_n_coeffs_equivalent_surface =
-            //     n_coeffs_equivalent_surface[0..=(global_depth as usize)].to_vec();
-            // let global_n_coeffs_check_surface =
-            //     n_coeffs_check_surface[0..=(global_depth as usize)].to_vec();
-
-            // let local_equivalent_surface_order =
-            //     equivalent_surface_order[(global_depth as usize)..=(total_depth as usize)].to_vec();
-            // let local_check_surface_order =
-            //     check_surface_order[(global_depth as usize)..=(total_depth as usize)].to_vec();
-            // let local_n_coeffs_equivalent_surface = n_coeffs_equivalent_surface
-            //     [(global_depth as usize)..=(total_depth as usize)]
-            //     .to_vec();
-            // let local_n_coeffs_check_surface =
-            //     n_coeffs_check_surface[(global_depth as usize)..=(total_depth as usize)].to_vec();
 
             let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                // equivalent_surface_order: global_equivalent_surface_order,
-                // check_surface_order: global_check_surface_order,
                 equivalent_surface_order: equivalent_surface_order.to_vec(),
                 check_surface_order: check_surface_order.to_vec(),
                 variable_expansion_order,
-                // n_coeffs_equivalent_surface: global_n_coeffs_equivalent_surface,
-                // n_coeffs_check_surface: global_n_coeffs_check_surface,
                 n_coeffs_equivalent_surface: n_coeffs_equivalent_surface.to_vec(),
                 n_coeffs_check_surface: n_coeffs_check_surface.to_vec(),
                 fmm_eval_type,

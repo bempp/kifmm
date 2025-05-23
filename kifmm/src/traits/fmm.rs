@@ -3,7 +3,7 @@ use crate::traits::tree::SingleFmmTree;
 use green_kernels::{traits::Kernel, types::GreenKernelEvalType};
 use rlst::RlstScalar;
 
-use super::{tree::SingleTree, types::FmmError};
+use crate::traits::{tree::SingleTree, types::FmmError};
 
 #[cfg(feature = "mpi")]
 use super::tree::MultiFmmTree;

@@ -1,3 +1,4 @@
+//! Local expansion translations
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashSet;
@@ -99,9 +100,9 @@ where
                                     });
                             }
 
-                            for i in 0..NSIBLINGS {
+                            for (i, t) in target_vec.iter().enumerate().take(NSIBLINGS) {
                                 let tmp = empty_array::<Scalar, 2>()
-                                    .simple_mult_into_resize(target_vec[i].r(), parent_locals.r());
+                                    .simple_mult_into_resize(t.r(), parent_locals.r());
 
                                 for j in 0..chunk_size {
                                     let chunk_displacement = j * NSIBLINGS;

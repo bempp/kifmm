@@ -1,4 +1,4 @@
-//! Builder objects to construct FMMs
+//! Builder for constructing FMMs on a single node
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
 use rlst::{MatrixSvd, RlstScalar};

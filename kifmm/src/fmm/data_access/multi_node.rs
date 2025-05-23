@@ -1,3 +1,4 @@
+use green_kernels::traits::Kernel as KernelTrait;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence, Rank};
 use num::Float;
 use rlst::RlstScalar;
@@ -11,8 +12,6 @@ use crate::{
     },
     MultiNodeFmmTree,
 };
-
-use green_kernels::traits::Kernel as KernelTrait;
 
 impl<Scalar, Kernel, FieldTranslation> DataAccessMulti
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>

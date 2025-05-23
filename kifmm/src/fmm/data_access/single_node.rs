@@ -1,3 +1,4 @@
+use green_kernels::traits::Kernel as KernelTrait;
 use rlst::RlstScalar;
 
 use crate::{
@@ -9,8 +10,6 @@ use crate::{
     },
     KiFmm, SingleNodeFmmTree,
 };
-
-use green_kernels::traits::Kernel as KernelTrait;
 
 impl<Scalar, Kernel, FieldTranslation> DataAccess for KiFmm<Scalar, Kernel, FieldTranslation>
 where

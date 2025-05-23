@@ -1,11 +1,13 @@
 //! Cache aligned arrays
-use kifmm_fftw_sys as ffi;
-use rlst::{c32, c64};
+use std::{
+    ops::{Deref, DerefMut},
+    os::raw::c_void,
+    slice::{from_raw_parts, from_raw_parts_mut},
+};
 
+use kifmm_fftw_sys as ffi;
 use num::Zero;
-use std::ops::{Deref, DerefMut};
-use std::os::raw::c_void;
-use std::slice::{from_raw_parts, from_raw_parts_mut};
+use rlst::{c32, c64};
 
 use crate::excall;
 

@@ -1,4 +1,4 @@
-//! Multipole to Multipole field translation
+//! Multipole expansion translations
 
 use std::collections::HashSet;
 

@@ -7,9 +7,9 @@ use mpi::{
     datatype::PartitionMut,
     topology::SimpleCommunicator,
     traits::{Communicator, CommunicatorCollectives, Equivalence},
+    Count,
 };
 use num::Float;
-use pulp::Scalar;
 use rlst::{
     rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
     VectorContainer,
@@ -18,7 +18,6 @@ use rlst::{
 use crate::{
     fmm::{
         constants::LEN_BYTES,
-        helpers::single_node::homogenous_kernel_scale,
         types::{BlasMetadataSaRcmp, FftMetadata, SendPtrMut},
     },
     traits::tree::{FmmTreeNode, MultiTree},
@@ -45,7 +44,7 @@ pub(crate) fn deserialise_vec<T: Pod>(input: &[u8]) -> (&[T], &[u8]) {
     (data, remaining)
 }
 
-pub(crate) fn serialise_nested_vec<T: Pod>(input: &Vec<Vec<T>>) -> Vec<u8> {
+pub(crate) fn serialise_nested_vec<T: Pod>(input: &[Vec<T>]) -> Vec<u8> {
     let mut buffer = Vec::new();
     buffer.extend_from_slice(&(input.len() as u64).to_le_bytes());
 
@@ -64,7 +63,7 @@ pub(crate) fn deserialise_nested_vec<T: Pod>(input: &[u8]) -> (Vec<Vec<T>>, &[u8
     let mut buffer = Vec::new();
     if len > 0 {
         for _ in 0..len {
-            let (t1, t2) = deserialise_vec::<T>(&rest);
+            let (t1, t2) = deserialise_vec::<T>(rest);
             buffer.push(t1.to_vec());
             rest = t2;
         }
@@ -83,13 +82,14 @@ pub(crate) fn serialise_array<T: RlstScalar + Pod>(
     buffer.extend_from_slice(rows);
     buffer.extend_from_slice(cols);
 
-    if input.data().len() > 0 {
+    if !input.is_empty() {
         buffer.extend_from_slice(cast_slice(input.data()));
     }
 
     buffer
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn deserialise_array<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>, &[u8]) {
@@ -111,7 +111,7 @@ pub(crate) fn deserialise_array<T: RlstScalar + Pod>(
 }
 
 pub(crate) fn serialise_nested_array<T: RlstScalar + Pod>(
-    input: &Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+    input: &[Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>],
 ) -> Vec<u8> {
     let mut buffer = Vec::new();
     buffer.extend_from_slice(&(input.len() as u64).to_le_bytes());
@@ -124,6 +124,7 @@ pub(crate) fn serialise_nested_array<T: RlstScalar + Pod>(
     buffer
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn deserialise_nested_array<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>, &[u8]) {
@@ -132,7 +133,7 @@ pub(crate) fn deserialise_nested_array<T: RlstScalar + Pod>(
     let mut buffer = Vec::new();
     if len > 0 {
         for _ in 0..len {
-            let (t1, t2) = deserialise_array::<T>(&rest);
+            let (t1, t2) = deserialise_array::<T>(rest);
             buffer.push(t1);
             rest = t2;
         }
@@ -156,9 +157,9 @@ pub(crate) fn deserialise_blas_metadata_sarcmp<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (BlasMetadataSaRcmp<T>, &[u8]) {
     let (u, rest) = deserialise_array(input);
-    let (st, rest) = deserialise_array(&rest);
-    let (c_u, rest) = deserialise_nested_array(&rest);
-    let (c_vt, rest) = deserialise_nested_array(&rest);
+    let (st, rest) = deserialise_array(rest);
+    let (c_u, rest) = deserialise_nested_array(rest);
+    let (c_vt, rest) = deserialise_nested_array(rest);
     (BlasMetadataSaRcmp { u, st, c_u, c_vt }, rest)
 }
 
@@ -186,7 +187,7 @@ pub(crate) fn deserialise_vec_blas_metadata_sarcmp<T: RlstScalar + Pod>(
 
     for _ in 0..len {
         let (data, t1) = deserialise_blas_metadata_sarcmp::<T>(rest);
-        rest = &t1;
+        rest = t1;
         buffer.push(data);
     }
 
@@ -215,13 +216,15 @@ pub(crate) fn deserialise_fft_metadata<T: RlstScalar + Pod>(
     )
 }
 
-pub fn serialise_vec_fft_metadata<T: RlstScalar + Pod>(input: &Vec<FftMetadata<T>>) -> Vec<u8> {
+pub(crate) fn serialise_vec_fft_metadata<T: RlstScalar + Pod>(
+    input: &Vec<FftMetadata<T>>,
+) -> Vec<u8> {
     let len = input.len() as u64;
     let mut buffer = Vec::new();
     buffer.extend_from_slice(&len.to_le_bytes());
 
     for data in input {
-        buffer.extend_from_slice(&&serialise_fft_metadata(data));
+        buffer.extend_from_slice(&serialise_fft_metadata(data));
     }
 
     buffer
@@ -237,7 +240,7 @@ pub(crate) fn deserialise_vec_fft_metadata<T: RlstScalar + Pod>(
 
     for _ in 0..len {
         let (data, t1) = deserialise_fft_metadata::<T>(rest);
-        rest = &t1;
+        rest = t1;
         buffer.push(data);
     }
 
@@ -290,7 +293,7 @@ pub(crate) fn all_gather_v_serialised(
     {
         let mut partition = PartitionMut::new(&mut output, &counts[..], &displacements[..]);
 
-        communicator.all_gather_varcount_into(&input_r[..], &mut partition);
+        communicator.all_gather_varcount_into(input_r, &mut partition);
     }
 
     output
@@ -460,4 +463,40 @@ where
     }
 
     result
+}
+
+/// Calculate load for precomputation based on a block distribution strategy
+pub(crate) fn calculate_precomputation_load(
+    n_precomputations: i32,
+    size: i32,
+) -> Option<(Vec<Count>, Vec<Count>)> {
+    if n_precomputations > 0 {
+        let mut counts;
+
+        if n_precomputations > 1 {
+            // Distributed pre-computation
+            let q = n_precomputations / size; // Base number of calculations per processor
+            let r = n_precomputations % size; // Extra calculations to distribute evenly among ranks
+
+            // Block distribution strategy
+            counts = (0..size)
+                .map(|i| if i < r { q + 1 } else { q })
+                .collect_vec();
+        } else {
+            // If only have one pre-computation, carry out on a single rank (root rank)
+            counts = vec![0; size as usize];
+            counts[0] = n_precomputations;
+        }
+
+        let mut curr = 0;
+        let mut displacements = Vec::new();
+        for &count in counts.iter() {
+            displacements.push(curr);
+            curr += count;
+        }
+
+        Some((counts, displacements))
+    } else {
+        None
+    }
 }
