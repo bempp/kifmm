@@ -500,3 +500,630 @@ pub(crate) fn calculate_precomputation_load(
         None
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use num::Complex;
+    use rand::distributions::{Distribution, Uniform};
+    use rlst::{dense::tools::RandScalar, DefaultIteratorMut};
+
+    fn test_array_real<T: RlstScalar + PartialOrd + RandScalar>()
+    where
+        T: rand::distributions::uniform::SampleUniform,
+    {
+        let m = 5;
+        let n = 4;
+        let mut expected = rlst_dynamic_array2!(T, [m, n]);
+        let mut rng = rand::thread_rng();
+        let between = Uniform::try_from(T::from(0.).unwrap()..T::from(1.0).unwrap()).unwrap();
+        expected
+            .iter_mut()
+            .for_each(|e| *e = between.sample(&mut rng));
+
+        let serialised = serialise_array(&expected);
+        let found = deserialise_array::<T>(&serialised).0;
+
+        (found.data().iter())
+            .zip(expected.data().iter())
+            .for_each(|(&e, &f)| {
+                assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
+            });
+    }
+
+    fn test_array_complex<T: RlstScalar<Real = T> + RandScalar + PartialOrd>()
+    where
+        T: rand::distributions::uniform::SampleUniform,
+        Complex<T>: RlstScalar,
+    {
+        let m = 5;
+        let n = 4;
+        let mut expected = rlst_dynamic_array2!(Complex<T>, [m, n]);
+
+        let mut rng = rand::thread_rng();
+        let between = Uniform::try_from(T::from(0.).unwrap()..T::from(1.0).unwrap()).unwrap();
+
+        expected.iter_mut().for_each(|e| {
+            *e = Complex {
+                re: between.sample(&mut rng),
+                im: between.sample(&mut rng),
+            }
+        });
+
+        let serialised = serialise_array(&expected);
+        let found = deserialise_array::<Complex<T>>(&serialised).0;
+
+        (found.data().iter())
+            .zip(expected.data().iter())
+            .for_each(|(&e, &f)| {
+                let diff = RlstScalar::powf(
+                    T::from(e.re()).unwrap() - T::from(f.re()).unwrap(),
+                    T::from(2.0).unwrap(),
+                ) + RlstScalar::powf(
+                    T::from(e.im()).unwrap() - T::from(f.im()).unwrap(),
+                    T::from(2.0).unwrap(),
+                );
+                let err = RlstScalar::powf(diff, T::from(0.5).unwrap().re());
+                println!("HERE {:?} {:?}", e, f);
+                assert!(err <= T::from(1e-6).unwrap().re());
+            });
+    }
+
+    fn test_array_real_empty<T: RlstScalar + PartialOrd + RandScalar>()
+    where
+        T: rand::distributions::uniform::SampleUniform,
+    {
+        let expected = rlst_dynamic_array2!(T, [0, 0]);
+        let serialised = serialise_array(&expected);
+        let found = deserialise_array::<T>(&serialised).0;
+        assert!(found.shape()[0] == 0);
+        assert!(found.shape()[1] == 0);
+        assert!(found.data().len() == 0);
+    }
+
+    fn test_array_complex_empty<T: RlstScalar + PartialOrd + RandScalar>()
+    where
+        T: rand::distributions::uniform::SampleUniform,
+        Complex<T>: RlstScalar,
+    {
+        let expected = rlst_dynamic_array2!(Complex<T>, [0, 0]);
+        let serialised = serialise_array(&expected);
+        let found = deserialise_array::<Complex<T>>(&serialised).0;
+        assert!(found.shape()[0] == 0);
+        assert!(found.shape()[1] == 0);
+        assert!(found.data().len() == 0);
+    }
+
+    fn test_vector_real<T: RlstScalar + PartialOrd>() {
+        let mut expected = vec![T::from(0.0).unwrap(); 10];
+        expected.iter_mut().for_each(|x| *x += T::one());
+        let serialised = serialise_vec(&expected);
+        let found = deserialise_vec::<T>(&serialised).0;
+
+        (expected.iter()).zip(found).for_each(|(&e, &f)| {
+            assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
+        });
+    }
+
+    fn test_nested_vector_real<T: RlstScalar + PartialOrd>() {
+        let n = 3;
+        let mut expected = vec![vec![T::from(0.0).unwrap(); 10]; n];
+
+        for i in 0..n {
+            expected[i]
+                .iter_mut()
+                .for_each(|x| *x += T::from(i as f32).unwrap());
+        }
+
+        // Insert an empty vector at the end
+        expected.push(Vec::new());
+
+        let serialised = serialise_nested_vec(&expected);
+        let (found, _rest) = deserialise_nested_vec::<T>(&serialised);
+
+        for i in 0..n {
+            (expected[i].iter())
+                .zip(found[i].iter())
+                .for_each(|(&e, &f)| {
+                    assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
+                });
+        }
+
+        assert!(found.len() == n + 1);
+        assert!(found.last().unwrap().is_empty());
+
+        // Now test with empty vectors in the middle, at even indices
+        let n = 5;
+        let mut expected = vec![Vec::new(); n];
+        for i in 0..n {
+            if n % 2 == 0 {
+                expected[i] = vec![T::one() * (T::from(i).unwrap())];
+            }
+        }
+
+        let serialised = serialise_nested_vec(&expected);
+        let (found, _) = deserialise_nested_vec::<T>(&serialised);
+
+        for i in 0..n {
+            if n % 2 == 0 {
+                (expected[i].iter())
+                    .zip(found[i].iter())
+                    .for_each(|(&e, &f)| {
+                        assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
+                    });
+            } else {
+                assert!(found[i].is_empty());
+            }
+        }
+
+        assert!(found.len() == n);
+    }
+
+    fn test_vector_complex<T: RlstScalar + Pod>()
+    where
+        <T as RlstScalar>::Real: PartialOrd,
+    {
+        let mut expected = vec![T::from(0.0).unwrap(); 10];
+        expected.iter_mut().for_each(|x| *x += T::one());
+        let serialised = serialise_vec(&expected);
+        let found = deserialise_vec::<T>(&serialised).0;
+
+        (expected.iter()).zip(found).for_each(|(&e, f)| {
+            let err = RlstScalar::powf(e.re() - f.re(), T::from(2.0).unwrap().re())
+                + RlstScalar::powf(e.im() - f.im(), T::from(2.0).unwrap().re());
+            let err = RlstScalar::powf(err, T::from(0.5).unwrap().re());
+            assert!(err <= T::from(1e-6).unwrap().re());
+        });
+    }
+
+    fn test_nested_vector_complex<T: RlstScalar + Pod>()
+    where
+        <T as RlstScalar>::Real: PartialOrd,
+    {
+        let n = 3;
+        let mut expected = vec![vec![T::from(0.0).unwrap(); 10]; n];
+
+        for i in 0..n {
+            expected[i]
+                .iter_mut()
+                .for_each(|x| *x += T::from(i as f32).unwrap());
+        }
+
+        // Insert an empty vector at the end
+        expected.push(Vec::new());
+
+        let serialised = serialise_nested_vec(&expected);
+        let (found, _) = deserialise_nested_vec::<T>(&serialised);
+
+        for i in 0..n {
+            (expected[i].iter())
+                .zip(found[i].iter())
+                .for_each(|(&e, &f)| {
+                    assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
+                });
+        }
+
+        assert!(found.len() == n + 1);
+        assert!(found.last().unwrap().is_empty());
+
+        // Now test with empty vectors in the middle, at even indices
+        let n = 5;
+        let mut expected = vec![Vec::new(); n];
+        for i in 0..n {
+            if n % 2 == 0 {
+                expected[i] = vec![T::one() * (T::from(i).unwrap())];
+            }
+        }
+
+        let serialised = serialise_nested_vec(&expected);
+        let (found, _) = deserialise_nested_vec::<T>(&serialised);
+
+        for i in 0..n {
+            if n % 2 == 0 {
+                (expected[i].iter())
+                    .zip(found[i].iter())
+                    .for_each(|(&e, &f)| {
+                        let err = RlstScalar::powf(e.re() - f.re(), T::from(2.0).unwrap().re())
+                            + RlstScalar::powf(e.im() - f.im(), T::from(2.0).unwrap().re());
+                        let err = RlstScalar::powf(err, T::from(0.5).unwrap().re());
+                        assert!(err <= T::from(1e-6).unwrap().re());
+                    });
+            } else {
+                assert!(found[i].is_empty());
+            }
+        }
+
+        assert!(found.len() == n);
+    }
+
+    fn test_empty_vector_real<T: Pod + RlstScalar + PartialOrd>() {
+        let expected: Vec<T> = Vec::new();
+        let serialised = serialise_vec(&expected);
+        let found = deserialise_vec::<T>(&serialised).0;
+        assert!(found.is_empty());
+    }
+
+    fn test_empty_vector_complex<T: RlstScalar>()
+    where
+        <T as RlstScalar>::Real: PartialOrd,
+    {
+        let expected: Vec<T> = Vec::new();
+        let serialised = serialise_vec(&expected);
+        let found = deserialise_vec::<T>(&serialised).0;
+        assert!(found.is_empty());
+    }
+
+    fn test_blas_metadata_sarcmp<T: Pod + RlstScalar + PartialOrd>() {
+        // test case where all elements are full
+        let m = 5;
+        let n = 4;
+        let mut u = rlst_dynamic_array2!(T, [m, n]);
+        u.data_mut().iter_mut().for_each(|e| *e += T::one());
+
+        let mut st = rlst_dynamic_array2!(T, [n, m]);
+        st.data_mut()
+            .iter_mut()
+            .for_each(|e| *e += T::from(2.0).unwrap());
+
+        let mut c_u = Vec::new();
+        let mut c_vt = Vec::new();
+
+        for _ in 0..316 {
+            let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|e| *e += T::from(3.0).unwrap());
+            c_u.push(tmp);
+
+            let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+            tmp.data_mut()
+                .iter_mut()
+                .for_each(|e| *e += T::from(4.0).unwrap());
+            c_vt.push(tmp);
+        }
+
+        let expected = BlasMetadataSaRcmp { u, st, c_u, c_vt };
+
+        let serialised = serialise_blas_metadata_sarcmp(&expected);
+        let (found, _) = deserialise_blas_metadata_sarcmp::<T>(&serialised);
+
+        // Test u
+        {
+            // test shape
+            assert!(found.u.shape()[0] == expected.u.shape()[0]);
+            assert!(found.u.shape()[1] == expected.u.shape()[1]);
+
+            // test data
+            found
+                .u
+                .data()
+                .iter()
+                .zip(expected.u.data().iter())
+                .for_each(|(&f, &e)| {
+                    assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                });
+        }
+
+        // Test st
+        {
+            // test shape
+            assert!(found.st.shape()[0] == expected.st.shape()[0]);
+            assert!(found.st.shape()[1] == expected.st.shape()[1]);
+
+            // test data
+            found
+                .st
+                .data()
+                .iter()
+                .zip(expected.st.data().iter())
+                .for_each(|(&f, &e)| {
+                    assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                });
+        }
+
+        // test c_u
+        {
+            // test shape
+            assert!(found.c_u.len() == expected.c_u.len());
+
+            // test data
+            found
+                .c_u
+                .iter()
+                .zip(expected.c_u.iter())
+                .for_each(|(f, e)| {
+                    f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
+                        assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                    });
+                });
+        }
+
+        // test c_vt
+        {
+            // test shape
+            assert!(found.c_vt.len() == expected.c_vt.len());
+
+            // test data
+            found
+                .c_vt
+                .iter()
+                .zip(expected.c_vt.iter())
+                .for_each(|(f, e)| {
+                    f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
+                        assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                    });
+                });
+        }
+    }
+
+    fn test_blas_metadata_sarcmp_empty<T: Pod + RlstScalar + PartialOrd>() {
+        // test case where some elements are empty
+        let m = 0;
+        let n = 0;
+        let u = rlst_dynamic_array2!(T, [m, n]);
+
+        let mut st = rlst_dynamic_array2!(T, [n, m]);
+        st.data_mut()
+            .iter_mut()
+            .for_each(|e| *e += T::from(2.0).unwrap());
+
+        let mut c_u = Vec::new();
+        let mut c_vt = Vec::new();
+
+        for i in 0..316 {
+            if i % 2 == 0 {
+                let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                tmp.data_mut()
+                    .iter_mut()
+                    .for_each(|e| *e += T::from(3.0).unwrap());
+                c_u.push(tmp);
+
+                let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                tmp.data_mut()
+                    .iter_mut()
+                    .for_each(|e| *e += T::from(4.0).unwrap());
+                c_vt.push(tmp);
+            } else {
+                c_u.push(rlst_dynamic_array2!(T, [0, 0]));
+                c_vt.push(rlst_dynamic_array2!(T, [0, 0]));
+            }
+        }
+
+        let expected = BlasMetadataSaRcmp { u, st, c_u, c_vt };
+
+        let serialised = serialise_blas_metadata_sarcmp(&expected);
+        let (found, _) = deserialise_blas_metadata_sarcmp::<T>(&serialised);
+
+        // Test u
+        {
+            // test shape
+            assert!(found.u.shape()[0] == expected.u.shape()[0]);
+            assert!(found.u.shape()[1] == expected.u.shape()[1]);
+
+            // test data
+            assert!(found.u.is_empty() && expected.u.is_empty());
+        }
+
+        // Test st
+        {
+            // test shape
+            assert!(found.st.shape()[0] == expected.st.shape()[0]);
+            assert!(found.st.shape()[1] == expected.st.shape()[1]);
+
+            // test data
+            found
+                .st
+                .data()
+                .iter()
+                .zip(expected.st.data().iter())
+                .for_each(|(&f, &e)| {
+                    assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                });
+        }
+
+        // test c_u
+        {
+            // test shape
+            assert!(found.c_u.len() == expected.c_u.len());
+
+            // test data
+            found
+                .c_u
+                .iter()
+                .zip(expected.c_u.iter())
+                .enumerate()
+                .for_each(|(i, (f, e))| {
+                    if i % 2 == 0 {
+                        f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
+                            assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                        });
+                    } else {
+                        assert!(f.is_empty() && e.is_empty());
+                    }
+                });
+        }
+
+        // test c_vt
+        {
+            // test shape
+            assert!(found.c_vt.len() == expected.c_vt.len());
+
+            // test data
+            found
+                .c_vt
+                .iter()
+                .zip(expected.c_vt.iter())
+                .enumerate()
+                .for_each(|(i, (f, e))| {
+                    if i % 2 == 0 {
+                        f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
+                            assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                        });
+                    } else {
+                        assert!(f.is_empty() && e.is_empty());
+                    }
+                });
+        }
+    }
+
+    fn test_nested_blas_metadata_sarcmp<T: Pod + RlstScalar + PartialOrd>() {
+        let e = 10;
+
+        let mut expected = Vec::new();
+        for _ in 0..e {
+            // test case where some elements are empty
+            let m = 0;
+            let n = 0;
+            let u = rlst_dynamic_array2!(T, [m, n]);
+
+            let mut st = rlst_dynamic_array2!(T, [n, m]);
+            st.data_mut()
+                .iter_mut()
+                .for_each(|e| *e += T::from(2.0).unwrap());
+
+            let mut c_u = Vec::new();
+            let mut c_vt = Vec::new();
+
+            for i in 0..316 {
+                if i % 2 == 0 {
+                    let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                    tmp.data_mut()
+                        .iter_mut()
+                        .for_each(|e| *e += T::from(3.0).unwrap());
+                    c_u.push(tmp);
+
+                    let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                    tmp.data_mut()
+                        .iter_mut()
+                        .for_each(|e| *e += T::from(4.0).unwrap());
+                    c_vt.push(tmp);
+                } else {
+                    c_u.push(rlst_dynamic_array2!(T, [0, 0]));
+                    c_vt.push(rlst_dynamic_array2!(T, [0, 0]));
+                }
+            }
+
+            expected.push(BlasMetadataSaRcmp { u, st, c_u, c_vt });
+        }
+
+        let serialised = serialise_vec_blas_metadata_sarcmp(&expected);
+        let (found, _rest) = deserialise_vec_blas_metadata_sarcmp::<T>(&serialised);
+
+        found.iter().zip(expected.iter()).for_each(|(f, e)| {
+            // Test u
+            {
+                // test shape
+                assert!(f.u.shape()[0] == e.u.shape()[0]);
+                assert!(f.u.shape()[1] == e.u.shape()[1]);
+
+                // test data
+                assert!(f.u.is_empty() && e.u.is_empty());
+            }
+
+            // Test st
+            {
+                // test shape
+                assert!(f.st.shape()[0] == e.st.shape()[0]);
+                assert!(f.st.shape()[1] == e.st.shape()[1]);
+
+                // test data
+                f.st.data()
+                    .iter()
+                    .zip(e.st.data().iter())
+                    .for_each(|(&f, &e)| {
+                        assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                    });
+            }
+
+            // test c_u
+            {
+                // test shape
+                assert!(f.c_u.len() == e.c_u.len());
+
+                // test data
+                f.c_u
+                    .iter()
+                    .zip(e.c_u.iter())
+                    .enumerate()
+                    .for_each(|(i, (f, e))| {
+                        if i % 2 == 0 {
+                            f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
+                                assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                            });
+                        } else {
+                            assert!(f.is_empty() && e.is_empty());
+                        }
+                    });
+            }
+
+            // test c_vt
+            {
+                // test shape
+                assert!(f.c_vt.len() == e.c_vt.len());
+
+                // test data
+                f.c_vt
+                    .iter()
+                    .zip(e.c_vt.iter())
+                    .enumerate()
+                    .for_each(|(i, (f, e))| {
+                        if i % 2 == 0 {
+                            f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
+                                assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                            });
+                        } else {
+                            assert!(f.is_empty() && e.is_empty());
+                        }
+                    });
+            }
+        });
+    }
+
+    #[test]
+    fn test_serialisation() {
+        test_vector_real::<f32>();
+        test_vector_real::<f64>();
+        test_vector_complex::<Complex<f32>>();
+        test_vector_complex::<Complex<f64>>();
+
+        test_empty_vector_real::<f32>();
+        test_empty_vector_real::<f64>();
+        test_empty_vector_complex::<Complex<f32>>();
+        test_empty_vector_complex::<Complex<f64>>();
+    }
+
+    #[test]
+    fn test_nested_serialisation() {
+        test_nested_vector_real::<f32>();
+        test_nested_vector_real::<f64>();
+        test_nested_vector_complex::<f64>();
+        test_nested_vector_complex::<f64>();
+    }
+
+    #[test]
+    fn test_serialisation_array() {
+        test_array_real::<f32>();
+        test_array_real::<f64>();
+        test_array_complex::<f32>();
+        test_array_complex::<f64>();
+
+        test_array_real_empty::<f32>();
+        test_array_real_empty::<f64>();
+        test_array_complex_empty::<f32>();
+        test_array_complex_empty::<f64>();
+    }
+
+    #[test]
+    fn test_blas_metadata() {
+        test_blas_metadata_sarcmp::<f32>();
+        test_blas_metadata_sarcmp::<f64>();
+
+        test_blas_metadata_sarcmp_empty::<f32>();
+        test_blas_metadata_sarcmp_empty::<f64>();
+    }
+
+    #[test]
+    fn test_nested_blas_metadata() {
+        test_nested_blas_metadata_sarcmp::<f32>();
+    }
+}
