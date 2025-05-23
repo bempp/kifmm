@@ -1414,6 +1414,39 @@ mod test {
     }
 
     #[test]
+    pub fn test_finest_first_child() {
+        let mut root = MortonKey::<f64>::root();
+        let found = root.finest_first_child();
+
+        for _ in 0..DEEPEST_LEVEL {
+            root = root.first_child();
+        }
+
+        assert_eq!(root, found);
+    }
+
+    #[test]
+    pub fn test_first_child_at_level() {
+        // Test case when first child is from root
+        let mut root = MortonKey::<f64>::root();
+        let found = root.first_child_at_level(1).unwrap();
+        for _ in 0..1 {
+            root = root.first_child();
+        }
+
+        assert_eq!(root, found);
+        assert_eq!(root.level(), found.level());
+
+        // Test case when the level is higher than the caller's level
+        let mut root = MortonKey::<f64>::root();
+        for _ in 0..2 {
+            root = root.first_child();
+        }
+
+        assert!(root.first_child_at_level(1).is_none());
+    }
+
+    #[test]
     pub fn test_neighbors() {
         let point = [0.5, 0.5, 0.5];
         let domain = Domain::<f64>::new(&[0., 0., 0.], &[1., 1., 1.]);

@@ -518,49 +518,41 @@ where
 
 #[cfg(test)]
 mod test {
+    #![allow(clippy::type_complexity)]
+
     use std::collections::HashSet;
+
+    use itertools::*;
+    use num::{Complex, Zero};
+    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rlst::{
+        c64, empty_array, rlst_dynamic_array2, rlst_dynamic_array3, MultIntoResize,
+        RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
+    };
 
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel,
         traits::Kernel as KernelTrait, types::GreenKernelEvalType,
     };
-    use rlst::{rlst_dynamic_array3, RawAccessMut, RlstScalar};
 
     use crate::{
-        fmm::field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
-        linalg::{pinv::pinv, rsvd::MatrixRsvd},
+        fmm::{
+            field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
+            helpers::single_node::flip3,
+        },
         traits::{
-            field::FieldTranslation as FieldTranslationTrait,
-            fmm::{DataAccess, HomogenousKernel, MetadataAccess},
-            general::single_node::{AsComplex, Epsilon},
-            tree::FmmTreeNode,
+            fftw::Dft,
+            fmm::{DataAccess, MetadataAccess},
+            tree::{FmmTreeNode, SingleFmmTree, SingleTree},
         },
         tree::{
-            constants::{ALPHA_INNER, NSIBLINGS_SQUARED},
-            helpers::find_corners,
+            constants::ALPHA_INNER,
+            helpers::{find_corners, points_fixture},
             types::MortonKey,
         },
-        Evaluate,
+        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, FmmSvdMode,
+        SingleNodeBuilder,
     };
-
-    use crate::fmm::helpers::single_node::{flip3, homogenous_kernel_scale, ncoeffs_kifmm};
-    use itertools::*;
-    use num::Complex;
-    use num::Zero;
-    use rand::rngs::StdRng;
-    use rand::SeedableRng;
-    use rlst::c64;
-    use rlst::RandomAccessByRef;
-    use rlst::RandomAccessMut;
-    use rlst::{
-        empty_array, rlst_dynamic_array1, rlst_dynamic_array2, MultIntoResize, RawAccess, Shape,
-    };
-
-    use crate::tree::helpers::points_fixture;
-    use crate::SingleNodeBuilder;
-    use rand::Rng;
-
-    use super::*;
 
     #[test]
     fn test_blas_field_translation_laplace() {
