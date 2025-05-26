@@ -38,12 +38,13 @@
 //     let sort_kind = SortKind::Samplesort { n_samples: 1000 };
 
 //     // Fmm Parameters
-//     let expansion_order = 4;
+//     let expansion_order = [4];
 //     let kernel = Laplace3dKernel::<f32>::new();
 //     let source_to_target = FftFieldTranslation::<f32>::new(None);
 
 //     // Generate some random test data local to each process
 //     let points = points_fixture::<f32>(n_points, None, None, Some(rank as u64));
+//     let charges = vec![1f32; n_points];
 
 //     ThreadPoolBuilder::new()
 //         .num_threads(1)
@@ -62,7 +63,7 @@
 //             sort_kind,
 //         )
 //         .unwrap()
-//         .parameters(charges, expansion_order, kernel, source_to_target)
+//         .parameters(&charges, &expansion_order, kernel,  GreenKernelEvalType::Value, source_to_target)
 //         .unwrap()
 //         .build()
 //         .unwrap();
@@ -133,7 +134,7 @@
 //             .unwrap()
 //             .parameters(
 //                 &vec![1f32; all_coordinates.len() / 3],
-//                 &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+//                 &expansion_order,
 //                 Laplace3dKernel::new(),
 //                 GreenKernelEvalType::Value,
 //                 FftFieldTranslation::new(None),

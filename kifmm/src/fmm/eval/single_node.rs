@@ -133,7 +133,7 @@ mod test {
     };
 
     use crate::{
-        fmm::types::BlasFieldTranslationIa,
+        fmm::{helpers::single_node::l2_error, types::BlasFieldTranslationIa},
         traits::{
             fmm::ChargeHandler,
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
@@ -188,11 +188,10 @@ mod test {
                 "i {:?} \n direct_i {:?}\n potential_i {:?}",
                 i, direct_i, potential_i
             );
-            direct_i.iter().zip(potential_i).for_each(|(&d, &p)| {
-                let abs_error = RlstScalar::abs(d - p);
-                let rel_error = abs_error / p;
-                assert!(rel_error <= threshold)
-            })
+
+
+            let l2_error = l2_error(&direct_i, &potential_i);
+            assert!(l2_error <= threshold);
         }
     }
 
@@ -337,12 +336,9 @@ mod test {
             &mut direct,
         );
 
-        direct.iter().zip(potential).for_each(|(&d, &p)| {
-            let abs_error = RlstScalar::abs(d - p);
-            let rel_error = abs_error / p;
-            println!("err {:?} \nd {:?} \np {:?}", rel_error, d, &p);
-            assert!(rel_error <= threshold)
-        });
+        let l2_error = l2_error(&direct, &potential);
+        assert!(l2_error <= threshold);
+
     }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(
@@ -403,14 +399,8 @@ mod test {
                 &mut found,
             );
 
-            let abs_error = RlstScalar::abs(expected[0] - found[0]);
-            let rel_error = abs_error / expected[0];
-
-            println!(
-                "i {:?} abs {:?} rel {:?} \n expected {:?} found {:?}",
-                i, abs_error, rel_error, expected, found
-            );
-            assert!(rel_error <= threshold);
+            let l2_error = l2_error(&found, &expected);
+            assert!(l2_error <= threshold);
         }
     }
 
@@ -479,10 +469,6 @@ mod test {
         let depth = None;
         let expansion_order = [6];
 
-        // let n_crit = None;
-        // let depth = Some(3);
-        // let expansion_order = [5, 6, 5, 6];
-
         let prune_empty = true;
 
         // Charge data
@@ -541,9 +527,6 @@ mod test {
         let targets = points_fixture::<f64>(n_targets, None, None, Some(1));
 
         // FMM parameters
-        // let n_crit = Some(100);
-        // let depth = None;
-        // let expansion_order = [6];
 
         let n_crit = None;
         let depth = Some(3);

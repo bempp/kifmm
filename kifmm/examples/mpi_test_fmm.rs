@@ -2,82 +2,73 @@
 
 #[cfg(feature = "mpi")]
 fn main() {
-    use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
-    use itertools::izip;
+    use green_kernels::{
+        helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
+        types::GreenKernelEvalType,
+    };
+    use itertools::{izip, Itertools};
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
-            fmm::{DataAccessMulti, EvaluateMulti},
+            fmm::EvaluateMulti,
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{helpers::points_fixture, types::SortKind},
-        FftFieldTranslation,
+        FftFieldTranslation, MultiNodeFmmTree,
     };
 
     use mpi::{
         datatype::PartitionMut,
-        traits::{Communicator, Root},
+        topology::SimpleCommunicator,
+        traits::{Communicator, Equivalence, Root},
     };
-    use rlst::RawAccess;
+    use num::Float;
+    use rlst::{RawAccess, RlstScalar};
 
-    fn test_fmm(
+    fn _test_multi_node_helmholtz_fmm_helper<
+        T: RlstScalar<Complex = T> + Float + Default + Equivalence,
+    >(
         name: String,
-        expansion_order: &[usize],
-        world: &mpi::topology::SimpleCommunicator,
-    ) {
-        let comm = world.duplicate();
-
-        // Tree parameters
-        let prune_empty = true;
-        let n_points = 10000;
-        let local_depth = 3;
-        let global_depth = 2;
-        let sort_kind = SortKind::Samplesort { n_samples: 100 };
-
-        // Fmm Parameters
-
-        let kernel = Laplace3dKernel::<f32>::new();
-        // let source_to_target =
-        //     BlasFieldTranslationSaRcmp::<f32>::new(None, None, kifmm::FmmSvdMode::Deterministic);
-        let source_to_target = FftFieldTranslation::<f32>::new(None);
-
-        // Generate some random test data local to each process
-        let points = points_fixture::<f32>(n_points, None, None, None);
-        let charges = vec![1f32; n_points];
-
-        let mut fmm = MultiNodeBuilder::new(false)
-            .tree(
-                &comm,
-                points.data(),
-                points.data(),
-                local_depth,
-                global_depth,
-                prune_empty,
-                sort_kind,
-            )
-            .unwrap()
-            .parameters(
-                &charges,
-                &expansion_order,
-                kernel,
-                GreenKernelEvalType::Value,
-                source_to_target,
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-
-        // Perform upward and downward passes
+        mut fmm: Box<
+            dyn EvaluateMulti<
+                Scalar = T,
+                Kernel = Helmholtz3dKernel<T>,
+                Tree = MultiNodeFmmTree<T::Real, SimpleCommunicator>,
+            >,
+        >,
+        eval_type: GreenKernelEvalType,
+        threshold: T::Real,
+    ) where
+        <T as RlstScalar>::Real: Equivalence,
+    {
+        // Run the FMM
         fmm.evaluate().unwrap();
 
-        // Gather all coordinates for the test
-        let root_process = fmm.communicator().process_at_rank(0);
-        let n_coords = fmm.tree().source_tree().coordinates.len() as i32;
-        let mut all_coordinates = vec![0f32; 3 * n_points * world.size() as usize];
+        // TODO add test for matrix input
+        let _eval_size = match eval_type {
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
+        };
 
-        if world.rank() == 0 {
-            let mut coordinates_counts = vec![0i32; fmm.communicator().size() as usize];
-            root_process.gather_into_root(&n_coords, &mut coordinates_counts);
+        let charges_rank = fmm.charges().unwrap();
+        let source_coordinates_rank = fmm.tree().source_tree().all_coordinates().unwrap();
+        let n_sources_rank = charges_rank.len() as i32;
+
+        // Gather all coordinates and charges for the test
+        let root_process = fmm.communicator().process_at_rank(0);
+
+        if fmm.communicator().rank() == 0 {
+            // Communicate counts
+            let mut sources_counts = vec![0i32; fmm.communicator().size() as usize];
+            root_process.gather_into_root(&n_sources_rank, &mut sources_counts);
+            let coordinates_counts = sources_counts.iter().map(|c| c * 3).collect_vec();
+
+            let mut sources_displacements = Vec::new();
+            let mut counter = 0;
+            for &count in sources_counts.iter() {
+                sources_displacements.push(counter);
+                counter += count;
+            }
 
             let mut coordinates_displacements = Vec::new();
             let mut counter = 0;
@@ -86,74 +77,256 @@ fn main() {
                 counter += count;
             }
 
-            let local_coords = fmm.tree().source_tree().all_coordinates().unwrap();
+            let n_sources = sources_counts.iter().sum::<i32>();
 
+            let mut all_coordinates = vec![T::Real::default(); 3 * n_sources as usize];
+            let mut all_charges = vec![T::default(); n_sources as usize];
+
+            // Communicate charges
+            let mut partition =
+                PartitionMut::new(&mut all_charges, sources_counts, sources_displacements);
+
+            root_process.gather_varcount_into_root(charges_rank, &mut partition);
+
+            // Communicate coordinates
             let mut partition = PartitionMut::new(
                 &mut all_coordinates,
                 coordinates_counts,
                 coordinates_displacements,
             );
 
-            root_process.gather_varcount_into_root(local_coords, &mut partition);
-        } else {
-            root_process.gather_into(&n_coords);
+            root_process.gather_varcount_into_root(source_coordinates_rank, &mut partition);
 
-            let local_coords = fmm.tree().source_tree().all_coordinates().unwrap();
-            root_process.gather_varcount_into(local_coords);
-        }
-
-        // Perform upward pass on global fmm
-        if world.rank() == 0 {
-            let targets = fmm.tree().target_tree().all_coordinates().unwrap();
-            let mut expected = vec![0f32; targets.len() / 3];
+            let target_coordinates_rank = fmm.tree().target_tree().all_coordinates().unwrap();
+            let n_targets = target_coordinates_rank.len() / 3;
+            let mut expected = vec![T::default(); n_targets];
 
             fmm.kernel().evaluate_st(
                 GreenKernelEvalType::Value,
                 &all_coordinates,
-                &fmm.tree().target_tree().all_coordinates().unwrap(),
-                &vec![1f32; n_points * (world.size() as usize)],
+                &target_coordinates_rank,
+                &all_charges,
                 &mut expected,
             );
 
             let found = fmm.potentials().unwrap();
 
-            let mut num = 0.0;
-            let mut den = 0.0;
-            for (expected, found) in izip!(&expected, found) {
-                num += (expected - found).abs().powf(2.0);
-                den += expected.abs().powf(2.0);
+            let mut num = T::real(0.0);
+            let mut den = T::real(0.0);
+            for (&expected, &found) in izip!(&expected, found) {
+                num += RlstScalar::powf(RlstScalar::abs(expected - found), T::real(2.0));
+                den += RlstScalar::powf(RlstScalar::abs(expected), T::real(2.0));
             }
 
-            let l2_error = (num / den).powf(0.5);
+            let l2_error = RlstScalar::powf(num / den, T::real(0.5));
 
-            println!(
-                "Global Upward Pass rank {:?} l2 {:?} \n expected {:?} found {:?}",
-                world.rank(),
-                l2_error,
-                &expected[0..5],
-                &found[0..5]
-            );
+            println!("L2 {:?}", l2_error);
+            assert!(l2_error <= threshold);
+            println!("...test_helmholtz_fmm_{} passed", name);
+        } else {
+            root_process.gather_into(&n_sources_rank);
 
-            println!("...test_fmm_{} passed", name);
+            // Communicate charges
+            root_process.gather_varcount_into(charges_rank);
+
+            // Communicate coordinates
+            root_process.gather_varcount_into(source_coordinates_rank);
         }
     }
 
-    let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
-    let world = universe.world();
+    fn test_multi_node_laplace_fmm_helper<T: RlstScalar<Real = T> + Float + Default + Equivalence>(
+        name: String,
+        mut fmm: Box<
+            dyn EvaluateMulti<
+                Scalar = T,
+                Kernel = Laplace3dKernel<T>,
+                Tree = MultiNodeFmmTree<T, SimpleCommunicator>,
+            >,
+        >,
+        eval_type: GreenKernelEvalType,
+        threshold: T,
+    ) where
+        <T as RlstScalar>::Real: Equivalence,
+    {
+        // Run the FMM
+        fmm.evaluate().unwrap();
 
-    // let expansion_order = [4];
-    // test_fmm(
-    //     "single expansion order all levels".to_string(),
-    //     &expansion_order,
-    //     &world,
-    // );
+        // TODO add test for matrix input
+        let _eval_size = match eval_type {
+            GreenKernelEvalType::Value => 1,
+            GreenKernelEvalType::ValueDeriv => 4,
+        };
 
-    let expansion_order = [4, 4, 5, 4, 5, 4];
-    test_fmm(
-        "variable expansion order per level".to_string(),
-        &expansion_order,
-        &world,
-    );
+        let charges_rank = fmm.charges().unwrap();
+        let source_coordinates_rank = fmm.tree().source_tree().all_coordinates().unwrap();
+        let n_sources_rank = charges_rank.len() as i32;
+
+        // Gather all coordinates and charges for the test
+        let root_process = fmm.communicator().process_at_rank(0);
+
+        if fmm.communicator().rank() == 0 {
+            // Communicate counts
+            let mut sources_counts = vec![0i32; fmm.communicator().size() as usize];
+            root_process.gather_into_root(&n_sources_rank, &mut sources_counts);
+            let coordinates_counts = sources_counts.iter().map(|c| c * 3).collect_vec();
+
+            let mut sources_displacements = Vec::new();
+            let mut counter = 0;
+            for &count in sources_counts.iter() {
+                sources_displacements.push(counter);
+                counter += count;
+            }
+
+            let mut coordinates_displacements = Vec::new();
+            let mut counter = 0;
+            for &count in coordinates_counts.iter() {
+                coordinates_displacements.push(counter);
+                counter += count;
+            }
+
+            let n_sources = sources_counts.iter().sum::<i32>();
+
+            let mut all_coordinates = vec![T::Real::default(); 3 * n_sources as usize];
+            let mut all_charges = vec![T::default(); n_sources as usize];
+
+            // Communicate charges
+            let mut partition =
+                PartitionMut::new(&mut all_charges, sources_counts, sources_displacements);
+
+            root_process.gather_varcount_into_root(charges_rank, &mut partition);
+
+            // Communicate coordinates
+            let mut partition = PartitionMut::new(
+                &mut all_coordinates,
+                coordinates_counts,
+                coordinates_displacements,
+            );
+
+            root_process.gather_varcount_into_root(source_coordinates_rank, &mut partition);
+
+            let target_coordinates_rank = fmm.tree().target_tree().all_coordinates().unwrap();
+            let n_targets = target_coordinates_rank.len() / 3;
+            let mut expected = vec![T::default(); n_targets];
+
+            fmm.kernel().evaluate_st(
+                GreenKernelEvalType::Value,
+                &all_coordinates,
+                &target_coordinates_rank,
+                &all_charges,
+                &mut expected,
+            );
+
+            let found = fmm.potentials().unwrap();
+
+            let mut num = T::real(0.0);
+            let mut den = T::real(0.0);
+            for (&expected, &found) in izip!(&expected, found) {
+                num += RlstScalar::powf(RlstScalar::abs(expected - found), T::real(2.0));
+                den += RlstScalar::powf(RlstScalar::abs(expected), T::real(2.0));
+            }
+
+            let l2_error = RlstScalar::powf(num / den, T::real(0.5));
+
+            // println!("L2 {:?}", l2_error);
+            assert!(l2_error <= threshold);
+            println!("...test_laplace_fmm_{} passed", name);
+        } else {
+            root_process.gather_into(&n_sources_rank);
+
+            // Communicate charges
+            root_process.gather_varcount_into(charges_rank);
+
+            // Communicate coordinates
+            root_process.gather_varcount_into(source_coordinates_rank);
+        }
+    }
+
+    // Test Laplace FMM
+    // N.B global tree refined to depth 3 to ensure that the global upward pass is also being run
+    {
+        let (universe, _threading) =
+            mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
+        let world = universe.world();
+        let comm = world.duplicate();
+
+        let n_points = 10000;
+        let charges = vec![1f32; n_points];
+        let eval_type = GreenKernelEvalType::Value;
+        let source_to_target = FftFieldTranslation::new(None);
+        let sources = points_fixture(n_points, None, None, None);
+        let local_depth = 3;
+        let global_depth = 3;
+        let prune_empty = true;
+
+        // Test case with a single expansion order applied at all levels
+        {
+            let expansion_order = [5];
+
+            let fmm = MultiNodeBuilder::new(false)
+                .tree(
+                    &comm.duplicate(),
+                    sources.data(),
+                    sources.data(),
+                    local_depth,
+                    global_depth,
+                    prune_empty,
+                    SortKind::Samplesort { n_samples: 10 },
+                )
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    source_to_target.clone(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            test_multi_node_laplace_fmm_helper(
+                "fixed_expansion_order".to_string(),
+                Box::new(fmm),
+                eval_type,
+                1e-4,
+            );
+        }
+
+        // Test case with multiple expansion orders which vary by level
+        {
+            let expansion_order = [4, 4, 5, 4, 5, 4, 5];
+            assert!(expansion_order.len() == (global_depth + local_depth + 1).try_into().unwrap());
+
+            let fmm = MultiNodeBuilder::new(false)
+                .tree(
+                    &comm.duplicate(),
+                    sources.data(),
+                    sources.data(),
+                    local_depth,
+                    global_depth,
+                    prune_empty,
+                    SortKind::Samplesort { n_samples: 10 },
+                )
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    source_to_target.clone(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            test_multi_node_laplace_fmm_helper(
+                "variable_expansion_order".to_string(),
+                Box::new(fmm),
+                eval_type,
+                1e-4,
+            );
+        }
+    }
 }
 
 #[cfg(not(feature = "mpi"))]
