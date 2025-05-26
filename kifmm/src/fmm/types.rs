@@ -954,7 +954,7 @@ pub enum Isa {
 #[allow(clippy::type_complexity)]
 pub struct KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Equivalence + Float,
+    Scalar: RlstScalar + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     FieldTranslation: FieldTranslationTrait,

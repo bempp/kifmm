@@ -44,8 +44,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default
         + AlignedAllocable
-        + Equivalence
-        + Float,
+        + Equivalence,
     <Scalar as AsComplex>::ComplexType:
         Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,

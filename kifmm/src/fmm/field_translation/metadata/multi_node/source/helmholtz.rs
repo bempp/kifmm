@@ -36,7 +36,7 @@ use crate::{
 impl<Scalar, FieldTranslation> SourceTranslationMetadata
     for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd + Equivalence + Float,
+    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Sync + Send + Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti + MetadataAccess,

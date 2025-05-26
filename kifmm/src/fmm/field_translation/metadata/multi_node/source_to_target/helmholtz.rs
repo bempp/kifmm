@@ -57,9 +57,8 @@ where
         + Default
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
-        + Equivalence
-        + Float,
-    <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence,
+        + Equivalence,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
@@ -124,8 +123,8 @@ where
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixRsvd + Equivalence + Float,
-    <Scalar as RlstScalar>::Real: Default + Equivalence,
+    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixRsvd + Equivalence,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: MetadataAccess,
 {
     fn displacements(&mut self, start_level: Option<u64>) {

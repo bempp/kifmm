@@ -16,7 +16,7 @@ use crate::{
 impl<Scalar, Kernel, FieldTranslation> DataAccessMulti
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Float + Equivalence,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,

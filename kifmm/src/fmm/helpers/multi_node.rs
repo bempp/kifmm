@@ -332,7 +332,7 @@ pub(crate) fn level_expansion_pointers_multi_node<T>(
     expansions: &[T],
 ) -> Vec<Vec<SendPtrMut<T>>>
 where
-    T: RlstScalar + Equivalence + Float,
+    T: RlstScalar + Equivalence,
     <T as RlstScalar>::Real: Float + Equivalence,
 {
     let mut result = vec![Vec::new(); (tree.total_depth() + 1).try_into().unwrap()];
@@ -372,7 +372,7 @@ pub(crate) fn leaf_expansion_pointers_multi_node<T>(
     expansions: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
-    T: RlstScalar + Equivalence + Float,
+    T: RlstScalar + Equivalence,
     <T as RlstScalar>::Real: RlstScalar + Equivalence + Float,
 {
     let n_leaves = tree.n_leaves().unwrap();
@@ -411,7 +411,7 @@ pub(crate) fn potential_pointers_multi_node<T>(
     potentials: &[T],
 ) -> Vec<SendPtrMut<T>>
 where
-    T: RlstScalar + Equivalence + Float,
+    T: RlstScalar + Equivalence,
     <T as RlstScalar>::Real: RlstScalar + Equivalence + Float,
 {
     let n_leaves = tree.n_leaves().unwrap();

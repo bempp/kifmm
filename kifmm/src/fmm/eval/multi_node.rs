@@ -21,7 +21,7 @@ use rlst::RlstScalar;
 impl<Scalar, Kernel, FieldTranslation> EvaluateMulti
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,

@@ -32,7 +32,7 @@ use crate::{
 impl<Scalar, Kernel, FieldTranslation> GhostExchange
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
@@ -838,7 +838,7 @@ where
             let requested_queries_rank = &self.ghost_requested_queries_v[l..r]; // (available) requested queries from this rank
             let mut query_size_rank = 0;
             for &query in requested_queries_rank.iter() {
-                let key = MortonKey::<Scalar>::from_morton(query);
+                let key = MortonKey::<Scalar::Real>::from_morton(query);
                 let buffer_size = self.n_coeffs_equivalent_surface(key.level()) as i32;
                 query_size_rank += buffer_size;
                 requested_multipoles_buffer_sizes.push(buffer_size);
@@ -942,7 +942,7 @@ where
 
 impl<Scalar, Kernel, FieldTranslation> GlobalFmmMetadata for KiFmm<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Float,
+    Scalar: RlstScalar + Default,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,

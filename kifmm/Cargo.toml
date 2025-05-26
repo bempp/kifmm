@@ -29,7 +29,7 @@ kifmm-fftw-sys = { path = "../fftw-sys" }
 green-kernels = { git = "https://github.com/bempp/green-kernels" }
 lazy_static = "1.4.0"
 num-complex = "0.4.5"
-mpi = { version = "0.8.*", optional = true}
+mpi = { version = "0.8.*", optional = true, features = ["complex"]}
 mpi-sys = { version="0.2.2", optional=true }
 memoffset = {version = "0.9.1", optional = true}
 pulp = "0.18.12"

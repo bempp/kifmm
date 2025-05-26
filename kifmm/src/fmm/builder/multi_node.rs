@@ -37,7 +37,7 @@ use crate::{
 
 impl<Scalar, Kernel, FieldTranslation> MultiNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Epsilon + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default + Clone,

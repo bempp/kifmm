@@ -30,7 +30,6 @@ use kifmm::{
 
 fn benchmark_fft_m2l<
     T: RlstScalar<Complex = T>
-        // + Float
         + Epsilon
         + MatrixSvd
         + AsComplex

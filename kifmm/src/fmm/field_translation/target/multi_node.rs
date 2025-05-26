@@ -26,7 +26,7 @@ use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAcces
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Sync + Send,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,

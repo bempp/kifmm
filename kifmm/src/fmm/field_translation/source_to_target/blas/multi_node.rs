@@ -31,7 +31,7 @@ use crate::{
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmmMulti<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     Self: MetadataAccess

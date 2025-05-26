@@ -40,7 +40,7 @@ use crate::{
 
 impl<Scalar, Kernel, FieldTranslation> Metadata for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Float + Equivalence,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
@@ -478,7 +478,7 @@ where
 
 impl<Scalar, Kernel> KiFmmMulti<Scalar, Kernel, FftFieldTranslation<Scalar>>
 where
-    Scalar: RlstScalar + AsComplex + Default + Dft + Float + Equivalence,
+    Scalar: RlstScalar + AsComplex + Default + Dft + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
 {
@@ -610,7 +610,7 @@ where
 impl<Scalar, FieldTranslation> MetadataAccess
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
@@ -675,7 +675,7 @@ where
 impl<Scalar, FieldTranslation> MetadataAccess
     for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + Equivalence + Float,
+    Scalar: RlstScalar<Complex = Scalar> + Default + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>

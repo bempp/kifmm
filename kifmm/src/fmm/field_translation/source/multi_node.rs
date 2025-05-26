@@ -31,7 +31,7 @@ use crate::{
 impl<Scalar, Kernel, FieldTranslation> SourceTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,

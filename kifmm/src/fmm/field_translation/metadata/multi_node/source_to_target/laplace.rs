@@ -52,8 +52,7 @@ where
         + AsComplex
         + Default
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
-        + Equivalence
-        + Float,
+        + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
 {
     fn displacements(&mut self, start_level: Option<u64>) {
