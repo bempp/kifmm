@@ -113,7 +113,6 @@ where
         self.source_to_target.displacements = displacements;
     }
 
-    // TODO
     fn source_to_target(&mut self) {
         // Compute the field translation operators
         let size = self.communicator.size();
@@ -364,15 +363,6 @@ where
                 kernel_data,
                 kernel_data_f: kernel_data_ft,
             };
-
-            // // Set operator data
-            // self.source_to_target.metadata.push(metadata.clone());
-
-            // // Copy for global FMM
-            // self.global_fmm
-            //     .source_to_target
-            //     .metadata
-            //     .push(metadata.clone());
 
             metadata_r.push(metadata);
         }

@@ -52,27 +52,28 @@ fn main() {
         .unwrap();
 
     // Queries are set as a part of the build
-    let fmm: kifmm::KiFmmMulti<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>> = MultiNodeBuilder::new(false)
-        .tree(
-            &comm,
-            points.data(),
-            points.data(),
-            local_depth,
-            global_depth,
-            prune_empty,
-            sort_kind,
-        )
-        .unwrap()
-        .parameters(
-            &charges,
-            &expansion_order,
-            kernel,
-            GreenKernelEvalType::Value,
-            source_to_target,
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+    let fmm: kifmm::KiFmmMulti<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>> =
+        MultiNodeBuilder::new(false)
+            .tree(
+                &comm,
+                points.data(),
+                points.data(),
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                &charges,
+                &expansion_order,
+                kernel,
+                GreenKernelEvalType::Value,
+                source_to_target,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
     fmm.p2m().unwrap();
 

@@ -189,7 +189,6 @@ mod test {
                 i, direct_i, potential_i
             );
 
-
             let l2_error = l2_error(&direct_i, &potential_i);
             assert!(l2_error <= threshold);
         }
@@ -338,7 +337,6 @@ mod test {
 
         let l2_error = l2_error(&direct, &potential);
         assert!(l2_error <= threshold);
-
     }
 
     fn test_root_multipole_laplace_single_node<T: RlstScalar + Float + Default>(

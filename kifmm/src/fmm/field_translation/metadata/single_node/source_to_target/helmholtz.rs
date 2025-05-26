@@ -126,7 +126,7 @@ where
 
         let mut result = BlasFieldTranslationIa::<Scalar>::default();
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let iterator = if self.variable_expansion_order {
             (2..=depth)
                 .zip(self.equivalent_surface_order.iter().skip(2).cloned())
                 .zip(self.check_surface_order.iter().skip(2).cloned())

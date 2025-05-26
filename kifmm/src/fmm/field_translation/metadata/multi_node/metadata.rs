@@ -1,5 +1,6 @@
 use green_kernels::{
-    laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
+    helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
+    types::GreenKernelEvalType,
 };
 use itertools::{izip, Itertools};
 use mpi::{
@@ -663,6 +664,55 @@ where
         } else {
             0
         }
+    }
+
+    fn displacement_index(&self, level: u64) -> usize {
+        let start_level = std::cmp::max(2, self.tree.source_tree.global_depth);
+        (level - start_level) as usize
+    }
+}
+
+impl<Scalar, FieldTranslation> MetadataAccess
+    for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
+where
+    Scalar: RlstScalar<Complex = Scalar> + Default + Equivalence + Float,
+    <Scalar as RlstScalar>::Real: RlstScalar + Default + Equivalence + Float,
+    FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
+    KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
+        + SourceToTargetTranslationMetadata
+        + SourceTranslationMetadata
+        + TargetTranslationMetadata,
+{
+    fn fft_map_index(&self, level: u64) -> usize {
+        if self.variable_expansion_order {
+            (level - 2) as usize
+        } else {
+            0
+        }
+    }
+
+    fn expansion_index(&self, level: u64) -> usize {
+        if self.variable_expansion_order {
+            level as usize
+        } else {
+            0
+        }
+    }
+
+    fn c2e_operator_index(&self, level: u64) -> usize {
+        level as usize
+    }
+
+    fn m2m_operator_index(&self, level: u64) -> usize {
+        (level - 1) as usize
+    }
+
+    fn l2l_operator_index(&self, level: u64) -> usize {
+        (level - 1) as usize
+    }
+
+    fn m2l_operator_index(&self, level: u64) -> usize {
+        (level - 2) as usize
     }
 
     fn displacement_index(&self, level: u64) -> usize {

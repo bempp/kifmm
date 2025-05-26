@@ -17,11 +17,9 @@ use crate::{
     tree::types::{MortonKey, SingleNodeTree},
 };
 
-
 #[allow(dead_code)]
 /// Compute the L2 norm of the relative error between two sequences
 pub(crate) fn l2_error<T: RlstScalar<Real = T>>(found: &[T], expected: &[T]) -> T {
-
     let mut num = T::zero();
     let mut den = T::zero();
 
@@ -32,7 +30,6 @@ pub(crate) fn l2_error<T: RlstScalar<Real = T>>(found: &[T], expected: &[T]) -> 
 
     RlstScalar::powf(num / den, T::from(0.5).unwrap().re())
 }
-
 
 /// Optionally time a function call
 #[inline]

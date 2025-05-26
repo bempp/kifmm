@@ -229,7 +229,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     fn fft_map_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             (level - 2) as usize
         } else {
             0
@@ -237,7 +237,7 @@ where
     }
 
     fn expansion_index(&self, level: u64) -> usize {
-        if self.equivalent_surface_order.len() > 1 {
+        if self.variable_expansion_order {
             level as usize
         } else {
             0
