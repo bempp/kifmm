@@ -965,7 +965,7 @@ where
                 kernel_data_f: kernel_data_ft,
             });
 
-            let iterator = if self.equivalent_surface_order.len() > 1 {
+            let iterator = if self.variable_expansion_order {
                 (3..=depth)
                     .zip(self.equivalent_surface_order.iter().cloned().skip(3))
                     .collect_vec()
@@ -1189,7 +1189,7 @@ where
         // Set operator data
         self.source_to_target.metadata = metadata;
 
-        let iterator = if self.equivalent_surface_order.len() > 1 {
+        let iterator = if self.variable_expansion_order {
             self.equivalent_surface_order
                 .iter()
                 .skip(2)
@@ -1198,6 +1198,10 @@ where
         } else {
             self.equivalent_surface_order.clone()
         };
+
+        // TODO potential bug wrt to above iterator and c2e operator index
+        // only storing a single map in that case, need to check trait impl
+        // of metadataaccess
 
         // Set required maps
         let mut tmp1 = Vec::new();

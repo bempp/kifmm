@@ -13,8 +13,8 @@ use crate::{
     fmm::{
         helpers::{
             multi_node::{
-                all_gather_v_serialised, calculate_precomputation_load, deserialise_nested_array,
-                serialise_nested_array,
+                all_gather_v_serialised, calculate_precomputation_load,
+                deserialise_nested_array_2x2, serialise_nested_array_2x2,
             },
             single_node::ncoeffs_kifmm,
         },
@@ -119,8 +119,8 @@ where
         }
 
         // Need to gather results at all ranks
-        let dc2e_inv_1_r_serialised = serialise_nested_array(&dc2e_inv_1_r);
-        let dc2e_inv_2_r_serialised = serialise_nested_array(&dc2e_inv_2_r);
+        let dc2e_inv_1_r_serialised = serialise_nested_array_2x2(&dc2e_inv_1_r);
+        let dc2e_inv_2_r_serialised = serialise_nested_array_2x2(&dc2e_inv_2_r);
 
         let dc2e_inv_1_serialised =
             all_gather_v_serialised(&dc2e_inv_1_r_serialised, &self.communicator);
@@ -128,16 +128,16 @@ where
             all_gather_v_serialised(&dc2e_inv_2_r_serialised, &self.communicator);
 
         // Reconstruct metadata
-        let (mut dc2e_inv_1, mut rest) = deserialise_nested_array(&dc2e_inv_1_serialised);
+        let (mut dc2e_inv_1, mut rest) = deserialise_nested_array_2x2(&dc2e_inv_1_serialised);
         while !rest.is_empty() {
-            let (mut t1, t2) = deserialise_nested_array::<Scalar>(rest);
+            let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
             dc2e_inv_1.append(&mut t1);
             rest = t2;
         }
 
-        let (mut dc2e_inv_2, mut rest) = deserialise_nested_array(&dc2e_inv_2_serialised);
+        let (mut dc2e_inv_2, mut rest) = deserialise_nested_array_2x2(&dc2e_inv_2_serialised);
         while !rest.is_empty() {
-            let (mut t1, t2) = deserialise_nested_array::<Scalar>(rest);
+            let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
             dc2e_inv_2.append(&mut t1);
             rest = t2;
         }

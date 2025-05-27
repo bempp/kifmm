@@ -646,6 +646,38 @@ where
     }
 }
 
+impl<Scalar> Clone for BlasFieldTranslationIa<Scalar>
+where
+    Scalar: RlstScalar,
+    Scalar::Real: Clone,
+    BlasMetadataIa<Scalar>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+    FmmSvdMode: Clone,
+{
+    fn clone(&self) -> Self {
+        BlasFieldTranslationIa {
+            threshold: self.threshold,
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            cutoff_ranks: self.cutoff_ranks.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<i32> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+            surface_diff: self.surface_diff,
+            svd_mode: self.svd_mode,
+        }
+    }
+}
+
 /// Variants of SVD algorithms
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {

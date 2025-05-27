@@ -1,49 +1,43 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Mutex, RwLock},
+    sync::RwLock,
 };
 
 use green_kernels::{
-    helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
-    types::GreenKernelEvalType,
+    helmholtz_3d::Helmholtz3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use itertools::{izip, Itertools};
 use mpi::traits::{Communicator, Equivalence};
 use num::{Float, Zero};
-use pulp::Scalar;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
     empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, MultIntoResize,
-    RawAccess, RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessByRef,
-    UnsafeRandomAccessMut,
+    RawAccess, RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessMut,
 };
 
 use crate::{
     fmm::{
-        field_translation::source_to_target::transfer_vector::{
-            self, compute_transfer_vectors_at_level,
-        },
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::{
             multi_node::{
-                all_gather_v_serialised, calculate_precomputation_load, deserialise_nested_array,
-                deserialise_nested_vec, deserialise_vec, deserialise_vec_blas_metadata_sarcmp,
-                deserialise_vec_fft_metadata, serialise_nested_array, serialise_nested_vec,
-                serialise_vec, serialise_vec_blas_metadata_sarcmp, serialise_vec_fft_metadata,
+                all_gather_v_serialised, calculate_precomputation_load,
+                deserialise_nested_array_2x2, deserialise_nested_array_3x3, deserialise_vec,
+                serialise_nested_array_2x2, serialise_nested_array_3x3, serialise_vec,
             },
             single_node::{find_cutoff_rank, flip3, ncoeffs_kifmm},
         },
-        types::{BlasMetadataIa, BlasMetadataSaRcmp, FftMetadata, KiFmmMulti},
+        types::{BlasMetadataIa, FftMetadata, KiFmmMulti},
     },
     linalg::rsvd::MatrixRsvd,
     traits::{
         fftw::{Dft, DftType},
-        field::{FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata},
+        field::SourceToTargetTranslationMetadata,
         fmm::MetadataAccess,
         general::single_node::AsComplex,
         tree::{Domain, FmmTreeNode, MultiFmmTree, MultiTree},
     },
     tree::{
-        constants::{ALPHA_INNER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM},
+        constants::{ALPHA_INNER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
         helpers::find_corners,
         types::MortonKey,
     },
@@ -117,7 +111,656 @@ where
         self.source_to_target.displacements = displacements;
     }
 
-    fn source_to_target(&mut self) {}
+    fn source_to_target(&mut self) {
+        // Compute the field translation operators
+        let size = self.communicator.size();
+        let rank = self.communicator.rank();
+        let alpha = Scalar::real(ALPHA_INNER);
+
+        // Pick a point in the middle of the domain
+        let two = Scalar::real(2.0);
+        let midway = self
+            .tree
+            .domain()
+            .side_length()
+            .iter()
+            .map(|d| *d / two)
+            .collect_vec();
+
+        let point = midway
+            .iter()
+            .zip(self.tree.domain().origin())
+            .map(|(m, o)| *m + *o)
+            .collect_vec();
+
+        let point = [point[0], point[1], point[2]];
+        let domain = self.tree.source_tree().domain();
+
+        let total_depth = self.tree.source_tree().total_depth();
+
+        let mut metadata_r: Vec<FftMetadata<<Scalar as AsComplex>::ComplexType>> = Vec::new();
+
+        if total_depth >= 2 {
+            // Encode point in centre of domain and compute halo of parent, and their resp. children
+            // Find unique transfer vectors in correct order at level 3
+            let key = MortonKey::from_point(&point, domain, 3);
+            let siblings = key.siblings();
+            let parent = key.parent();
+
+            let halo = parent.neighbors();
+            let halo_children = halo.iter().map(|h| h.children()).collect_vec();
+
+            let mut transfer_vector_index = vec![vec![0usize; NSIBLINGS_SQUARED]; NHALO];
+
+            for (i, halo_child_set) in halo_children.iter().enumerate() {
+                let outer_displacement = i;
+
+                for (j, sibling) in siblings.iter().enumerate() {
+                    for (k, halo_child) in halo_child_set.iter().enumerate() {
+                        let tv = halo_child.find_transfer_vector(sibling).unwrap();
+
+                        let inner_displacement = NSIBLINGS * j + k;
+                        transfer_vector_index[outer_displacement][inner_displacement] = tv;
+                    }
+                }
+            }
+
+            // Compute data for level 2 separately, only on root rank
+            {
+                let equivalent_surface_order = if self.variable_expansion_order {
+                    self.equivalent_surface_order[2]
+                } else {
+                    *self.equivalent_surface_order.last().unwrap()
+                };
+
+                let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
+                let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
+                let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
+
+                // Need to find valid source/target pairs at this level with matching transfer vectors;
+                let all_keys = MortonKey::<Scalar::Real>::root().descendants(2).unwrap();
+
+                // The child boxes in the halo of the sibling set
+                let mut sources = vec![];
+                // The sibling set
+                let mut targets = vec![];
+
+                // Green's function evaluations for each source, target pair interaction
+                let mut kernel_data_vec_r = vec![];
+
+                for _ in 0..NHALO {
+                    sources.push(vec![
+                        MortonKey::<Scalar::Real>::default();
+                        NSIBLINGS_SQUARED
+                    ]);
+                    targets.push(vec![
+                        MortonKey::<Scalar::Real>::default();
+                        NSIBLINGS_SQUARED
+                    ]);
+                    kernel_data_vec_r.push(vec![]);
+                }
+
+                let mut tv_source_target_pair_map = HashMap::new();
+                for source in all_keys.iter() {
+                    for target in all_keys.iter() {
+                        let transfer_vector = source.find_transfer_vector(target).unwrap();
+
+                        if !tv_source_target_pair_map.keys().contains(&transfer_vector) {
+                            tv_source_target_pair_map.insert(transfer_vector, (source, target));
+                        }
+                    }
+                }
+
+                let mut tasks = Vec::new();
+
+                // Identify tasks (FFTs) at this level to distribute over available resources
+                // Iterate over each set of convolutions in the halo (26)
+                for i in 0..NHALO {
+                    // Iterate over each unique convolution between sibling set, and halo siblings (64)
+                    for j in 0..NSIBLINGS_SQUARED {
+                        let tv = transfer_vector_index[i][j];
+                        let (source, target) = tv_source_target_pair_map.get(&tv).unwrap();
+
+                        let v_list: HashSet<MortonKey<_>> = target
+                            .parent()
+                            .neighbors()
+                            .iter()
+                            .flat_map(|pn| pn.children())
+                            .filter(|pnc| !target.is_adjacent(pnc))
+                            .collect();
+
+                        if v_list.contains(source) {
+                            tasks.push((i, j, true));
+                        } else {
+                            tasks.push((i, j, false));
+                        }
+                    }
+                }
+
+                // Partition tasks over available resources
+                let n_precomputations = tasks.len() as i32;
+
+                let (load_counts, load_displacement) =
+                    calculate_precomputation_load(n_precomputations, size).unwrap();
+
+                // Compute mandated local portion
+                let local_load_count = load_counts[rank as usize];
+                let local_load_displacement = load_displacement[rank as usize];
+
+                let tasks_r = &tasks[(local_load_displacement as usize)
+                    ..((local_load_displacement + local_load_count) as usize)];
+
+                // Compute locally mandated portion of tasks
+                for &(i, j, contains) in tasks_r {
+                    let tv = transfer_vector_index[i][j];
+                    let (source, target) = tv_source_target_pair_map.get(&tv).unwrap();
+
+                    let source_equivalent_surface = source.surface_grid(
+                        equivalent_surface_order,
+                        self.tree.source_tree().domain(),
+                        alpha,
+                    );
+
+                    let target_check_surface = target.surface_grid(
+                        equivalent_surface_order,
+                        self.tree.source_tree().domain(),
+                        alpha,
+                    );
+
+                    if contains {
+                        // Compute convolution grid around the source box
+                        let conv_point_corner_index = 7;
+                        let corners = find_corners(&source_equivalent_surface[..]);
+                        let conv_point_corner = [
+                            corners[self.dim * conv_point_corner_index],
+                            corners[self.dim * conv_point_corner_index + 1],
+                            corners[self.dim * conv_point_corner_index + 2],
+                        ];
+
+                        let (conv_grid, _) = source.convolution_grid(
+                            equivalent_surface_order,
+                            self.tree.source_tree().domain(),
+                            alpha,
+                            &conv_point_corner,
+                            conv_point_corner_index,
+                        );
+
+                        // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
+                        let kernel_point_index = 0;
+                        let kernel_point = [
+                            target_check_surface[self.dim * kernel_point_index],
+                            target_check_surface[self.dim * kernel_point_index + 1],
+                            target_check_surface[self.dim * kernel_point_index + 2],
+                        ];
+
+                        // Compute Green's fct evaluations
+                        let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
+                            equivalent_surface_order,
+                            &conv_grid,
+                            kernel_point,
+                        ));
+
+                        // Compute FFT of padded kernel
+                        let mut kernel_hat =
+                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+
+                        let plan = Scalar::plan_forward(
+                            kernel.data_mut(),
+                            kernel_hat.data_mut(),
+                            &shape,
+                            None,
+                        )
+                        .unwrap();
+
+                        let _ = Scalar::forward_dft(
+                            kernel.data_mut(),
+                            kernel_hat.data_mut(),
+                            &shape,
+                            &plan,
+                        );
+
+                        kernel_data_vec_r[i].push(kernel_hat);
+                    } else {
+                        // Fill with zeros when interaction doesn't exist
+                        let kernel_hat_zeros =
+                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                        kernel_data_vec_r[i].push(kernel_hat_zeros);
+                    }
+                }
+
+                // Serialise kernel data
+                let mut kernel_data_vec_r_serialised = Vec::new();
+                for vec in kernel_data_vec_r.iter() {
+                    kernel_data_vec_r_serialised.push(serialise_nested_array_3x3(vec))
+                }
+
+                // Communicate kernel data
+                let mut global_kernel_data_vec_serialised = vec![Vec::new(); NHALO];
+                for (i, save_data) in global_kernel_data_vec_serialised
+                    .iter_mut()
+                    .take(NHALO)
+                    .enumerate()
+                {
+                    let mut global_kernel_data_serialised_i = all_gather_v_serialised(
+                        &kernel_data_vec_r_serialised[i],
+                        &self.communicator,
+                    );
+                    save_data.append(&mut global_kernel_data_serialised_i);
+                }
+
+                // Deserialise kernel data
+                let mut global_kernel_data_vec = Vec::new();
+                for _ in 0..NHALO {
+                    global_kernel_data_vec.push(vec![])
+                }
+
+                for (i, kernel_data_serialised) in
+                    global_kernel_data_vec_serialised.iter().enumerate()
+                {
+                    let (mut kernel_data_i, mut rest) =
+                        deserialise_nested_array_3x3::<<Scalar as AsComplex>::ComplexType>(
+                            &kernel_data_serialised,
+                        );
+                    while !rest.is_empty() {
+                        let (mut t1, t2) = deserialise_nested_array_3x3::<
+                            <Scalar as AsComplex>::ComplexType,
+                        >(rest);
+                        kernel_data_i.append(&mut t1);
+                        rest = t2;
+                    }
+                    global_kernel_data_vec[i] = kernel_data_i;
+                }
+
+                // Each element corresponds to all evaluations for each sibling (in order) at that halo position
+                let mut kernel_data = vec![
+                    vec![
+                        <Scalar as DftType>::OutputType::zero();
+                        NSIBLINGS_SQUARED * transform_size
+                    ];
+                    halo_children.len()
+                ];
+
+                // For each halo position
+                for i in 0..halo_children.len() {
+                    // For each unique interaction
+                    for j in 0..NSIBLINGS_SQUARED {
+                        let offset = j * transform_size;
+                        kernel_data[i][offset..offset + transform_size]
+                            .copy_from_slice(global_kernel_data_vec[i][j].data())
+                    }
+                }
+
+                // We want to use this data by frequency in the implementation of FFT M2L
+                // Rearrangement: Grouping by frequency, then halo child, then sibling
+                let mut kernel_data_f = vec![];
+                for _ in &halo_children {
+                    kernel_data_f.push(vec![]);
+                }
+                for i in 0..halo_children.len() {
+                    let current_vector = &kernel_data[i];
+                    for l in 0..transform_size {
+                        // halo child
+                        for k in 0..NSIBLINGS {
+                            // sibling
+                            for j in 0..NSIBLINGS {
+                                let index = j * transform_size * 8 + k * transform_size + l;
+                                kernel_data_f[i].push(current_vector[index]);
+                            }
+                        }
+                    }
+                }
+
+                // TODO: Get rid of this transpose
+                // Transpose results for better cache locality in application
+                let mut kernel_data_ft = Vec::new();
+                for freq in 0..transform_size {
+                    let frequency_offset = NSIBLINGS_SQUARED * freq;
+                    for kernel_f in kernel_data_f.iter().take(NHALO) {
+                        let k_f = &kernel_f
+                            [frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
+                            .to_vec();
+                        let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                        let mut k_ft = rlst_dynamic_array2!(
+                            <Scalar as DftType>::OutputType,
+                            [NSIBLINGS, NSIBLINGS]
+                        );
+                        k_ft.fill_from(k_f_.r());
+                        kernel_data_ft.push(k_ft.data().to_vec());
+                    }
+                }
+
+                metadata_r.push(FftMetadata {
+                    kernel_data,
+                    kernel_data_f: kernel_data_ft,
+                });
+            }
+
+            // Run on remaining levels
+            {
+                let iterator = if self.variable_expansion_order {
+                    (3..=total_depth)
+                        .zip(self.equivalent_surface_order.iter().cloned().skip(3))
+                        .collect_vec()
+                } else {
+                    (3..=total_depth)
+                        .zip(vec![
+                            *self.equivalent_surface_order.last().unwrap();
+                            (total_depth - 2) as usize
+                        ])
+                        .collect_vec()
+                };
+
+                for &(level, equivalent_surface_order) in &iterator {
+                    let shape = <Scalar as Dft>::shape_in(equivalent_surface_order);
+                    let transform_shape = <Scalar as Dft>::shape_out(equivalent_surface_order);
+                    let transform_size = <Scalar as Dft>::size_out(equivalent_surface_order);
+
+                    // Encode point in centre of domain and compute halo of parent, and their resp. children
+                    let key = MortonKey::from_point(&point, domain, level);
+                    let siblings = key.siblings();
+                    let parent = key.parent();
+
+                    let halo = parent.neighbors();
+                    let halo_children = halo.iter().map(|h| h.children()).collect_vec();
+
+                    // The child boxes in the halo of the sibling set
+                    let mut sources = vec![];
+                    // The sibling set
+                    let mut targets = vec![];
+                    // The transfer vectors corresponding to source->target translations
+                    let mut transfer_vectors = vec![];
+                    // Green's function evaluations for each source, target pair interaction
+                    let mut kernel_data_vec_r = vec![];
+
+                    for _ in &halo_children {
+                        sources.push(vec![]);
+                        targets.push(vec![]);
+                        transfer_vectors.push(vec![]);
+                        kernel_data_vec_r.push(vec![]);
+                    }
+
+                    // Each set of 64 M2L operators will correspond to a point in the halo
+                    // Computing transfer of potential from sibling set to halo
+                    for (i, halo_child_set) in halo_children.iter().enumerate() {
+                        let mut tmp_transfer_vectors = vec![];
+                        let mut tmp_targets = vec![];
+                        let mut tmp_sources = vec![];
+
+                        // Consider all halo children for a given sibling at a time
+                        for sibling in siblings.iter() {
+                            for halo_child in halo_child_set.iter() {
+                                tmp_transfer_vectors.push(halo_child.find_transfer_vector(sibling));
+                                tmp_targets.push(sibling);
+                                tmp_sources.push(halo_child);
+                            }
+                        }
+
+                        // From source to target
+                        transfer_vectors[i] = tmp_transfer_vectors;
+                        targets[i] = tmp_targets;
+                        sources[i] = tmp_sources;
+                    }
+
+                    let mut tasks = Vec::new();
+
+                    // Iterate over each set of convolutions in the halo (26)
+                    for i in 0..transfer_vectors.len() {
+                        // Iterate over each unique convolution between sibling set, and halo siblings (64)
+                        for j in 0..transfer_vectors[i].len() {
+                            // Translating from sibling set to boxes in its M2L halo
+                            let target = targets[i][j];
+                            let source = sources[i][j];
+                            let v_list: HashSet<MortonKey<_>> = target
+                                .parent()
+                                .neighbors()
+                                .iter()
+                                .flat_map(|pn| pn.children())
+                                .filter(|pnc| !target.is_adjacent(pnc))
+                                .collect();
+
+                            if v_list.contains(source) {
+                                tasks.push((i, j, true));
+                            } else {
+                                tasks.push((i, j, false));
+                            }
+                        }
+                    }
+
+                    let n_precomputations = tasks.len() as i32;
+
+                    let (load_counts, load_displacement) =
+                        calculate_precomputation_load(n_precomputations, size).unwrap();
+
+                    // Compute mandated local portion
+                    let local_load_count = load_counts[rank as usize];
+                    let local_load_displacement = load_displacement[rank as usize];
+
+                    let tasks_r = &tasks[(local_load_displacement as usize)
+                        ..((local_load_displacement + local_load_count) as usize)];
+
+                    for &(i, j, contains) in tasks_r {
+                        let target = targets[i][j];
+                        let source = sources[i][j];
+
+                        let source_equivalent_surface = source.surface_grid(
+                            equivalent_surface_order,
+                            self.tree.source_tree().domain(),
+                            alpha,
+                        );
+
+                        let target_check_surface = target.surface_grid(
+                            equivalent_surface_order,
+                            self.tree.source_tree().domain(),
+                            alpha,
+                        );
+
+                        if contains {
+                            // Compute convolution grid around the source box
+                            let conv_point_corner_index = 7;
+                            let corners = find_corners(&source_equivalent_surface[..]);
+                            let conv_point_corner = [
+                                corners[self.dim * conv_point_corner_index],
+                                corners[self.dim * conv_point_corner_index + 1],
+                                corners[self.dim * conv_point_corner_index + 2],
+                            ];
+
+                            let (conv_grid, _) = source.convolution_grid(
+                                equivalent_surface_order,
+                                self.tree.source_tree().domain(),
+                                alpha,
+                                &conv_point_corner,
+                                conv_point_corner_index,
+                            );
+
+                            // Calculate Green's fct evaluations with respect to a 'kernel point' on the target box
+                            let kernel_point_index = 0;
+                            let kernel_point = [
+                                target_check_surface[self.dim * kernel_point_index],
+                                target_check_surface[self.dim * kernel_point_index + 1],
+                                target_check_surface[self.dim * kernel_point_index + 2],
+                            ];
+
+                            // Compute Green's fct evaluations
+                            let mut kernel = flip3(&self.evaluate_greens_fct_convolution_grid(
+                                equivalent_surface_order,
+                                &conv_grid,
+                                kernel_point,
+                            ));
+
+                            // Compute FFT of padded kernel
+                            let mut kernel_hat = rlst_dynamic_array3!(
+                                <Scalar as DftType>::OutputType,
+                                transform_shape
+                            );
+
+                            let plan = Scalar::plan_forward(
+                                kernel.data_mut(),
+                                kernel_hat.data_mut(),
+                                &shape,
+                                None,
+                            )
+                            .unwrap();
+
+                            let _ = Scalar::forward_dft(
+                                kernel.data_mut(),
+                                kernel_hat.data_mut(),
+                                &shape,
+                                &plan,
+                            );
+
+                            kernel_data_vec_r[i].push(kernel_hat);
+                        } else {
+                            // Fill with zeros when interaction doesn't exist
+                            let kernel_hat_zeros = rlst_dynamic_array3!(
+                                <Scalar as DftType>::OutputType,
+                                transform_shape
+                            );
+                            kernel_data_vec_r[i].push(kernel_hat_zeros);
+                        }
+                    }
+
+                    // Serialise kernel data at this level
+                    let mut kernel_data_vec_r_serialised = Vec::new();
+                    for vec in kernel_data_vec_r.iter() {
+                        kernel_data_vec_r_serialised.push(serialise_nested_array_3x3(vec))
+                    }
+
+                    // Communicate kernel data at this level
+                    let mut global_kernel_data_vec_serialised = vec![Vec::new(); NHALO];
+                    for (i, save_data) in global_kernel_data_vec_serialised
+                        .iter_mut()
+                        .take(NHALO)
+                        .enumerate()
+                    {
+                        let mut global_kernel_data_serialised_i = all_gather_v_serialised(
+                            &kernel_data_vec_r_serialised[i],
+                            &self.communicator,
+                        );
+                        save_data.append(&mut global_kernel_data_serialised_i);
+                    }
+
+                    // Deserialise kernel data at this level
+                    let mut global_kernel_data_vec = Vec::new();
+                    for _ in 0..NHALO {
+                        global_kernel_data_vec.push(vec![])
+                    }
+
+                    for (i, kernel_data_serialised) in
+                        global_kernel_data_vec_serialised.iter().enumerate()
+                    {
+                        let (mut kernel_data_i, mut rest) =
+                            deserialise_nested_array_3x3::<<Scalar as AsComplex>::ComplexType>(
+                                &kernel_data_serialised,
+                            );
+                        while !rest.is_empty() {
+                            let (mut t1, t2) = deserialise_nested_array_3x3::<
+                                <Scalar as AsComplex>::ComplexType,
+                            >(rest);
+                            kernel_data_i.append(&mut t1);
+                            rest = t2;
+                        }
+                        global_kernel_data_vec[i] = kernel_data_i;
+                    }
+
+                    // Each element corresponds to all evaluations for each sibling (in order) at that halo position
+                    let mut kernel_data = vec![
+                        vec![
+                            <Scalar as DftType>::OutputType::zero();
+                            NSIBLINGS_SQUARED * transform_size
+                        ];
+                        halo_children.len()
+                    ];
+
+                    // For each halo position
+                    for i in 0..halo_children.len() {
+                        // For each unique interaction
+                        for j in 0..NSIBLINGS_SQUARED {
+                            let offset = j * transform_size;
+                            kernel_data[i][offset..offset + transform_size]
+                                .copy_from_slice(global_kernel_data_vec[i][j].data())
+                        }
+                    }
+
+                    // We want to use this data by frequency in the implementation of FFT M2L
+                    // Rearrangement: Grouping by frequency, then halo child, then sibling
+                    let mut kernel_data_f = vec![];
+                    for _ in &halo_children {
+                        kernel_data_f.push(vec![]);
+                    }
+                    for i in 0..halo_children.len() {
+                        let current_vector = &kernel_data[i];
+                        for l in 0..transform_size {
+                            // halo child
+                            for k in 0..NSIBLINGS {
+                                // sibling
+                                for j in 0..NSIBLINGS {
+                                    let index = j * transform_size * 8 + k * transform_size + l;
+                                    kernel_data_f[i].push(current_vector[index]);
+                                }
+                            }
+                        }
+                    }
+
+                    // TODO: Get rid of this transpose
+                    // Transpose results for better cache locality in application
+                    let mut kernel_data_ft = Vec::new();
+                    for freq in 0..transform_size {
+                        let frequency_offset = NSIBLINGS_SQUARED * freq;
+                        for kernel_f in kernel_data_f.iter().take(NHALO) {
+                            let k_f = &kernel_f
+                                [frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
+                                .to_vec();
+                            let k_f_ =
+                                rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                            let mut k_ft = rlst_dynamic_array2!(
+                                <Scalar as DftType>::OutputType,
+                                [NSIBLINGS, NSIBLINGS]
+                            );
+                            k_ft.fill_from(k_f_.r());
+                            kernel_data_ft.push(k_ft.data().to_vec());
+                        }
+                    }
+
+                    metadata_r.push(FftMetadata {
+                        kernel_data,
+                        kernel_data_f: kernel_data_ft,
+                    });
+                }
+            }
+        }
+
+        // Set operator data
+        self.source_to_target.metadata = metadata_r.clone();
+        self.global_fmm.source_to_target.metadata = metadata_r.clone();
+
+        // Compute and attach maps
+        let iterator = if self.variable_expansion_order {
+            self.equivalent_surface_order
+                .iter()
+                .skip(2)
+                .cloned()
+                .collect_vec()
+        } else {
+            self.equivalent_surface_order.clone()
+        };
+
+        let mut tmp1 = Vec::new();
+        let mut tmp2 = Vec::new();
+        for equivalent_surface_order in iterator {
+            let (surf_to_conv_map, conv_to_surf_map) =
+                Self::compute_surf_to_conv_map(equivalent_surface_order);
+            tmp1.push(surf_to_conv_map);
+            tmp2.push(conv_to_surf_map)
+        }
+        self.source_to_target.surf_to_conv_map = tmp1.clone();
+        self.source_to_target.conv_to_surf_map = tmp2.clone();
+
+        // Copy for global FMM
+        self.global_fmm.source_to_target.surf_to_conv_map =
+            self.source_to_target.surf_to_conv_map.clone();
+        self.global_fmm.source_to_target.conv_to_surf_map =
+            self.source_to_target.conv_to_surf_map.clone();
+    }
 }
 
 impl<Scalar> SourceToTargetTranslationMetadata
@@ -129,7 +772,8 @@ where
 {
     fn displacements(&mut self, start_level: Option<u64>) {
         let mut displacements = Vec::new();
-        let start_level = start_level.unwrap_or(2).max(2);
+        let start_level =
+            start_level.unwrap_or_else(|| std::cmp::max(2, self.tree.source_tree().global_depth()));
 
         for level in start_level..=self.tree.source_tree().total_depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
@@ -343,10 +987,10 @@ where
         }
 
         // Communicate metadata
-        let u_r_serialised = serialise_nested_array(&u_r);
+        let u_r_serialised = serialise_nested_array_2x2(&u_r);
         let global_u_serialised = all_gather_v_serialised(&u_r_serialised, &self.communicator);
 
-        let vt_r_serialised = serialise_nested_array(&vt_r);
+        let vt_r_serialised = serialise_nested_array_2x2(&vt_r);
         let global_vt_serialised = all_gather_v_serialised(&vt_r_serialised, &self.communicator);
 
         let cutoff_rank_r_serialised = serialise_vec(&cutoff_ranks_r);
@@ -358,36 +1002,83 @@ where
             all_gather_v_serialised(&level_r_serialised, &self.communicator);
 
         // Reconstruct metadata
-        let (mut global_u, mut rest) = deserialise_nested_array::<Scalar>(&global_u_serialised);
+        let (mut global_u, mut rest) = deserialise_nested_array_2x2::<Scalar>(&global_u_serialised);
         while !rest.is_empty() {
-            let (mut t1, t2) = deserialise_nested_array::<Scalar>(rest);
+            let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
             global_u.append(&mut t1);
             rest = t2;
         }
 
-        let (mut global_vt, mut rest) = deserialise_nested_array::<Scalar>(&global_vt_serialised);
+        let (mut global_vt, mut rest) =
+            deserialise_nested_array_2x2::<Scalar>(&global_vt_serialised);
         while !rest.is_empty() {
-            let (mut t1, t2) = deserialise_nested_array::<Scalar>(rest);
+            let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
             global_vt.append(&mut t1);
             rest = t2;
         }
 
-        let (mut global_cutoff_ranks, mut rest) =
-            deserialise_nested_vec::<i32>(&global_cutoff_rank_serialised);
+        let (global_cutoff_ranks, mut rest) =
+            deserialise_vec::<i32>(&global_cutoff_rank_serialised);
+        let mut global_cutoff_ranks = global_cutoff_ranks.to_vec();
         while !rest.is_empty() {
-            let (mut t1, t2) = deserialise_nested_vec::<i32>(rest);
-            global_cutoff_ranks.append(&mut t1);
+            let (t1, t2) = deserialise_vec::<i32>(rest);
+            global_cutoff_ranks.append(&mut t1.to_vec());
             rest = t2;
         }
 
-        let (mut global_levels, mut rest) = deserialise_nested_vec::<u64>(&global_level_serialised);
+        let (global_levels, mut rest) = deserialise_vec::<u64>(&global_level_serialised);
+        let mut global_levels = global_levels.to_vec();
         while !rest.is_empty() {
-            let (mut t1, t2) = deserialise_nested_vec::<u64>(rest);
-            global_levels.append(&mut t1);
+            let (t1, t2) = deserialise_vec::<u64>(rest);
+            global_levels.append(&mut t1.to_vec());
             rest = t2;
         }
 
-        // test that results are returned in level order
-        println!("levels {:?}", global_levels)
+        // Reconstruct metadata
+        let mut curr_idx = 0;
+        let mut curr_level = global_levels[curr_idx];
+        let mut metadata = vec![BlasMetadataIa::<Scalar>::default(); (total_depth - 1) as usize];
+        let mut cutoff_ranks = vec![Vec::new(); (total_depth - 1) as usize];
+        for (level, cutoff_rank, u, vt) in
+            izip!(global_levels, global_cutoff_ranks, global_u, global_vt)
+        {
+            metadata[(level - 2) as usize].u.push(u);
+            metadata[(level - 2) as usize].vt.push(vt);
+            cutoff_ranks[(level - 2) as usize].push(cutoff_rank as usize);
+
+            // if level == curr_level {
+            //     metadata[curr_idx].u.push(u);
+            //     metadata[curr_idx].vt.push(vt);
+            //     cutoff_ranks[curr_idx].push(cutoff_rank as usize);
+            // } else {
+            //     curr_idx += 1;
+            //     curr_level += 1;
+            //     metadata[curr_idx].u.push(u);
+            //     metadata[curr_idx].vt.push(vt);
+            //     cutoff_ranks[curr_idx].push(cutoff_rank as usize);
+            // }
+        }
+
+        // Update metadata on global/local FMMs
+        self.source_to_target.metadata = metadata.clone();
+        self.global_fmm.source_to_target.metadata = metadata.clone();
+
+        self.source_to_target.cutoff_ranks = cutoff_ranks.clone();
+        self.global_fmm.source_to_target.cutoff_ranks = cutoff_ranks.clone();
+
+        for level in 2..=total_depth {
+            let transfer_vectors = compute_transfer_vectors_at_level(level).unwrap();
+            self.source_to_target
+                .transfer_vectors
+                .push(transfer_vectors.clone());
+            self.global_fmm
+                .source_to_target
+                .transfer_vectors
+                .push(transfer_vectors.clone());
+            self.ghost_fmm_v
+                .source_to_target
+                .transfer_vectors
+                .push(transfer_vectors.clone());
+        }
     }
 }

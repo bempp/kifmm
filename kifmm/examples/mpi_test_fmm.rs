@@ -14,7 +14,7 @@ fn main() {
             tree::{MultiFmmTree, MultiTree},
         },
         tree::{helpers::points_fixture, types::SortKind},
-        FftFieldTranslation, MultiNodeFmmTree,
+        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, MultiNodeFmmTree,
     };
 
     use mpi::{
@@ -22,12 +22,10 @@ fn main() {
         topology::SimpleCommunicator,
         traits::{Communicator, Equivalence, Root},
     };
-    use num::Float;
-    use rlst::{RawAccess, RlstScalar};
+    use num::{Float, One};
+    use rlst::{c32, RawAccess, RlstScalar};
 
-    fn _test_multi_node_helmholtz_fmm_helper<
-        T: RlstScalar<Complex = T> + Float + Default + Equivalence,
-    >(
+    fn test_multi_node_helmholtz_fmm_helper<T: RlstScalar<Complex = T> + Default + Equivalence>(
         name: String,
         mut fmm: Box<
             dyn EvaluateMulti<
@@ -39,7 +37,7 @@ fn main() {
         eval_type: GreenKernelEvalType,
         threshold: T::Real,
     ) where
-        <T as RlstScalar>::Real: Equivalence,
+        <T as RlstScalar>::Real: Equivalence + Float,
     {
         // Run the FMM
         fmm.evaluate().unwrap();
@@ -252,12 +250,13 @@ fn main() {
         let n_points = 10000;
         let charges = vec![1f32; n_points];
         let eval_type = GreenKernelEvalType::Value;
-        let source_to_target = FftFieldTranslation::new(None);
         let sources = points_fixture(n_points, None, None, None);
         let local_depth = 3;
         let global_depth = 3;
         let prune_empty = true;
 
+        // FFT Field translation
+        let source_to_target = FftFieldTranslation::new(None);
         // Test case with a single expansion order applied at all levels
         {
             let expansion_order = [5];
@@ -285,7 +284,7 @@ fn main() {
                 .unwrap();
 
             test_multi_node_laplace_fmm_helper(
-                "fixed_expansion_order".to_string(),
+                "fixed_expansion_order_fft_m2l".to_string(),
                 Box::new(fmm),
                 eval_type,
                 1e-4,
@@ -320,13 +319,137 @@ fn main() {
                 .unwrap();
 
             test_multi_node_laplace_fmm_helper(
-                "variable_expansion_order".to_string(),
+                "variable_expansion_order_fft_m2l".to_string(),
+                Box::new(fmm),
+                eval_type,
+                1e-4,
+            );
+        }
+
+        // BLAS field translation
+        let source_to_target =
+            BlasFieldTranslationSaRcmp::new(None, None, kifmm::FmmSvdMode::Deterministic);
+        // Test case with a single expansion order applied at all levels
+        {
+            let expansion_order = [5];
+
+            let fmm = MultiNodeBuilder::new(false)
+                .tree(
+                    &comm.duplicate(),
+                    sources.data(),
+                    sources.data(),
+                    local_depth,
+                    global_depth,
+                    prune_empty,
+                    SortKind::Samplesort { n_samples: 10 },
+                )
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    source_to_target.clone(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            test_multi_node_laplace_fmm_helper(
+                "fixed_expansion_order_blas_m2l".to_string(),
+                Box::new(fmm),
+                eval_type,
+                1e-4,
+            );
+        }
+
+        // Test case with multiple expansion orders which vary by level
+        {
+            let expansion_order = [4, 4, 5, 4, 5, 4, 5];
+            assert!(expansion_order.len() == (global_depth + local_depth + 1).try_into().unwrap());
+
+            let fmm = MultiNodeBuilder::new(false)
+                .tree(
+                    &comm.duplicate(),
+                    sources.data(),
+                    sources.data(),
+                    local_depth,
+                    global_depth,
+                    prune_empty,
+                    SortKind::Samplesort { n_samples: 10 },
+                )
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    eval_type,
+                    source_to_target.clone(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            test_multi_node_laplace_fmm_helper(
+                "variable_expansion_order_blas_m2l".to_string(),
                 Box::new(fmm),
                 eval_type,
                 1e-4,
             );
         }
     }
+
+    // // Test Helmholtz FMM
+    // {
+    //     let (universe, _threading) =
+    //         mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
+    //     let world = universe.world();
+    //     let comm = world.duplicate();
+
+    //     let n_points = 10000;
+    //     let charges = vec![c32::one(); n_points];
+    //     let eval_type = GreenKernelEvalType::Value;
+    //     let source_to_target =
+    //         BlasFieldTranslationIa::new(None, None, kifmm::FmmSvdMode::Deterministic);
+    //     // let source_to_target = FftFieldTranslation::new(None);
+    //     let sources = points_fixture(n_points, None, None, None);
+    //     let local_depth = 3;
+    //     let global_depth = 3;
+    //     let prune_empty = true;
+
+    //     {
+    //         let expansion_order = [5];
+
+    //         let fmm = MultiNodeBuilder::new(false)
+    //             .tree(
+    //                 &comm.duplicate(),
+    //                 sources.data(),
+    //                 sources.data(),
+    //                 local_depth,
+    //                 global_depth,
+    //                 prune_empty,
+    //                 SortKind::Samplesort { n_samples: 10 },
+    //             )
+    //             .unwrap()
+    //             .parameters(
+    //                 &charges,
+    //                 &expansion_order,
+    //                 Helmholtz3dKernel::new(1.0),
+    //                 eval_type,
+    //                 source_to_target,
+    //             )
+    //             .unwrap()
+    //             .build()
+    //             .unwrap();
+
+    //         test_multi_node_helmholtz_fmm_helper(
+    //             "low_frequency".to_string(),
+    //             Box::new(fmm),
+    //             eval_type,
+    //             1e-4,
+    //         );
+    //     }
+    // }
 }
 
 #[cfg(not(feature = "mpi"))]

@@ -11,8 +11,8 @@ use mpi::{
 };
 use num::Float;
 use rlst::{
-    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
-    VectorContainer,
+    rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RawAccess, RawAccessMut,
+    RlstScalar, Shape, VectorContainer,
 };
 
 use crate::{
@@ -72,7 +72,7 @@ pub(crate) fn deserialise_nested_vec<T: Pod>(input: &[u8]) -> (Vec<Vec<T>>, &[u8
     (buffer, rest)
 }
 
-pub(crate) fn serialise_array<T: RlstScalar + Pod>(
+pub(crate) fn serialise_array_2x2<T: RlstScalar + Pod>(
     input: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
 ) -> Vec<u8> {
     let mut buffer = Vec::new();
@@ -89,8 +89,28 @@ pub(crate) fn serialise_array<T: RlstScalar + Pod>(
     buffer
 }
 
+pub(crate) fn serialise_array_3x3<T: RlstScalar + Pod>(
+    input: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
+) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    let shape = input.shape();
+    let rows = &(shape[0] as u64).to_le_bytes();
+    let cols = &(shape[1] as u64).to_le_bytes();
+    let depth = &(shape[2] as u64).to_le_bytes();
+
+    buffer.extend_from_slice(rows);
+    buffer.extend_from_slice(cols);
+    buffer.extend_from_slice(depth);
+
+    if !input.is_empty() {
+        buffer.extend_from_slice(cast_slice(input.data()));
+    }
+
+    buffer
+}
+
 #[allow(clippy::type_complexity)]
-pub(crate) fn deserialise_array<T: RlstScalar + Pod>(
+pub(crate) fn deserialise_array_2x2<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>, &[u8]) {
     let (rows_bytes, rest) = input.split_at(LEN_BYTES);
@@ -110,7 +130,30 @@ pub(crate) fn deserialise_array<T: RlstScalar + Pod>(
     (array, remaining)
 }
 
-pub(crate) fn serialise_nested_array<T: RlstScalar + Pod>(
+#[allow(clippy::type_complexity)]
+pub(crate) fn deserialise_array_3x3<T: RlstScalar + Pod>(
+    input: &[u8],
+) -> (Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>, &[u8]) {
+    let (rows_bytes, rest) = input.split_at(LEN_BYTES);
+    let rows = u64::from_le_bytes(rows_bytes.try_into().unwrap()) as usize;
+    let (cols_bytes, rest) = rest.split_at(LEN_BYTES);
+    let cols = u64::from_le_bytes(cols_bytes.try_into().unwrap()) as usize;
+    let (depth_bytes, rest) = rest.split_at(LEN_BYTES);
+    let depth = u64::from_le_bytes(depth_bytes.try_into().unwrap()) as usize;
+
+    let expected_size = rows * cols * depth;
+    let total_bytes = std::mem::size_of::<T>() * expected_size;
+
+    let (data_bytes, remaining) = rest.split_at(total_bytes);
+    let data = cast_slice::<u8, T>(data_bytes);
+
+    let mut array = rlst_dynamic_array3!(T, [rows, cols, depth]);
+    array.data_mut().copy_from_slice(data);
+
+    (array, remaining)
+}
+
+pub(crate) fn serialise_nested_array_2x2<T: RlstScalar + Pod>(
     input: &[Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>],
 ) -> Vec<u8> {
     let mut buffer = Vec::new();
@@ -118,14 +161,28 @@ pub(crate) fn serialise_nested_array<T: RlstScalar + Pod>(
 
     if !input.is_empty() {
         for vec in input.iter() {
-            buffer.extend_from_slice(&serialise_array(vec));
+            buffer.extend_from_slice(&serialise_array_2x2(vec));
+        }
+    }
+    buffer
+}
+
+pub(crate) fn serialise_nested_array_3x3<T: RlstScalar + Pod>(
+    input: &[Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>],
+) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(&(input.len() as u64).to_le_bytes());
+
+    if !input.is_empty() {
+        for vec in input.iter() {
+            buffer.extend_from_slice(&serialise_array_3x3(vec));
         }
     }
     buffer
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn deserialise_nested_array<T: RlstScalar + Pod>(
+pub(crate) fn deserialise_nested_array_2x2<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>, &[u8]) {
     let (len_bytes, mut rest) = input.split_at(LEN_BYTES);
@@ -133,7 +190,25 @@ pub(crate) fn deserialise_nested_array<T: RlstScalar + Pod>(
     let mut buffer = Vec::new();
     if len > 0 {
         for _ in 0..len {
-            let (t1, t2) = deserialise_array::<T>(rest);
+            let (t1, t2) = deserialise_array_2x2::<T>(rest);
+            buffer.push(t1);
+            rest = t2;
+        }
+    }
+
+    (buffer, rest)
+}
+
+#[allow(clippy::type_complexity)]
+pub(crate) fn deserialise_nested_array_3x3<T: RlstScalar + Pod>(
+    input: &[u8],
+) -> (Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>, &[u8]) {
+    let (len_bytes, mut rest) = input.split_at(LEN_BYTES);
+    let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
+    let mut buffer = Vec::new();
+    if len > 0 {
+        for _ in 0..len {
+            let (t1, t2) = deserialise_array_3x3::<T>(rest);
             buffer.push(t1);
             rest = t2;
         }
@@ -146,20 +221,20 @@ pub(crate) fn serialise_blas_metadata_sarcmp<T: RlstScalar + Pod>(
     input: &BlasMetadataSaRcmp<T>,
 ) -> Vec<u8> {
     let mut buffer: Vec<u8> = Vec::new();
-    buffer.extend_from_slice(&serialise_array(&input.u));
-    buffer.extend_from_slice(&serialise_array(&input.st));
-    buffer.extend_from_slice(&serialise_nested_array(&input.c_u));
-    buffer.extend_from_slice(&serialise_nested_array(&input.c_vt));
+    buffer.extend_from_slice(&serialise_array_2x2(&input.u));
+    buffer.extend_from_slice(&serialise_array_2x2(&input.st));
+    buffer.extend_from_slice(&serialise_nested_array_2x2(&input.c_u));
+    buffer.extend_from_slice(&serialise_nested_array_2x2(&input.c_vt));
     buffer
 }
 
 pub(crate) fn deserialise_blas_metadata_sarcmp<T: RlstScalar + Pod>(
     input: &[u8],
 ) -> (BlasMetadataSaRcmp<T>, &[u8]) {
-    let (u, rest) = deserialise_array(input);
-    let (st, rest) = deserialise_array(rest);
-    let (c_u, rest) = deserialise_nested_array(rest);
-    let (c_vt, rest) = deserialise_nested_array(rest);
+    let (u, rest) = deserialise_array_2x2(input);
+    let (st, rest) = deserialise_array_2x2(rest);
+    let (c_u, rest) = deserialise_nested_array_2x2(rest);
+    let (c_vt, rest) = deserialise_nested_array_2x2(rest);
     (BlasMetadataSaRcmp { u, st, c_u, c_vt }, rest)
 }
 
@@ -521,8 +596,8 @@ mod test {
             .iter_mut()
             .for_each(|e| *e = between.sample(&mut rng));
 
-        let serialised = serialise_array(&expected);
-        let found = deserialise_array::<T>(&serialised).0;
+        let serialised = serialise_array_2x2(&expected);
+        let found = deserialise_array_2x2::<T>(&serialised).0;
 
         (found.data().iter())
             .zip(expected.data().iter())
@@ -550,8 +625,8 @@ mod test {
             }
         });
 
-        let serialised = serialise_array(&expected);
-        let found = deserialise_array::<Complex<T>>(&serialised).0;
+        let serialised = serialise_array_2x2(&expected);
+        let found = deserialise_array_2x2::<Complex<T>>(&serialised).0;
 
         (found.data().iter())
             .zip(expected.data().iter())
@@ -574,8 +649,8 @@ mod test {
         T: rand::distributions::uniform::SampleUniform,
     {
         let expected = rlst_dynamic_array2!(T, [0, 0]);
-        let serialised = serialise_array(&expected);
-        let found = deserialise_array::<T>(&serialised).0;
+        let serialised = serialise_array_2x2(&expected);
+        let found = deserialise_array_2x2::<T>(&serialised).0;
         assert!(found.shape()[0] == 0);
         assert!(found.shape()[1] == 0);
         assert!(found.data().len() == 0);
@@ -587,8 +662,8 @@ mod test {
         Complex<T>: RlstScalar,
     {
         let expected = rlst_dynamic_array2!(Complex<T>, [0, 0]);
-        let serialised = serialise_array(&expected);
-        let found = deserialise_array::<Complex<T>>(&serialised).0;
+        let serialised = serialise_array_2x2(&expected);
+        let found = deserialise_array_2x2::<Complex<T>>(&serialised).0;
         assert!(found.shape()[0] == 0);
         assert!(found.shape()[1] == 0);
         assert!(found.data().len() == 0);
