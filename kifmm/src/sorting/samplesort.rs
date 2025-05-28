@@ -8,7 +8,7 @@ use mpi::{
     traits::{Communicator, CommunicatorCollectives, Equivalence},
     Count,
 };
-use rand::{thread_rng, Rng};
+use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 
 /// A sample sort implementation, the number of samples must be at most
 /// the size of the local array, and greater than 0.
@@ -45,7 +45,10 @@ where
     if size > 1 {
         // 1. Collect k samples from each process onto all other processes
         let mut received_samples = vec![T::default(); n_samples * (size as usize)];
-        let mut rng = thread_rng();
+
+        // TODO remove seeded range when I merge
+        let mut rng = StdRng::seed_from_u64(42);
+        // let mut rng = thread_rng();
         let sample_idxs: Vec<usize> = (0..n_samples)
             .map(|_| rng.gen_range(0..array.len()))
             .collect();

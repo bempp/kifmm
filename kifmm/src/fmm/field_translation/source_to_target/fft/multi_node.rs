@@ -2,7 +2,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use mpi::{topology::SimpleCommunicator, traits::Equivalence};
+use mpi::{topology::SimpleCommunicator, traits::{CommunicatorCollectives, Equivalence}};
 use num::{Float, One, Zero};
 
 use rayon::prelude::{
@@ -152,6 +152,13 @@ where
                         // Lookup multipole data from source tree
                         let multipoles = self.multipoles(level).unwrap();
 
+                        // if self.rank == 0 && level == 4 {
+                        //     println!("FFT level {:?} sources {:?}", level, sources.len());
+                        //     println!("FFT level {:?} rank {:?} {:?}", level, self.rank, multipoles.len());
+                        //     println!("FFT level {:?} rank {:?} {:?}", level, self.rank, multipoles);
+                        // }
+
+
                         // Buffer to store FFT of multipole data in frequency order
                         let mut signals_hat_f: AlignedVec<<Scalar as AsComplex>::ComplexType> =
                             AlignedVec::new(size_out * (n_sources + n_zeros));
@@ -189,6 +196,7 @@ where
 
                         // Lookup multipole data from source tree
                         let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
+
 
                         // Buffer to store FFT of multipole data in frequency order
                         let n_zeros = 8; // pad amount
@@ -413,6 +421,11 @@ where
                             &plan,
                         );
 
+                        // if self.rank == 0 && level == 4 {
+                        //     println!("FFT level {:?} rank {:?} {:?}", level, self.rank, check_potential.len());
+                        //     println!("FFT level {:?} rank {:?} {:?}", level, self.rank, check_potential.as_slice());
+                        // }
+
                         check_potential
                             .par_chunks_exact(NSIBLINGS * size_in)
                             .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
@@ -455,7 +468,20 @@ where
                                         local.iter_mut().zip(result).for_each(|(l, r)| *l += *r);
                                     });
                             });
+
                     }
+
+
+                    // // TODO remove
+                    // let ptr = self.level_locals[level as usize][0].raw;
+                    // let all_locals = unsafe {
+                    //     std::slice::from_raw_parts_mut(ptr, n_targets * n_coeffs_equivalent_surface)
+                    // };
+                    // if self.rank == 0 && level == 4 {
+                    //     println!("FFT level {:?} rank {:?} {:?}", level, self.rank, all_locals.len());
+                    //     println!("FFT level {:?} rank {:?} {:?}", level, self.rank, all_locals);
+                    // }
+
                 }
 
                 Ok(())

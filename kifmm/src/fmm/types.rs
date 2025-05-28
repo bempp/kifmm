@@ -176,8 +176,9 @@ where
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub(crate) dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
 
+    // TODO add crate level restriction
     /// Data and metadata for field translations
-    pub(crate) source_to_target: FieldTranslation,
+    pub source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
     pub(crate) source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level

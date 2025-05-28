@@ -3,7 +3,7 @@
 use std::sync::Mutex;
 
 use itertools::Itertools;
-use mpi::{topology::SimpleCommunicator, traits::Equivalence};
+use mpi::{topology::SimpleCommunicator, traits::{CommunicatorCollectives, Equivalence}};
 use num::Float;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
@@ -336,13 +336,18 @@ where
 
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
-                        // all_sentinels.push(sentinel);
+
+                        // if self.rank == 0 && level == 4 {
+                        //     println!("BLAS level {:?} sources {:?}", level, sources.len());
+                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, multipoles.len());
+                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, multipoles);
+                        // }
+
                     }
 
                     // Handle ghost sources
                     if let Some(sources) = self.ghost_fmm_v.tree.source_tree.keys(level) {
                         n_translations += 1;
-                        //         let sentinel = -1i32;
 
                         all_displacements.push(
                             &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
@@ -354,38 +359,40 @@ where
                         // Lookup multipole data from source tree
                         let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
 
+
+
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
-                        //         all_sentinels.push(sentinel);
                     }
 
                     // Allocate buffer to store check potentials
-                    let check_potentials =
+                    let all_check_potentials =
                         rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets]);
 
-                    let mut check_potentials_ptrs = Vec::new();
+                    let mut all_check_potentials_ptrs = Vec::new();
 
                     for i in 0..n_targets {
                         let raw = unsafe {
-                            check_potentials
+                            all_check_potentials
                                 .data()
                                 .as_ptr()
                                 .add(i * n_coeffs_check_surface)
                                 as *mut Scalar
                         };
                         let send_ptr = SendPtrMut { raw };
-                        check_potentials_ptrs.push(send_ptr);
+                        all_check_potentials_ptrs.push(send_ptr);
                     }
 
-                    let level_check_potentials =
-                        check_potentials_ptrs.iter().map(Mutex::new).collect_vec();
+                    let level_check_potentials = all_check_potentials_ptrs
+                        .iter()
+                        .map(Mutex::new)
+                        .collect_vec();
 
                     // Compute translations
                     for i in 0..n_translations {
-                        let all_displacements = all_displacements[i];
-                        //         let sentinel = all_sentinels[i];
+                        let all_displacements_i = all_displacements[i];
 
-                        let multipole_idxs = all_displacements
+                        let multipole_idxs = all_displacements_i
                             .iter()
                             .map(|displacement| {
                                 displacement
@@ -399,7 +406,7 @@ where
                             })
                             .collect_vec();
 
-                        let local_idxs = all_displacements
+                        let local_idxs = all_displacements_i
                             .iter()
                             .map(|displacements| {
                                 displacements
@@ -421,7 +428,7 @@ where
                             [n_coeffs_equivalent_surface, n_sources]
                         );
 
-                        // 2. Apply BLAS operation
+                        // 1. Apply BLAS operation
                         {
                             let all_u_sub = &self.source_to_target.metadata[m2l_operator_index].u;
                             let all_vt_sub = &self.source_to_target.metadata[m2l_operator_index].vt;
@@ -487,30 +494,48 @@ where
                                 });
                         }
 
-                        // 2. Compute local expansions from compressed check potentials
-                        {
-                            let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                self.dc2e_inv_1[c2e_operator_index].r(),
-                                empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    self.dc2e_inv_2[c2e_operator_index].r(),
-                                    check_potentials.r(),
-                                ),
-                            );
+                        // if self.rank == 0 && level == 4 {
+                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_check_potentials..data().len());
+                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_check_potentials.data());
+                        // }
 
-                            let ptr = self.level_locals[level as usize][0].raw;
-                            let all_locals = unsafe {
-                                std::slice::from_raw_parts_mut(
-                                    ptr,
-                                    n_targets * n_coeffs_equivalent_surface,
-                                )
-                            };
-
-                            all_locals
-                                .iter_mut()
-                                .zip(locals.data().iter())
-                                .for_each(|(l, r)| *l += *r);
-                        }
                     }
+
+                    // 2. Compute local expansions from compressed check potentials
+                    {
+                        let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            self.dc2e_inv_1[c2e_operator_index].r(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.dc2e_inv_2[c2e_operator_index].r(),
+                                all_check_potentials.r(),
+                            ),
+                        );
+
+                        let ptr = self.level_locals[level as usize][0].raw;
+                        let all_locals = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                ptr,
+                                n_targets * n_coeffs_equivalent_surface,
+                            )
+                        };
+
+                        // println!("HERE rank {:?} {:?}", self.rank(), &all_locals[0..10]);
+                        all_locals
+                            .iter_mut()
+                            .zip(locals.data().iter())
+                            .for_each(|(l, r)| *l += *r);
+                    }
+
+                    // // TODO remove
+                    // let ptr = self.level_locals[level as usize][0].raw;
+                    // let all_locals = unsafe {
+                    //     std::slice::from_raw_parts_mut(ptr, n_targets * n_coeffs_equivalent_surface)
+                    // };
+                    // if self.rank == 0 && level == 4 {
+                    //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_locals.len());
+                    //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_locals);
+                    // }
+
                 }
 
                 Ok(())

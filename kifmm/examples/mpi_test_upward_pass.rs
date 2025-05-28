@@ -5,7 +5,7 @@ fn main() {
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
     use itertools::izip;
-    use kifmm::MultiNodeFmmTree;
+    use kifmm::{BlasFieldTranslationIa, MultiNodeFmmTree};
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
@@ -96,8 +96,6 @@ fn main() {
             T::real(0.0) // or handle division-by-zero error
         };
 
-        // if fmm.rank() == 0 {
-        // }
 
         println!(
             "Local Upward Pass rank {:?} l2 err {:?} \n expected {:?} found {:?}",
@@ -281,12 +279,47 @@ fn main() {
         let n_points = 10000;
         let charges = vec![Complex32::one(); n_points];
         let eval_type = GreenKernelEvalType::Value;
-        let source_to_target = FftFieldTranslation::new(None);
         let sources = points_fixture(n_points, None, None, None);
         let local_depth = 3;
         let global_depth = 3;
         let prune_empty = true;
 
+        let source_to_target = FftFieldTranslation::new(None);
+        // Single expansion order
+        {
+            let expansion_order = [5];
+
+            let fmm = MultiNodeBuilder::new(false)
+                .tree(
+                    &comm.duplicate(),
+                    sources.data(),
+                    sources.data(),
+                    local_depth,
+                    global_depth,
+                    prune_empty,
+                    SortKind::Samplesort { n_samples: 10 },
+                )
+                .unwrap()
+                .parameters(
+                    &charges,
+                    &expansion_order,
+                    Helmholtz3dKernel::new(1.0),
+                    eval_type,
+                    source_to_target.clone(),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+
+            test_multi_node_helmholtz_upward_pass_helper(
+                "fixed_expansion_order".to_string(),
+                Box::new(fmm),
+                eval_type,
+                1e-3,
+            );
+        }
+
+        let source_to_target = BlasFieldTranslationIa::new(None, None, kifmm::FmmSvdMode::Deterministic);
         // Single expansion order
         {
             let expansion_order = [5];

@@ -639,7 +639,7 @@ mod test {
                     T::from(2.0).unwrap(),
                 );
                 let err = RlstScalar::powf(diff, T::from(0.5).unwrap().re());
-                println!("HERE {:?} {:?}", e, f);
+                // println!("HERE {:?} {:?}", e, f);
                 assert!(err <= T::from(1e-6).unwrap().re());
             });
     }
