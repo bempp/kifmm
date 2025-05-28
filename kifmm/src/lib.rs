@@ -85,7 +85,6 @@ pub mod traits;
 pub mod tree;
 
 use bytemuck as _;
-#[cfg(feature = "strict")]
 use serde_yaml as _;
 
 // Public API
