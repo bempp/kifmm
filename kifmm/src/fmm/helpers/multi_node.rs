@@ -583,15 +583,15 @@ mod test {
     use rand::distributions::{Distribution, Uniform};
     use rlst::{dense::tools::RandScalar, DefaultIteratorMut};
 
-    fn test_array_real<T: RlstScalar + PartialOrd + RandScalar>()
+    fn test_array_real<T>()
     where
-        T: rand::distributions::uniform::SampleUniform,
+        T: rand::distributions::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
     {
         let m = 5;
         let n = 4;
         let mut expected = rlst_dynamic_array2!(T, [m, n]);
         let mut rng = rand::thread_rng();
-        let between = Uniform::try_from(T::from(0.).unwrap()..T::from(1.0).unwrap()).unwrap();
+        let between = Uniform::from(T::from(0.).unwrap()..T::from(1.0).unwrap());
         expected
             .iter_mut()
             .for_each(|e| *e = between.sample(&mut rng));
@@ -606,9 +606,12 @@ mod test {
             });
     }
 
-    fn test_array_complex<T: RlstScalar<Real = T> + RandScalar + PartialOrd>()
+    fn test_array_complex<T>()
     where
-        T: rand::distributions::uniform::SampleUniform,
+        T: rand::distributions::uniform::SampleUniform
+            + RlstScalar<Real = T>
+            + RandScalar
+            + PartialOrd,
         Complex<T>: RlstScalar,
     {
         let m = 5;
@@ -616,7 +619,7 @@ mod test {
         let mut expected = rlst_dynamic_array2!(Complex<T>, [m, n]);
 
         let mut rng = rand::thread_rng();
-        let between = Uniform::try_from(T::from(0.).unwrap()..T::from(1.0).unwrap()).unwrap();
+        let between = Uniform::from(T::from(0.).unwrap()..T::from(1.0).unwrap());
 
         expected.iter_mut().for_each(|e| {
             *e = Complex {
@@ -639,26 +642,25 @@ mod test {
                     T::from(2.0).unwrap(),
                 );
                 let err = RlstScalar::powf(diff, T::from(0.5).unwrap().re());
-                // println!("HERE {:?} {:?}", e, f);
                 assert!(err <= T::from(1e-6).unwrap().re());
             });
     }
 
-    fn test_array_real_empty<T: RlstScalar + PartialOrd + RandScalar>()
+    fn test_array_real_empty<T>()
     where
-        T: rand::distributions::uniform::SampleUniform,
+        T: rand::distributions::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
     {
         let expected = rlst_dynamic_array2!(T, [0, 0]);
         let serialised = serialise_array_2x2(&expected);
         let found = deserialise_array_2x2::<T>(&serialised).0;
         assert!(found.shape()[0] == 0);
         assert!(found.shape()[1] == 0);
-        assert!(found.data().len() == 0);
+        assert!(found.data().is_empty());
     }
 
-    fn test_array_complex_empty<T: RlstScalar + PartialOrd + RandScalar>()
+    fn test_array_complex_empty<T>()
     where
-        T: rand::distributions::uniform::SampleUniform,
+        T: rand::distributions::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
         Complex<T>: RlstScalar,
     {
         let expected = rlst_dynamic_array2!(Complex<T>, [0, 0]);
@@ -666,7 +668,7 @@ mod test {
         let found = deserialise_array_2x2::<Complex<T>>(&serialised).0;
         assert!(found.shape()[0] == 0);
         assert!(found.shape()[1] == 0);
-        assert!(found.data().len() == 0);
+        assert!(found.data().is_empty());
     }
 
     fn test_vector_real<T: RlstScalar + PartialOrd>() {
@@ -684,8 +686,8 @@ mod test {
         let n = 3;
         let mut expected = vec![vec![T::from(0.0).unwrap(); 10]; n];
 
-        for i in 0..n {
-            expected[i]
+        for (i, expected_i) in expected.iter_mut().enumerate().take(n) {
+            expected_i
                 .iter_mut()
                 .for_each(|x| *x += T::from(i as f32).unwrap());
         }
@@ -696,8 +698,8 @@ mod test {
         let serialised = serialise_nested_vec(&expected);
         let (found, _rest) = deserialise_nested_vec::<T>(&serialised);
 
-        for i in 0..n {
-            (expected[i].iter())
+        for (i, expected_i) in expected.iter_mut().enumerate().take(n) {
+            (expected_i.iter())
                 .zip(found[i].iter())
                 .for_each(|(&e, &f)| {
                     assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
@@ -710,9 +712,9 @@ mod test {
         // Now test with empty vectors in the middle, at even indices
         let n = 5;
         let mut expected = vec![Vec::new(); n];
-        for i in 0..n {
+        for (i, expected_i) in expected.iter_mut().enumerate().take(n) {
             if n % 2 == 0 {
-                expected[i] = vec![T::one() * (T::from(i).unwrap())];
+                *expected_i = vec![T::one() * (T::from(i).unwrap())];
             }
         }
 
@@ -758,8 +760,8 @@ mod test {
         let n = 3;
         let mut expected = vec![vec![T::from(0.0).unwrap(); 10]; n];
 
-        for i in 0..n {
-            expected[i]
+        for (i, expected_i) in expected.iter_mut().enumerate().take(n) {
+            expected_i
                 .iter_mut()
                 .for_each(|x| *x += T::from(i as f32).unwrap());
         }
@@ -784,9 +786,9 @@ mod test {
         // Now test with empty vectors in the middle, at even indices
         let n = 5;
         let mut expected = vec![Vec::new(); n];
-        for i in 0..n {
+        for (i, expected_i) in expected.iter_mut().enumerate().take(n) {
             if n % 2 == 0 {
-                expected[i] = vec![T::one() * (T::from(i).unwrap())];
+                *expected_i = vec![T::one() * (T::from(i).unwrap())];
             }
         }
 

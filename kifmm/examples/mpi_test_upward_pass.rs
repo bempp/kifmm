@@ -5,7 +5,6 @@ fn main() {
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};
     use itertools::izip;
-    use kifmm::{BlasFieldTranslationIa, MultiNodeFmmTree};
     use kifmm::{
         fmm::types::MultiNodeBuilder,
         traits::{
@@ -15,6 +14,7 @@ fn main() {
         tree::{constants::ALPHA_INNER, helpers::points_fixture, types::SortKind},
         FftFieldTranslation,
     };
+    use kifmm::{BlasFieldTranslationIa, MultiNodeFmmTree};
     use mpi::topology::SimpleCommunicator;
     use mpi::traits::{Communicator, Equivalence};
     use num::{Float, One};
@@ -95,7 +95,6 @@ fn main() {
         } else {
             T::real(0.0) // or handle division-by-zero error
         };
-
 
         println!(
             "Local Upward Pass rank {:?} l2 err {:?} \n expected {:?} found {:?}",
@@ -319,7 +318,8 @@ fn main() {
             );
         }
 
-        let source_to_target = BlasFieldTranslationIa::new(None, None, kifmm::FmmSvdMode::Deterministic);
+        let source_to_target =
+            BlasFieldTranslationIa::new(None, None, kifmm::FmmSvdMode::Deterministic);
         // Single expansion order
         {
             let expansion_order = [5];

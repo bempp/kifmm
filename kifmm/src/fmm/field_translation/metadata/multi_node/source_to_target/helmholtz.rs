@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Mutex, RwLock},
+    sync::RwLock,
 };
 
 use green_kernels::{
@@ -37,7 +37,7 @@ use crate::{
         tree::{Domain, FmmTreeNode, MultiFmmTree, MultiTree},
     },
     tree::{
-        constants::{ALPHA_INNER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED, NTRANSFER_VECTORS_KIFMM},
+        constants::{ALPHA_INNER, NHALO, NSIBLINGS, NSIBLINGS_SQUARED},
         helpers::find_corners,
         types::MortonKey,
     },
@@ -215,11 +215,10 @@ where
 
                 // Identify tasks (FFTs) at this level to distribute over available resources
                 // Iterate over each set of convolutions in the halo (26)
-                for i in 0..NHALO {
+                for (i, tv_i) in transfer_vector_index.iter().enumerate().take(NHALO) {
                     // Iterate over each unique convolution between sibling set, and halo siblings (64)
-                    for j in 0..NSIBLINGS_SQUARED {
-                        let tv = transfer_vector_index[i][j];
-                        let (source, target) = tv_source_target_pair_map.get(&tv).unwrap();
+                    for (j, tv) in tv_i.iter().enumerate().take(NSIBLINGS_SQUARED) {
+                        let (source, target) = tv_source_target_pair_map.get(tv).unwrap();
 
                         let v_list: HashSet<MortonKey<_>> = target
                             .parent()
@@ -359,7 +358,7 @@ where
                 {
                     let (mut kernel_data_i, mut rest) =
                         deserialise_nested_array_3x3::<<Scalar as AsComplex>::ComplexType>(
-                            &kernel_data_serialised,
+                            kernel_data_serialised,
                         );
                     while !rest.is_empty() {
                         let (mut t1, t2) = deserialise_nested_array_3x3::<
@@ -650,7 +649,7 @@ where
                     {
                         let (mut kernel_data_i, mut rest) =
                             deserialise_nested_array_3x3::<<Scalar as AsComplex>::ComplexType>(
-                                &kernel_data_serialised,
+                                kernel_data_serialised,
                             );
                         while !rest.is_empty() {
                             let (mut t1, t2) = deserialise_nested_array_3x3::<
@@ -840,409 +839,241 @@ where
     }
 
     fn source_to_target(&mut self) {
-        // Compute interaction matrices between source and unique targets, defined by unique transfer vectors
+        let size = self.communicator.size();
+        let rank = self.communicator.rank();
         let alpha = Scalar::real(ALPHA_INNER);
-        let depth = self.tree.source_tree().total_depth();
-
-        let mut result = BlasFieldTranslationIa::<Scalar>::default();
+        let total_depth = self.tree.source_tree().total_depth();
 
         let iterator = if self.variable_expansion_order {
-            (2..=depth)
+            (2..=total_depth)
                 .zip(self.equivalent_surface_order.iter().skip(2).cloned())
                 .zip(self.check_surface_order.iter().skip(2).cloned())
                 .collect_vec()
         } else {
-            (2..=depth)
+            (2..=total_depth)
                 .zip(vec![
                     *self.equivalent_surface_order.last().unwrap();
-                    (depth - 1) as usize
+                    (total_depth - 1) as usize
                 ])
                 .zip(vec![
                     *self.check_surface_order.last().unwrap();
-                    (depth - 1) as usize
+                    (total_depth - 1) as usize
                 ])
                 .collect_vec()
         };
 
-        for ((level, equivalent_surface_order), check_surface_order) in iterator {
+        // First need to enumerate tasks
+        let mut tasks = Vec::new();
+        for &((level, equivalent_surface_order), check_surface_order) in iterator.iter() {
             let transfer_vectors =
                 compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
-
-            let mut level_result = BlasMetadataIa::default();
-            let level_u = Mutex::new(Vec::new());
-            let level_vt = Mutex::new(Vec::new());
-            let level_cutoff_rank = Mutex::new(vec![0usize; NTRANSFER_VECTORS_KIFMM]);
-
-            let domain = self.tree.source_tree().domain();
-
-            for _ in 0..NTRANSFER_VECTORS_KIFMM {
-                level_u
-                    .lock()
-                    .unwrap()
-                    .push(rlst_dynamic_array2!(Scalar, [1, 1]));
-                level_vt
-                    .lock()
-                    .unwrap()
-                    .push(rlst_dynamic_array2!(Scalar, [1, 1]));
+            for &t in transfer_vectors.iter() {
+                tasks.push((level, equivalent_surface_order, check_surface_order, t));
             }
-
-            transfer_vectors
-                .into_par_iter()
-                .enumerate()
-                .for_each(|(i, t)| {
-                    let source_equivalent_surface =
-                        t.source
-                            .surface_grid(equivalent_surface_order, domain, alpha);
-                    let n_sources = ncoeffs_kifmm(equivalent_surface_order);
-
-                    let target_check_surface =
-                        t.target.surface_grid(check_surface_order, domain, alpha);
-                    let n_targets = ncoeffs_kifmm(check_surface_order);
-
-                    let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_targets, n_sources]);
-
-                    self.kernel.assemble_st(
-                        GreenKernelEvalType::Value,
-                        &target_check_surface[..],
-                        &source_equivalent_surface[..],
-                        tmp_gram.data_mut(),
-                    );
-
-                    let mu = tmp_gram.shape()[0];
-                    let nvt = tmp_gram.shape()[1];
-                    let k = std::cmp::min(mu, nvt);
-
-                    let mut u = rlst_dynamic_array2!(Scalar, [mu, k]);
-                    let mut sigma = vec![Scalar::zero().re(); k];
-                    let mut vt = rlst_dynamic_array2!(Scalar, [k, nvt]);
-
-                    let target_rank;
-
-                    match &self.source_to_target.svd_mode {
-                        &FmmSvdMode::Random {
-                            n_components,
-                            normaliser,
-                            n_oversamples,
-                            random_state,
-                        } => {
-                            // Estimate targget rank if unspecified by user
-                            if let Some(n_components) = n_components {
-                                target_rank = n_components
-                            } else {
-                                let max_equivalent_surface_ncoeffs =
-                                    self.n_coeffs_equivalent_surface.iter().max().unwrap();
-                                let max_check_surface_ncoeffs =
-                                    self.n_coeffs_check_surface.iter().max().unwrap();
-                                target_rank =
-                                    *max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs);
-                            }
-
-                            (sigma, u, vt) = Scalar::rsvd_fixed_rank(
-                                &tmp_gram,
-                                target_rank,
-                                n_oversamples,
-                                normaliser,
-                                random_state,
-                            )
-                            .unwrap();
-                        }
-
-                        FmmSvdMode::Deterministic => {
-                            tmp_gram
-                                .into_svd_alloc(
-                                    u.r_mut(),
-                                    vt.r_mut(),
-                                    &mut sigma[..],
-                                    SvdMode::Reduced,
-                                )
-                                .unwrap();
-                        }
-                    }
-
-                    let mut sigma_mat = rlst_dynamic_array2!(Scalar, [k, k]);
-
-                    for (j, s) in sigma.iter().enumerate().take(k) {
-                        unsafe {
-                            *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
-                        }
-                    }
-
-                    let vt =
-                        empty_array::<Scalar, 2>().simple_mult_into_resize(sigma_mat.r(), vt.r());
-
-                    let cutoff_rank =
-                        find_cutoff_rank(&sigma, self.source_to_target.threshold, n_sources);
-
-                    let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
-                    let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
-
-                    u_compressed.fill_from(u.into_subview([0, 0], [mu, cutoff_rank]));
-                    vt_compressed.fill_from(vt.into_subview([0, 0], [cutoff_rank, nvt]));
-                    level_u.lock().unwrap()[i] = u_compressed;
-                    level_vt.lock().unwrap()[i] = vt_compressed;
-                    level_cutoff_rank.lock().unwrap()[i] = cutoff_rank;
-                });
-
-            let level_u = std::mem::take(&mut *level_u.lock().unwrap());
-            let level_vt = std::mem::take(&mut *level_vt.lock().unwrap());
-            let level_cutoff_rank = std::mem::take(&mut *level_cutoff_rank.lock().unwrap());
-            level_result.u = level_u;
-            level_result.vt = level_vt;
-
-            let transfer_vectors =
-                compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
-            result.cutoff_ranks.push(level_cutoff_rank);
-            result.metadata.push(level_result);
-            result.transfer_vectors.push(transfer_vectors);
         }
 
-        // if self.rank == 0 {
-        //     println!("FOO {:?}", result.metadata.last().unwrap().u[0].data());
-        // }
+        // Now distribute tasks more granularly, as doing independent compressions for each transfer vctor at each level
+        let n_precomputations = tasks.len() as i32;
 
-        self.source_to_target = result.clone();
-        self.global_fmm.source_to_target = result.clone();
-        self.ghost_fmm_v.source_to_target.transfer_vectors = result.transfer_vectors.clone();
+        let (load_counts, load_displacement) =
+            calculate_precomputation_load(n_precomputations, size).unwrap();
 
-        // let size = self.communicator.size();
-        // let rank = self.communicator.rank();
-        // let alpha = Scalar::real(ALPHA_INNER);
-        // let total_depth = self.tree.source_tree().total_depth();
+        // Compute mandated local portion
+        let local_load_count = load_counts[rank as usize];
+        let local_load_displacement = load_displacement[rank as usize];
 
-        // let iterator = if self.variable_expansion_order {
-        //     (2..=total_depth)
-        //         .zip(self.equivalent_surface_order.iter().skip(2).cloned())
-        //         .zip(self.check_surface_order.iter().skip(2).cloned())
-        //         .collect_vec()
-        // } else {
-        //     (2..=total_depth)
-        //         .zip(vec![
-        //             *self.equivalent_surface_order.last().unwrap();
-        //             (total_depth - 1) as usize
-        //         ])
-        //         .zip(vec![
-        //             *self.check_surface_order.last().unwrap();
-        //             (total_depth - 1) as usize
-        //         ])
-        //         .collect_vec()
-        // };
+        let tasks_r = &tasks[(local_load_displacement as usize)
+            ..((local_load_displacement + local_load_count) as usize)];
 
-        // // First need to enumerate tasks
-        // let mut tasks = Vec::new();
-        // for &((level, equivalent_surface_order), check_surface_order) in iterator.iter() {
-        //     let transfer_vectors =
-        //         compute_transfer_vectors_at_level::<Scalar::Real>(level).unwrap();
-        //     for &t in transfer_vectors.iter() {
-        //         tasks.push((level, equivalent_surface_order, check_surface_order, t));
-        //     }
-        // }
+        let domain = self.tree.source_tree().domain();
 
-        // // Now distribute tasks more granularly, as doing independent compressions for each transfer vctor at each level
-        // let n_precomputations = tasks.len() as i32;
+        let mut u_r = Vec::new();
+        let mut vt_r = Vec::new();
+        let mut cutoff_ranks_r = Vec::new();
+        let mut level_r = Vec::new();
 
-        // let (load_counts, load_displacement) =
-        //     calculate_precomputation_load(n_precomputations, size).unwrap();
+        for &(level, equivalent_surface_order, check_surface_order, transfer_vector) in
+            tasks_r.iter()
+        {
+            let source_equivalent_surface =
+                transfer_vector
+                    .source
+                    .surface_grid(equivalent_surface_order, domain, alpha);
+            let n_sources = ncoeffs_kifmm(equivalent_surface_order);
 
-        // // Compute mandated local portion
-        // let local_load_count = load_counts[rank as usize];
-        // let local_load_displacement = load_displacement[rank as usize];
+            let target_check_surface =
+                transfer_vector
+                    .target
+                    .surface_grid(check_surface_order, domain, alpha);
+            let n_targets = ncoeffs_kifmm(check_surface_order);
 
-        // let tasks_r = &tasks[(local_load_displacement as usize)
-        //     ..((local_load_displacement + local_load_count) as usize)];
+            let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_targets, n_sources]);
 
-        // let domain = self.tree.source_tree().domain();
+            self.kernel.assemble_st(
+                GreenKernelEvalType::Value,
+                &target_check_surface[..],
+                &source_equivalent_surface[..],
+                tmp_gram.data_mut(),
+            );
 
-        // let mut u_r = Vec::new();
-        // let mut vt_r = Vec::new();
-        // let mut cutoff_ranks_r = Vec::new();
-        // let mut level_r = Vec::new();
+            let mu = tmp_gram.shape()[0];
+            let nvt = tmp_gram.shape()[1];
+            let k = std::cmp::min(mu, nvt);
 
-        // for &(level, equivalent_surface_order, check_surface_order, transfer_vector) in
-        //     tasks_r.iter()
-        // {
-        //     let source_equivalent_surface =
-        //         transfer_vector
-        //             .source
-        //             .surface_grid(equivalent_surface_order, domain, alpha);
-        //     let n_sources = ncoeffs_kifmm(equivalent_surface_order);
+            let mut u = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut sigma = vec![Scalar::zero().re(); k];
+            let mut vt = rlst_dynamic_array2!(Scalar, [k, nvt]);
 
-        //     let target_check_surface =
-        //         transfer_vector
-        //             .target
-        //             .surface_grid(check_surface_order, domain, alpha);
-        //     let n_targets = ncoeffs_kifmm(check_surface_order);
+            let target_rank;
 
-        //     let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_targets, n_sources]);
+            match &self.source_to_target.svd_mode {
+                &FmmSvdMode::Random {
+                    n_components,
+                    normaliser,
+                    n_oversamples,
+                    random_state,
+                } => {
+                    // Estimate target rank if unspecified by user
+                    if let Some(n_components) = n_components {
+                        target_rank = n_components
+                    } else {
+                        let max_equivalent_surface_ncoeffs =
+                            self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                        let max_check_surface_ncoeffs =
+                            self.n_coeffs_check_surface.iter().max().unwrap();
+                        target_rank =
+                            *max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs);
+                    }
 
-        //     self.kernel.assemble_st(
-        //         GreenKernelEvalType::Value,
-        //         &target_check_surface[..],
-        //         &source_equivalent_surface[..],
-        //         tmp_gram.data_mut(),
-        //     );
+                    (sigma, u, vt) = Scalar::rsvd_fixed_rank(
+                        &tmp_gram,
+                        target_rank,
+                        n_oversamples,
+                        normaliser,
+                        random_state,
+                    )
+                    .unwrap();
+                }
 
-        //     let mu = tmp_gram.shape()[0];
-        //     let nvt = tmp_gram.shape()[1];
-        //     let k = std::cmp::min(mu, nvt);
+                FmmSvdMode::Deterministic => {
+                    tmp_gram
+                        .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut sigma[..], SvdMode::Reduced)
+                        .unwrap();
+                }
+            }
 
-        //     let mut u = rlst_dynamic_array2!(Scalar, [mu, k]);
-        //     let mut sigma = vec![Scalar::zero().re(); k];
-        //     let mut vt = rlst_dynamic_array2!(Scalar, [k, nvt]);
+            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [k, k]);
 
-        //     let target_rank;
+            for (j, s) in sigma.iter().enumerate().take(k) {
+                unsafe {
+                    *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                }
+            }
 
-        //     match &self.source_to_target.svd_mode {
-        //         &FmmSvdMode::Random {
-        //             n_components,
-        //             normaliser,
-        //             n_oversamples,
-        //             random_state,
-        //         } => {
-        //             // Estimate target rank if unspecified by user
-        //             if let Some(n_components) = n_components {
-        //                 target_rank = n_components
-        //             } else {
-        //                 let max_equivalent_surface_ncoeffs =
-        //                     self.n_coeffs_equivalent_surface.iter().max().unwrap();
-        //                 let max_check_surface_ncoeffs =
-        //                     self.n_coeffs_check_surface.iter().max().unwrap();
-        //                 target_rank =
-        //                     *max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs);
-        //             }
+            let vt = empty_array::<Scalar, 2>().simple_mult_into_resize(sigma_mat.r(), vt.r());
 
-        //             (sigma, u, vt) = Scalar::rsvd_fixed_rank(
-        //                 &tmp_gram,
-        //                 target_rank,
-        //                 n_oversamples,
-        //                 normaliser,
-        //                 random_state,
-        //             )
-        //             .unwrap();
-        //         }
+            let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, n_sources);
 
-        //         FmmSvdMode::Deterministic => {
-        //             tmp_gram
-        //                 .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut sigma[..], SvdMode::Reduced)
-        //                 .unwrap();
-        //         }
-        //     }
+            let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
+            let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
 
-        //     let mut sigma_mat = rlst_dynamic_array2!(Scalar, [k, k]);
+            u_compressed.fill_from(u.into_subview([0, 0], [mu, cutoff_rank]));
+            vt_compressed.fill_from(vt.into_subview([0, 0], [cutoff_rank, nvt]));
+            u_r.push(u_compressed);
+            vt_r.push(vt_compressed);
+            cutoff_ranks_r.push(cutoff_rank as i32);
+            level_r.push(level);
+        }
 
-        //     for (j, s) in sigma.iter().enumerate().take(k) {
-        //         unsafe {
-        //             *sigma_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
-        //         }
-        //     }
+        // Communicate metadata
+        let u_r_serialised = serialise_nested_array_2x2(&u_r);
+        let global_u_serialised = all_gather_v_serialised(&u_r_serialised, &self.communicator);
 
-        //     let vt = empty_array::<Scalar, 2>().simple_mult_into_resize(sigma_mat.r(), vt.r());
+        let vt_r_serialised = serialise_nested_array_2x2(&vt_r);
+        let global_vt_serialised = all_gather_v_serialised(&vt_r_serialised, &self.communicator);
 
-        //     let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, n_sources);
+        let cutoff_rank_r_serialised = serialise_vec(&cutoff_ranks_r);
+        let global_cutoff_rank_serialised =
+            all_gather_v_serialised(&cutoff_rank_r_serialised, &self.communicator);
 
-        //     let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
-        //     let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+        let level_r_serialised = serialise_vec(&level_r);
+        let global_level_serialised =
+            all_gather_v_serialised(&level_r_serialised, &self.communicator);
 
-        //     u_compressed.fill_from(u.into_subview([0, 0], [mu, cutoff_rank]));
-        //     vt_compressed.fill_from(vt.into_subview([0, 0], [cutoff_rank, nvt]));
-        //     u_r.push(u_compressed);
-        //     vt_r.push(vt_compressed);
-        //     cutoff_ranks_r.push(cutoff_rank as i32);
-        //     level_r.push(level);
-        // }
+        // Reconstruct metadata
+        let (mut global_u, mut rest) = deserialise_nested_array_2x2::<Scalar>(&global_u_serialised);
+        while !rest.is_empty() {
+            let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
+            global_u.append(&mut t1);
+            rest = t2;
+        }
 
-        // // Communicate metadata
-        // let u_r_serialised = serialise_nested_array_2x2(&u_r);
-        // let global_u_serialised = all_gather_v_serialised(&u_r_serialised, &self.communicator);
+        let (mut global_vt, mut rest) =
+            deserialise_nested_array_2x2::<Scalar>(&global_vt_serialised);
+        while !rest.is_empty() {
+            let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
+            global_vt.append(&mut t1);
+            rest = t2;
+        }
 
-        // let vt_r_serialised = serialise_nested_array_2x2(&vt_r);
-        // let global_vt_serialised = all_gather_v_serialised(&vt_r_serialised, &self.communicator);
+        let (global_cutoff_ranks, mut rest) =
+            deserialise_vec::<i32>(&global_cutoff_rank_serialised);
+        let mut global_cutoff_ranks = global_cutoff_ranks.to_vec();
+        while !rest.is_empty() {
+            let (t1, t2) = deserialise_vec::<i32>(rest);
+            global_cutoff_ranks.append(&mut t1.to_vec());
+            rest = t2;
+        }
 
-        // let cutoff_rank_r_serialised = serialise_vec(&cutoff_ranks_r);
-        // let global_cutoff_rank_serialised =
-        //     all_gather_v_serialised(&cutoff_rank_r_serialised, &self.communicator);
+        let (global_levels, mut rest) = deserialise_vec::<u64>(&global_level_serialised);
+        let mut global_levels = global_levels.to_vec();
+        while !rest.is_empty() {
+            let (t1, t2) = deserialise_vec::<u64>(rest);
+            global_levels.append(&mut t1.to_vec());
+            rest = t2;
+        }
 
-        // let level_r_serialised = serialise_vec(&level_r);
-        // let global_level_serialised =
-        //     all_gather_v_serialised(&level_r_serialised, &self.communicator);
+        // Reconstruct metadata
+        let mut curr_idx = 0;
+        let mut curr_level = global_levels[curr_idx];
+        let mut metadata = vec![BlasMetadataIa::<Scalar>::default(); (total_depth - 1) as usize];
+        let mut cutoff_ranks = vec![Vec::new(); (total_depth - 1) as usize];
+        for (level, cutoff_rank, u, vt) in
+            izip!(global_levels, global_cutoff_ranks, global_u, global_vt)
+        {
+            if level == curr_level {
+                metadata[curr_idx].u.push(u);
+                metadata[curr_idx].vt.push(vt);
+                cutoff_ranks[curr_idx].push(cutoff_rank as usize);
+            } else {
+                curr_idx += 1;
+                curr_level += 1;
+                metadata[curr_idx].u.push(u);
+                metadata[curr_idx].vt.push(vt);
+                cutoff_ranks[curr_idx].push(cutoff_rank as usize);
+            }
+        }
 
-        // // Reconstruct metadata
-        // let (mut global_u, mut rest) = deserialise_nested_array_2x2::<Scalar>(&global_u_serialised);
-        // while !rest.is_empty() {
-        //     let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
-        //     global_u.append(&mut t1);
-        //     rest = t2;
-        // }
+        // Update metadata on global/local FMMs
+        self.source_to_target.metadata = metadata.clone();
+        self.global_fmm.source_to_target.metadata = metadata.clone();
 
-        // let (mut global_vt, mut rest) =
-        //     deserialise_nested_array_2x2::<Scalar>(&global_vt_serialised);
-        // while !rest.is_empty() {
-        //     let (mut t1, t2) = deserialise_nested_array_2x2::<Scalar>(rest);
-        //     global_vt.append(&mut t1);
-        //     rest = t2;
-        // }
+        self.source_to_target.cutoff_ranks = cutoff_ranks.clone();
+        self.global_fmm.source_to_target.cutoff_ranks = cutoff_ranks.clone();
 
-        // let (global_cutoff_ranks, mut rest) =
-        //     deserialise_vec::<i32>(&global_cutoff_rank_serialised);
-        // let mut global_cutoff_ranks = global_cutoff_ranks.to_vec();
-        // while !rest.is_empty() {
-        //     let (t1, t2) = deserialise_vec::<i32>(rest);
-        //     global_cutoff_ranks.append(&mut t1.to_vec());
-        //     rest = t2;
-        // }
-
-        // let (global_levels, mut rest) = deserialise_vec::<u64>(&global_level_serialised);
-        // let mut global_levels = global_levels.to_vec();
-        // while !rest.is_empty() {
-        //     let (t1, t2) = deserialise_vec::<u64>(rest);
-        //     global_levels.append(&mut t1.to_vec());
-        //     rest = t2;
-        // }
-
-        // // Reconstruct metadata
-        // let mut curr_idx = 0;
-        // let mut curr_level = global_levels[curr_idx];
-        // let mut metadata = vec![BlasMetadataIa::<Scalar>::default(); (total_depth - 1) as usize];
-        // let mut cutoff_ranks = vec![Vec::new(); (total_depth - 1) as usize];
-        // for (level, cutoff_rank, u, vt) in
-        //     izip!(global_levels, global_cutoff_ranks, global_u, global_vt)
-        // {
-        //     metadata[(level - 2) as usize].u.push(u);
-        //     metadata[(level - 2) as usize].vt.push(vt);
-        //     cutoff_ranks[(level - 2) as usize].push(cutoff_rank as usize);
-
-        //     // if level == curr_level {
-        //     //     metadata[curr_idx].u.push(u);
-        //     //     metadata[curr_idx].vt.push(vt);
-        //     //     cutoff_ranks[curr_idx].push(cutoff_rank as usize);
-        //     // } else {
-        //     //     curr_idx += 1;
-        //     //     curr_level += 1;
-        //     //     metadata[curr_idx].u.push(u);
-        //     //     metadata[curr_idx].vt.push(vt);
-        //     //     cutoff_ranks[curr_idx].push(cutoff_rank as usize);
-        //     // }
-        // }
-
-        // // Update metadata on global/local FMMs
-        // self.source_to_target.metadata = metadata.clone();
-        // self.global_fmm.source_to_target.metadata = metadata.clone();
-
-        // self.source_to_target.cutoff_ranks = cutoff_ranks.clone();
-        // self.global_fmm.source_to_target.cutoff_ranks = cutoff_ranks.clone();
-
-        // for level in 2..=total_depth {
-        //     let transfer_vectors = compute_transfer_vectors_at_level(level).unwrap();
-        //     self.source_to_target
-        //         .transfer_vectors
-        //         .push(transfer_vectors.clone());
-        //     self.global_fmm
-        //         .source_to_target
-        //         .transfer_vectors
-        //         .push(transfer_vectors.clone());
-        //     self.ghost_fmm_v
-        //         .source_to_target
-        //         .transfer_vectors
-        //         .push(transfer_vectors.clone());
-        // }
+        for level in 2..=total_depth {
+            let transfer_vectors = compute_transfer_vectors_at_level(level).unwrap();
+            self.source_to_target
+                .transfer_vectors
+                .push(transfer_vectors.clone());
+            self.global_fmm
+                .source_to_target
+                .transfer_vectors
+                .push(transfer_vectors.clone());
+            self.ghost_fmm_v
+                .source_to_target
+                .transfer_vectors
+                .push(transfer_vectors.clone());
+        }
     }
 }

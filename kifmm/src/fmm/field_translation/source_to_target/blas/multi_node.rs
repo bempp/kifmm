@@ -3,7 +3,7 @@
 use std::sync::Mutex;
 
 use itertools::Itertools;
-use mpi::{topology::SimpleCommunicator, traits::{CommunicatorCollectives, Equivalence}};
+use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
@@ -43,7 +43,6 @@ where
     KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>:
         DataAccess<Scalar = Scalar, Kernel = Kernel>,
 {
-    // TODO: remove sentinel collection as they are all the exact same now.
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
@@ -336,13 +335,6 @@ where
 
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
-
-                        // if self.rank == 0 && level == 4 {
-                        //     println!("BLAS level {:?} sources {:?}", level, sources.len());
-                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, multipoles.len());
-                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, multipoles);
-                        // }
-
                     }
 
                     // Handle ghost sources
@@ -358,8 +350,6 @@ where
 
                         // Lookup multipole data from source tree
                         let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
-
-
 
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
@@ -493,12 +483,6 @@ where
                                     }
                                 });
                         }
-
-                        // if self.rank == 0 && level == 4 {
-                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_check_potentials..data().len());
-                        //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_check_potentials.data());
-                        // }
-
                     }
 
                     // 2. Compute local expansions from compressed check potentials
@@ -519,23 +503,11 @@ where
                             )
                         };
 
-                        // println!("HERE rank {:?} {:?}", self.rank(), &all_locals[0..10]);
                         all_locals
                             .iter_mut()
                             .zip(locals.data().iter())
                             .for_each(|(l, r)| *l += *r);
                     }
-
-                    // // TODO remove
-                    // let ptr = self.level_locals[level as usize][0].raw;
-                    // let all_locals = unsafe {
-                    //     std::slice::from_raw_parts_mut(ptr, n_targets * n_coeffs_equivalent_surface)
-                    // };
-                    // if self.rank == 0 && level == 4 {
-                    //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_locals.len());
-                    //     println!("BLAS level {:?} rank {:?} {:?}", level, self.rank, all_locals);
-                    // }
-
                 }
 
                 Ok(())

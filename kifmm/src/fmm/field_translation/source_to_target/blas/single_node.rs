@@ -51,7 +51,6 @@ where
         let displacement_index = self.displacement_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
 
-        // let sentinel = sources.len();
         let sentinel = -1i32;
 
         // Compute the displacements

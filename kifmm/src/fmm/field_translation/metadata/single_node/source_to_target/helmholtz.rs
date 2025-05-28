@@ -51,8 +51,6 @@ where
         let mut displacements = Vec::new();
         let start_level = start_level.unwrap_or(2).max(2);
 
-        println!("HERE {:?}", self.tree.target_tree().all_keys_set().unwrap().len());
-
         for level in start_level..=self.tree.source_tree().depth() {
             let sources = self.tree.source_tree().keys(level).unwrap();
             let n_sources = sources.len();
@@ -280,8 +278,6 @@ where
             result.metadata.push(level_result);
             result.transfer_vectors.push(transfer_vectors);
         }
-
-        // println!("BAR {:?}", result.metadata.last().unwrap().u[0].data());
 
         self.source_to_target = result;
     }
@@ -1202,10 +1198,6 @@ where
         } else {
             self.equivalent_surface_order.clone()
         };
-
-        // TODO potential bug wrt to above iterator and c2e operator index
-        // only storing a single map in that case, need to check trait impl
-        // of metadataaccess
 
         // Set required maps
         let mut tmp1 = Vec::new();

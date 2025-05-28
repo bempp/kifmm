@@ -189,7 +189,7 @@ mod test {
                 i, direct_i, potential_i
             );
 
-            let l2_error = l2_error(&direct_i, &potential_i);
+            let l2_error = l2_error(&direct_i, potential_i);
             assert!(l2_error <= threshold);
         }
     }
@@ -335,7 +335,7 @@ mod test {
             &mut direct,
         );
 
-        let l2_error = l2_error(&direct, &potential);
+        let l2_error = l2_error(&direct, potential);
         assert!(l2_error <= threshold);
     }
 
