@@ -91,6 +91,8 @@ The `hpc` directory contains example slurm scripts, and build hints for successf
 
 We welcome contributions to this project, and are grateful for your interest. Contributions can take many forms, including bug reports, feature requests code contributions and documentation.
 
+We've taken care to document the publicly facing API for users, however crate level documentation for developers is ongoing, especially as we integrate new functionality into the library. We would welcome additions by developers to crate level docs, and this would be a great first contribution.
+
 ### Reporting Bugs and Issues
 
 Errors in the library should be added to the [GitHub issue tracker](https://github.com/bempp/kifmm/issues).
