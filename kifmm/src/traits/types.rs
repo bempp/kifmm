@@ -19,7 +19,7 @@ pub enum FmmError {
 
 /// Enumeration of operator types for timing
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum FmmOperatorType {
     /// particle to multipole
     P2M,
@@ -42,7 +42,7 @@ pub enum FmmOperatorType {
 
 /// Enumeration of communication types for timing
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum CommunicationType {
     /// Tree construction
     SourceTree,
@@ -77,7 +77,7 @@ pub enum CommunicationType {
 
 /// Enumeration of metadata construction for timing
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum MetadataType {
     /// Field translation data
     SourceToTargetData,
@@ -96,69 +96,41 @@ pub enum MetadataType {
 
     /// Ghost FMM U
     GhostFmmU,
-}
 
-/// C compatible struct for operator timing
+    /// Pointer and Buffer Creation
+    MetadataCreation,
+
+    /// Displacement Map Creation
+    DisplacementMap,
+}
+/// C compatible struct for timing
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
-pub struct FmmOperatorTime {
-    /// Operator name
-    pub operator: FmmOperatorType,
-
+pub struct OperatorTime {
     /// Time in milliseconds
     pub time: u64,
 }
 
-/// C compatible struct for communication timing
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct CommunicationTime {
-    /// Operator name
-    pub operator: CommunicationType,
+impl OperatorTime {
+    /// Constructor
+    pub fn new(time: u64) -> Self {
+        Self { time }
+    }
 
-    /// Time in milliseconds
-    pub time: u64,
-}
-
-/// C compatible struct for metadata timing
-#[derive(Debug, Clone, Copy)]
-#[repr(C)]
-pub struct MetadataTime {
-    /// Operator name
-    pub operator: MetadataType,
-
-    /// Time in milliseconds
-    pub time: u64,
-}
-
-macro_rules! impl_time_constructors {
-    ($struct_name:ident, $operator_type:ty) => {
-        impl $struct_name {
-            /// Constructor
-            pub fn new(operator: $operator_type, time: u64) -> Self {
-                Self { operator, time }
-            }
-
-            /// Constructor from instant
-            pub fn from_instant(operator: $operator_type, time: Instant) -> Self {
-                let time = time.elapsed().as_millis() as u64;
-                Self { operator, time }
-            }
-
-            /// Constructor from duration
-            pub fn from_duration(operator: $operator_type, time: Duration) -> Self {
-                Self {
-                    operator,
-                    time: time.as_millis() as u64,
-                }
-            }
+    /// Construct from instant
+    pub fn from_instant(time: Instant) -> Self {
+        Self {
+            time: time.elapsed().as_millis() as u64,
         }
-    };
-}
+    }
 
-impl_time_constructors!(FmmOperatorTime, FmmOperatorType);
-impl_time_constructors!(CommunicationTime, CommunicationType);
-impl_time_constructors!(MetadataTime, MetadataType);
+    /// Constructor from duration
+    pub fn from_duration(time: Duration) -> Self {
+        Self {
+            time: time.as_millis() as u64,
+        }
+    }
+}
 
 impl fmt::Display for FmmOperatorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -199,33 +171,9 @@ impl fmt::Display for MetadataType {
             MetadataType::GlobalFmm => write!(f, "Global FMM"),
             MetadataType::GhostFmmV => write!(f, "Ghost FMM V"),
             MetadataType::GhostFmmU => write!(f, "Ghost FMM U"),
+            MetadataType::DisplacementMap => write!(f, "Displacement Map"),
+            MetadataType::MetadataCreation => write!(f, "Pointer and Buffer Creation"),
         }
-    }
-}
-
-impl std::fmt::Display for FmmOperatorTime {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Operator: {}, Time: {} ms", self.operator, self.time)
-    }
-}
-
-impl std::fmt::Display for CommunicationTime {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Communication Type: {}, Time: {} ms",
-            self.operator, self.time
-        )
-    }
-}
-
-impl std::fmt::Display for MetadataTime {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "Metadata Type: {}, Time: {} ms",
-            self.operator, self.time
-        )
     }
 }
 

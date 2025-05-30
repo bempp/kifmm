@@ -11,7 +11,7 @@ use crate::{
         },
         fmm::{DataAccess, HomogenousKernel},
         tree::{SingleFmmTree, SingleTree},
-        types::{FmmError, FmmOperatorTime, FmmOperatorType},
+        types::{FmmError, FmmOperatorType, OperatorTime},
     },
     Evaluate, KiFmm,
 };
@@ -32,7 +32,7 @@ where
 
         if let Some(d) = duration {
             self.operator_times
-                .push(FmmOperatorTime::from_duration(FmmOperatorType::P2M, d));
+                .insert(FmmOperatorType::P2M, OperatorTime::from_duration(d));
         }
 
         Ok(())
@@ -46,10 +46,8 @@ where
             result?;
 
             if let Some(d) = duration {
-                self.operator_times.push(FmmOperatorTime::from_duration(
-                    FmmOperatorType::M2M(level),
-                    d,
-                ));
+                self.operator_times
+                    .insert(FmmOperatorType::M2M(level), OperatorTime::from_duration(d));
             }
         }
 
@@ -65,10 +63,8 @@ where
                 result?;
 
                 if let Some(d) = duration {
-                    self.operator_times.push(FmmOperatorTime::from_duration(
-                        FmmOperatorType::L2L(level),
-                        d,
-                    ));
+                    self.operator_times
+                        .insert(FmmOperatorType::L2L(level), OperatorTime::from_duration(d));
                 }
             }
 
@@ -77,10 +73,8 @@ where
             result?;
 
             if let Some(d) = duration {
-                self.operator_times.push(FmmOperatorTime::from_duration(
-                    FmmOperatorType::M2L(level),
-                    d,
-                ));
+                self.operator_times
+                    .insert(FmmOperatorType::M2L(level), OperatorTime::from_duration(d));
             }
         }
         Ok(())
@@ -94,7 +88,7 @@ where
 
         if let Some(d) = duration {
             self.operator_times
-                .push(FmmOperatorTime::from_duration(FmmOperatorType::P2P, d));
+                .insert(FmmOperatorType::P2P, OperatorTime::from_duration(d));
         }
 
         let (result, duration) = optionally_time(self.timed, || self.l2p());
@@ -103,7 +97,7 @@ where
 
         if let Some(d) = duration {
             self.operator_times
-                .push(FmmOperatorTime::from_duration(FmmOperatorType::L2P, d));
+                .insert(FmmOperatorType::L2P, OperatorTime::from_duration(d));
         }
 
         Ok(())

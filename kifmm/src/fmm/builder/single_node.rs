@@ -1,4 +1,6 @@
 //! Builder for constructing FMMs on a single node
+use std::collections::HashMap;
+
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
 use rlst::{MatrixSvd, RlstScalar};
@@ -16,7 +18,7 @@ use crate::{
         fmm::{HomogenousKernel, Metadata},
         general::single_node::Epsilon,
         tree::{SingleFmmTree, SingleTree},
-        types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
+        types::{CommunicationType, MetadataType, OperatorTime},
     },
     tree::{types::Domain, SingleNodeTree},
 };
@@ -87,25 +89,25 @@ where
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            let mut communication_times = Vec::new();
+            let mut communication_times = HashMap::new();
 
             // Source and target trees calculated over the same domain
             let (source_domain, d) = optionally_time(timed, || Domain::from_local_points(sources));
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_domain, d) = optionally_time(timed, || Domain::from_local_points(targets));
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Calculate union of domains for source and target points, needed to define operators
@@ -144,10 +146,10 @@ where
             let source_tree = source_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_tree, d) = optionally_time(timed, || {
@@ -157,10 +159,10 @@ where
             let target_tree = target_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let fmm_tree = SingleNodeFmmTree {
@@ -317,7 +319,7 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                    .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
             let (_, duration) = optionally_time(timed, || result.target());
@@ -325,20 +327,39 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                    .insert(MetadataType::TargetData, OperatorTime::from_duration(d));
             }
 
             let (_, duration) = optionally_time(timed, || result.source_to_target());
 
             if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
+                result.metadata_times.insert(
                     MetadataType::SourceToTargetData,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            SourceToTargetTranslationMetadata::displacements(&mut result, None);
+            let (_, duration) = optionally_time(timed, || {
+                result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap())
+            });
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::MetadataCreation,
+                    OperatorTime::from_duration(d),
+                );
+            }
+
+            let (_, duration) = optionally_time(timed, || {
+                SourceToTargetTranslationMetadata::displacements(&mut result, None)
+            });
+
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::DisplacementMap,
+                    OperatorTime::from_duration(d),
+                );
+            }
+
             Ok(result)
         }
     }

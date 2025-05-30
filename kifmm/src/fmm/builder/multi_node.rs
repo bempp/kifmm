@@ -26,7 +26,7 @@ use crate::{
         },
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::{multi_node::GlobalFmmMetadata, single_node::Epsilon},
-        types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
+        types::{CommunicationType, MetadataType, OperatorTime},
     },
     tree::{
         types::{Domain, SortKind},
@@ -107,7 +107,7 @@ where
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            let mut communication_times = Vec::new();
+            let mut communication_times = HashMap::new();
 
             // Source and target trees calculated over the same domain
             let (source_domain, d) = optionally_time(timed, || {
@@ -115,10 +115,10 @@ where
             });
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_domain, d) = optionally_time(timed, || {
@@ -126,10 +126,10 @@ where
             });
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Calculate union of domains for source and target points, needed to define operators
@@ -150,10 +150,10 @@ where
             let source_tree = source_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_tree, d) = optionally_time(timed, || {
@@ -171,10 +171,10 @@ where
             let target_tree = target_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Create an FMM tree, and set its layout of source boxes
@@ -191,10 +191,8 @@ where
             let (_, duration) = optionally_time(timed, || fmm_tree.set_source_layout());
 
             if let Some(d) = duration {
-                communication_times.push(CommunicationTime::from_duration(
-                    CommunicationType::Layout,
-                    d,
-                ))
+                communication_times
+                    .insert(CommunicationType::Layout, OperatorTime::from_duration(d));
             }
 
             // Set requires queries at this point for U and V list data, can be intensive for deep trees
@@ -376,7 +374,7 @@ where
                 ghost_fmm_u,
                 kernel_eval_size: 1,
                 source: Vec::default(),
-                operator_times: Vec::default(),
+                operator_times: HashMap::default(),
                 charges: Vec::default(),
                 charge_index_pointer_sources: Vec::default(),
                 charge_index_pointer_targets: Vec::default(),
@@ -399,7 +397,7 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                metadata_times: Vec::default(),
+                metadata_times: HashMap::default(),
                 ghost_requested_queries_v: Vec::default(),
                 ghost_requested_queries_key_to_index_v: HashMap::default(),
                 ghost_requested_queries_counts_v: Vec::default(),
@@ -426,7 +424,7 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                    .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
             let (_, duration) = optionally_time(timed, || result.target());
@@ -434,17 +432,17 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                    .insert(MetadataType::TargetData, OperatorTime::from_duration(d));
             }
 
             // TODO
             let (_, duration) = optionally_time(timed, || result.source_to_target());
 
             if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
+                result.metadata_times.insert(
                     MetadataType::SourceToTargetData,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Metadata for global FMM and FMM
@@ -469,8 +467,23 @@ where
                 result.global_fmm.displacements(None);
             }
 
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            result.displacements(None);
+            let (_, duration) = optionally_time(timed, || {
+                result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap())
+            });
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::MetadataCreation,
+                    OperatorTime::from_duration(d),
+                );
+            }
+
+            let (_, duration) = optionally_time(timed, || result.displacements(None));
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::DisplacementMap,
+                    OperatorTime::from_duration(d),
+                );
+            }
 
             Ok(result)
         }

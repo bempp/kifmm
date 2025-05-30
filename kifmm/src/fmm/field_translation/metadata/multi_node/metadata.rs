@@ -32,7 +32,7 @@ use crate::{
         fmm::{DataAccess, DataAccessMulti, HomogenousKernel, Metadata, MetadataAccess},
         general::{multi_node::GhostExchange, single_node::AsComplex},
         tree::{MultiFmmTree, MultiTree},
-        types::{CommunicationTime, CommunicationType},
+        types::{CommunicationType, OperatorTime},
     },
     tree::constants::{ALPHA_INNER, ALPHA_OUTER},
     FftFieldTranslation, KiFmm, SingleNodeFmmTree,
@@ -455,11 +455,10 @@ where
         });
 
         if let Some(d) = duration {
-            self.communication_times
-                .push(CommunicationTime::from_duration(
-                    CommunicationType::GhostExchangeU,
-                    d,
-                ))
+            self.communication_times.insert(
+                CommunicationType::GhostExchangeU,
+                OperatorTime::from_duration(d),
+            );
         }
 
         let (_, duration) = optionally_time(self.timed, || {
@@ -467,11 +466,10 @@ where
         });
 
         if let Some(d) = duration {
-            self.communication_times
-                .push(CommunicationTime::from_duration(
-                    CommunicationType::GhostExchangeV,
-                    d,
-                ))
+            self.communication_times.insert(
+                CommunicationType::GhostExchangeV,
+                OperatorTime::from_duration(d),
+            );
         }
     }
 }

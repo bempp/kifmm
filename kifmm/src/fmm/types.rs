@@ -15,7 +15,7 @@ use crate::{
         field::FieldTranslation as FieldTranslationTrait,
         fmm::HomogenousKernel,
         general::single_node::AsComplex,
-        types::{CommunicationTime, FmmOperatorTime, MetadataTime},
+        types::{CommunicationType, FmmOperatorType, MetadataType, OperatorTime},
     },
     tree::{Domain, MortonKey, SingleNodeTree},
 };
@@ -95,13 +95,13 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Operator runtimes
-    pub operator_times: Vec<FmmOperatorTime>,
+    pub operator_times: HashMap<FmmOperatorType, OperatorTime>,
 
     /// Communication runtimes
-    pub communication_times: Vec<CommunicationTime>,
+    pub communication_times: HashMap<CommunicationType, OperatorTime>,
 
     /// Metadata runtimes
-    pub metadata_times: Vec<MetadataTime>,
+    pub metadata_times: HashMap<MetadataType, OperatorTime>,
 
     /// Whether the object and its methods are timed
     pub(crate) timed: bool,
@@ -231,9 +231,9 @@ where
     fn default() -> Self {
         KiFmm {
             timed: false,
-            operator_times: Vec::default(),
-            communication_times: Vec::default(),
-            metadata_times: Vec::default(),
+            operator_times: HashMap::default(),
+            communication_times: HashMap::default(),
+            metadata_times: HashMap::default(),
             isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: FieldTranslation::default(),
@@ -417,7 +417,7 @@ where
     pub fmm_eval_type: Option<FmmEvalType>,
 
     /// Communication runtimes
-    pub communication_times: Option<Vec<CommunicationTime>>,
+    pub communication_times: Option<HashMap<CommunicationType, OperatorTime>>,
 }
 
 /// Builder for distributed FMM, example usage can be found in the examples directory.
@@ -476,7 +476,7 @@ where
     pub charges: Option<Vec<Scalar>>,
 
     /// Communication runtimes
-    pub communication_times: Option<Vec<CommunicationTime>>,
+    pub communication_times: Option<HashMap<CommunicationType, OperatorTime>>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -992,13 +992,13 @@ where
     FieldTranslation: FieldTranslationTrait,
 {
     /// Operator runtimes
-    pub operator_times: Vec<FmmOperatorTime>,
+    pub operator_times: HashMap<FmmOperatorType, OperatorTime>,
 
     /// Communication runtimes
-    pub communication_times: Vec<CommunicationTime>,
+    pub communication_times: HashMap<CommunicationType, OperatorTime>,
 
     /// Metadata runtimes
-    pub metadata_times: Vec<MetadataTime>,
+    pub metadata_times: HashMap<MetadataType, OperatorTime>,
 
     /// Set to true if expansion order varies by level
     pub(crate) variable_expansion_order: bool,
