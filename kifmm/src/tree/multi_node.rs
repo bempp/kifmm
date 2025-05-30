@@ -304,8 +304,6 @@ where
 
     /// Constructor for trees on multiple nodes with MPI
     ///
-    /// TODO: This is an experimental API, and at the moment one cannot pass global indices to coordinate data
-    /// which will be handled in a future release
     ///
     /// # Arguments
     /// * `communicator` - The MPI communicator corresponding to the world group.

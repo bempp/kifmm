@@ -1,3 +1,4 @@
+use green_kernels::traits::Kernel as KernelTrait;
 use rlst::RlstScalar;
 
 use crate::{
@@ -9,8 +10,6 @@ use crate::{
     },
     KiFmm, SingleNodeFmmTree,
 };
-
-use green_kernels::traits::Kernel as KernelTrait;
 
 impl<Scalar, Kernel, FieldTranslation> DataAccess for KiFmm<Scalar, Kernel, FieldTranslation>
 where
@@ -105,19 +104,22 @@ where
     }
 
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
-        let multipole_ptr = &self.level_multipoles[level as usize][0][0];
-        let n_sources = self.tree.source_tree.n_keys(level).unwrap();
-        unsafe {
-            match self.fmm_eval_type {
-                FmmEvalType::Vector => Some(std::slice::from_raw_parts(
-                    multipole_ptr.raw,
-                    self.n_coeffs_equivalent_surface(level) * n_sources,
-                )),
-                FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
-                    multipole_ptr.raw,
-                    self.n_coeffs_equivalent_surface(level) * n_sources * n_matvecs,
-                )),
+        if let Some(n_sources) = self.tree().source_tree().n_keys(level) {
+            let multipole_ptr = &self.level_multipoles[level as usize][0][0];
+            unsafe {
+                match self.fmm_eval_type {
+                    FmmEvalType::Vector => Some(std::slice::from_raw_parts(
+                        multipole_ptr.raw,
+                        self.n_coeffs_equivalent_surface(level) * n_sources,
+                    )),
+                    FmmEvalType::Matrix(n_matvecs) => Some(std::slice::from_raw_parts(
+                        multipole_ptr.raw,
+                        self.n_coeffs_equivalent_surface(level) * n_sources * n_matvecs,
+                    )),
+                }
             }
+        } else {
+            None
         }
     }
 

@@ -13,7 +13,7 @@ use rlst::{
 use crate::{
     fmm::{
         constants::{M2M_MAX_BLOCK_SIZE, P2M_MAX_BLOCK_SIZE},
-        helpers::single_node::chunk_size,
+        helpers::single_node::{chunk_size, homogenous_kernel_scale},
         types::{FmmEvalType, KiFmm},
     },
     traits::{
@@ -46,7 +46,7 @@ where
         let check_surface_size = n_coeffs_check_surface * self.dim;
 
         let coordinates = self.tree.source_tree.all_coordinates().unwrap();
-        let ncoordinates = coordinates.len() / self.dim;
+        let n_coordinates = coordinates.len() / self.dim;
         let depth = self.tree.source_tree().depth();
         let operator_index = self.c2e_operator_index(depth);
 
@@ -86,17 +86,21 @@ where
                         },
                     );
 
-                // Use check potentials to compute the multipole expansion
+                let depth = self.tree.source_tree().depth();
                 let chunk_size = chunk_size(n_leaves, P2M_MAX_BLOCK_SIZE);
+
+                let scale = if self.kernel.is_homogenous() {
+                    homogenous_kernel_scale(depth)
+                } else {
+                    Scalar::one()
+                };
+
+                // Use check potentials to compute the multipole expansion
                 check_potentials
                     .data()
                     .par_chunks_exact(n_coeffs_check_surface * chunk_size)
                     .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
-                    .zip(
-                        self.leaf_scales_sources
-                            .par_chunks_exact(n_coeffs_check_surface * chunk_size),
-                    )
-                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                    .for_each(|(check_potential, multipole_ptrs)| {
                         let check_potential = rlst_array_from_slice2!(
                             check_potential,
                             [n_coeffs_check_surface, chunk_size]
@@ -106,7 +110,7 @@ where
                             let mut scaled_check_potential =
                                 rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, chunk_size]);
                             scaled_check_potential.fill_from(check_potential);
-                            scaled_check_potential.scale_inplace(scale[0]);
+                            scaled_check_potential.scale_inplace(scale);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].r(),
@@ -169,7 +173,7 @@ where
 
                             if n_sources > 0 {
                                 for i in 0..n_matvecs {
-                                    let charge_vec_displacement = i * ncoordinates;
+                                    let charge_vec_displacement = i * n_coordinates;
                                     let charges_i = &self.charges[charge_vec_displacement
                                         + charge_index_pointer.0
                                         ..charge_vec_displacement + charge_index_pointer.1];
@@ -190,16 +194,19 @@ where
                         },
                     );
 
+                let depth = self.tree.source_tree().depth();
+                let scale = if self.kernel.is_homogenous() {
+                    homogenous_kernel_scale(depth)
+                } else {
+                    Scalar::one()
+                };
+
                 // Compute multipole expansions
                 check_potentials
                     .data()
                     .par_chunks_exact(n_coeffs_check_surface * n_matvecs)
                     .zip(self.leaf_multipoles.par_iter())
-                    .zip(
-                        self.leaf_scales_sources
-                            .par_chunks_exact(n_coeffs_check_surface),
-                    )
-                    .for_each(|((check_potential, multipole_ptrs), scale)| {
+                    .for_each(|(check_potential, multipole_ptrs)| {
                         let check_potential = rlst_array_from_slice2!(
                             check_potential,
                             [n_coeffs_check_surface, n_matvecs]
@@ -210,7 +217,7 @@ where
                                 rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_matvecs]);
 
                             scaled_check_potential.fill_from(check_potential);
-                            scaled_check_potential.scale_inplace(scale[0]);
+                            scaled_check_potential.scale_inplace(scale);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].r(),
@@ -261,7 +268,7 @@ where
 
         let operator_index = self.m2m_operator_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
-        let ncoeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
+        let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
         let parent_targets: HashSet<_> =
             child_sources.iter().map(|source| source.parent()).collect();
@@ -269,7 +276,7 @@ where
         let mut parent_targets = parent_targets.into_iter().collect_vec();
 
         parent_targets.sort();
-        let nparents = parent_targets.len();
+        let n_parents = parent_targets.len();
         let child_multipoles = self.multipoles(level).unwrap();
 
         match self.fmm_eval_type {
@@ -285,13 +292,13 @@ where
                     parent_multipoles.push(parent_multipole);
                 }
 
-                let max_chunk_size = if nparents > M2M_MAX_BLOCK_SIZE {
+                let max_chunk_size = if n_parents > M2M_MAX_BLOCK_SIZE {
                     M2M_MAX_BLOCK_SIZE
                 } else {
-                    nparents
+                    n_parents
                 };
 
-                let chunk_size = chunk_size(nparents, max_chunk_size);
+                let chunk_size = chunk_size(n_parents, max_chunk_size);
 
                 child_multipoles
                     .par_chunks_exact(NSIBLINGS * n_coeffs_equivalent_surface * chunk_size)
@@ -318,7 +325,7 @@ where
                                 let parent_multipole = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         parent_multipole_pointer.raw,
-                                        ncoeffs_equivalent_surface_parent,
+                                        n_coeffs_equivalent_surface_parent,
                                     )
                                 };
 
@@ -326,8 +333,8 @@ where
                                     .iter_mut()
                                     .zip(
                                         &parent_multipoles_chunk.data()[chunk_idx
-                                            * ncoeffs_equivalent_surface_parent
-                                            ..(chunk_idx + 1) * ncoeffs_equivalent_surface_parent],
+                                            * n_coeffs_equivalent_surface_parent
+                                            ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent],
                                     )
                                     .for_each(|(p, t)| *p += *t);
                             }
@@ -338,7 +345,7 @@ where
             }
 
             FmmEvalType::Matrix(n_matvecs) => {
-                let mut parent_multipoles = vec![Vec::new(); nparents];
+                let mut parent_multipoles = vec![Vec::new(); n_parents];
 
                 for (parent_idx, parent) in parent_targets.iter().enumerate() {
                     for charge_vec_idx in 0..n_matvecs {
@@ -378,12 +385,12 @@ where
                                 let parent_multipole_j = unsafe {
                                     std::slice::from_raw_parts_mut(
                                         raw,
-                                        ncoeffs_equivalent_surface_parent,
+                                        n_coeffs_equivalent_surface_parent,
                                     )
                                 };
                                 let result_ij = &result_i.data()[j
-                                    * ncoeffs_equivalent_surface_parent
-                                    ..(j + 1) * ncoeffs_equivalent_surface_parent];
+                                    * n_coeffs_equivalent_surface_parent
+                                    ..(j + 1) * n_coeffs_equivalent_surface_parent];
                                 parent_multipole_j
                                     .iter_mut()
                                     .zip(result_ij.iter())

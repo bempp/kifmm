@@ -332,7 +332,6 @@ where
                                     .collect_vec();
 
                                 let charges = u_list_indices
-                                    // .clone()
                                     .iter()
                                     .map(|&&idx| {
                                         let index_pointer = &self.charge_index_pointer_sources[idx];
@@ -402,7 +401,6 @@ where
 
                                 let charge_vec_displacement = i * n_all_source_coordinates;
                                 let charges = u_list_indices
-                                    // .clone()
                                     .iter()
                                     .map(|&&idx| {
                                         let index_pointer = &self.charge_index_pointer_sources[idx];

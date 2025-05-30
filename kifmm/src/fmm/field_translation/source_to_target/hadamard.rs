@@ -1,6 +1,7 @@
 //! Implementations of 8x8 operation during Hadamard product in FFT based M2L operations.
-use crate::{fmm::types::Isa, traits::general::single_node::Hadamard8x8};
 use rlst::{c32, c64, RlstScalar};
+
+use crate::{fmm::types::Isa, traits::general::single_node::Hadamard8x8};
 
 /// The 8x8 Hadamard operation, always inlined.
 ///

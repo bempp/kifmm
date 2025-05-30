@@ -14,3 +14,6 @@ pub const DEFAULT_NCRIT: u64 = 150;
 
 /// Default maximum block size to use to process multiple child clusters during FFT M2L
 pub const DEFAULT_M2L_FFT_BLOCK_SIZE: usize = 128;
+
+/// Number of bytes used to encode vector lengths in serialisation
+pub const LEN_BYTES: usize = 8;

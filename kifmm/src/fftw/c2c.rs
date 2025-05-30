@@ -4,8 +4,10 @@ use kifmm_fftw_sys as ffi;
 use rayon::prelude::*;
 use rlst::{c32, c64, RlstScalar};
 
-use super::types::{FftError, ShapeInfo, Sign};
-use crate::traits::fftw::{ComplexToComplexFft3D, Dft};
+use crate::{
+    fftw::types::{FftError, ShapeInfo, Sign},
+    traits::fftw::{ComplexToComplexFft3D, Dft},
+};
 
 /// Validate the dimensions of the (batch) input and output sequences in complex-to-complex DFTs
 ///

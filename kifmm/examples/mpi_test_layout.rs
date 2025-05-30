@@ -36,7 +36,7 @@ fn main() {
         let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
         // Fmm Parameters
-        let expansion_order = 4;
+        let expansion_order = [4];
         let kernel = Laplace3dKernel::<f32>::new();
         let source_to_target = FftFieldTranslation::<f32>::new(None);
 
@@ -63,7 +63,7 @@ fn main() {
             .unwrap()
             .parameters(
                 &charges,
-                expansion_order,
+                &expansion_order,
                 kernel,
                 green_kernels::types::GreenKernelEvalType::Value,
                 source_to_target,
