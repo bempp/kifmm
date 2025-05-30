@@ -93,6 +93,10 @@ uv venv --python=3.10 && source .venv/bin/activate && uv pip install maturin pip
 
 2. Use the Maturin CLI to install the Python bindings into this virtual environment, which additionally will install all required dependencies.
 
+```bash
+maturin develop --release
+```
+
 Note that Maturin must be run from the `kifmm` crate root, not the workspace root, and that setuptools must be set to a version compatible with Mayavi.
 
 ```bash
