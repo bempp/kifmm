@@ -6,29 +6,21 @@ Indeed, the full API is more extensive, including features that enable for varia
 
 
 ```rust
-use rand::{thread_rng, Rng};
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
-use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder, FmmSvdMode};
-use kifmm::traits::tree::{FmmTree, Tree};
-use kifmm::traits::fmm::Fmm;
-
+use kifmm::{BlasFieldTranslationSaRcmp, SingleNodeBuilder, FmmSvdMode, DataAccess, Evaluate,};
+use kifmm::traits::tree::{SingleTree, SingleFmmTree};
+use kifmm::tree::helpers::points_fixture;
+use rlst::{RawAccess};
 
 fn main() {
     // Generate some random source/target/charge data
-    let dim = 3;
     let n_sources = 1000000;
     let n_targets = 2000000;
 
     // The number of vectors of source densities, FMM is configured from data
-    let n = 1;
-    let mut rng = thread_rng();
-    let mut sources = vec![0f32; n_sources * dim * n];
-    let mut targets = vec![0f32; n_targets * dim * n];
-    let mut charges = vec![0f32; n_sources * n];
-
-    sources.iter_mut().for_each(|s| *s = rng.gen());
-    targets.iter_mut().for_each(|t| *t = rng.gen());
-    charges.iter_mut().for_each(|c| *c = rng.gen());
+    let sources =  points_fixture(n_sources, None, None, None);
+    let targets = points_fixture(n_targets, None, None, None);
+    let charges = vec![1f32; n_sources];
 
     // Set tree parameters
     // Library refines tree till fewer than 'n_crit' points per leaf box
@@ -51,7 +43,7 @@ fn main() {
     let svd_mode = FmmSvdMode::Deterministic; // Choose SVD compression mode, random or deterministic
 
     let mut fmm = SingleNodeBuilder::new(timed)
-        .tree(&sources, &targets, n_crit, depth, prune_empty) // Create tree
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty) // Create tree
         .unwrap()
         .parameters(
             &charges,
@@ -68,7 +60,7 @@ fn main() {
         .unwrap();
 
     // Run FMM
-    fmm.evaluate();
+    let _  = fmm.evaluate();
 
     // Lookup potentials by leaf from target leaf boxes
     let leaf_idx = 0;
