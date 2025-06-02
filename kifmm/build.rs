@@ -5,13 +5,10 @@ use std::path::{Path, PathBuf};
 fn main() {
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    // Determine the workspace root directory by finding the nearest ancestor directory containing a Cargo.toml
-    let workspace_root = find_workspace_root(&crate_dir).expect("Unable to find workspace root");
-
     // Determine the target directory within the workspace root
     let target_dir = env::var("CARGO_TARGET_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| workspace_root.join("target"));
+        .unwrap_or_else(|_| Path::new(&crate_dir).join("target"));
 
     // Ensure the target directory exists
     fs::create_dir_all(target_dir).expect("Unable to create target directory");
@@ -31,15 +28,4 @@ fn main() {
 
     // Write the bindings to the header file
     bindings.write_to_file(header_path);
-}
-
-// Helper function to find the workspace root directory
-fn find_workspace_root(current_dir: &str) -> Option<PathBuf> {
-    let mut dir = PathBuf::from(current_dir);
-    while dir.pop() {
-        if dir.join("Cargo.toml").exists() {
-            return Some(dir);
-        }
-    }
-    None
 }
