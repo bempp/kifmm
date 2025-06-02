@@ -4,6 +4,11 @@
 #include <stdlib.h>
 
 /**
+ * Number of bytes used to encode vector lengths in serialisation
+ */
+#define LEN_BYTES 8
+
+/**
  * Enumeration of communication types for timing
  */
 typedef enum CommunicationType {
@@ -95,6 +100,14 @@ typedef enum MetadataType {
    * Ghost FMM U
    */
   MetadataType_GhostFmmU,
+  /**
+   * Pointer and Buffer Creation
+   */
+  MetadataType_MetadataCreation,
+  /**
+   * Displacement Map Creation
+   */
+  MetadataType_DisplacementMap,
 } MetadataType;
 
 /**
@@ -129,40 +142,32 @@ typedef struct FmmEvaluator {
 } FmmEvaluator;
 
 /**
- * C compatible struct for communication timing
+ * C compatible struct for timing
  */
-typedef struct CommunicationTime {
-  /**
-   * Operator name
-   */
-  enum CommunicationType operator_;
+typedef struct OperatorTime {
   /**
    * Time in milliseconds
    */
   uint64_t time;
-} CommunicationTime;
+} OperatorTime;
+
+typedef struct CommunicationEntry {
+  enum CommunicationType comm_type;
+  struct OperatorTime time;
+} CommunicationEntry;
 
 typedef struct CommunicationTimes {
-  struct CommunicationTime *times;
+  struct CommunicationEntry *times;
   uintptr_t length;
 } CommunicationTimes;
 
-/**
- * C compatible struct for metadata timing
- */
-typedef struct MetadataTime {
-  /**
-   * Operator name
-   */
-  enum MetadataType operator_;
-  /**
-   * Time in milliseconds
-   */
-  uint64_t time;
-} MetadataTime;
+typedef struct MetadataEntry {
+  enum MetadataType metadata_type;
+  struct OperatorTime time;
+} MetadataEntry;
 
 typedef struct MetadataTimes {
-  struct MetadataTime *times;
+  struct MetadataEntry *times;
   uintptr_t length;
 } MetadataTimes;
 
@@ -211,22 +216,13 @@ typedef struct FmmOperatorType {
   };
 } FmmOperatorType;
 
-/**
- * C compatible struct for operator timing
- */
-typedef struct FmmOperatorTime {
-  /**
-   * Operator name
-   */
-  struct FmmOperatorType operator_;
-  /**
-   * Time in milliseconds
-   */
-  uint64_t time;
-} FmmOperatorTime;
+typedef struct FmmOperatorEntry {
+  struct FmmOperatorType op_type;
+  struct OperatorTime time;
+} FmmOperatorEntry;
 
 typedef struct FmmOperatorTimes {
-  struct FmmOperatorTime *times;
+  struct FmmOperatorEntry *times;
   uintptr_t length;
 } FmmOperatorTimes;
 
