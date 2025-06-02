@@ -7,84 +7,73 @@ authors:
   - name: Srinath Kailasa
     orcid: 0000-0001-9734-8318
     equal-contrib: false
-    affiliation: "1" # (Multiple affiliations must be quoted)
+    affiliation: "1, 2" # (Multiple affiliations must be quoted)
 affiliations:
  - name: Department of Mathematics, University College London, UK
    index: 1
-date: 5 April 2024
+ - name: Department of Engineering, University of Cambridge, UK
+   index: 2
+date: 22 January 2025
 bibliography: paper.bib
 ---
 
 # Summary
 
-We present `kifmm-rs` a Rust based implementation of the kernel independent Fast Multipole Method (kiFMM) with C bindings, that serves as a implementation framework for kiFMMs [@Ying2004; @Greengard1987]. The FMM is a key algorithm for scientific computing due to its acceleration of the computation of $N$-body potential evaluation problems of the form,
+`kifmm-rs` is an open-source framework for implementing Fast Multipole Methods (FMMs) in shared and distributed memory in three dimensions. FMMs accelerate the calculation of $N$-body potential evaluation problems that arise in computational science and engineering of the form,
 
 \begin{equation}
     \phi(x_i) = \sum_{j=1}^N K(x_i, y_j) q(y_j)
     \label{eq:sec:summary:potential}
 \end{equation}
 
-from $O(N^2)$ to $O(N)$ or $O(N \log(N))$, where the potential $\phi$ is evaluated at a set of target points, $\{x_i\}_{i=1}^M$, due to a set of densities, $\{ q_j \}_{j=1}^N$ and $K(.,.)$ is the interaction kernel. Compatible kernels commonly arise in science and engineering, such as the Laplace kernel which models the electrostatic or gravitational potentials corresponding to a cluster of source points on a cluster of target points,
+where the potential $\phi$ is evaluated at a set of target particles, $\{x_i\}_{i=1}^M$, due to a set of densities, $\{ q_j \}_{j=1}^N$ collocated at a set of source particles $\{y_j\}_{j=1}^N$. This evaluation can be interpreted as a matrix-vector multiplication,
+
+\begin{equation}
+    \symbfup{\phi} = \mathbf{K} \mathbf{q}
+    \label{eq:sec:summary:matvec}
+\end{equation}
+
+where $\symbfup{\phi}$ is an $M$ dimensional vector, $\mathbf{K}$ is a dense $M \times N$ matrix and $\mathbf{q}$ is an $N$ dimensional vector. As $\mathbf{K}$ is dense, the naive evaluation of \eqref{eq:sec:summary:matvec} is of $O(M \cdot N)$ complexity. FMMs provide a way of evaluating \eqref{eq:sec:summary:matvec} in $O(P(M+N))$ where $P$ is a user defined parameter $P \ll M, N$ called the _expansion order_, for a range of interaction kernels $K(\cdot)$ that commonly arise from elliptic partial differential equations (PDEs). The prototypical example for which the FMM was first presented is the Laplace kernel [@Greengard1987], which describes particles interacting electrostatically or gravitationally,
 
 \begin{equation}
     K(x, y) = \begin{cases}
-	\frac{1}{2 \pi} \log(\frac{1}{\|x-y\|}),  \> \> (2D) \\
-	\frac{1}{4 \pi \|x-y\|}, \> \> (3D)
+	\frac{1}{2 \pi} \log(\frac{1}{\|x-y\|}),  \> \> \text{, 2D} \\
+	\frac{1}{4 \pi \|x-y\|}, \> \> \text{, 3D}
     \end{cases}
-    \label{eq:sec:summary:laplace_kernel}
+å    \label{eq:sec:summary:laplace_kernel}
 \end{equation}
 
-FMMs split (\ref{eq:sec:summary:potential}) for a given cluster of target points into \textit{near} and \textit{far} components, the latter of which are taken to be amenable to approximation,
+Since their initial introduction FMMs have been developed for a wide variety of kernel functions such as the Helmholtz kernel which arises from the time-independent wave equation [@rokhlin1993diagonal],
 
 \begin{equation}
-    \phi(x_i) = \sum_{y_j \in \text{Near}(x_i)} K(x_i, y_j) q_j + \sum_{y_j \in \text{Far}(x_i)} K(x_i, y_j) q_j
-    \label{eq:sec:summary:near_far_split}
+    K(x, y) = \begin{cases}
+      \frac{i}{4} H_0^{(1)}(k |\mathbf{x-y}|)  \text{, 2D}\\
+        \frac{e^{ik |\mathbf{x-y}|}}{4\pi |\mathbf{x-y}|}  \text{, 3D}
+  \end{cases}
+  \label{eq:sec:summary:helmholtz_kernel}
 \end{equation}
 
-The evaluation of the near field component is done directly and referred to as the point to point (P2P) operation. The far-field component is compressed via a _field translation_, referred to as the multipole to local (M2L) operation. This split, in addition to a recursive loop through a hierarchical data structure used to discretise the problem, gives rise to the complexity of the FMM. These two operations dominate runtimes in practical implementations, and commonly the focus of implementation optimisations.
+As well as the Stokes kernel describing fluid flow [@tornberg2008fast], and the Navier kernel used in elastostatics [@fu1998fast] among others. The major application of FMMs is found in the accelerated application of dense operator matrices that arise from the integral formulation of partial differential equations, and as a result FMM algorithms are a crucial component across simulations in many domains, from medical imaging to geophysics.
+
+FMMs accelerate the evaluation of \eqref{eq:sec:summary:matvec} by decomposing the problem domain using a hierarchical tree, a quadtree in 2D and an octree in 3D, the algorithm consisting of a series of operations collectively referred to as _field translations_. Evaluations of the off-diagonal blocks of the matrix $\mathbf{K}$ in \eqref{eq:sec:summary:matvec} correspond to the `multipole to local' or M2L field translation which summarise the long-range interactions of a local cluster of target points, and the evaluation of the diagonal blocks correspond to unavoidable direct evaluations of the kernel function for evaluating near-range interactions. M2L is the most challenging optimisation bottleneck in FMMs due to its memory-bound nature.
+
+Many parts of an implementation are common across FMM algorithms, such as the tree setup and the kernel function implementation. As a result, our framework is presented as a set of modular, re-usable, sub-components of each of the key algorithmic sub-components: (i) the tree in shared and distributed memory, (ii) the field translation operations and (iii) the kernel evaluation. We use our framework to develop an implementation of the so-called kernel independent Fast Multiple Method (kiFMM) [@Ying2004], compatible with a wide variety of elliptic PDE kernels with an implementation for the Laplace and Helmholtz kernels provided currently. The kiFMM has favourable implementation properties due to its formulation in terms of high operational-intensity BLAS operations.
 
 # Statement of need
 
-Previous high-performance codes for computing kiFMMs include [@Malhotra2015; @wang2021exafmm]. Both of these efforts are provided as templated C++ libraries with optimisations specialised for x86 architectures. Notably, neither softwares is well optimised for Arm targets which are becoming more common as both commodity and HPC platforms, additionally neither supports BLAS based M2L operations which we show in [@Kailasa2024] to be highly competitive with their FFT based approach, able to handle multiple sets of source densities, and are well suited to modern hardware with a simple specification.
+Other notable software efforts for the FMM include PVFMM [@Malhotra2015], ExaFMM [@wang2021exafmm], ScalFMM [@blanchard2015scalfmm] and TBFMM [@bramas2020tbfmm]. PVFMM, ScalFMM and TBFMM are fully distributed implementations of the black box FMM [@fong2009black] and kiFMM respectively. The latter two are notable for being distributed using a task-based runtime, with the former using a more traditional MPI based approach. ExaFMM offers a shared memory implementation of the kiFMM, with Python interfaces and a simple template based design. A commonality of previous implementations is the coupling of algorithmic optimisation with implementation optimisation. For example, ExaFMM and PVFMM both offer field translations that are highly optimised for x86 architectures and lack ARM support, with ScalFMM and TBFMM being tailored to the runtime systems they are designed for.
 
-Our principle contributions with `kifmm-rs` are:
+Our design is data oriented, with complex behaviour composed over simple linear data structures using Rust's trait system. Traits offer a way of specifying behaviour defining contracts between types that are enforced by Rust's compiler. This enables the exposure of performance critical sections in a manner that is easy to optimise in isolation. In contrast to previous software efforts, our design enables a decoupling of the underlying algorithmic implementation and the software optimisation. This has enabled the comparative analysis of the implementation of the critical M2L field translation [@Kailasa2024], and the future iterative refinement of field translations in response to algorithmic and hardware advances.
 
-- A _highly portable_ Rust-based data-oriented software design that allows us to easily test the impact of different algorithmic approaches and computational backends, such as BLAS libraries, for critical algorithmic sub-components as well as deploy to different architectures enabled with Rust's LLVM based compiler. We present the software for shared memory, with plans for distributed memory extension.
-- _Competitive_ single-node performance, especially in single precision, enabled by the optimisation of BLAS based M2L field translation, based entirely on level 3 operations with high arithmetic intensity that are well suited to modern hardware architectures that prioritise minimal memory movement per flop.
-- The ability to _process multiple sets of source densities_ corresponding to the same point distribution using (\ref{eq:sec:summary:potential}), a common application in the Boundary Element Method.
+Our principle contributions with `kifmm-rs` can therefore be summarised as:
+
+- _A modular data-oriented design_ which enables field translations to be implemented over simple linear data structures, allowing us to easily examine the impact of different algorithmic approaches and computational backends, such as BLAS libraries, for critical algorithmic sub-components.
+- _Optimisations for ARM and x86 targets_. ARM targets are increasingly common in high-performance computing systems, with portability enabled by Rust's LLVM based compiler.
+- _Competitive shared and distributed memory performance_. With state of the art M2L performance [@Kailasa2024], as well as a communication-optimal distributed memory implementation inspired by [@Ibeid2016].
 - _A C API_, using Rust's C ABI compatibility allowing for the construction of bindings into other languages, with full Python bindings for non-specialist users.
+- _A moderate frequency Helmholtz FMM_. Helmholtz FMMs are often presented for the low-frequency case [@wang2021exafmm,@Malhotra2015], due to the challenging data sizes involved. We present an extension of the kiFMM to the Helmholtz problem which has proven so far to be effective in single precision for relatively high wave numbers of up to $k \sim 100$.
 
-A full API description is available as a part of published [documentation](https://bempp.github.io/kifmm/kifmm/index.html). Both [Python](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples) and [Rust](https://github.com/bempp/kifmm/tree/main/kifmm/examples) examples can be found in the repository.
-
-# Software design
-
-Rust traits are contracts between types, and types can implement multiple traits. We are able to compose complex polymorphic behaviour for our data structures, which consist of simple structs of arrays, by writing all interfaces using traits. Enabling us to compose sub-components of our software, such as field translation algorithms, explicit SIMD vectorisation strategies for different architectures (via the Pulp library [@pulp]), tree datastructures, interaction kernels and underlying BLAS or LAPACK implementations (via the RLST library [@rlst]). This makes our software more akin to a framework for developing kiFMMs, which can take different flavours, and be used to explore the efficacy of different FMM approaches across hardware targets and software backends.
-
-# Benchmarks
-
-We benchmark our software against leading implementations on a single node [@Malhotra2015; @wang2021exafmm] in Figure (1) for the x86 architecture in Table (\ref{tab:hardware_and_software}) for achieving relative errors, $\epsilon$, of $1 \times 10^{-11}$ in double precision and $1 \times 10^{-4}$ in single precision with respect to the direct evaluation of potential for points contained in a given box for a benchmark problem of computing (\ref{eq:sec:summary:potential}) for the three dimensional Laplace kernel (\ref{eq:sec:summary:laplace_kernel}) for problem sizes between 100,000 and 1,000,000 uniformly distributed source and target points, which are taken to be the same set. Best parameter settings are described in the Appendix of [@Kailasa2024]. We repeat the benchmark for the Arm architecture for `kifmm-rs` in Figure (2), presented without comparison to competing software due to lack of support.
-
-![X86 benchmarks against leading kiFMM software for achieving relative error $\epsilon$, for `kifmm-rs` the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss.png)
-
-![Arm benchmarks for achieving relative error $\epsilon$, for `kifmm-rs` the number of sets of source densities being processed is given in brackets, and runtimes are then reported per FMM call.](./images/joss2.png)
-
-Table: Hardware and software used in our benchmarks. We report per core cache sizes for L1/L2 and total cache size for L3. \label{tab:hardware_and_software}
-
-|  | **Apple M1 Pro** | **AMD 3790X** |
-|----------|----------|----------|
-| **Cache Line Size**    | 128 B| 64 B   |
-| **L1i/L1d**    | 192/128 KB   | 32/32 KB   |
-| **L2**    | 12 MB   | 512 KB   |
-| **L3**    | 12 MB   | 134 MB  |
-| **Memory**    | 16 GB   | 252 GB   |
-| **Max Clock Speed**    | 3.2 GhZ  | 3.7 GhZ   |
-| **Sockets/Cores/Threads**    | 1/8/8   | 1/32/64   |
-| **Architecture**    | Arm V8.5   | x86   |
-| **BLAS**    | Apple Accelerate   | Open BLAS   |
-| **LAPACK**    | Apple Accelerate   | Open BLAS  |
-| **FFT**    | FFTW   | FFTW  |
-| **Threading**    | Rayon   | Rayon |
-| **SIMD Extensions** | Neon | SSE, SSE2, AVX, AVX2|
+`kifmm-rs` is currently a core library used as a part of the Bempp boundary element project [@bempp_rs]. A full API description is available as a part of published [documentation](https://bempp.github.io/kifmm/kifmm/index.html). [Python](https://github.com/bempp/kifmm/tree/main/kifmm/python/examples), [Rust](https://github.com/bempp/kifmm/tree/main/kifmm/examples) and [C](https://github.com/bempp/kifmm/tree/main/kifmm/c) examples can be found in the repository.
 
 # Acknowledgements
 

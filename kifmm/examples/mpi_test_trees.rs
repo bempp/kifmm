@@ -1,3 +1,5 @@
+//? mpirun -n {{NPROCESSES}} --features "mpi"
+
 #[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
@@ -59,7 +61,13 @@ fn main() {
             sort_kind,
         )
         .unwrap()
-        .parameters(&charges, expansion_order, kernel, source_to_target)
+        .parameters(
+            &charges,
+            expansion_order,
+            kernel,
+            GreenKernelEvalType::Value,
+            source_to_target,
+        )
         .unwrap()
         .build()
         .unwrap();

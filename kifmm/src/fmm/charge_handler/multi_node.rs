@@ -113,6 +113,8 @@ where
         if n_source_points == n_source_points_input {
             self.clear().unwrap();
             self.charges = charges.to_vec();
+            // Setup data dependencies for U list
+            self.u_list_exchange();
             Ok(())
         } else {
             Err(FmmError::Io(std::io::Error::new(
