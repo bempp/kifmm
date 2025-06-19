@@ -45,6 +45,7 @@ where
     if size > 1 {
         // 1. Collect k samples from each process onto all other processes
         let mut received_samples = vec![T::default(); n_samples * (size as usize)];
+
         let mut rng = thread_rng();
         let sample_idxs: Vec<usize> = (0..n_samples)
             .map(|_| rng.gen_range(0..array.len()))

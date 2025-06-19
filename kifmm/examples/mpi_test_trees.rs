@@ -63,7 +63,7 @@ fn main() {
         .unwrap()
         .parameters(
             &charges,
-            expansion_order,
+            &[expansion_order],
             kernel,
             GreenKernelEvalType::Value,
             source_to_target,

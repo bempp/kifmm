@@ -1,6 +1,6 @@
 //! Field Traits
 
-use super::types::FmmError;
+use crate::traits::types::FmmError;
 /// Marker trait for field translations
 pub trait FieldTranslation {
     /// Metadata for applying each to source to target translation, depends on both the kernel

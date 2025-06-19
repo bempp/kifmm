@@ -8,7 +8,7 @@ use crate::{
         fmm::{DataAccessMulti, EvaluateMulti, HomogenousKernel},
         general::multi_node::GhostExchange,
         tree::{MultiFmmTree, MultiTree},
-        types::{CommunicationTime, CommunicationType, FmmOperatorTime, FmmOperatorType},
+        types::{CommunicationType, FmmOperatorType, OperatorTime},
     },
     Evaluate, KiFmm,
 };
@@ -21,7 +21,7 @@ use rlst::RlstScalar;
 impl<Scalar, Kernel, FieldTranslation> EvaluateMulti
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
@@ -40,7 +40,7 @@ where
 
         if let Some(d) = duration {
             self.operator_times
-                .push(FmmOperatorTime::from_duration(FmmOperatorType::P2M, d));
+                .insert(FmmOperatorType::P2M, OperatorTime::from_duration(d));
         }
 
         Ok(())
@@ -57,10 +57,8 @@ where
             result?;
 
             if let Some(d) = duration {
-                self.operator_times.push(FmmOperatorTime::from_duration(
-                    FmmOperatorType::M2M(level),
-                    d,
-                ));
+                self.operator_times
+                    .insert(FmmOperatorType::M2M(level), OperatorTime::from_duration(d));
             }
         }
 
@@ -80,10 +78,8 @@ where
                 result?;
 
                 if let Some(d) = duration {
-                    self.operator_times.push(FmmOperatorTime::from_duration(
-                        FmmOperatorType::L2L(level),
-                        d,
-                    ));
+                    self.operator_times
+                        .insert(FmmOperatorType::L2L(level), OperatorTime::from_duration(d));
                 }
 
                 let (result, duration) = optionally_time(self.timed, || self.m2l(level));
@@ -91,10 +87,8 @@ where
                 result?;
 
                 if let Some(d) = duration {
-                    self.operator_times.push(FmmOperatorTime::from_duration(
-                        FmmOperatorType::M2L(level),
-                        d,
-                    ));
+                    self.operator_times
+                        .insert(FmmOperatorType::M2L(level), OperatorTime::from_duration(d));
                 }
             }
         } else {
@@ -106,10 +100,8 @@ where
                     result?;
 
                     if let Some(d) = duration {
-                        self.operator_times.push(FmmOperatorTime::from_duration(
-                            FmmOperatorType::L2L(level),
-                            d,
-                        ));
+                        self.operator_times
+                            .insert(FmmOperatorType::L2L(level), OperatorTime::from_duration(d));
                     }
                 }
 
@@ -118,10 +110,8 @@ where
                 result?;
 
                 if let Some(d) = duration {
-                    self.operator_times.push(FmmOperatorTime::from_duration(
-                        FmmOperatorType::M2L(level),
-                        d,
-                    ));
+                    self.operator_times
+                        .insert(FmmOperatorType::M2L(level), OperatorTime::from_duration(d));
                 }
             }
         }
@@ -137,7 +127,7 @@ where
 
         if let Some(d) = duration {
             self.operator_times
-                .push(FmmOperatorTime::from_duration(FmmOperatorType::P2P, d));
+                .insert(FmmOperatorType::P2P, OperatorTime::from_duration(d));
         }
 
         let (result, duration) = optionally_time(self.timed, || self.l2p());
@@ -146,7 +136,7 @@ where
 
         if let Some(d) = duration {
             self.operator_times
-                .push(FmmOperatorTime::from_duration(FmmOperatorType::L2P, d));
+                .insert(FmmOperatorType::L2P, OperatorTime::from_duration(d));
         }
 
         Ok(())
@@ -163,11 +153,10 @@ where
         });
 
         if let Some(d) = d {
-            self.communication_times
-                .push(CommunicationTime::from_duration(
-                    CommunicationType::GhostExchangeVRuntime,
-                    d,
-                ))
+            self.communication_times.insert(
+                CommunicationType::GhostExchangeVRuntime,
+                OperatorTime::from_duration(d),
+            );
         }
 
         // Gather global FMM
@@ -176,11 +165,10 @@ where
         });
 
         if let Some(d) = d {
-            self.communication_times
-                .push(CommunicationTime::from_duration(
-                    CommunicationType::GatherGlobalFmm,
-                    d,
-                ))
+            self.communication_times.insert(
+                CommunicationType::GatherGlobalFmm,
+                OperatorTime::from_duration(d),
+            );
         }
 
         // Execute FMM on global root
@@ -195,11 +183,10 @@ where
         });
 
         if let Some(d) = d {
-            self.communication_times
-                .push(CommunicationTime::from_duration(
-                    CommunicationType::ScatterGlobalFmm,
-                    d,
-                ))
+            self.communication_times.insert(
+                CommunicationType::ScatterGlobalFmm,
+                OperatorTime::from_duration(d),
+            );
         }
 
         // Perform remainder of downward pass

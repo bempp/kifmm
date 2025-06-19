@@ -1,3 +1,4 @@
+//! Local expansion translations
 use itertools::Itertools;
 use rayon::prelude::*;
 use std::collections::HashSet;
@@ -25,9 +26,9 @@ use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAcces
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
-    FieldTranslation: FieldTranslationTrait,
+    FieldTranslation: FieldTranslationTrait + Sync + Send,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     Self: MetadataAccess
         + DataAccessMulti<
@@ -36,16 +37,20 @@ where
             Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>,
         >,
 {
+    // TODO
     fn l2l(&self, level: u64) -> Result<(), crate::traits::types::FmmError> {
         if let Some(child_targets) = self.tree.target_tree().keys(level) {
+            let operator_index = self.l2l_operator_index(level);
+            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+            let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
+
             let parent_sources: HashSet<MortonKey<_>> =
                 child_targets.iter().map(|source| source.parent()).collect();
 
             let mut parent_sources = parent_sources.into_iter().collect_vec();
+
             parent_sources.sort();
             let n_parents = parent_sources.len();
-            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
-            let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -68,7 +73,8 @@ where
 
                     let child_locals = &self.level_locals[level as usize];
 
-                    let target_vec = &self.target_vec;
+                    // let target_vec = &self.target_vec;
+                    let target_vec = &self.target_vec[operator_index];
 
                     parent_locals
                         .par_chunks_exact(chunk_size)
@@ -94,9 +100,9 @@ where
                                     });
                             }
 
-                            for (i, target_vec_i) in target_vec.iter().enumerate().take(NSIBLINGS) {
+                            for (i, t) in target_vec.iter().enumerate().take(NSIBLINGS) {
                                 let tmp = empty_array::<Scalar, 2>()
-                                    .simple_mult_into_resize(target_vec_i.r(), parent_locals.r());
+                                    .simple_mult_into_resize(t.r(), parent_locals.r());
 
                                 for j in 0..chunk_size {
                                     let chunk_displacement = j * NSIBLINGS;
@@ -121,8 +127,7 @@ where
 
                 FmmEvalType::Matrix(_) => {
                     return Err(FmmError::Unimplemented(
-                        "M2L unimplemented for matrix input with BLAS field translations"
-                            .to_string(),
+                        "M2L unimplemented for matrix input".to_string(),
                     ))
                 }
             }

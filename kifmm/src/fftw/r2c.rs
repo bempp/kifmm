@@ -2,11 +2,12 @@
 use kifmm_fftw_sys as ffi;
 
 use num_complex::Complex;
-
 use rayon::prelude::*;
 
-use super::types::{FftError, ShapeInfo};
-use crate::traits::fftw::{Dft, RealToComplexFft3D};
+use crate::{
+    fftw::types::{FftError, ShapeInfo},
+    traits::fftw::{Dft, RealToComplexFft3D},
+};
 
 /// Validate the dimensions of the (batch) input and output sequences in real-to-complex DFTs
 ///

@@ -5,10 +5,11 @@ rustflags = ["-C", "target-cpu=native"]
 rustflags = ["-C", "target-feature=+fma,+sse2,+avx,+avx2"]
 
 [target.aarch64]
-rustflags = ["-C", "target-feature=+neon"]
+rustflags = ["-C", "target-feature=+neon+fp-armv8,+fma"]
 
 [env]
 OPENBLAS_NUM_THREADS = "1"
+ARCH ="APPLE_M1"
 
 [profile.release]
 opt-level = 3

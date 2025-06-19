@@ -1,4 +1,4 @@
-//! Multipole to Multipole field translation
+//! Multipole expansion translations
 
 use std::collections::HashSet;
 
@@ -21,7 +21,7 @@ use crate::{
     },
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, SourceTranslation},
-        fmm::{DataAccessMulti, HomogenousKernel},
+        fmm::{DataAccessMulti, HomogenousKernel, MetadataAccess},
         tree::{MultiFmmTree, MultiTree},
         types::FmmError,
     },
@@ -31,23 +31,25 @@ use crate::{
 impl<Scalar, Kernel, FieldTranslation> SourceTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
-    Self: DataAccessMulti<Scalar = Scalar>,
+    Self: MetadataAccess + DataAccessMulti<Scalar = Scalar>,
 {
     fn p2m(&self) -> Result<(), crate::traits::types::FmmError> {
         if let Some(_leaves) = self.tree.source_tree().all_leaves() {
-            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
-            let n_coeffs_check_surface = self.n_coeffs_check_surface;
+            let &n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface.last().unwrap();
+            let &n_coeffs_check_surface = self.n_coeffs_check_surface.last().unwrap();
             let n_leaves = self.tree.source_tree().n_leaves().unwrap();
             let check_surface_size = n_coeffs_check_surface * self.dim;
-            let coordinates = self.tree.source_tree().all_coordinates().unwrap();
 
+            let coordinates = self.tree.source_tree().all_coordinates().unwrap();
             let all_charges = &self.charges;
             let kernel = &self.kernel;
             let dim = self.dim;
+            let depth = self.tree.source_tree().total_depth();
+            let operator_index = self.c2e_operator_index(depth);
 
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
@@ -114,17 +116,17 @@ where
                                 scaled_check_potential.scale_inplace(scale);
 
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    uc2e_inv_1[0].r(),
+                                    uc2e_inv_1[operator_index].r(),
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        uc2e_inv_2[0].r(),
+                                        uc2e_inv_2[operator_index].r(),
                                         scaled_check_potential,
                                     ),
                                 )
                             } else {
                                 empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                    uc2e_inv_1[0].r(),
+                                    uc2e_inv_1[operator_index].r(),
                                     empty_array::<Scalar, 2>().simple_mult_into_resize(
-                                        uc2e_inv_2[0].r(),
+                                        uc2e_inv_2[operator_index].r(),
                                         check_potential.r(),
                                     ),
                                 )
@@ -163,7 +165,9 @@ where
 
     fn m2m(&self, level: u64) -> Result<(), crate::traits::types::FmmError> {
         if let Some(child_sources) = self.tree.source_tree.keys(level) {
-            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface;
+            let operator_index = self.m2m_operator_index(level);
+            let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+            let n_coeffs_equivalent_surface_parent = self.n_coeffs_equivalent_surface(level - 1);
 
             let parent_targets: HashSet<_> =
                 child_sources.iter().map(|source| source.parent()).collect();
@@ -208,7 +212,7 @@ where
 
                                 let parent_multipoles_chunk = empty_array::<Scalar, 2>()
                                     .simple_mult_into_resize(
-                                        source.r(),
+                                        source[operator_index].r(),
                                         child_multipoles_chunk_mat,
                                     );
 
@@ -221,7 +225,7 @@ where
                                     let parent_multipole = unsafe {
                                         std::slice::from_raw_parts_mut(
                                             parent_multipole_pointer.raw,
-                                            n_coeffs_equivalent_surface,
+                                            n_coeffs_equivalent_surface_parent,
                                         )
                                     };
 
@@ -229,8 +233,9 @@ where
                                         .iter_mut()
                                         .zip(
                                             &parent_multipoles_chunk.data()[chunk_idx
-                                                * n_coeffs_equivalent_surface
-                                                ..(chunk_idx + 1) * n_coeffs_equivalent_surface],
+                                                * n_coeffs_equivalent_surface_parent
+                                                ..(chunk_idx + 1)
+                                                    * n_coeffs_equivalent_surface_parent],
                                         )
                                         .for_each(|(p, t)| *p += *t);
                                 }
@@ -240,7 +245,7 @@ where
 
                 FmmEvalType::Matrix(_n) => {
                     return Err(FmmError::Unimplemented(
-                        "Unimplemented for matrix input".to_string(),
+                        "M2L unimplemented for matrix input".to_string(),
                     ))
                 }
             }

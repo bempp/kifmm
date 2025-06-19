@@ -1,3 +1,4 @@
+//! Charge handling in multi-node setting
 use green_kernels::traits::Kernel as KernelTrait;
 use itertools::izip;
 use mpi::{
