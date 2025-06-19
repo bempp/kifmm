@@ -6,8 +6,8 @@
            version="5.3.1"
            xsi:schemaLocation="http://www.crossref.org/schema/5.3.1 http://www.crossref.org/schemas/crossref5.3.1.xsd">
   <head>
-    <doi_batch_id>20250124T110854-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
-    <timestamp>20250124110854</timestamp>
+    <doi_batch_id>20250619T082312-61670f6b3849e21d912ec13b0a2eb9ab575a9dd8</doi_batch_id>
+    <timestamp>20250619082312</timestamp>
     <depositor>
       <depositor_name>JOSS Admin</depositor_name>
       <email_address>admin@theoj.org</email_address>
@@ -91,11 +91,12 @@ algorithm in two and three dimensions</article_title>
 Physics</journal_title>
             <issue>2</issue>
             <volume>196</volume>
+            <doi>10.1016/j.jcp.2003.11.021</doi>
             <cYear>2004</cYear>
             <unstructured_citation>Ying, L., Biros, G., &amp; Zorin, D.
 (2004). A kernel-independent adaptive fast multipole algorithm in two
-and three dimensions. Journal of Computational Physics, 196(2),
-591–626.</unstructured_citation>
+and three dimensions. Journal of Computational Physics, 196(2), 591–626.
+https://doi.org/10.1016/j.jcp.2003.11.021</unstructured_citation>
           </citation>
           <citation key="Malhotra2015">
             <article_title>PVFMM: A parallel kernel independent FMM for
@@ -105,11 +106,12 @@ particle and volume potentials</article_title>
 Physics</journal_title>
             <issue>3</issue>
             <volume>18</volume>
+            <doi>10.4208/cicp.020215.150515sw</doi>
             <cYear>2015</cYear>
             <unstructured_citation>Malhotra, D., &amp; Biros, G. (2015).
 PVFMM: A parallel kernel independent FMM for particle and volume
-potentials. Communications in Computational Physics, 18(3),
-808–830.</unstructured_citation>
+potentials. Communications in Computational Physics, 18(3), 808–830.
+https://doi.org/10.4208/cicp.020215.150515sw</unstructured_citation>
           </citation>
           <citation key="wang2021exafmm">
             <article_title>ExaFMM: A high-performance fast multipole
@@ -119,11 +121,12 @@ method library with c++ and python interfaces</article_title>
 Software</journal_title>
             <issue>61</issue>
             <volume>6</volume>
+            <doi>10.21105/joss.03145</doi>
             <cYear>2021</cYear>
             <unstructured_citation>Wang, T., Yokota, R., &amp; Barba, L.
 A. (2021). ExaFMM: A high-performance fast multipole method library with
-c++ and python interfaces. Journal of Open Source Software, 6(61),
-3145.</unstructured_citation>
+c++ and python interfaces. Journal of Open Source Software, 6(61), 3145.
+https://doi.org/10.21105/joss.03145</unstructured_citation>
           </citation>
           <citation key="fong2009black">
             <article_title>The black-box fast multipole
@@ -133,10 +136,12 @@ method</article_title>
 Physics</journal_title>
             <issue>23</issue>
             <volume>228</volume>
+            <doi>10.1016/j.jcp.2009.08.031</doi>
             <cYear>2009</cYear>
             <unstructured_citation>Fong, W., &amp; Darve, E. (2009). The
 black-box fast multipole method. Journal of Computational Physics,
-228(23), 8712–8725.</unstructured_citation>
+228(23), 8712–8725.
+https://doi.org/10.1016/j.jcp.2009.08.031</unstructured_citation>
           </citation>
           <citation key="bramas2020tbfmm">
             <article_title>TBFMM: A c++ generic and parallel fast
@@ -146,10 +151,12 @@ multipole method library</article_title>
 Software</journal_title>
             <issue>56</issue>
             <volume>5</volume>
+            <doi>10.21105/joss.02444</doi>
             <cYear>2020</cYear>
             <unstructured_citation>Bramas, B. (2020). TBFMM: A c++
 generic and parallel fast multipole method library. Journal of Open
-Source Software, 5(56), 2444.</unstructured_citation>
+Source Software, 5(56), 2444.
+https://doi.org/10.21105/joss.02444</unstructured_citation>
           </citation>
           <citation key="blanchard2015scalfmm">
             <article_title>ScalFMM: A generic parallel fast multipole
@@ -189,11 +196,12 @@ three-dimensional stokes equations</article_title>
 Physics</journal_title>
             <issue>3</issue>
             <volume>227</volume>
+            <doi>10.1016/j.jcp.2007.06.029</doi>
             <cYear>2008</cYear>
             <unstructured_citation>Tornberg, A.-K., &amp; Greengard, L.
 (2008). A fast multipole method for the three-dimensional stokes
-equations. Journal of Computational Physics, 227(3),
-1613–1619.</unstructured_citation>
+equations. Journal of Computational Physics, 227(3), 1613–1619.
+https://doi.org/10.1016/j.jcp.2007.06.029</unstructured_citation>
           </citation>
           <citation key="fu1998fast">
             <article_title>A fast solution method for three-dimensional
@@ -203,13 +211,14 @@ many-particle problems of linear elasticity</article_title>
 in Engineering</journal_title>
             <issue>7</issue>
             <volume>42</volume>
+            <doi>10.1002/(SICI)1097-0207(19980815)42:7%3C1215::AID-NME406%3E3.0.CO;2-5</doi>
             <cYear>1998</cYear>
             <unstructured_citation>Fu, Y., Klimkowski, K. J., Rodin, G.
 J., Berger, E., Browne, J. C., Singer, J. K., Van De Geijn, R. A., &amp;
 Vemaganti, K. S. (1998). A fast solution method for three-dimensional
 many-particle problems of linear elasticity. International Journal for
-Numerical Methods in Engineering, 42(7),
-1215–1229.</unstructured_citation>
+Numerical Methods in Engineering, 42(7), 1215–1229.
+https://doi.org/10.1002/(SICI)1097-0207(19980815)42:7%3C1215::AID-NME406%3E3.0.CO;2-5</unstructured_citation>
           </citation>
           <citation key="rokhlin1993diagonal">
             <article_title>Diagonal forms of translation operators for
@@ -219,11 +228,12 @@ the helmholtz equation in three dimensions</article_title>
 analysis</journal_title>
             <issue>1</issue>
             <volume>1</volume>
+            <doi>10.1006/acha.1993.1006</doi>
             <cYear>1993</cYear>
             <unstructured_citation>Rokhlin, V. (1993). Diagonal forms of
 translation operators for the helmholtz equation in three dimensions.
-Applied and Computational Harmonic Analysis, 1(1),
-82–93.</unstructured_citation>
+Applied and Computational Harmonic Analysis, 1(1), 82–93.
+https://doi.org/10.1006/acha.1993.1006</unstructured_citation>
           </citation>
           <citation key="Greengard1987">
             <article_title>A fast algorithm for particle
@@ -233,10 +243,12 @@ simulations</article_title>
 physics</journal_title>
             <issue>2</issue>
             <volume>73</volume>
+            <doi>10.1016/0021-9991(87)90140-9</doi>
             <cYear>1987</cYear>
             <unstructured_citation>Greengard, L., &amp; Rokhlin, V.
 (1987). A fast algorithm for particle simulations. Journal of
-Computational Physics, 73(2), 325–348.</unstructured_citation>
+Computational Physics, 73(2), 325–348.
+https://doi.org/10.1016/0021-9991(87)90140-9</unstructured_citation>
           </citation>
           <citation key="Kailasa2024">
             <article_title>M2L translation operators for kernel
@@ -245,11 +257,13 @@ architectures</article_title>
             <author>Kailasa</author>
             <journal_title>arXiv preprint
 arXiv:2408.07436</journal_title>
+            <doi>10.48550/arXiv.2408.07436</doi>
             <cYear>2024</cYear>
             <unstructured_citation>Kailasa, S., Betcke, T., &amp;
 Kazdadi, S. E. (2024). M2L translation operators for kernel independent
 fast multipole methods on modern architectures. arXiv Preprint
-arXiv:2408.07436.</unstructured_citation>
+arXiv:2408.07436.
+https://doi.org/10.48550/arXiv.2408.07436</unstructured_citation>
           </citation>
           <citation key="bempp_rs">
             <article_title>Bempp-rs: Boundary element methods in
