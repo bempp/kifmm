@@ -5,7 +5,7 @@ license = "BSD-3-Clause"
 homepage = "https://github.com/bempp/kifmm"
 repository = "https://github.com/bempp/kifmm"
 authors = ["Srinath Kailasa <srinathkailasa@gmail.com>"]
-version = "0.2.0"
+version = "0.2.0-dev"
 edition = "2021"
 
 links="fftw3"
