@@ -37,6 +37,8 @@ Though we note that MPI functionality is not supported in the current release ve
 
 The main external dependencies of this package are
 
+- [RLST](https://github.com/linalg-rs/rlst) for linear algebra and data containers. We currently use the branch on head.
+- [Green Kernels](https://github.com/bempp/green-kernels/tree/main), for SIMD optimized greens function evaluations.
 - FFTW
 - BLAS
 - LAPACK
