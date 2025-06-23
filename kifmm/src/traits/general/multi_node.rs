@@ -56,6 +56,7 @@ where
         &mut self,
         leaves: Vec<<<<Self as DataAccess>::Tree as SingleFmmTree>::Tree as SingleTree>::Node>,
         multipoles: Vec<Self::Scalar>,
+        global_depth: u64,
     );
 
     /// Set data associated with received locals for global tree

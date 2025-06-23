@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use itertools::Itertools;
+use itertools::{izip, Itertools};
 use num::traits::Float;
 use rlst::{
     rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape,
@@ -16,6 +16,20 @@ use crate::{
     traits::tree::{FmmTreeNode, SingleTree},
     tree::types::{MortonKey, SingleNodeTree},
 };
+
+#[allow(dead_code)]
+/// Compute the L2 norm of the relative error between two sequences
+pub(crate) fn l2_error<T: RlstScalar<Real = T>>(found: &[T], expected: &[T]) -> T {
+    let mut num = T::zero();
+    let mut den = T::zero();
+
+    for (&l, &r) in izip!(found, expected) {
+        num += RlstScalar::powf(RlstScalar::abs(l - r), T::real(2.0));
+        den += RlstScalar::powf(RlstScalar::abs(r), T::real(2.0));
+    }
+
+    RlstScalar::powf(num / den, T::from(0.5).unwrap().re())
+}
 
 /// Optionally time a function call
 #[inline]
@@ -90,31 +104,6 @@ pub(crate) fn m2l_scale<T: RlstScalar>(level: u64) -> Result<T, std::io::Error> 
             T::from(level - 3).unwrap().re(),
         ))
     }
-}
-
-/// Compute the scaling for each leaf box in a tree
-///
-/// # Arguments
-/// * `tree`- Single node tree
-/// * `n_coeffs`- Number of interpolation points on leaf box
-pub(crate) fn leaf_scales_single_node<T>(
-    tree: &SingleNodeTree<T::Real>,
-    n_coeffs_leaf: usize,
-) -> Vec<T>
-where
-    T: RlstScalar + Default,
-{
-    let mut result = vec![T::default(); tree.n_leaves().unwrap() * n_coeffs_leaf];
-
-    for (i, leaf) in tree.all_leaves().unwrap().iter().enumerate() {
-        // Assign scales
-        let l = i * n_coeffs_leaf;
-        let r = l + n_coeffs_leaf;
-
-        result[l..r]
-            .copy_from_slice(vec![homogenous_kernel_scale(leaf.level()); n_coeffs_leaf].as_slice());
-    }
-    result
 }
 
 /// Compute the surfaces for each leaf box
@@ -380,6 +369,24 @@ where
     }
 
     flipped
+}
+
+/// Compute the cutoff rank for an SVD decomposition of a matrix from its singular values
+/// using a specified `threshold` as a tolerance parameter
+pub(crate) fn find_cutoff_rank<T: RlstScalar + PartialOrd>(
+    singular_values: &[T],
+    threshold: T,
+    max_rank: usize,
+) -> usize {
+    let len = singular_values.len().min(max_rank);
+
+    for (i, &s) in singular_values.iter().take(len).enumerate() {
+        if s <= threshold {
+            return i;
+        }
+    }
+
+    len - 1
 }
 
 #[cfg(test)]

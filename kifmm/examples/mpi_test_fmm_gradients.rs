@@ -35,7 +35,7 @@ fn main() {
     let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
     // Fmm Parameters
-    let expansion_order = 5;
+    let expansion_order = [5];
     let kernel = Laplace3dKernel::<f32>::new();
 
     ThreadPoolBuilder::new()
@@ -66,7 +66,7 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 kernel.clone(),
                 GreenKernelEvalType::ValueDeriv,
                 source_to_target,
@@ -142,7 +142,7 @@ fn main() {
                 .unwrap()
                 .parameters(
                     &all_charges,
-                    &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
@@ -152,7 +152,6 @@ fn main() {
                 .unwrap();
             single_fmm.evaluate().unwrap();
             let mut expected = vec![0f32; 4 * &multi_fmm.tree.target_tree.coordinates.len() / 3];
-            let n_expected = expected.len();
 
             multi_fmm.kernel().evaluate_st(
                 GreenKernelEvalType::ValueDeriv,
@@ -164,21 +163,15 @@ fn main() {
 
             let distributed = multi_fmm.potentials().unwrap();
 
-            let mut err = 0.;
-            for (l, r) in izip!(expected, distributed) {
-                err += (l - r).abs() / l;
+            let mut num = 0.0;
+            let mut den = 0.0;
+            for (expected, &found) in izip!(expected, distributed) {
+                num += (expected - found).abs().powf(2.0);
+                den += expected.abs().powf(2.0);
             }
+            let l2_error = (num / den).powf(0.5);
 
-            err /= n_expected as f32;
-
-            // println!(
-            //     "{:?} expected: {:?} \n found: {:?}",
-            //     world.rank(),
-            //     &distributed[0..25],
-            //     &expected[0..25]
-            // );
-
-            assert!(err.abs() < 1e-2);
+            assert!(l2_error.abs() < 1e-4);
 
             println!("...test_fmm_gradients M2L=FFT passed");
         }
@@ -208,7 +201,7 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 kernel,
                 GreenKernelEvalType::ValueDeriv,
                 source_to_target,
@@ -284,7 +277,7 @@ fn main() {
                 .unwrap()
                 .parameters(
                     &all_charges,
-                    &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
@@ -294,7 +287,6 @@ fn main() {
                 .unwrap();
             single_fmm.evaluate().unwrap();
             let mut expected = vec![0f32; 4 * &multi_fmm.tree.target_tree.coordinates.len() / 3];
-            let n_expected = expected.len();
             multi_fmm.kernel().evaluate_st(
                 GreenKernelEvalType::ValueDeriv,
                 &all_coordinates,
@@ -305,14 +297,15 @@ fn main() {
 
             let distributed = multi_fmm.potentials().unwrap();
 
-            let mut err = 0.;
-            for (l, r) in izip!(expected, distributed) {
-                err += (l - r).abs() / l;
+            let mut num = 0.0;
+            let mut den = 0.0;
+            for (expected, &found) in izip!(expected, distributed) {
+                num += (expected - found).abs().powf(2.0);
+                den += expected.abs().powf(2.0);
             }
+            let l2_error = (num / den).powf(0.5);
 
-            err /= n_expected as f32;
-
-            assert!(err.abs() < 1e-2);
+            assert!(l2_error.abs() < 1e-4);
             println!("...test_fmm_gradients M2L=BLAS passed")
         }
     }

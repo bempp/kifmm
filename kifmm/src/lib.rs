@@ -85,6 +85,7 @@ pub mod traits;
 pub mod tree;
 
 use bytemuck as _;
+use serde_yaml as _;
 
 // Public API
 #[doc(inline)]

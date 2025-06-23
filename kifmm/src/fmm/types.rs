@@ -15,7 +15,7 @@ use crate::{
         field::FieldTranslation as FieldTranslationTrait,
         fmm::HomogenousKernel,
         general::single_node::AsComplex,
-        types::{CommunicationTime, FmmOperatorTime, MetadataTime},
+        types::{CommunicationType, FmmOperatorType, MetadataType, OperatorTime},
     },
     tree::{Domain, MortonKey, SingleNodeTree},
 };
@@ -95,13 +95,13 @@ where
     <Scalar as RlstScalar>::Real: Default,
 {
     /// Operator runtimes
-    pub operator_times: Vec<FmmOperatorTime>,
+    pub operator_times: HashMap<FmmOperatorType, OperatorTime>,
 
     /// Communication runtimes
-    pub communication_times: Vec<CommunicationTime>,
+    pub communication_times: HashMap<CommunicationType, OperatorTime>,
 
     /// Metadata runtimes
-    pub metadata_times: Vec<MetadataTime>,
+    pub metadata_times: HashMap<MetadataType, OperatorTime>,
 
     /// Whether the object and its methods are timed
     pub(crate) timed: bool,
@@ -159,9 +159,6 @@ where
 
     /// Upward surfaces associated with target leaves
     pub(crate) leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
-
-    /// Scales of each source leaf box
-    pub(crate) leaf_scales_sources: Vec<Scalar>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
@@ -234,9 +231,9 @@ where
     fn default() -> Self {
         KiFmm {
             timed: false,
-            operator_times: Vec::default(),
-            communication_times: Vec::default(),
-            metadata_times: Vec::default(),
+            operator_times: HashMap::default(),
+            communication_times: HashMap::default(),
+            metadata_times: HashMap::default(),
             isa: Isa::default(),
             tree: SingleNodeFmmTree::default(),
             source_to_target: FieldTranslation::default(),
@@ -273,7 +270,6 @@ where
             charges: Vec::default(),
             charge_index_pointer_sources: Vec::default(),
             charge_index_pointer_targets: Vec::default(),
-            leaf_scales_sources: Vec::default(),
         }
     }
 }
@@ -420,11 +416,8 @@ where
     /// FMM eval type
     pub fmm_eval_type: Option<FmmEvalType>,
 
-    /// Has depth or ncrit been set
-    pub depth_set: Option<bool>,
-
     /// Communication runtimes
-    pub communication_times: Option<Vec<CommunicationTime>>,
+    pub communication_times: Option<HashMap<CommunicationType, OperatorTime>>,
 }
 
 /// Builder for distributed FMM, example usage can be found in the examples directory.
@@ -439,6 +432,9 @@ where
 {
     /// Whether construction and operators are timed
     pub timed: Option<bool>,
+
+    /// Variable expansion order by level
+    pub variable_expansion_order: Option<bool>,
 
     /// Kernel
     pub kernel: Option<Kernel>,
@@ -459,16 +455,16 @@ where
     pub source_to_target: Option<FieldTranslation>,
 
     /// Equivalent surface order, variable expansion order not supported
-    pub equivalent_surface_order: Option<usize>,
+    pub equivalent_surface_order: Option<Vec<usize>>,
 
     /// Check surface order, variable expansion order not supported
-    pub check_surface_order: Option<usize>,
+    pub check_surface_order: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub n_coeffs_equivalent_surface: Option<usize>,
+    pub n_coeffs_equivalent_surface: Option<Vec<usize>>,
 
     /// Number of coefficients
-    pub n_coeffs_check_surface: Option<usize>,
+    pub n_coeffs_check_surface: Option<Vec<usize>>,
 
     /// Kernel eval type
     pub kernel_eval_type: Option<GreenKernelEvalType>,
@@ -480,7 +476,7 @@ where
     pub charges: Option<Vec<Scalar>>,
 
     /// Communication runtimes
-    pub communication_times: Option<Vec<CommunicationTime>>,
+    pub communication_times: Option<HashMap<CommunicationType, OperatorTime>>,
 }
 
 /// Represents an octree structure for Fast Multipole Method (FMM) calculations on a single node.
@@ -632,6 +628,38 @@ where
             transfer_vectors: self.transfer_vectors.clone(),
             cutoff_rank: self.cutoff_rank.clone(),
             directional_cutoff_ranks: self.directional_cutoff_ranks.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<i32> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+            surface_diff: self.surface_diff,
+            svd_mode: self.svd_mode,
+        }
+    }
+}
+
+impl<Scalar> Clone for BlasFieldTranslationIa<Scalar>
+where
+    Scalar: RlstScalar,
+    Scalar::Real: Clone,
+    BlasMetadataIa<Scalar>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+    FmmSvdMode: Clone,
+{
+    fn clone(&self) -> Self {
+        BlasFieldTranslationIa {
+            threshold: self.threshold,
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            cutoff_ranks: self.cutoff_ranks.clone(),
             displacements: self
                 .displacements
                 .iter()
@@ -958,19 +986,22 @@ pub enum Isa {
 #[allow(clippy::type_complexity)]
 pub struct KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Equivalence + Float,
+    Scalar: RlstScalar + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     FieldTranslation: FieldTranslationTrait,
 {
     /// Operator runtimes
-    pub operator_times: Vec<FmmOperatorTime>,
+    pub operator_times: HashMap<FmmOperatorType, OperatorTime>,
 
     /// Communication runtimes
-    pub communication_times: Vec<CommunicationTime>,
+    pub communication_times: HashMap<CommunicationType, OperatorTime>,
 
     /// Metadata runtimes
-    pub metadata_times: Vec<MetadataTime>,
+    pub metadata_times: HashMap<MetadataType, OperatorTime>,
+
+    /// Set to true if expansion order varies by level
+    pub(crate) variable_expansion_order: bool,
 
     /// Dimension
     pub(crate) dim: usize,
@@ -1006,16 +1037,16 @@ where
     pub(crate) charges: Vec<Scalar>,
 
     /// The expansion order used to construct check surfaces
-    pub(crate) check_surface_order: usize,
+    pub(crate) check_surface_order: Vec<usize>,
 
     /// The expansion order of the FMM, used to construct equivalent surfaces.
-    pub(crate) equivalent_surface_order: usize,
+    pub(crate) equivalent_surface_order: Vec<usize>,
 
     /// The number of coefficients, corresponding to points discretising the equivalent surface
-    pub(crate) n_coeffs_equivalent_surface: usize,
+    pub(crate) n_coeffs_equivalent_surface: Vec<usize>,
 
     /// The number of coefficients, corresponding to points discretising the check surface
-    pub(crate) n_coeffs_check_surface: usize,
+    pub(crate) n_coeffs_check_surface: Vec<usize>,
 
     /// Set by the kernel evaluation type, either 1 or 4 corresponding to evaluating potentials or potentials and derivatives
     pub(crate) kernel_eval_type: GreenKernelEvalType,
@@ -1041,9 +1072,6 @@ where
     /// Upward surfaces associated with target leaves
     pub(crate) leaf_downward_equivalent_surfaces_targets: Vec<Scalar::Real>,
 
-    /// Scales of each source leaf box
-    pub(crate) leaf_scales_sources: Vec<Scalar>,
-
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
     pub(crate) uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
@@ -1064,13 +1092,15 @@ where
     pub(crate) source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub(crate) source: Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>,
+    pub(crate) source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
     /// The metadata required for source to source translation
-    pub(crate) source_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) source_vec:
+        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub(crate) target_vec: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) target_vec:
+        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
 
     /// Multipoles associated with locally owned data
     pub(crate) multipoles: Vec<Scalar>,
@@ -1120,11 +1150,23 @@ where
     /// Store received V list queries displacements
     pub(crate) ghost_received_queries_displacements_v: Vec<Count>,
 
+    /// Store requsted V List queries that have actually been found
+    pub(crate) ghost_requested_queries_v: Vec<u64>,
+
     /// Store requested V list queries counts
     pub(crate) ghost_requested_queries_counts_v: Vec<Count>,
 
+    /// Store requested V list queries displacements
+    pub(crate) ghost_requested_queries_displacements_v: Vec<Count>,
+
     /// Requested V list queries index map of ghost keys from V list queries
     pub(crate) ghost_requested_queries_key_to_index_v: HashMap<MortonKey<Scalar::Real>, usize>,
+
+    /// The requested multipole data buffer sizes by request
+    pub(crate) ghost_requested_queries_v_buffer_sizes_counts: Vec<usize>,
+
+    /// The displacements of requested multipole data buffer sizes by request
+    pub(crate) ghost_requested_queries_v_buffer_sizes_displacements: Vec<usize>,
 
     /// Number of input charges (initial input, unordered by Morton sort)
     pub(crate) local_count_charges: u64,
@@ -1135,21 +1177,27 @@ where
     /// All global indices to send new (unordered) charge data to
     pub(crate) ghost_received_queries_charge: Vec<u64>,
 
+    // TODO: Replaec with u64
     /// Counts of all global indices to send new (unordered) charge data to
     pub(crate) ghost_received_queries_charge_counts: Vec<i32>,
 
+    // TODO: Replaec with u64
     /// Displacements of all global indices to send new (unordered) charge data to
     pub(crate) ghost_received_queries_charge_displacements: Vec<i32>,
 
+    // TODO: Replaec with u64
     /// Store charge queries counts to send
     pub(crate) charge_send_queries_counts: Vec<Count>,
 
+    // TODO: Replaec with u64
     /// Store charge queries displacments to send
     pub(crate) charge_send_queries_displacements: Vec<Count>,
 
+    // TODO: Replaec with u64
     /// Store charge queries counts to receive
     pub(crate) charge_receive_queries_counts: Vec<Count>,
 
+    // TODO: Replaec with u64
     /// Store charge queries displacments to receive
     pub(crate) charge_receive_queries_displacements: Vec<Count>,
 }

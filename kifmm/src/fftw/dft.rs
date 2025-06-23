@@ -5,11 +5,12 @@ use kifmm_fftw_sys as ffi;
 
 use crate::{
     excall,
-    fftw::types::{BatchSize, FftError, Plan, Plan32, Plan64, Sign, FFTW_ESTIMATE},
+    fftw::{
+        helpers::validate_plan,
+        types::{BatchSize, FftError, Plan, Plan32, Plan64, Sign, FFTW_ESTIMATE},
+    },
     traits::fftw::{ComplexToComplexFft3D, Dft, DftType, RealToComplexFft3D},
 };
-
-use super::helpers::validate_plan;
 
 impl Dft for f32 {
     type Plan = Plan<Self, Plan32>;

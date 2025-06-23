@@ -1,9 +1,7 @@
 //! Tree Traits
-use std::{collections::HashSet, hash::Hash};
-
-use rlst::RlstScalar;
-
 use num::traits::Float;
+use rlst::RlstScalar;
+use std::{collections::HashSet, hash::Hash};
 
 use crate::tree::types::Point;
 

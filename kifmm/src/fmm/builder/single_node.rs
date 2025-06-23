@@ -1,5 +1,5 @@
-//! Builder objects to construct FMMs
-use std::collections::HashSet;
+//! Builder for constructing FMMs on a single node
+use std::collections::HashMap;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
@@ -18,7 +18,7 @@ use crate::{
         fmm::{HomogenousKernel, Metadata},
         general::single_node::Epsilon,
         tree::{SingleFmmTree, SingleTree},
-        types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
+        types::{CommunicationType, MetadataType, OperatorTime},
     },
     tree::{types::Domain, SingleNodeTree},
 };
@@ -52,7 +52,6 @@ where
             n_coeffs_check_surface: None,
             kernel_eval_type: None,
             fmm_eval_type: None,
-            depth_set: None,
         }
     }
 
@@ -90,25 +89,25 @@ where
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            let mut communication_times = Vec::new();
+            let mut communication_times = HashMap::new();
 
             // Source and target trees calculated over the same domain
             let (source_domain, d) = optionally_time(timed, || Domain::from_local_points(sources));
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_domain, d) = optionally_time(timed, || Domain::from_local_points(targets));
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Calculate union of domains for source and target points, needed to define operators
@@ -121,7 +120,6 @@ where
             if depth.is_some() && n_crit.is_none() {
                 source_depth = depth.unwrap();
                 target_depth = depth.unwrap();
-                self.depth_set = Some(true);
             } else if depth.is_none() && n_crit.is_some() {
                 // Estimate depth based on a uniform distribution
                 source_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
@@ -132,7 +130,6 @@ where
                     n_targets as u64,
                     n_crit.unwrap(),
                 );
-                self.depth_set = Some(false);
             } else {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,
@@ -149,10 +146,10 @@ where
             let source_tree = source_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_tree, d) = optionally_time(timed, || {
@@ -162,10 +159,10 @@ where
             let target_tree = target_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let fmm_tree = SingleNodeFmmTree {
@@ -229,36 +226,38 @@ where
             }
 
             let depth = self.tree.as_ref().unwrap().source_tree().depth();
-            let depth_set = self.depth_set.unwrap();
 
-            let expected_len = if depth_set { (depth + 1) as usize } else { 1 };
+            let equivalent_surface_order;
 
-            if expansion_order.len() != expected_len {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidInput,
-                    "Number of expansion orders must either be 1, or match the depth of the tree",
-                ));
-            }
+            if expansion_order.len() > 1 {
+                self.variable_expansion_order = Some(true);
 
-            let unique_expansion_orders: HashSet<_> = expansion_order.iter().cloned().collect();
+                let expected_len = (depth as usize) + 1;
 
-            if unique_expansion_orders.len() > 1 {
-                self.variable_expansion_order = Some(true)
+                if expansion_order.len() != expected_len {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Number of expansion orders must either be 1, or match the depth of the tree",
+                    ));
+                }
+
+                equivalent_surface_order = expansion_order.to_vec();
             } else {
-                self.variable_expansion_order = Some(false)
+                self.variable_expansion_order = Some(false);
+                equivalent_surface_order = vec![expansion_order[0]];
             }
 
             let check_surface_order = if source_to_target.overdetermined() {
-                expansion_order
+                equivalent_surface_order
                     .iter()
                     .map(|&e| e + source_to_target.surface_diff())
                     .collect_vec()
             } else {
-                expansion_order.to_vec()
+                equivalent_surface_order.to_vec()
             };
 
             self.n_coeffs_equivalent_surface = Some(
-                expansion_order
+                equivalent_surface_order
                     .iter()
                     .map(|&e| ncoeffs_kifmm(e))
                     .collect_vec(),
@@ -272,7 +271,7 @@ where
             );
 
             self.isa = Some(Isa::new());
-            self.equivalent_surface_order = Some(expansion_order.to_vec());
+            self.equivalent_surface_order = Some(equivalent_surface_order.to_vec());
             self.check_surface_order = Some(check_surface_order.to_vec());
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);
@@ -320,7 +319,7 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                    .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
             let (_, duration) = optionally_time(timed, || result.target());
@@ -328,20 +327,39 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                    .insert(MetadataType::TargetData, OperatorTime::from_duration(d));
             }
 
             let (_, duration) = optionally_time(timed, || result.source_to_target());
 
             if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
+                result.metadata_times.insert(
                     MetadataType::SourceToTargetData,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            SourceToTargetTranslationMetadata::displacements(&mut result, None);
+            let (_, duration) = optionally_time(timed, || {
+                result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap())
+            });
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::MetadataCreation,
+                    OperatorTime::from_duration(d),
+                );
+            }
+
+            let (_, duration) = optionally_time(timed, || {
+                SourceToTargetTranslationMetadata::displacements(&mut result, None)
+            });
+
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::DisplacementMap,
+                    OperatorTime::from_duration(d),
+                );
+            }
+
             Ok(result)
         }
     }

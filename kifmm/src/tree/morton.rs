@@ -574,6 +574,15 @@ where
         Self::new(&self.anchor, 1 + self.morton)
     }
 
+    /// Return first child at a given level greater than or equal to the level of a morton key
+    pub fn first_child_at_level(&self, level: u64) -> Option<Self> {
+        if level >= self.level() {
+            Some(Self::new(&self.anchor, level - self.level() + self.morton))
+        } else {
+            None
+        }
+    }
+
     /// Return the first child of a Morton Key on the deepest level.
     pub fn finest_first_child(&self) -> Self {
         Self::new(&self.anchor, DEEPEST_LEVEL - self.level() + self.morton)
@@ -1402,6 +1411,39 @@ mod test {
         let result = a.finest_ancestor(&b);
         let expected = MortonKey::new(&[0, 0, 0], 0);
         assert!(result == expected);
+    }
+
+    #[test]
+    pub fn test_finest_first_child() {
+        let mut root = MortonKey::<f64>::root();
+        let found = root.finest_first_child();
+
+        for _ in 0..DEEPEST_LEVEL {
+            root = root.first_child();
+        }
+
+        assert_eq!(root, found);
+    }
+
+    #[test]
+    pub fn test_first_child_at_level() {
+        // Test case when first child is from root
+        let mut root = MortonKey::<f64>::root();
+        let found = root.first_child_at_level(1).unwrap();
+        for _ in 0..1 {
+            root = root.first_child();
+        }
+
+        assert_eq!(root, found);
+        assert_eq!(root.level(), found.level());
+
+        // Test case when the level is higher than the caller's level
+        let mut root = MortonKey::<f64>::root();
+        for _ in 0..2 {
+            root = root.first_child();
+        }
+
+        assert!(root.first_child_at_level(1).is_none());
     }
 
     #[test]

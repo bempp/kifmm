@@ -1,10 +1,15 @@
+//! Builder for constructing FMMs on multi-node.
+use std::collections::HashMap;
+
+use itertools::Itertools;
 use mpi::{
     topology::{Communicator, SimpleCommunicator},
     traits::Equivalence,
 };
 use num::Float;
-use rlst::{rlst_dynamic_array2, MatrixSvd, RlstScalar};
-use std::collections::HashMap;
+use rlst::{MatrixSvd, RlstScalar};
+
+use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 use crate::{
     fmm::{
@@ -21,7 +26,7 @@ use crate::{
         },
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::{multi_node::GlobalFmmMetadata, single_node::Epsilon},
-        types::{CommunicationTime, CommunicationType, MetadataTime, MetadataType},
+        types::{CommunicationType, MetadataType, OperatorTime},
     },
     tree::{
         types::{Domain, SortKind},
@@ -30,11 +35,9 @@ use crate::{
     KiFmm, MultiNodeFmmTree, SingleNodeFmmTree,
 };
 
-use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
-
 impl<Scalar, Kernel, FieldTranslation> MultiNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Epsilon + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default + Clone,
@@ -68,6 +71,7 @@ where
             kernel_eval_type: None,
             fmm_eval_type: None,
             communication_times: None,
+            variable_expansion_order: None,
         }
     }
 
@@ -75,7 +79,7 @@ where
     #[allow(clippy::too_many_arguments)]
     pub fn tree(
         mut self,
-        comm: &SimpleCommunicator,
+        global_communicator: &SimpleCommunicator,
         sources: &[Scalar::Real],
         targets: &[Scalar::Real],
         local_depth: u64,
@@ -103,27 +107,29 @@ where
                 "Must have a positive number of source or target particles",
             ))
         } else {
-            let mut communication_times = Vec::new();
+            let mut communication_times = HashMap::new();
 
             // Source and target trees calculated over the same domain
-            let (source_domain, d) =
-                optionally_time(timed, || Domain::from_global_points(sources, comm));
+            let (source_domain, d) = optionally_time(timed, || {
+                Domain::from_global_points(sources, global_communicator)
+            });
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
-            let (target_domain, d) =
-                optionally_time(timed, || Domain::from_global_points(targets, comm));
+            let (target_domain, d) = optionally_time(timed, || {
+                Domain::from_global_points(targets, global_communicator)
+            });
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetDomain,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Calculate union of domains for source and target points, needed to define operators
@@ -131,7 +137,7 @@ where
 
             let (source_tree, d) = optionally_time(timed, || {
                 MultiNodeTree::new(
-                    comm,
+                    global_communicator,
                     sources,
                     local_depth,
                     global_depth,
@@ -144,15 +150,15 @@ where
             let source_tree = source_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::SourceTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             let (target_tree, d) = optionally_time(timed, || {
                 MultiNodeTree::new(
-                    comm,
+                    global_communicator,
                     targets,
                     local_depth,
                     global_depth,
@@ -165,10 +171,10 @@ where
             let target_tree = target_tree?;
 
             if let Some(d) = d {
-                communication_times.push(CommunicationTime::from_duration(
+                communication_times.insert(
                     CommunicationType::TargetTree,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Create an FMM tree, and set its layout of source boxes
@@ -185,10 +191,8 @@ where
             let (_, duration) = optionally_time(timed, || fmm_tree.set_source_layout());
 
             if let Some(d) = duration {
-                communication_times.push(CommunicationTime::from_duration(
-                    CommunicationType::Layout,
-                    d,
-                ))
+                communication_times
+                    .insert(CommunicationType::Layout, OperatorTime::from_duration(d));
             }
 
             // Set requires queries at this point for U and V list data, can be intensive for deep trees
@@ -196,7 +200,7 @@ where
             fmm_tree.set_queries(true);
             fmm_tree.set_queries(false);
 
-            self.communicator = Some(comm.duplicate());
+            self.communicator = Some(global_communicator.duplicate());
             self.tree = Some(fmm_tree);
             self.communication_times = Some(communication_times);
             Ok(self)
@@ -207,7 +211,7 @@ where
     pub fn parameters(
         mut self,
         charges: &[Scalar],
-        expansion_order: usize,
+        expansion_order: &[usize],
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
@@ -218,15 +222,57 @@ where
                 "Must build tree before specifying FMM parameters",
             ))
         } else {
-            self.n_coeffs_equivalent_surface = Some(ncoeffs_kifmm(expansion_order));
-            self.n_coeffs_check_surface = Some(ncoeffs_kifmm(expansion_order));
+            let total_depth = self.tree.as_ref().unwrap().source_tree.total_depth;
+
+            let equivalent_surface_order;
+
+            if expansion_order.len() > 1 {
+                self.variable_expansion_order = Some(true);
+
+                if expansion_order.len() != (total_depth as usize) + 1 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Number of expansion orders must either be 1, or match the depth of the tree",
+                    ));
+                }
+
+                equivalent_surface_order = expansion_order.to_vec();
+            } else {
+                self.variable_expansion_order = Some(false);
+                equivalent_surface_order = vec![expansion_order[0]; (total_depth + 1) as usize];
+            }
+
+            let check_surface_order = if source_to_target.overdetermined() {
+                equivalent_surface_order
+                    .iter()
+                    .map(|&e| e + source_to_target.surface_diff())
+                    .collect_vec()
+            } else {
+                equivalent_surface_order.to_vec()
+            };
+
+            self.n_coeffs_equivalent_surface = Some(
+                equivalent_surface_order
+                    .iter()
+                    .map(|&e| ncoeffs_kifmm(e))
+                    .collect_vec(),
+            );
+
+            self.n_coeffs_check_surface = Some(
+                check_surface_order
+                    .iter()
+                    .map(|&c| ncoeffs_kifmm(c))
+                    .collect_vec(),
+            );
+
+            self.equivalent_surface_order = Some(equivalent_surface_order.to_vec());
+            self.check_surface_order = Some(check_surface_order.to_vec());
+
             self.kernel = Some(kernel);
             self.fmm_eval_type = Some(FmmEvalType::Vector);
             self.kernel_eval_type = Some(eval_type);
             self.isa = Some(Isa::new());
             self.source_to_target = Some(source_to_target);
-            self.equivalent_surface_order = Some(expansion_order);
-            self.check_surface_order = Some(expansion_order);
             self.charges = Some(charges.to_vec()); // un-ordered charges
             Ok(self)
         }
@@ -256,15 +302,15 @@ where
             let check_surface_order = self.check_surface_order.unwrap();
             let communication_times = self.communication_times.unwrap();
             let timed = self.timed.unwrap();
+            let variable_expansion_order = self.variable_expansion_order.unwrap();
 
-            let tmp_arr = rlst_dynamic_array2!(Scalar, [1, 1]);
             let global_fmm: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: vec![equivalent_surface_order],
-                check_surface_order: vec![check_surface_order],
-                variable_expansion_order: false,
-                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
+                variable_expansion_order,
+                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface.to_vec(),
+                n_coeffs_check_surface: n_coeffs_check_surface.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -275,11 +321,11 @@ where
 
             let ghost_fmm_v: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: vec![equivalent_surface_order],
-                check_surface_order: vec![check_surface_order],
-                variable_expansion_order: false,
-                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
+                variable_expansion_order,
+                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface.to_vec(),
+                n_coeffs_check_surface: check_surface_order.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -290,11 +336,11 @@ where
 
             let ghost_fmm_u: KiFmm<Scalar, Kernel, FieldTranslation> = KiFmm {
                 isa: self.isa.unwrap(),
-                equivalent_surface_order: vec![equivalent_surface_order],
-                check_surface_order: vec![check_surface_order],
-                variable_expansion_order: false,
-                n_coeffs_equivalent_surface: vec![n_coeffs_check_surface],
-                n_coeffs_check_surface: vec![n_coeffs_equivalent_surface],
+                equivalent_surface_order: equivalent_surface_order.to_vec(),
+                check_surface_order: check_surface_order.to_vec(),
+                variable_expansion_order,
+                n_coeffs_equivalent_surface: n_coeffs_equivalent_surface.to_vec(),
+                n_coeffs_check_surface: n_coeffs_check_surface.to_vec(),
                 fmm_eval_type,
                 kernel_eval_type,
                 kernel: kernel.clone(),
@@ -306,6 +352,7 @@ where
             let mut result = KiFmmMulti {
                 timed,
                 dim: 3,
+                variable_expansion_order,
                 communication_times,
                 isa: self.isa.unwrap(),
                 communicator,
@@ -326,15 +373,14 @@ where
                 ghost_fmm_v,
                 ghost_fmm_u,
                 kernel_eval_size: 1,
-                source: tmp_arr,
-                operator_times: Vec::default(),
+                source: Vec::default(),
+                operator_times: HashMap::default(),
                 charges: Vec::default(),
                 charge_index_pointer_sources: Vec::default(),
                 charge_index_pointer_targets: Vec::default(),
                 leaf_upward_check_surfaces_sources: Vec::default(),
                 leaf_downward_equivalent_surfaces_targets: Vec::default(),
                 leaf_upward_equivalent_surfaces_sources: Vec::default(),
-                leaf_scales_sources: Vec::default(),
                 uc2e_inv_1: Vec::default(),
                 uc2e_inv_2: Vec::default(),
                 dc2e_inv_1: Vec::default(),
@@ -351,9 +397,13 @@ where
                 level_index_pointer_locals: Vec::default(),
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
-                metadata_times: Vec::default(),
+                metadata_times: HashMap::default(),
+                ghost_requested_queries_v: Vec::default(),
                 ghost_requested_queries_key_to_index_v: HashMap::default(),
                 ghost_requested_queries_counts_v: Vec::default(),
+                ghost_requested_queries_v_buffer_sizes_counts: Vec::default(),
+                ghost_requested_queries_v_buffer_sizes_displacements: Vec::default(),
+                ghost_requested_queries_displacements_v: Vec::default(),
                 ghost_received_queries_displacements_v: Vec::default(),
                 ghost_received_queries_counts_v: Vec::default(),
                 ghost_received_queries_v: Vec::default(),
@@ -374,7 +424,7 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::SourceData, d))
+                    .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
             let (_, duration) = optionally_time(timed, || result.target());
@@ -382,21 +432,22 @@ where
             if let Some(d) = duration {
                 result
                     .metadata_times
-                    .push(MetadataTime::from_duration(MetadataType::TargetData, d))
+                    .insert(MetadataType::TargetData, OperatorTime::from_duration(d));
             }
 
+            // TODO
             let (_, duration) = optionally_time(timed, || result.source_to_target());
 
             if let Some(d) = duration {
-                result.metadata_times.push(MetadataTime::from_duration(
+                result.metadata_times.insert(
                     MetadataType::SourceToTargetData,
-                    d,
-                ))
+                    OperatorTime::from_duration(d),
+                );
             }
 
             // Metadata for global FMM and FMM
 
-            // On nominated node only
+            // // On nominated node only
             if result.communicator.rank() == 0 {
                 result.global_fmm.set_source_tree(
                     &result.tree.domain,
@@ -416,8 +467,23 @@ where
                 result.global_fmm.displacements(None);
             }
 
-            result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap());
-            result.displacements(None);
+            let (_, duration) = optionally_time(timed, || {
+                result.metadata(self.kernel_eval_type.unwrap(), &self.charges.unwrap())
+            });
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::MetadataCreation,
+                    OperatorTime::from_duration(d),
+                );
+            }
+
+            let (_, duration) = optionally_time(timed, || result.displacements(None));
+            if let Some(d) = duration {
+                result.metadata_times.insert(
+                    MetadataType::DisplacementMap,
+                    OperatorTime::from_duration(d),
+                );
+            }
 
             Ok(result)
         }

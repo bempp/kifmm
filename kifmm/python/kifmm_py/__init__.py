@@ -42,19 +42,19 @@ class OperatorTimes:
         if self.times_p.length > 0:
             for i in range(0, self.times_p.length):
                 operator_time = self.times_p.times[i]
-                tag = operator_time.operator_.tag
-                time = operator_time.time
+                tag = operator_time.op_type.tag
+                time = operator_time.time.time
 
                 if tag == lib.FmmOperatorType_P2M:
                     operator_name = "P2M"
                 elif tag == lib.FmmOperatorType_M2M:
-                    level = operator_time.operator_.m2m
+                    level = operator_time.op_type.m2m
                     operator_name = f"M2M({level})"
                 elif tag == lib.FmmOperatorType_M2L:
-                    level = operator_time.operator_.m2l
+                    level = operator_time.op_type.m2l
                     operator_name = f"M2L({level})"
                 elif tag == lib.FmmOperatorType_L2L:
-                    level = operator_time.operator_.l2l
+                    level = operator_time.op_type.l2l
                     operator_name = f"L2L({level})"
                 elif tag == lib.FmmOperatorType_L2P:
                     operator_name = "L2P"
@@ -78,8 +78,8 @@ class MetadataTimes:
         if self.times_p.length > 0:
             for i in range(0, self.times_p.length):
                 metadata_time = self.times_p.times[i]
-                tag = metadata_time.operator_
-                time = metadata_time.time
+                tag = metadata_time.metadata_type
+                time = metadata_time.time.time
 
                 if tag == 0:
                     operator_name = "source_to_target_data"
@@ -93,6 +93,10 @@ class MetadataTimes:
                     operator_name = "ghost_fmm_v"
                 elif tag == 5:
                     operator_name = "ghost_fmm_u"
+                elif tag == 6:
+                    operator_name = "buffers_and_pointers"
+                elif tag == 7:
+                    operator_name = "displacement_map"
 
                 self._times[operator_name] = time
 
@@ -111,8 +115,8 @@ class CommunicationTimes:
         if self.times_p.length > 0:
             for i in range(0, self.times_p.length):
                 communication_time = self.times_p.times[i]
-                tag = communication_time.operator_
-                time = communication_time.time
+                tag = communication_time.comm_type
+                time = communication_time.time.time
 
                 if tag == 0:
                     operator_name = "source_tree"

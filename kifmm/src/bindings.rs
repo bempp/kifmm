@@ -13,7 +13,7 @@ use crate::{
 pub mod types {
     use std::ffi::c_void;
 
-    use crate::traits::types::{CommunicationTime, FmmOperatorTime, MetadataTime};
+    use crate::traits::types::{CommunicationType, FmmOperatorType, MetadataType, OperatorTime};
 
     /// Static FMM type
     #[repr(C)]
@@ -136,20 +136,41 @@ pub mod types {
     }
 
     #[repr(C)]
+    #[derive(Debug, Clone, Copy)]
+    pub struct FmmOperatorEntry {
+        pub op_type: FmmOperatorType,
+        pub time: OperatorTime,
+    }
+
+    #[repr(C)]
     pub struct FmmOperatorTimes {
-        pub times: *mut FmmOperatorTime,
+        pub times: *mut FmmOperatorEntry,
         pub length: usize,
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy)]
+    pub struct MetadataEntry {
+        pub metadata_type: MetadataType,
+        pub time: OperatorTime,
     }
 
     #[repr(C)]
     pub struct MetadataTimes {
-        pub times: *mut MetadataTime,
+        pub times: *mut MetadataEntry,
         pub length: usize,
     }
 
     #[repr(C)]
+    #[derive(Debug, Clone, Copy)]
+    pub struct CommunicationEntry {
+        pub comm_type: CommunicationType,
+        pub time: OperatorTime,
+    }
+
+    #[repr(C)]
     pub struct CommunicationTimes {
-        pub times: *mut CommunicationTime,
+        pub times: *mut CommunicationEntry,
         pub length: usize,
     }
 }
@@ -1560,7 +1581,7 @@ pub mod api {
     use itertools::Itertools;
 
     use crate::{
-        bindings::MetadataTimes,
+        bindings::{CommunicationEntry, FmmOperatorEntry, MetadataEntry, MetadataTimes},
         fmm::types::FmmEvalType,
         traits::{
             fmm::{ChargeHandler, DataAccess},
@@ -1602,24 +1623,46 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1627,24 +1670,47 @@ pub mod api {
                 FmmTranslationCType::Fft => {
                     let fmm =
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
 
-                    let times = CommunicationTimes { times, length };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1653,24 +1719,46 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1678,24 +1766,46 @@ pub mod api {
                 FmmTranslationCType::Fft => {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let length = unsafe { (*fmm).communication_times.len() };
-                    let times = unsafe { (*fmm).communication_times.as_mut_ptr() };
+                    let entries: Vec<CommunicationEntry> = unsafe {
+                        (*fmm)
+                            .communication_times
+                            .iter()
+                            .map(|(&comm_type, &time)| CommunicationEntry { comm_type, time })
+                            .collect()
+                    };
 
-                    let times = CommunicationTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(CommunicationTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
         }
@@ -1725,24 +1835,52 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1751,24 +1889,52 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1777,24 +1943,52 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1802,24 +1996,53 @@ pub mod api {
                 FmmTranslationCType::Fft => {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
 
-                    let times = MetadataTimes { times, length };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let length = unsafe { (*fmm).metadata_times.len() };
-                    let times = unsafe { (*fmm).metadata_times.as_mut_ptr() };
+                    let entries: Vec<MetadataEntry> = unsafe {
+                        (*fmm)
+                            .metadata_times
+                            .iter()
+                            .map(|(&metadata_type, &time)| MetadataEntry {
+                                metadata_type,
+                                time,
+                            })
+                            .collect()
+                    };
 
-                    let times = MetadataTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(MetadataTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
         }
@@ -1849,24 +2072,46 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1875,23 +2120,46 @@ pub mod api {
                     let fmm =
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1900,24 +2168,46 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -1926,24 +2216,46 @@ pub mod api {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
                     let fmm = pointer
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
         }
@@ -1975,12 +2287,23 @@ pub mod api {
                         pointer as *mut KiFmm<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>>;
                     let _ = unsafe { (*fmm).evaluate() };
 
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    let times = FmmOperatorTimes { times, length };
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
 
-                    Box::into_raw(Box::new(times))
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
@@ -1988,12 +2311,24 @@ pub mod api {
                         as *mut KiFmm<f32, Laplace3dKernel<f32>, BlasFieldTranslationSaRcmp<f32>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -2003,12 +2338,24 @@ pub mod api {
                         pointer as *mut KiFmm<f64, Laplace3dKernel<f64>, FftFieldTranslation<f64>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
@@ -2016,11 +2363,24 @@ pub mod api {
                         as *mut KiFmm<f64, Laplace3dKernel<f64>, BlasFieldTranslationSaRcmp<f64>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
-                    let times = FmmOperatorTimes { times, length };
 
-                    Box::into_raw(Box::new(times))
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
+
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -2030,12 +2390,24 @@ pub mod api {
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, FftFieldTranslation<c32>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
@@ -2043,12 +2415,24 @@ pub mod api {
                         as *mut KiFmm<c32, Helmholtz3dKernel<c32>, BlasFieldTranslationIa<c32>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
 
@@ -2058,12 +2442,24 @@ pub mod api {
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, FftFieldTranslation<c64>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
 
                 FmmTranslationCType::Blas => {
@@ -2071,12 +2467,24 @@ pub mod api {
                         as *mut KiFmm<c64, Helmholtz3dKernel<c64>, BlasFieldTranslationIa<c64>>;
 
                     let _ = unsafe { (*fmm).evaluate() };
-                    let length = unsafe { (*fmm).operator_times.len() };
-                    let times = unsafe { (*fmm).operator_times.as_mut_ptr() };
 
-                    let times = FmmOperatorTimes { times, length };
+                    let entries: Vec<FmmOperatorEntry> = unsafe {
+                        (*fmm)
+                            .operator_times
+                            .iter()
+                            .map(|(&op_type, &time)| FmmOperatorEntry { op_type, time })
+                            .collect()
+                    };
 
-                    Box::into_raw(Box::new(times))
+                    // Leak the Vec to pass to C safely
+                    let length = entries.len();
+                    let mut boxed_entries = entries.into_boxed_slice();
+                    let ptr = boxed_entries.as_mut_ptr();
+                    std::mem::forget(boxed_entries); // Prevent Rust from freeing it
+
+                    let boxed = Box::new(FmmOperatorTimes { times: ptr, length });
+
+                    Box::into_raw(boxed)
                 }
             },
         }
