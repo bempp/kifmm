@@ -1,3 +1,4 @@
+use green_kernels::traits::Kernel as KernelTrait;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence, Rank};
 use num::Float;
 use rlst::RlstScalar;
@@ -12,12 +13,10 @@ use crate::{
     MultiNodeFmmTree,
 };
 
-use green_kernels::traits::Kernel as KernelTrait;
-
 impl<Scalar, Kernel, FieldTranslation> DataAccessMulti
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Float + Equivalence,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: RlstScalar + Default + Float + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
@@ -44,23 +43,23 @@ where
     }
 
     fn variable_expansion_order(&self) -> bool {
-        false
+        self.variable_expansion_order
     }
 
-    fn equivalent_surface_order(&self, _level: u64) -> usize {
-        self.equivalent_surface_order
+    fn equivalent_surface_order(&self, level: u64) -> usize {
+        self.equivalent_surface_order[self.expansion_index(level)]
     }
 
-    fn check_surface_order(&self, _level: u64) -> usize {
-        self.check_surface_order
+    fn check_surface_order(&self, level: u64) -> usize {
+        self.check_surface_order[self.expansion_index(level)]
     }
 
-    fn n_coeffs_equivalent_surface(&self, _level: u64) -> usize {
-        self.n_coeffs_equivalent_surface
+    fn n_coeffs_equivalent_surface(&self, level: u64) -> usize {
+        self.n_coeffs_equivalent_surface[self.expansion_index(level)]
     }
 
-    fn n_coeffs_check_surface(&self, _level: u64) -> usize {
-        self.n_coeffs_check_surface
+    fn n_coeffs_check_surface(&self, level: u64) -> usize {
+        self.n_coeffs_check_surface[self.expansion_index(level)]
     }
 
     fn kernel(&self) -> &Self::Kernel {
@@ -96,12 +95,11 @@ where
     fn multipoles(&self, level: u64) -> Option<&[Self::Scalar]> {
         if let Some(n_sources) = self.tree().source_tree().n_keys(level) {
             let multipole_ptr = &self.level_multipoles[level as usize][0];
-
             unsafe {
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.n_coeffs_equivalent_surface * n_sources,
+                        self.n_coeffs_equivalent_surface(level) * n_sources,
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -119,7 +117,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.n_coeffs_equivalent_surface * n_targets,
+                        self.n_coeffs_equivalent_surface(level) * n_targets,
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -140,7 +138,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         multipole_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -156,12 +154,11 @@ where
     ) -> Option<&mut [Self::Scalar]> {
         if let Some(&key_idx) = self.tree().source_tree().level_index(key) {
             let multipole_ptr = &self.level_multipoles[key.level() as usize][key_idx];
-
             unsafe {
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts_mut(
                         multipole_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -182,7 +179,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts(
                         local_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }
@@ -203,7 +200,7 @@ where
                 match self.fmm_eval_type {
                     FmmEvalType::Vector => Some(std::slice::from_raw_parts_mut(
                         local_ptr.raw,
-                        self.n_coeffs_equivalent_surface,
+                        self.n_coeffs_equivalent_surface(key.level()),
                     )),
                     FmmEvalType::Matrix(_n) => None,
                 }

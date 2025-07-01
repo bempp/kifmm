@@ -38,7 +38,7 @@ fn main() {
     let sort_kind = SortKind::Samplesort { n_samples: 1000 };
 
     // Fmm Parameters
-    let expansion_order = 4;
+    let expansion_order = [4];
     let kernel = Laplace3dKernel::<f32>::new();
     let source_to_target = FftFieldTranslation::<f32>::new(None);
 
@@ -52,35 +52,36 @@ fn main() {
         .unwrap();
 
     // Queries are set as a part of the build
-    let multi_fmm = MultiNodeBuilder::new(false)
-        .tree(
-            &comm,
-            points.data(),
-            points.data(),
-            local_depth,
-            global_depth,
-            prune_empty,
-            sort_kind,
-        )
-        .unwrap()
-        .parameters(
-            &charges,
-            expansion_order,
-            kernel,
-            GreenKernelEvalType::Value,
-            source_to_target,
-        )
-        .unwrap()
-        .build()
-        .unwrap();
+    let fmm: kifmm::KiFmmMulti<f32, Laplace3dKernel<f32>, FftFieldTranslation<f32>> =
+        MultiNodeBuilder::new(false)
+            .tree(
+                &comm,
+                points.data(),
+                points.data(),
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                &charges,
+                &expansion_order,
+                kernel,
+                GreenKernelEvalType::Value,
+                source_to_target,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
 
-    multi_fmm.p2m().unwrap();
+    fmm.p2m().unwrap();
 
     // Test that the interaction lists remain the same with respect to a single node FMM
     // Gather all data for the test
 
     let root_process = comm.process_at_rank(0);
-    let n_coords = multi_fmm.tree().source_tree().coordinates.len() as i32;
+    let n_coords = fmm.tree().source_tree().coordinates.len() as i32;
     let mut all_coordinates = vec![0f32; 3 * n_points * world.size() as usize];
 
     let mut global_leaves_counts = vec![0i32; world.size() as usize];
@@ -96,7 +97,7 @@ fn main() {
             counter += count;
         }
 
-        let local_coords = multi_fmm.tree().source_tree().all_coordinates().unwrap();
+        let local_coords = fmm.tree().source_tree().all_coordinates().unwrap();
 
         let mut partition = PartitionMut::new(
             &mut all_coordinates,
@@ -107,16 +108,16 @@ fn main() {
         root_process.gather_varcount_into_root(local_coords, &mut partition);
 
         // Gather leaf counts
-        let n_leaves = multi_fmm.tree.source_tree.leaves.len() as i32;
+        let n_leaves = fmm.tree.source_tree.leaves.len() as i32;
         root_process.gather_into_root(&n_leaves, &mut global_leaves_counts);
     } else {
         root_process.gather_into(&n_coords);
 
-        let local_coords = multi_fmm.tree().source_tree().all_coordinates().unwrap();
+        let local_coords = fmm.tree().source_tree().all_coordinates().unwrap();
         root_process.gather_varcount_into(local_coords);
 
         // gather leaf counts
-        let n_leaves = multi_fmm.tree.source_tree.leaves.len() as i32;
+        let n_leaves = fmm.tree.source_tree.leaves.len() as i32;
         root_process.gather_into(&n_leaves);
     }
 
@@ -124,7 +125,7 @@ fn main() {
         vec![MortonKey::<f32>::default(); global_leaves_counts.iter().sum::<i32>() as usize];
     let mut global_multipoles = vec![
         0f32;
-        multi_fmm.n_coeffs_equivalent_surface(0)
+        fmm.n_coeffs_equivalent_surface(0)
             * global_leaves_counts.iter().sum::<i32>() as usize
     ];
 
@@ -140,9 +141,9 @@ fn main() {
         let mut global_multipoles_displacements = Vec::new();
         let mut displacement = 0;
         for &count in global_leaves_counts.iter() {
-            global_multipoles_counts.push(count * multi_fmm.n_coeffs_equivalent_surface(0) as i32);
+            global_multipoles_counts.push(count * fmm.n_coeffs_equivalent_surface(0) as i32);
             global_multipoles_displacements.push(displacement);
-            displacement += multi_fmm.n_coeffs_equivalent_surface(0) as i32 * count;
+            displacement += fmm.n_coeffs_equivalent_surface(0) as i32 * count;
         }
 
         let mut partition = PartitionMut::new(
@@ -151,14 +152,14 @@ fn main() {
             global_leaves_displacements,
         );
 
-        let leaves = &multi_fmm.tree.source_tree.leaves;
+        let leaves = &fmm.tree.source_tree.leaves;
         root_process.gather_varcount_into_root(&leaves[..], &mut partition);
 
-        let mut multipoles = vec![0f32; multi_fmm.n_coeffs_equivalent_surface(0) * leaves.len()];
+        let mut multipoles = vec![0f32; fmm.n_coeffs_equivalent_surface(0) * leaves.len()];
         for (i, leaf) in leaves.iter().enumerate() {
-            let l = i * multi_fmm.n_coeffs_equivalent_surface(0);
-            let r = l + multi_fmm.n_coeffs_equivalent_surface(0);
-            multipoles[l..r].copy_from_slice(multi_fmm.multipole(leaf).unwrap());
+            let l = i * fmm.n_coeffs_equivalent_surface(0);
+            let r = l + fmm.n_coeffs_equivalent_surface(0);
+            multipoles[l..r].copy_from_slice(fmm.multipole(leaf).unwrap());
         }
 
         let mut partition = PartitionMut::new(
@@ -169,13 +170,13 @@ fn main() {
 
         root_process.gather_varcount_into_root(&multipoles, &mut partition);
     } else {
-        let leaves = &multi_fmm.tree.source_tree.leaves;
+        let leaves = &fmm.tree.source_tree.leaves;
 
-        let mut multipoles = vec![0f32; multi_fmm.n_coeffs_equivalent_surface(0) * leaves.len()];
+        let mut multipoles = vec![0f32; fmm.n_coeffs_equivalent_surface(0) * leaves.len()];
         for (i, leaf) in leaves.iter().enumerate() {
-            let l = i * multi_fmm.n_coeffs_equivalent_surface(0);
-            let r = l + multi_fmm.n_coeffs_equivalent_surface(0);
-            multipoles[l..r].copy_from_slice(multi_fmm.multipole(leaf).unwrap());
+            let l = i * fmm.n_coeffs_equivalent_surface(0);
+            let r = l + fmm.n_coeffs_equivalent_surface(0);
+            multipoles[l..r].copy_from_slice(fmm.multipole(leaf).unwrap());
         }
 
         root_process.gather_varcount_into(&leaves[..]);
@@ -194,7 +195,7 @@ fn main() {
             .unwrap()
             .parameters(
                 &vec![1f32; all_coordinates.len() / 3],
-                &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+                &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
@@ -225,11 +226,11 @@ fn main() {
 
         for (leaf, new_idx) in new_key_to_index.iter() {
             let old_idx = old_key_to_index.get(leaf).unwrap();
-            let l = old_idx * multi_fmm.n_coeffs_equivalent_surface(0);
-            let r = l + multi_fmm.n_coeffs_equivalent_surface(0);
+            let l = old_idx * fmm.n_coeffs_equivalent_surface(0);
+            let r = l + fmm.n_coeffs_equivalent_surface(0);
 
-            let new_l = new_idx * multi_fmm.n_coeffs_equivalent_surface(0);
-            let new_r = new_l + multi_fmm.n_coeffs_equivalent_surface(0);
+            let new_l = new_idx * fmm.n_coeffs_equivalent_surface(0);
+            let new_r = new_l + fmm.n_coeffs_equivalent_surface(0);
 
             re_ordered_global_multipoles[new_l..new_r].copy_from_slice(&global_multipoles[l..r]);
         }

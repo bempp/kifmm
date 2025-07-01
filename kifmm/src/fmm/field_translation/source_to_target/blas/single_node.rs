@@ -51,7 +51,6 @@ where
         let displacement_index = self.displacement_index(level);
         let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
 
-        // let sentinel = sources.len();
         let sentinel = -1i32;
 
         // Compute the displacements
@@ -499,15 +498,7 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 // Lookup multipole data from source tree
-                let multipoles = rlst_array_from_slice2!(
-                    unsafe {
-                        std::slice::from_raw_parts(
-                            self.level_multipoles[level as usize][0][0].raw,
-                            n_coeffs_equivalent_surface * n_sources,
-                        )
-                    },
-                    [n_coeffs_equivalent_surface, n_sources]
-                );
+                let multipoles = self.multipoles(level).unwrap();
 
                 // Allocate buffer to store check potentials
                 let check_potentials =
@@ -550,7 +541,7 @@ where
                                     * n_coeffs_equivalent_surface
                                     ..(local_multipole_idx + 1) * n_coeffs_equivalent_surface]
                                     .copy_from_slice(
-                                        &multipoles.data()[global_multipole_idx
+                                        &multipoles[global_multipole_idx
                                             * n_coeffs_equivalent_surface
                                             ..(global_multipole_idx + 1)
                                                 * n_coeffs_equivalent_surface],
@@ -611,15 +602,7 @@ where
             }
             FmmEvalType::Matrix(n_matvecs) => {
                 // Lookup multipole data from source tree
-                let multipoles = rlst_array_from_slice2!(
-                    unsafe {
-                        std::slice::from_raw_parts(
-                            self.level_multipoles[level as usize][0][0].raw,
-                            n_coeffs_equivalent_surface * n_sources * n_matvecs,
-                        )
-                    },
-                    [n_coeffs_equivalent_surface, n_sources * n_matvecs]
-                );
+                let multipoles = self.multipoles(level).unwrap();
 
                 let check_potentials =
                     rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_sources * n_matvecs]);
@@ -685,7 +668,7 @@ where
                                             + charge_vec_displacement
                                             + n_coeffs_equivalent_surface]
                                         .copy_from_slice(
-                                            &multipoles.data()[key_displacement_global
+                                            &multipoles[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement

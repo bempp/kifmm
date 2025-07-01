@@ -3,9 +3,8 @@
 
 use itertools::Itertools;
 use num::Float;
-use rand::prelude::*;
-use rlst::RlstScalar;
-use rlst::{rlst_dynamic_array2, Array, BaseArray, VectorContainer};
+use rand::{distributions::Uniform, prelude::*, rngs::StdRng, SeedableRng};
+use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
 
 /// Alias for an rlst container for point data, expected with shape [n_points, 3];
 pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -54,27 +53,71 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
 pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
     n_points: usize,
 ) -> PointsMat<T> {
-    // Generate a set of randomly distributed points
-    let mut range = StdRng::seed_from_u64(0);
-    let pi = T::from(3.134159).unwrap();
+    // Seeded random number generator for reproducibility
+    let mut rng = StdRng::seed_from_u64(0);
+    let pi = T::from(std::f64::consts::PI).unwrap();
     let two = T::from(2.0).unwrap();
-    let half = T::from(0.5).unwrap();
+    let one = T::one();
 
-    let between = rand::distributions::Uniform::from(T::zero()..T::one());
+    // Uniform distributions for phi and cos(theta)
+    let phi_dist = Uniform::from(T::zero()..(two * pi));
+    let u_dist = Uniform::from(T::zero()..one);
 
+    // Initialize points array
     let mut points = rlst_dynamic_array2!(T, [3, n_points]);
-    let mut phi = rlst_dynamic_array2!(T, [n_points, 1]);
-    let mut theta = rlst_dynamic_array2!(T, [n_points, 1]);
 
     for i in 0..n_points {
-        phi[[i, 0]] = between.sample(&mut range) * two * pi;
-        theta[[i, 0]] = ((between.sample(&mut range) - half) * two).acos();
+        // Generate random phi and theta
+        let phi = phi_dist.sample(&mut rng);
+        let u = u_dist.sample(&mut rng);
+        let theta = (one - two * u).acos();
+
+        // Compute Cartesian coordinates
+        let x = theta.sin() * phi.cos();
+        let y = theta.sin() * phi.sin();
+        let z = theta.cos();
+
+        // Assign to points array
+        points[[0, i]] = x;
+        points[[1, i]] = y;
+        points[[2, i]] = z;
     }
 
+    points
+}
+
+/// Points fixture for testing, uniformly samples on surface of an oblate-spheroid
+///
+/// # Arguments
+/// * `n_points` - The number of points to sample.
+/// * `a` - Semi-axis length along x- and y-axes.
+/// * `c` -  Semi-axis length along the z-axis.
+pub fn points_fixture_oblate_spheroid<
+    T: RlstScalar + rand::distributions::uniform::SampleUniform,
+>(
+    n_points: usize,
+    a: T,
+    c: T,
+) -> PointsMat<T> {
+    let mut rng = StdRng::seed_from_u64(0); // Use a fixed seed for reproducibility
+    let pi = T::from(std::f64::consts::PI).unwrap();
+    let two = T::from(2.0).unwrap();
+    let one = T::one();
+
+    let phi_dist = Uniform::from(T::zero()..(two * pi)); // Azimuthal angle
+    let cos_theta_dist = Uniform::from(-one..one); // Cosine of polar angle
+
+    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
+
     for i in 0..n_points {
-        points[[0, i]] = half * theta[[i, 0]].sin() * phi[[i, 0]].cos() + half;
-        points[[1, i]] = half * theta[[i, 0]].sin() * phi[[i, 0]].sin() + half;
-        points[[2, i]] = half * theta[[i, 0]].cos() + half;
+        let phi = phi_dist.sample(&mut rng); // Random azimuthal angle
+        let cos_theta = cos_theta_dist.sample(&mut rng); // Random cosine of polar angle
+        let theta = cos_theta.acos(); // Compute polar angle
+
+        // Parametric equations for the oblate spheroid
+        points[[0, i]] = a * theta.sin() * phi.cos(); // x-axis
+        points[[1, i]] = a * theta.sin() * phi.sin(); // y-axis
+        points[[2, i]] = c * theta.cos(); // z-axis
     }
 
     points

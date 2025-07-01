@@ -34,7 +34,7 @@ fn main() {
     let sort_kind = SortKind::Samplesort { n_samples: 100 };
 
     // Fmm Parameters
-    let expansion_order = 4;
+    let expansion_order = [4];
     let kernel = Laplace3dKernel::<f32>::new();
 
     ThreadPoolBuilder::new()
@@ -65,7 +65,7 @@ fn main() {
             .unwrap()
             .parameters(
                 charges.data(),
-                expansion_order,
+                &expansion_order,
                 kernel.clone(),
                 GreenKernelEvalType::Value,
                 source_to_target,
@@ -146,7 +146,7 @@ fn main() {
                 .unwrap()
                 .parameters(
                     &all_charges,
-                    &vec![expansion_order; (local_depth + global_depth + 1) as usize],
+                    &expansion_order,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
@@ -166,21 +166,6 @@ fn main() {
             );
 
             let distributed = multi_fmm.potentials().unwrap();
-
-            // println!(
-            //     "{:?} expected: {:?} \n found: {:?}",
-            //     world.rank(),
-            //     &distributed[0..100],
-            //     &expected[0..100]
-            // );
-
-            // let mut err = 0f32;
-            // for (l, r) in izip!(distributed, expected) {
-            //     println!("l {:?}, r {:?}", l, r);
-            //     err += (l-r).abs()/r.abs();
-            // }
-
-            // println!("ERROR {:?}", err/(multi_fmm.tree.target_tree.n_coordinates_tot().unwrap() as f32));
 
             if multi_fmm.communicator().size() > 1 {
                 distributed

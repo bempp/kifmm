@@ -25,13 +25,13 @@ use crate::{
         types::FmmError,
     },
     tree::constants::NTRANSFER_VECTORS_KIFMM,
-    BlasFieldTranslationSaRcmp, DataAccess, KiFmm, MultiNodeFmmTree,
+    BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, DataAccess, KiFmm, MultiNodeFmmTree,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmmMulti<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     Self: MetadataAccess
@@ -50,21 +50,20 @@ where
                     // Metadata
                     let m2l_operator_index = self.m2l_operator_index(level);
                     let c2e_operator_index = self.c2e_operator_index(level);
+                    let displacement_index = self.displacement_index(level);
                     let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+                    let sentinel = -1i32;
 
                     // Parameters
                     let n_targets = targets.len();
                     let mut n_translations = 0;
-                    let mut all_sentinels = Vec::new();
                     let mut all_n_sources = Vec::new();
                     let mut all_multipoles = Vec::new();
                     let mut all_displacements = Vec::new();
-                    let displacement_index = self.displacement_index(level);
 
                     // Handle locally contained source boxes
                     if let Some(sources) = self.tree().source_tree().keys(level) {
                         n_translations += 1;
-                        let sentinel = -1i32;
 
                         all_displacements
                             .push(&self.source_to_target.displacements[displacement_index]);
@@ -77,13 +76,11 @@ where
 
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
-                        all_sentinels.push(sentinel);
                     }
 
                     // Handle ghost sources
                     if let Some(sources) = self.ghost_fmm_v.tree.source_tree.keys(level) {
                         n_translations += 1;
-                        let sentinel = -1i32;
 
                         all_displacements.push(
                             &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
@@ -97,7 +94,6 @@ where
 
                         all_n_sources.push(n_sources);
                         all_multipoles.push(multipoles);
-                        all_sentinels.push(sentinel);
                     }
 
                     // Allocate buffer to store compressed check potentials
@@ -130,7 +126,6 @@ where
                     // Compute translations
                     for i in 0..n_translations {
                         let all_displacements = all_displacements[i];
-                        let sentinel = all_sentinels[i];
 
                         let multipole_idxs = all_displacements
                             .iter()
@@ -271,6 +266,243 @@ where
                                 n_targets * n_coeffs_equivalent_surface,
                             )
                         };
+                        all_locals
+                            .iter_mut()
+                            .zip(locals.data().iter())
+                            .for_each(|(l, r)| *l += *r);
+                    }
+                }
+
+                Ok(())
+            }
+            FmmEvalType::Matrix(_) => Err(FmmError::Unimplemented(
+                "M2L unimplemented for matrix input with BLAS field translations".to_string(),
+            )),
+        }
+    }
+
+    fn p2l(&self, _level: u64) -> Result<(), FmmError> {
+        Ok(())
+    }
+}
+
+impl<Scalar, Kernel> SourceToTargetTranslation
+    for KiFmmMulti<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
+where
+    Scalar: RlstScalar + Default + Equivalence,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
+    Self: MetadataAccess
+        + DataAccessMulti<
+            Scalar = Scalar,
+            Kernel = Kernel,
+            Tree = MultiNodeFmmTree<Scalar::Real, SimpleCommunicator>,
+        >,
+    KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>:
+        DataAccess<Scalar = Scalar, Kernel = Kernel>,
+{
+    fn m2l(&self, level: u64) -> Result<(), FmmError> {
+        match self.fmm_eval_type {
+            FmmEvalType::Vector => {
+                if let Some(targets) = self.tree().target_tree().keys(level) {
+                    // Metadata
+                    let m2l_operator_index = self.m2l_operator_index(level);
+                    let c2e_operator_index = self.c2e_operator_index(level);
+                    let displacement_index = self.displacement_index(level);
+                    let n_coeffs_equivalent_surface = self.n_coeffs_equivalent_surface(level);
+                    let n_coeffs_check_surface = self.n_coeffs_check_surface(level);
+                    let sentinel = -1i32;
+
+                    // Parameters
+                    let n_targets = targets.len();
+                    let mut n_translations = 0;
+                    let mut all_n_sources = Vec::new();
+                    let mut all_multipoles = Vec::new();
+                    let mut all_displacements = Vec::new();
+
+                    // Handle locally contained source boxes
+                    if let Some(sources) = self.tree().source_tree().keys(level) {
+                        n_translations += 1;
+
+                        all_displacements
+                            .push(&self.source_to_target.displacements[displacement_index]);
+
+                        // Number of sources at this level
+                        let n_sources = sources.len();
+
+                        // Lookup multipole data from source tree
+                        let multipoles = self.multipoles(level).unwrap();
+
+                        all_n_sources.push(n_sources);
+                        all_multipoles.push(multipoles);
+                    }
+
+                    // Handle ghost sources
+                    if let Some(sources) = self.ghost_fmm_v.tree.source_tree.keys(level) {
+                        n_translations += 1;
+
+                        all_displacements.push(
+                            &self.ghost_fmm_v.source_to_target.displacements[displacement_index],
+                        );
+
+                        // Number of sources at this level
+                        let n_sources = sources.len();
+
+                        // Lookup multipole data from source tree
+                        let multipoles = self.ghost_fmm_v.multipoles(level).unwrap();
+
+                        all_n_sources.push(n_sources);
+                        all_multipoles.push(multipoles);
+                    }
+
+                    // Allocate buffer to store check potentials
+                    let all_check_potentials =
+                        rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets]);
+
+                    let mut all_check_potentials_ptrs = Vec::new();
+
+                    for i in 0..n_targets {
+                        let raw = unsafe {
+                            all_check_potentials
+                                .data()
+                                .as_ptr()
+                                .add(i * n_coeffs_check_surface)
+                                as *mut Scalar
+                        };
+                        let send_ptr = SendPtrMut { raw };
+                        all_check_potentials_ptrs.push(send_ptr);
+                    }
+
+                    let level_check_potentials = all_check_potentials_ptrs
+                        .iter()
+                        .map(Mutex::new)
+                        .collect_vec();
+
+                    // Compute translations
+                    for i in 0..n_translations {
+                        let all_displacements_i = all_displacements[i];
+
+                        let multipole_idxs = all_displacements_i
+                            .iter()
+                            .map(|displacement| {
+                                displacement
+                                    .read()
+                                    .unwrap()
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, &d)| d != sentinel)
+                                    .map(|(i, _)| i)
+                                    .collect_vec()
+                            })
+                            .collect_vec();
+
+                        let local_idxs = all_displacements_i
+                            .iter()
+                            .map(|displacements| {
+                                displacements
+                                    .read()
+                                    .unwrap()
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, &d)| d != sentinel)
+                                    .map(|(_, &j)| j as usize)
+                                    .collect_vec()
+                            })
+                            .collect_vec();
+
+                        let n_sources = all_n_sources[i];
+                        let multipoles = &all_multipoles[i];
+
+                        let multipoles = rlst_array_from_slice2!(
+                            multipoles,
+                            [n_coeffs_equivalent_surface, n_sources]
+                        );
+
+                        // 1. Apply BLAS operation
+                        {
+                            let all_u_sub = &self.source_to_target.metadata[m2l_operator_index].u;
+                            let all_vt_sub = &self.source_to_target.metadata[m2l_operator_index].vt;
+
+                            (0..NTRANSFER_VECTORS_KIFMM)
+                                .into_par_iter()
+                                .zip(multipole_idxs)
+                                .zip(local_idxs)
+                                .for_each(|((c_idx, multipole_idxs), local_idxs)| {
+                                    let u = &all_u_sub[c_idx];
+                                    let vt = &all_vt_sub[c_idx];
+
+                                    let mut multipoles_subset = rlst_dynamic_array2!(
+                                        Scalar,
+                                        [n_coeffs_equivalent_surface, multipole_idxs.len()]
+                                    );
+
+                                    for (local_multipole_idx, &global_multipole_idx) in
+                                        multipole_idxs.iter().enumerate()
+                                    {
+                                        multipoles_subset.data_mut()[local_multipole_idx
+                                            * n_coeffs_equivalent_surface
+                                            ..(local_multipole_idx + 1)
+                                                * n_coeffs_equivalent_surface]
+                                            .copy_from_slice(
+                                                &multipoles.data()[global_multipole_idx
+                                                    * n_coeffs_equivalent_surface
+                                                    ..(global_multipole_idx + 1)
+                                                        * n_coeffs_equivalent_surface],
+                                            );
+                                    }
+
+                                    let check_potential = empty_array::<Scalar, 2>()
+                                        .simple_mult_into_resize(
+                                            u.r(),
+                                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                                vt.r(),
+                                                multipoles_subset.r(),
+                                            ),
+                                        );
+
+                                    for (multipole_idx, &local_idx) in local_idxs.iter().enumerate()
+                                    {
+                                        let tmp = &check_potential.data()[multipole_idx
+                                            * n_coeffs_check_surface
+                                            ..(multipole_idx + 1) * n_coeffs_check_surface];
+
+                                        let check_potential_lock =
+                                            level_check_potentials[local_idx].lock().unwrap();
+                                        let check_potential_ptr = check_potential_lock.raw;
+                                        let global_check_potential = unsafe {
+                                            std::slice::from_raw_parts_mut(
+                                                check_potential_ptr,
+                                                n_coeffs_check_surface,
+                                            )
+                                        };
+
+                                        global_check_potential
+                                            .iter_mut()
+                                            .zip(tmp)
+                                            .for_each(|(l, r)| *l += *r);
+                                    }
+                                });
+                        }
+                    }
+
+                    // 2. Compute local expansions from compressed check potentials
+                    {
+                        let locals = empty_array::<Scalar, 2>().simple_mult_into_resize(
+                            self.dc2e_inv_1[c2e_operator_index].r(),
+                            empty_array::<Scalar, 2>().simple_mult_into_resize(
+                                self.dc2e_inv_2[c2e_operator_index].r(),
+                                all_check_potentials.r(),
+                            ),
+                        );
+
+                        let ptr = self.level_locals[level as usize][0].raw;
+                        let all_locals = unsafe {
+                            std::slice::from_raw_parts_mut(
+                                ptr,
+                                n_targets * n_coeffs_equivalent_surface,
+                            )
+                        };
+
                         all_locals
                             .iter_mut()
                             .zip(locals.data().iter())
