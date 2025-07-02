@@ -61,10 +61,7 @@ where
         } else {
             Err(FmmError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!(
-                    "Expected {} right hand side vectors, found {}",
-                    n_matvecs, n_matvecs_input
-                ),
+                format!("Expected {n_matvecs} right hand side vectors, found {n_matvecs_input}"),
             )))
         }
     }
@@ -94,10 +91,7 @@ where
         } else {
             Err(FmmError::Io(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!(
-                    "Expected {} right hand side vectors, found {}",
-                    n_matvecs, n_matvecs_input
-                ),
+                format!("Expected {n_matvecs} right hand side vectors, found {n_matvecs_input}"),
             )))
         }
     }
