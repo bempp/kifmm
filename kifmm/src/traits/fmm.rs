@@ -143,6 +143,7 @@ pub trait DataAccess {
     /// Get the multipole expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The source node.
+    #[allow(clippy::mut_from_ref)]
     fn multipole_mut(
         &self,
         key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,
@@ -164,6 +165,7 @@ pub trait DataAccess {
     /// Get the local expansion data associated with a node as a slice
     /// # Arguments
     /// * `key` - The target node.
+    #[allow(clippy::mut_from_ref)]
     fn local_mut(
         &self,
         key: &<<Self::Tree as SingleFmmTree>::Tree as SingleTree>::Node,

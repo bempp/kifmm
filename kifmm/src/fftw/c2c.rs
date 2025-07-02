@@ -247,7 +247,7 @@ mod test {
             let expected = c64::new(i as f64, 0.);
             let dif = (v - expected).norm();
             if dif > 1e-7 {
-                panic!("Large difference: v={}, dif={}", v, dif);
+                panic!("Large difference: v={v}, dif={dif}");
             }
         }
     }

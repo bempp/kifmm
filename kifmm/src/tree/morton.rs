@@ -688,7 +688,7 @@ where
         match valid {
             false => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("Cannot find descendants below level {:?}", DEEPEST_LEVEL),
+                format!("Cannot find descendants below level {DEEPEST_LEVEL:?}"),
             )),
             true => {
                 let mut descendants = vec![*self];
