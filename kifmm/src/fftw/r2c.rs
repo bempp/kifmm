@@ -318,7 +318,7 @@ mod test {
             let expected = i as f64;
             let dif = (v - expected).abs();
             if dif > 1e-7 {
-                panic!("Large difference: v={}, dif={}", v, dif);
+                panic!("Large difference: v={v}, dif={dif}");
             }
         }
     }

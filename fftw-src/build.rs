@@ -10,15 +10,15 @@ use zip::ZipArchive;
 
 /// Run a shell command
 fn run(command: &mut Command) {
-    println!("Running: {:?}", command);
+    println!("Running: {command:?}");
     match command.status() {
         Ok(status) => {
             if !status.success() {
-                panic!("`{:?}` failed: {}", command, status);
+                panic!("`{command:?}` failed: {status}");
             }
         }
         Err(error) => {
-            panic!("failed to execute `{:?}`: {}", command, error);
+            panic!("failed to execute `{command:?}`: {error}");
         }
     }
 }

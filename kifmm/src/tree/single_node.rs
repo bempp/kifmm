@@ -901,10 +901,8 @@ where
             }
 
             (false, _, _, _, _) => {
-                let msg = format!(
-                    "Invalid depth, depth={} > max allowed depth={}",
-                    depth, DEEPEST_LEVEL
-                );
+                let msg =
+                    format!("Invalid depth, depth={depth} > max allowed depth={DEEPEST_LEVEL}");
                 Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, msg))
             }
 

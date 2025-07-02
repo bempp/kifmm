@@ -434,15 +434,13 @@ where
     fn m2l(&self, level: u64) -> Result<(), FmmError> {
         let Some(targets) = self.tree().target_tree().keys(level) else {
             return Err(FmmError::Failed(format!(
-                "M2L failed at level {:?}, no targets found",
-                level
+                "M2L failed at level {level:?}, no targets found"
             )));
         };
 
         let Some(sources) = self.tree().source_tree().keys(level) else {
             return Err(FmmError::Failed(format!(
-                "M2L failed at level {:?}, no sources found",
-                level
+                "M2L failed at level {level:?}, no sources found"
             )));
         };
 

@@ -136,9 +136,9 @@ impl fmt::Display for FmmOperatorType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             FmmOperatorType::P2M => write!(f, "P2M"),
-            FmmOperatorType::M2M(level) => write!(f, "M2M({})", level),
-            FmmOperatorType::M2L(level) => write!(f, "M2L({})", level),
-            FmmOperatorType::L2L(level) => write!(f, "L2L({})", level),
+            FmmOperatorType::M2M(level) => write!(f, "M2M({level})"),
+            FmmOperatorType::M2L(level) => write!(f, "M2L({level})"),
+            FmmOperatorType::L2L(level) => write!(f, "L2L({level})"),
             FmmOperatorType::L2P => write!(f, "L2P"),
             FmmOperatorType::P2P => write!(f, "P2P"),
         }
@@ -180,9 +180,9 @@ impl fmt::Display for MetadataType {
 impl std::fmt::Display for FmmError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            FmmError::Failed(e) => write!(f, "Failed: {}", e),
-            FmmError::Unimplemented(e) => write!(f, "Unimplemented: {}", e),
-            FmmError::Io(e) => write!(f, "I/O error: {}", e),
+            FmmError::Failed(e) => write!(f, "Failed: {e}"),
+            FmmError::Unimplemented(e) => write!(f, "Unimplemented: {e}"),
+            FmmError::Io(e) => write!(f, "I/O error: {e}"),
         }
     }
 }

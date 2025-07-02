@@ -261,8 +261,7 @@ where
     fn m2m(&self, level: u64) -> Result<(), FmmError> {
         let Some(child_sources) = self.tree.source_tree.keys(level) else {
             return Err(FmmError::Failed(format!(
-                "M2M failed at level {:?}, no sources found",
-                level
+                "M2M failed at level {level:?}, no sources found"
             )));
         };
 

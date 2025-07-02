@@ -178,10 +178,7 @@ mod test {
                 &mut direct_i,
             );
 
-            println!(
-                "i {:?} \n direct_i {:?}\n potential_i {:?}",
-                i, direct_i, potential_i
-            );
+            println!("i {i:?} \n direct_i {direct_i:?}\n potential_i {potential_i:?}");
 
             let l2_error = l2_error(&direct_i, potential_i);
             assert!(l2_error <= threshold);
@@ -229,10 +226,7 @@ mod test {
                 &mut direct_i,
             );
 
-            println!(
-                "i {:?} \n direct_i {:?}\n potential_i {:?}",
-                i, direct_i, potential_i
-            );
+            println!("i {i:?} \n direct_i {direct_i:?}\n potential_i {potential_i:?}");
             direct_i.iter().zip(potential_i).for_each(|(&d, &p)| {
                 let abs_error = (d - p).abs();
                 let rel_error = abs_error / p.abs();
@@ -441,10 +435,7 @@ mod test {
 
         let abs_error = (expected[0] - found[0]).abs();
         let rel_error = abs_error / expected[0].abs();
-        println!(
-            "abs {:?} rel {:?} \n expected {:?} found {:?}",
-            abs_error, rel_error, expected, found
-        );
+        println!("abs {abs_error:?} rel {rel_error:?} \n expected {expected:?} found {found:?}");
         assert!(rel_error <= threshold);
     }
 
