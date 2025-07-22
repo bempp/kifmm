@@ -1,6 +1,3 @@
-//? mpirun -n {{NPROCESSES}} --features "mpi"
-
-#[cfg(feature = "mpi")]
 #[allow(dead_code)]
 mod mpi {
 
@@ -129,8 +126,4 @@ mod mpi {
     }
 }
 
-#[cfg(feature = "mpi")]
 use mpi::main;
-
-#[cfg(not(feature = "mpi"))]
-fn main() {}

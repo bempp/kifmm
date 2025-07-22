@@ -1,4 +1,3 @@
-#[cfg(feature = "mpi")]
 fn main() {
     use std::collections::HashMap;
 
@@ -256,6 +255,3 @@ fn main() {
         println!("...test_p2m passed");
     }
 }
-
-#[cfg(not(feature = "mpi"))]
-fn main() {}

@@ -1,6 +1,3 @@
-//? mpirun -n {{NPROCESSES}} --features "mpi"
-
-#[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::laplace_3d::Laplace3dKernel;
     use itertools::Itertools;
@@ -236,6 +233,3 @@ fn main() {
         }
     }
 }
-
-#[cfg(not(feature = "mpi"))]
-fn main() {}
