@@ -74,67 +74,67 @@ name = "mpi_test_attach_charges_ordered"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_attach_charges_ordered.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_attach_charges_unordered"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_attach_charges_unordered.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_fmm_gradients"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_fmm_gradients.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_fmm"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_fmm.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_layout"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_layout.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_p2m"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_p2m.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_sort"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_sort.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_trees"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_trees.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_test_upward_pass"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_test_upward_pass.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
 
 [[example]]
 name = "mpi_tree"
 required-features = ["mpi"]
 
 [package.metadata.example.mpi_tree.templated-examples]
-run = "mpirun -n {{NPROCESSES}}"
+command = "mpirun -n {{NPROCESSES}}"
