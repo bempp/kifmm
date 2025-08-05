@@ -251,7 +251,11 @@ fn main() {
 
         // Test that the multipoles found are the same globally as locally
         // assert!(error.iter().sum::<f32>() <= threshold);
-        println!("{} shcould be less than {}", error.iter().sum::<f32>(), threshold);
+        println!(
+            "{} shcould be less than {}",
+            error.iter().sum::<f32>(),
+            threshold
+        );
 
         println!("...test_p2m passed");
     }
