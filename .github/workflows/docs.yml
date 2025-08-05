@@ -3,8 +3,7 @@ name: 📖
 on:
   push:
   pull_request:
-    branches:
-      - main
+    branches: [main]
   merge_group:
 
 jobs:
@@ -20,39 +19,10 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: "mpich"
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Build docs
-        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options --html-in-header kifmm/src/docs-header.html" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --features "strict"
-
-  build-and-deploy-docs:
-    name: Build and deploy docs
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    if: github.ref == 'refs/heads/main'
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    concurrency:
-      group: "pages"
-      cancel-in-progress: true
-    steps:
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: "nightly"
-          components: rustfmt
-      - name: Set up MPI
-        uses: mpi4py/setup-mpi@v1
-        with:
-          mpi: "mpich"
-      - uses: actions/checkout@v3
-
-      - name: Build docs
-        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options --html-in-header kifmm/src/docs-header.html" cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples
+        run: cargo +nightly doc --no-deps -Zunstable-options -Zrustdoc-scrape-examples --all-features
 
       - name: Set file permissions
         run: |
@@ -61,10 +31,25 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@v3
+        if: github.ref == 'refs/heads/main'
       - name: Upload artifact for docs
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: 'target/doc'
+        if: github.ref == 'refs/heads/main'
+
+  deploy-docs:
+    name: Deploy docs to GitHub pages
+    runs-on: ubuntu-latest
+    needs:
+      - build-docs
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
       - name: Deploy docs to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4

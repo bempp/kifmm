@@ -1,6 +1,5 @@
 //! Create a multi-node tree, distributed with MPI
 
-#[cfg(feature = "mpi")]
 fn main() {
     use kifmm::tree::{helpers::points_fixture, MultiNodeTree, SortKind};
     use rlst::RawAccess;
@@ -36,6 +35,3 @@ fn main() {
     )
     .unwrap();
 }
-
-#[cfg(not(feature = "mpi"))]
-fn main() {}

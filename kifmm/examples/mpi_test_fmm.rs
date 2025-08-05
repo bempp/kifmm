@@ -1,6 +1,3 @@
-//? mpirun -n {{NPROCESSES}} --features "mpi"
-
-#[cfg(feature = "mpi")]
 fn main() {
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
@@ -572,6 +569,3 @@ fn main() {
         }
     }
 }
-
-#[cfg(not(feature = "mpi"))]
-fn main() {}

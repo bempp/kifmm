@@ -28,11 +28,12 @@ jobs:
         uses: mpi4py/setup-mpi@v1
         with:
           mpi: ${{ matrix.mpi }}
-      - name: Install cargo-mpirun
-        run: cargo install cargo-mpirun --force
-      - uses: actions/checkout@v3
+      - name: Install cargo-mpirun and cargo-templated-examples
+        run: cargo install cargo-mpirun cargo-templated-examples --force
       - name: Install Blas
         run: sudo apt-get install -y libopenblas-dev
+
+      - uses: actions/checkout@v3
       - name: Run unit tests
         run: cargo test ${{ matrix.feature-flags }}
       - name: Run unit tests in release mode
@@ -42,7 +43,4 @@ jobs:
       - name: Test benchmarks build
         run: cargo bench --no-run ${{ matrix.feature-flags }}
       - name: Run examples
-        run: |
-          python3 find_examples.py
-          chmod +x examples.sh
-          ./examples.sh
+        run: cargo templated-examples NPROCESSES 2,4
