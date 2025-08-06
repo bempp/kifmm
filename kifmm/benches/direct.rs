@@ -35,10 +35,7 @@ fn benchmark_direct_laplace<
     let kernel = Laplace3dKernel::<T>::new();
 
     group.bench_function(
-        format!(
-            "mode={}, precision={}, n_points={}",
-            mode, precision, n_points
-        ),
+        format!("mode={mode}, precision={precision}, n_points={n_points}"),
         |b| {
             b.iter(|| {
                 if mode == "multi_threaded" {
@@ -82,10 +79,7 @@ fn benchmark_direct_helmholtz<
     let kernel = Helmholtz3dKernel::<Complex<T>>::new(<Complex<T> as RlstScalar>::real(1.0));
 
     group.bench_function(
-        format!(
-            "mode={}, precision={}, n_points={}",
-            mode, precision, n_points
-        ),
+        format!("mode={mode}, precision={precision}, n_points={n_points}"),
         |b| {
             b.iter(|| {
                 if mode == "multi_threaded" {
@@ -130,8 +124,8 @@ fn direct(c: &mut Criterion) {
     });
 
     let kernel = "helmholtz";
-    println!("Testing kernel: {}", kernel);
-    println!("Using arch: {}", arch);
+    println!("Testing kernel: {kernel}");
+    println!("Using arch: {arch}");
 
     let arch = root
         .get("kernel")
