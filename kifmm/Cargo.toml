@@ -50,6 +50,10 @@ cbindgen = "0.26.0"
 name = "laplace"
 harness = false
 
+[[bench]]
+name = "direct"
+harness = false
+
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
 rustdoc-args = [ "--html-in-header", "./src/docs-header.html" ]

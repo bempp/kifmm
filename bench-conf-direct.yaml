@@ -1,0 +1,78 @@
+kernel:
+  laplace:
+    arch:
+      APPLE_M1:
+        mode:
+          single_threaded:
+            fp32:
+              n_points: [5000, 10000]
+            fp64:
+              n_points: [5000, 10000]
+          multi_threaded:
+            fp32:
+              n_points: [10000, 20000, 50000]
+            fp64:
+              n_points: [10000, 20000]
+
+      AMD_3790X:
+        mode:
+          single_threaded:
+            fp32:
+              n_points: [5000, 10000]
+            fp64:
+              n_points: [5000, 10000]
+          multi_threaded:
+            fp32:
+              n_points: [10000, 20000, 50000]
+            fp64:
+              n_points: [10000, 20000]
+      H100:
+        mode:
+          single_threaded:
+            fp32:
+              n_points: [5000, 10000]
+            fp64:
+              n_points: [5000, 10000]
+          multi_threaded:
+            fp32:
+              n_points: [10000, 20000, 50000]
+            fp64:
+              n_points: [10000, 20000]
+  helmholtz:
+    arch:
+      APPLE_M1:
+        mode:
+          single_threaded:
+            fp32:
+              n_points: [5000, 10000]
+            fp64:
+              n_points: [5000, 10000]
+          multi_threaded:
+            fp32:
+              n_points: [10000, 20000, 50000]
+            fp64:
+              n_points: [10000, 20000]
+      AMD_3790X:
+        mode:
+          single_threaded:
+            fp32:
+              n_points: [5000, 10000]
+            fp64:
+              n_points: [5000, 10000]
+          multi_threaded:
+            fp32:
+              n_points: [10000, 20000, 50000]
+            fp64:
+              n_points: [10000, 20000]
+      H100:
+        mode:
+          single_threaded:
+            fp32:
+              n_points: [5000, 10000]
+            fp64:
+              n_points: [5000, 10000]
+          multi_threaded:
+            fp32:
+              n_points: [10000, 20000, 50000]
+            fp64:
+              n_points: [10000, 20000]

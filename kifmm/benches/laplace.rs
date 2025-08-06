@@ -182,7 +182,7 @@ fn laplace_potentials(c: &mut Criterion) {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
-        .join("bench-conf.yaml");
+        .join("bench-conf-fmm.yaml");
 
     let yaml_str = fs::read_to_string(path).unwrap();
     let root: Value = serde_yaml::from_str(&yaml_str).unwrap();
