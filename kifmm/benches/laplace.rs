@@ -35,7 +35,8 @@ fn benchmark_fft_m2l<
         + MatrixSvd
         + AsComplex
         + Dft<InputType = T, OutputType = <T as AsComplex>::ComplexType>
-        + Default,
+        + Default
+        + AlignedAllocable,
     M: Measurement,
 >(
     group: &mut criterion::BenchmarkGroup<'_, M>,
@@ -49,7 +50,6 @@ fn benchmark_fft_m2l<
     <T as Dft>::Plan: Sync,
     <T as AsComplex>::ComplexType: AlignedAllocable,
     <T as AsComplex>::ComplexType: Hadamard8x8<Scalar = <T as AsComplex>::ComplexType>,
-    T: AlignedAllocable,
 {
     // FFT based M2L for a vector of charges
     // FMM parameters
@@ -77,12 +77,12 @@ fn benchmark_fft_m2l<
         .unwrap();
 
     group.bench_function(
-        format!("M2L=FFT digits={} n_points={}", digits, n_points),
+        format!("M2L=FFT digits={digits} n_points={n_points}"),
         |b| b.iter(|| fmm_fft.evaluate()),
     );
 
     group.bench_function(
-        format!("M2L=FFT digits={} n_points={},  M2L ", digits, n_points),
+        format!("M2L=FFT digits={digits} n_points={n_points},  M2L "),
         |b| {
             b.iter(|| {
                 for level in 2..=fmm_fft.tree().target_tree().depth() {
@@ -93,11 +93,12 @@ fn benchmark_fft_m2l<
     );
 
     group.bench_function(
-        format!("M2L=FFT digits={} n_points={}, P2P ", digits, n_points),
+        format!("M2L=FFT digits={digits} n_points={n_points}, P2P "),
         |b| b.iter(|| fmm_fft.p2p().unwrap()),
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn benchmark_blas_m2l<
     T: RlstScalar<Real = T> + Epsilon + MatrixRsvd + Float + SampleUniform,
     M: Measurement,
@@ -142,18 +143,12 @@ fn benchmark_blas_m2l<
         .unwrap();
 
     group.bench_function(
-        format!(
-            "M2L=BLAS digits={} n_points={} n_vecs={}",
-            digits, n_points, n_vecs
-        ),
+        format!("M2L=BLAS digits={digits} n_points={n_points} n_vecs={n_vecs}",),
         |b| b.iter(|| fmm_blas.evaluate()),
     );
 
     group.bench_function(
-        format!(
-            "M2L=BLAS digits={} n_points={} n_vecs={}, M2L",
-            digits, n_points, n_vecs
-        ),
+        format!("M2L=BLAS digits={digits} n_points={n_points} n_vecs={n_vecs}, M2L",),
         |b| {
             b.iter(|| {
                 for level in 2..=fmm_blas.tree().target_tree().depth() {
@@ -164,10 +159,7 @@ fn benchmark_blas_m2l<
     );
 
     group.bench_function(
-        format!(
-            "M2L=BLAS digits={} n_points={} n_vecs={}, P2P",
-            digits, n_points, n_vecs
-        ),
+        format!("M2L=BLAS digits={digits} n_points={n_points} n_vecs={n_vecs}, P2P",),
         |b| b.iter(|| fmm_blas.p2p().unwrap()),
     );
 }
@@ -182,7 +174,7 @@ fn laplace_potentials(c: &mut Criterion) {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
-        .join("bench-conf.yaml");
+        .join("bench-conf-fmm.yaml");
 
     let yaml_str = fs::read_to_string(path).unwrap();
     let root: Value = serde_yaml::from_str(&yaml_str).unwrap();
@@ -192,8 +184,8 @@ fn laplace_potentials(c: &mut Criterion) {
     });
 
     let kernel = "laplace";
-    println!("Testing kernel: {}", kernel);
-    println!("Using arch: {}", arch);
+    println!("Testing kernel: {kernel}");
+    println!("Using arch: {arch}");
 
     let arch = root
         .get("kernel")
