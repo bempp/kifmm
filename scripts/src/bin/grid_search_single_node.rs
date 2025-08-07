@@ -1,4 +1,4 @@
-//! Optimal parameter search
+//! Optimal parameter search on a single node for the Laplace problem
 use std::{fs::File, ops::DerefMut, sync::Mutex, time::Instant};
 
 use csv::Writer;
@@ -155,7 +155,7 @@ fn grid_search_laplace_blas<T>(
         fmm.evaluate().unwrap();
         let time = s.elapsed().as_millis() as f32;
         progress += 1;
-        println!("BLAS Evaluated {:?}/{:?}", progress, n_params);
+        println!("BLAS Evaluated {progress:?}/{n_params:?}");
 
         let leaf_idx = 1;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
@@ -356,7 +356,7 @@ fn grid_search_laplace_fft<T>(
         fmm.evaluate().unwrap();
         let time = s.elapsed().as_millis() as f32;
         progress += 1;
-        println!("FFT Evaluated {:?}/{:?}", progress, n_params);
+        println!("FFT Evaluated {progress:?}/{n_params:?}");
 
         let leaf_idx = 1;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];

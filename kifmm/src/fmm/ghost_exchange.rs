@@ -185,8 +185,8 @@ where
             let l = i * n_coeffs_equivalent_surface;
             let r = l + n_coeffs_equivalent_surface;
             self.local_mut(root)
-                .unwrap()
-                .copy_from_slice(&receive_buffer[l..r]);
+            .unwrap()
+            .copy_from_slice(&receive_buffer[l..r]);
         }
     }
 

@@ -51,206 +51,216 @@ struct Args {
 }
 
 fn main() {
-    // let (universe, _threading) =
-    //     mpi::initialize_with_threading(mpi::Threading::Serialized).unwrap();
-    // let world = universe.world();
-    // let comm = world.duplicate();
+    let (universe, _threading) =
+        mpi::initialize_with_threading(mpi::Threading::Serialized).unwrap();
+    let world = universe.world();
+    let comm = world.duplicate();
 
-    // // Tree parameters
-    // let args = Args::parse();
-    // let expansion_order = args.expansion_order;
-    // let prune_empty = args.prune_empty;
-    // let n_points = args.n_points;
-    // let local_depth = args.local_depth;
-    // let global_depth = args.global_depth;
-    // let threshold = args.threshold;
-    // let n_threads = args.n_threads;
-    // let n_samples = args.n_samples;
-    // let id = args.id;
+    // Tree parameters
+    let args = Args::parse();
+    let expansion_order = args.expansion_order;
+    let prune_empty = args.prune_empty;
+    let n_points = args.n_points;
+    let local_depth = args.local_depth;
+    let global_depth = args.global_depth;
+    let threshold = args.threshold;
+    let n_threads = args.n_threads;
+    let n_samples = args.n_samples;
+    let id = args.id;
 
-    // assert!(n_samples > 0 && n_samples < n_points);
+    assert!(n_samples > 0 && n_samples < n_points);
 
-    // let sort_kind = SortKind::Samplesort { n_samples };
+    let sort_kind = SortKind::Samplesort { n_samples };
 
-    // // Fmm Parameters
-    // let kernel = Laplace3dKernel::<f32>::new();
+    // Fmm Parameters
+    let kernel = Laplace3dKernel::<f32>::new();
 
-    // ThreadPoolBuilder::new()
-    //     .num_threads(n_threads)
-    //     .build_global()
-    //     .unwrap();
+    ThreadPoolBuilder::new()
+        .num_threads(n_threads)
+        .build_global()
+        .unwrap();
 
-    // let source_to_target =
-    //     BlasFieldTranslationSaRcmp::<f32>::new(Some(threshold), None, FmmSvdMode::Deterministic);
+    let source_to_target =
+        BlasFieldTranslationSaRcmp::<f32>::new(Some(threshold), None, FmmSvdMode::Deterministic);
 
-    // // Generate some random test data local to each process
-    // let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
-    // let charges = vec![1f32; n_points];
+    // Generate some random test data local to each process
+    let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let charges = vec![1f32; n_points];
 
-    // let mut multi_fmm = MultiNodeBuilder::new(true)
-    //     .tree(
-    //         &comm,
-    //         points.data(),
-    //         points.data(),
-    //         local_depth,
-    //         global_depth,
-    //         prune_empty,
-    //         sort_kind.clone(),
-    //     )
-    //     .unwrap()
-    //     .parameters(
-    //         &charges,
-    //         expansion_order,
-    //         kernel.clone(),
-    //         green_kernels::types::GreenKernelEvalType::Value,
-    //         source_to_target,
-    //     )
-    //     .unwrap()
-    //     .build()
-    //     .unwrap();
+    let mut multi_fmm = MultiNodeBuilder::new(true)
+        .tree(
+            &comm,
+            points.data(),
+            points.data(),
+            local_depth,
+            global_depth,
+            prune_empty,
+            sort_kind.clone(),
+        )
+        .unwrap()
+        .parameters(
+            &charges,
+            &[expansion_order],
+            kernel.clone(),
+            green_kernels::types::GreenKernelEvalType::Value,
+            source_to_target,
+        )
+        .unwrap()
+        .build()
+        .unwrap();
 
-    // let start = Instant::now();
-    // multi_fmm.evaluate().unwrap();
-    // let runtime = start.elapsed().as_millis();
+    let start = Instant::now();
+    multi_fmm.evaluate().unwrap();
+    let runtime = start.elapsed().as_millis();
 
-    // // Destructure operator times
-    // let mut operator_times = HashMap::new();
+    // Destructure operator times
+    let mut operator_times = HashMap::new();
 
-    // for time in multi_fmm.operator_times.iter() {
-    //     match &time.operator {
-    //         FmmOperatorType::P2M => {
-    //             operator_times.insert("p2m", time.time);
-    //         }
-    //         FmmOperatorType::P2P => {
-    //             operator_times.insert("p2p", time.time);
-    //         }
-    //         FmmOperatorType::L2P => {
-    //             operator_times.insert("l2p", time.time);
-    //         }
-    //         FmmOperatorType::M2L(_) => {
-    //             if let Some(existing) = operator_times.get_mut("m2l") {
-    //                 *existing += time.time;
-    //             } else {
-    //                 operator_times.insert("m2l", time.time);
-    //             }
-    //         }
-    //         FmmOperatorType::M2M(_) => {
-    //             if let Some(existing) = operator_times.get_mut("m2m") {
-    //                 *existing += time.time;
-    //             } else {
-    //                 operator_times.insert("m2m", time.time);
-    //             }
-    //         }
-    //         FmmOperatorType::L2L(_) => {
-    //             if let Some(existing) = operator_times.get_mut("l2l") {
-    //                 *existing += time.time;
-    //             } else {
-    //                 operator_times.insert("l2l", time.time);
-    //             }
-    //         }
-    //     }
-    // }
+    for (&op_type, op_time) in multi_fmm.operator_times.iter() {
+        match op_type {
+            FmmOperatorType::P2M => {
+                operator_times.insert("p2m", op_time.time);
+            }
+            FmmOperatorType::P2P => {
+                operator_times.insert("p2p", op_time.time);
+            }
+            FmmOperatorType::L2P => {
+                operator_times.insert("l2p", op_time.time);
+            }
+            FmmOperatorType::M2L(_) => {
+                if let Some(existing) = operator_times.get_mut("m2l") {
+                    *existing += op_time.time;
+                } else {
+                    operator_times.insert("m2l", op_time.time);
+                }
+            }
+            FmmOperatorType::M2M(_) => {
+                if let Some(existing) = operator_times.get_mut("m2m") {
+                    *existing += op_time.time;
+                } else {
+                    operator_times.insert("m2m", op_time.time);
+                }
+            }
+            FmmOperatorType::L2L(_) => {
+                if let Some(existing) = operator_times.get_mut("l2l") {
+                    *existing += op_time.time;
+                } else {
+                    operator_times.insert("l2l", op_time.time);
+                }
+            }
+        }
+    }
 
-    // // Destructure communication times
-    // let mut communication_times = HashMap::new();
-    // for time in multi_fmm.communication_times.iter() {
-    //     match &time.operator {
-    //         CommunicationType::SourceTree => {
-    //             communication_times.insert("source_tree", time.time);
-    //         }
-    //         CommunicationType::TargetTree => {
-    //             communication_times.insert("target_tree", time.time);
-    //         }
-    //         CommunicationType::SourceDomain => {
-    //             communication_times.insert("source_domain", time.time);
-    //         }
-    //         CommunicationType::TargetDomain => {
-    //             communication_times.insert("target_domain", time.time);
-    //         }
-    //         CommunicationType::Layout => {
-    //             communication_times.insert("layout", time.time);
-    //         }
-    //         CommunicationType::GhostExchangeV => {
-    //             communication_times.insert("ghost_exchange_v", time.time);
-    //         }
-    //         CommunicationType::GhostExchangeVRuntime => {
-    //             communication_times.insert("ghost_exchange_v_runtime", time.time);
-    //         }
-    //         CommunicationType::GhostExchangeU => {
-    //             communication_times.insert("ghost_exchange_u", time.time);
-    //         }
-    //         CommunicationType::GatherGlobalFmm => {
-    //             communication_times.insert("gather_global_fmm", time.time);
-    //         }
-    //         CommunicationType::ScatterGlobalFmm => {
-    //             communication_times.insert("scatter_global_fmm", time.time);
-    //         }
-    //     }
-    // }
+    // Destructure communication times
+    let mut communication_times = HashMap::new();
+    for (&comm_type, comm_time) in multi_fmm.communication_times.iter() {
+        match comm_type {
+            CommunicationType::SourceTree => {
+                communication_times.insert("source_tree", comm_time.time);
+            }
+            CommunicationType::TargetTree => {
+                communication_times.insert("target_tree", comm_time.time);
+            }
+            CommunicationType::SourceDomain => {
+                communication_times.insert("source_domain", comm_time.time);
+            }
+            CommunicationType::TargetDomain => {
+                communication_times.insert("target_domain", comm_time.time);
+            }
+            CommunicationType::Layout => {
+                communication_times.insert("layout", comm_time.time);
+            }
+            CommunicationType::GhostExchangeV => {
+                communication_times.insert("ghost_exchange_v", comm_time.time);
+            }
+            CommunicationType::GhostExchangeVRuntime => {
+                communication_times.insert("ghost_exchange_v_runtime", comm_time.time);
+            }
+            CommunicationType::GhostExchangeU => {
+                communication_times.insert("ghost_exchange_u", comm_time.time);
+            }
+            CommunicationType::GatherGlobalFmm => {
+                communication_times.insert("gather_global_fmm", comm_time.time);
+            }
+            CommunicationType::ScatterGlobalFmm => {
+                communication_times.insert("scatter_global_fmm", comm_time.time);
+            }
+        }
+    }
 
-    // // Destructure metadata times
-    // let mut metadata_times = HashMap::new();
+    // Destructure metadata times
+    let mut metadata_times = HashMap::new();
 
-    // for time in multi_fmm.metadata_times.iter() {
-    //     match &time.operator {
-    //         MetadataType::SourceToTargetData => {
-    //             metadata_times.insert("source_to_target_data", time.time);
-    //         }
-    //         MetadataType::SourceData => {
-    //             metadata_times.insert("source_data", time.time);
-    //         }
-    //         MetadataType::TargetData => {
-    //             metadata_times.insert("target_data", time.time);
-    //         }
-    //         MetadataType::GlobalFmm => {
-    //             metadata_times.insert("global_fmm", time.time);
-    //         }
-    //         MetadataType::GhostFmmV => {
-    //             metadata_times.insert("ghost_fmm_v", time.time);
-    //         }
-    //         MetadataType::GhostFmmU => {
-    //             metadata_times.insert("ghost_fmm_u", time.time);
-    //         }
-    //     }
-    // }
+    for (&metadata_type, metadata_time) in multi_fmm.metadata_times.iter() {
+        match metadata_type {
+            MetadataType::SourceToTargetData => {
+                metadata_times.insert("source_to_target_data", metadata_time.time);
+            }
+            MetadataType::SourceData => {
+                metadata_times.insert("source_data", metadata_time.time);
+            }
+            MetadataType::TargetData => {
+                metadata_times.insert("target_data", metadata_time.time);
+            }
+            MetadataType::GlobalFmm => {
+                metadata_times.insert("global_fmm", metadata_time.time);
+            }
+            MetadataType::GhostFmmV => {
+                metadata_times.insert("ghost_fmm_v", metadata_time.time);
+            }
+            MetadataType::GhostFmmU => {
+                metadata_times.insert("ghost_fmm_u", metadata_time.time);
+            }
 
-    // println!(
-    //     "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-    //      {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-    //      {:?},{:?},{:?},{:?},{:?},{:?},\
-    //      {:?},{:?},{:?},{:?},{:?},{:?},{:?}",
-    //     id,
-    //     multi_fmm.rank(),
-    //     runtime,
-    //     operator_times.get("p2m").unwrap_or(&0),
-    //     operator_times.get("m2m").unwrap_or(&0),
-    //     operator_times.get("l2l").unwrap_or(&0),
-    //     operator_times.get("m2l").unwrap_or(&0),
-    //     operator_times.get("p2p").unwrap_or(&0),
-    //     communication_times.get("source_tree").unwrap_or(&0),
-    //     communication_times.get("target_tree").unwrap_or(&0),
-    //     communication_times.get("source_domain").unwrap_or(&0),
-    //     communication_times.get("target_domain").unwrap_or(&0),
-    //     communication_times.get("layout").unwrap_or(&0),
-    //     communication_times.get("ghost_exchange_v").unwrap_or(&0),
-    //     communication_times
-    //         .get("ghost_exchange_v_runtime")
-    //         .unwrap_or(&0),
-    //     communication_times.get("ghost_exchange_u").unwrap_or(&0),
-    //     communication_times.get("gather_global_fmm").unwrap_or(&0),
-    //     communication_times.get("scatter_global_fmm").unwrap_or(&0),
-    //     metadata_times.get("source_to_target_data").unwrap_or(&0),
-    //     metadata_times.get("source_data").unwrap_or(&0),
-    //     metadata_times.get("target_data").unwrap_or(&0),
-    //     metadata_times.get("global_fmm").unwrap_or(&0),
-    //     metadata_times.get("ghost_fmm_v").unwrap_or(&0),
-    //     metadata_times.get("ghost_fmm_u").unwrap_or(&0),
-    //     args.expansion_order,
-    //     args.n_points,
-    //     args.local_depth,
-    //     args.global_depth,
-    //     args.threshold,
-    //     args.n_threads,
-    //     args.n_samples
-    // );
+            MetadataType::DisplacementMap => {
+                metadata_times.insert("displacement_map", metadata_time.time);
+            }
+
+            MetadataType::MetadataCreation => {
+                metadata_times.insert("metadata_creation", metadata_time.time);
+            }
+        }
+    }
+
+    println!(
+        "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?}, {:?}, {:?}\
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?}",
+        id,
+        multi_fmm.rank(),
+        runtime,
+        operator_times.get("p2m").unwrap_or(&0),
+        operator_times.get("m2m").unwrap_or(&0),
+        operator_times.get("l2l").unwrap_or(&0),
+        operator_times.get("m2l").unwrap_or(&0),
+        operator_times.get("p2p").unwrap_or(&0),
+        communication_times.get("source_tree").unwrap_or(&0),
+        communication_times.get("target_tree").unwrap_or(&0),
+        communication_times.get("source_domain").unwrap_or(&0),
+        communication_times.get("target_domain").unwrap_or(&0),
+        communication_times.get("layout").unwrap_or(&0),
+        communication_times.get("ghost_exchange_v").unwrap_or(&0),
+        communication_times
+            .get("ghost_exchange_v_runtime")
+            .unwrap_or(&0),
+        communication_times.get("ghost_exchange_u").unwrap_or(&0),
+        communication_times.get("gather_global_fmm").unwrap_or(&0),
+        communication_times.get("scatter_global_fmm").unwrap_or(&0),
+        metadata_times.get("source_to_target_data").unwrap_or(&0),
+        metadata_times.get("source_data").unwrap_or(&0),
+        metadata_times.get("target_data").unwrap_or(&0),
+        metadata_times.get("global_fmm").unwrap_or(&0),
+        metadata_times.get("ghost_fmm_v").unwrap_or(&0),
+        metadata_times.get("ghost_fmm_u").unwrap_or(&0),
+        metadata_times.get("displacement_map").unwrap_or(&0),
+        metadata_times.get("metadata_creation").unwrap_or(&0),
+        args.expansion_order,
+        args.n_points,
+        args.local_depth,
+        args.global_depth,
+        args.threshold,
+        args.n_threads,
+        args.n_samples
+    );
 }
