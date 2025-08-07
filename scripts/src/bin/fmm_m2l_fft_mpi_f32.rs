@@ -112,7 +112,6 @@ fn main() {
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
 
-
     // Destructure operator times
     let mut operator_times = HashMap::new();
 
