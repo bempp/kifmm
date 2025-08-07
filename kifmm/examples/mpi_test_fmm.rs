@@ -135,7 +135,7 @@ fn main() {
             };
 
             assert!(l2_error <= threshold);
-            println!("...test_helmholtz_fmm_{} passed", name);
+            println!("...test_helmholtz_fmm_{name} passed");
         } else {
             root_process.gather_into(&n_sources_rank);
 
@@ -241,7 +241,7 @@ fn main() {
             let l2_error = RlstScalar::powf(num / den, T::real(0.5));
 
             assert!(l2_error <= threshold);
-            println!("...test_laplace_fmm_{} passed", name);
+            println!("...test_laplace_fmm_{name} passed");
         } else {
             root_process.gather_into(&n_sources_rank);
 
