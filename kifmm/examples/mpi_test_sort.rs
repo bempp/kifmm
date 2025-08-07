@@ -56,7 +56,7 @@ mod mpi {
         }
 
         if rank == 0 {
-            println!("...test_{} passed", label)
+            println!("...test_{label} passed")
         }
     }
 

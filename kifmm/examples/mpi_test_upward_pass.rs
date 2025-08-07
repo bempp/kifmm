@@ -101,7 +101,7 @@ fn main() {
             found
         );
         assert!(l2_error <= threshold);
-        println!("...test_upward_pass_global_tree {} passed", name);
+        println!("...test_upward_pass_global_tree {name} passed");
     }
 
     fn test_multi_node_laplace_upward_pass_helper<
@@ -178,7 +178,7 @@ fn main() {
         }
 
         assert!(l2_error <= threshold);
-        println!("...test_upward_pass_global_tree {} passed", name);
+        println!("...test_upward_pass_global_tree {name} passed");
     }
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
