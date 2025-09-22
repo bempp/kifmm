@@ -3,10 +3,11 @@
 #![allow(non_snake_case)]
 
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-
+include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 #[cfg(all(test))]
 mod tests {
+
     use lazy_static::lazy_static;
 
     lazy_static! {
