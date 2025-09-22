@@ -16,9 +16,11 @@ csv = "1.3.0"
 mpi = { version = "0.8.*", optional = true}
 rayon = "1.9"
 clap = { version = "4.5.4", features = ["derive"] }
+kifmm-papi-sys = { path = "../papi-sys", optional = true}
 
 [features]
 mpi = ["kifmm/mpi", "dep:mpi"]
+papi = ["dep:kifmm-papi-sys"]
 
 [[bin]]
 name = "grid_search_single_node"
@@ -34,3 +36,8 @@ required-features = ["mpi"]
 name = "fmm_m2l_blas_mpi_f32"
 path = "src/bin/fmm_m2l_blas_mpi_f32.rs"
 required-features = ["mpi"]
+
+[[bin]]
+name = "fmm_m2l_fft_mpi_f32_papi"
+path = "src/bin/fmm_m2l_fft_mpi_f32_papi.rs"
+required-features = ["mpi", "papi"]

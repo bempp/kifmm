@@ -1,6 +1,23 @@
 # Running `kifmm-rs` on HPC
 
 
+## Experiments
+
+### 1. Weak Scaling
+
+Runtime represented by wall-clack over all involved processes
+
+#### 1.i Adjust the grain size in different weak scaling runs
+
+- Grain size is the number of local trees per process
+- Larger grain size leads to greater bandwidth use in local comms
+
+
+#### 1.ii Measure the scaling of each operation in runtime and setup
+
+
+
+
 We summarise suggestions for successfully building and achieving performance with `kifmm` HPC platforms.
 
 ## ARCHER2
