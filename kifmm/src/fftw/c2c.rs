@@ -23,7 +23,8 @@ fn validate_shape_c2c(
     let n_input = in_shape.iter().product();
     let n_output = n_input;
 
-    let valid = in_shape.len() == 3 && in_len % n_input == 0 && out_len % n_input == 0;
+    let valid =
+        in_shape.len() == 3 && in_len.is_multiple_of(n_input) && out_len.is_multiple_of(n_input);
     if valid {
         Ok(ShapeInfo { n_input, n_output })
     } else {

@@ -1,4 +1,3 @@
-use pkg_config;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
@@ -44,9 +43,9 @@ fn main() {
         bindgen::Builder::default()
             .header("wrapper.h")
             .clang_args(clang_args)
-            .allowlist_function("^PAPI_[[:alpha:]_]+")
-            .allowlist_var("^PAPI_[[:alpha:]_]+")
-            .allowlist_type("^PAPI_[[:alpha:]_]+")
+            .allowlist_function("^PAPI_.*")
+            .allowlist_var("^PAPI_.*")
+            .allowlist_type("^PAPI_.*")
             .generate()
             .expect("Unable to generate PAPI bindings")
             .write_to_file(out_path.join("bindings.rs"))
