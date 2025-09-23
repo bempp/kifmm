@@ -66,5 +66,6 @@ fn main() {
     } else {
         println!("cargo:warning=PAPI not found, skipping bindings");
         std::fs::write(out_path.join("bindings.rs"), "// no papi\n").unwrap();
+        std::fs::write(out_path.join("codegen.rs"), "// no papi\n").unwrap();
     }
 }
