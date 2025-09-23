@@ -29,6 +29,7 @@ where
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> PartialOrd for Point<T>
 where
     T: RlstScalar + Float,
