@@ -117,19 +117,15 @@ where
             let source_depth;
             let target_depth;
 
-            if depth.is_some() && n_crit.is_none() {
-                source_depth = depth.unwrap();
-                target_depth = depth.unwrap();
-            } else if depth.is_none() && n_crit.is_some() {
+            if let (Some(depth), None) = (depth, n_crit) {
+                source_depth = depth;
+                target_depth = depth;
+            } else if let (None, Some(n_crit)) = (depth, n_crit) {
                 // Estimate depth based on a uniform distribution
-                source_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
-                    n_sources as u64,
-                    n_crit.unwrap(),
-                );
-                target_depth = SingleNodeTree::<Scalar::Real>::minimum_depth(
-                    n_targets as u64,
-                    n_crit.unwrap(),
-                );
+                source_depth =
+                    SingleNodeTree::<Scalar::Real>::minimum_depth(n_sources as u64, n_crit);
+                target_depth =
+                    SingleNodeTree::<Scalar::Real>::minimum_depth(n_targets as u64, n_crit);
             } else {
                 return Err(std::io::Error::new(
                     std::io::ErrorKind::InvalidData,

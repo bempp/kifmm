@@ -325,7 +325,7 @@ where
         let dim = 3;
         let coords_len = coordinates.len();
 
-        if !coordinates.is_empty() && coords_len % dim == 0 {
+        if !coordinates.is_empty() && coords_len.is_multiple_of(dim) {
             let domain = domain.unwrap_or(Domain::from_global_points(coordinates, communicator));
             let n_coords = coords_len / dim;
 
