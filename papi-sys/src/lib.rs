@@ -11,8 +11,10 @@ mod bindings {
     include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 }
 
+#[allow(unused)]
 pub use bindings::*;
 
+#[allow(unused)]
 #[cfg(test)]
 mod tests {
 
@@ -27,7 +29,6 @@ mod tests {
 
     use super::*;
 
-    #[allow(unused)]
     fn do_papi_init() {
         unsafe {
             let ver = PAPI_library_init(PAPI_VER_CURRENT);
