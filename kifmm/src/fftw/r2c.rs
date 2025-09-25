@@ -24,7 +24,7 @@ fn validate_shape_r2c(
     let n_d = in_shape.last().unwrap();
     let n_sub = (n / n_d) * (n_d / 2 + 1);
 
-    let valid = in_shape.len() == 3 && in_len % n == 0 && out_len % n_sub == 0;
+    let valid = in_shape.len() == 3 && in_len.is_multiple_of(n) && out_len.is_multiple_of(n_sub);
     if valid {
         Ok(ShapeInfo {
             n_input: n,
@@ -50,7 +50,7 @@ fn validate_shape_c2r(
     let n_d = in_shape.last().unwrap();
     let n_sub = (n / n_d) * (n_d / 2 + 1);
 
-    let valid = in_shape.len() == 3 && in_len % n_sub == 0 && out_len % n == 0;
+    let valid = in_shape.len() == 3 && in_len.is_multiple_of(n_sub) && out_len.is_multiple_of(n);
     if valid {
         Ok(ShapeInfo {
             n_input: n,

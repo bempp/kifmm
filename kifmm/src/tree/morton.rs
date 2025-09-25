@@ -275,6 +275,7 @@ where
     }
 }
 
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl<T> PartialOrd for MortonKey<T>
 where
     T: RlstScalar + Float,

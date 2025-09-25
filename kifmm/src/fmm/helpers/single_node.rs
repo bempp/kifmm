@@ -64,7 +64,7 @@ pub(crate) fn ncoeffs_kifmm(expansion_order: usize) -> usize {
 pub(crate) fn chunk_size(n: usize, max: usize) -> usize {
     let max_divisor = max;
     for divisor in (1..=max_divisor).rev() {
-        if n % divisor == 0 {
+        if n.is_multiple_of(divisor) {
             return divisor;
         }
     }

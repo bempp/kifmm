@@ -839,7 +839,7 @@ where
 
         let valid_len = !coordinates_row_major.is_empty();
         let coords_len = coordinates_row_major.len();
-        let valid_dim = coords_len % dim == 0;
+        let valid_dim = coords_len.is_multiple_of(dim);
         let valid_depth = depth <= DEEPEST_LEVEL;
         let root_specified = match root {
             Some(_root) => true,
