@@ -1751,7 +1751,7 @@ pub mod constructors {
 pub mod constructors_mpi {
     use core::panic;
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
-    use mpi::ffi::ompi_communicator_t;
+    use mpi_sys::ompi_communicator_t;
     use mpi::raw::FromRaw;
     use std::ffi::c_void;
 
