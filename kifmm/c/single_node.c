@@ -38,15 +38,15 @@ int main() {
 
   // Instantiate a Laplace evaluator
   struct FmmEvaluator *evaluator = laplace_fft_f64_alloc(
-      timed,
-      expansion_order, nexpansion_order, eval_type, (const void *)sources,
-      n_sources * 3, (const void *)targets, n_targets * 3, (const void *)charges,
-      n_sources, prune_empty, n_crit, depth, block_size);
+      timed, expansion_order, nexpansion_order, eval_type,
+      (const void *)sources, n_sources * 3, (const void *)targets,
+      n_targets * 3, (const void *)charges, n_sources, prune_empty, n_crit,
+      depth, block_size);
 
-   evaluate(evaluator);
-   FmmOperatorTimes *times =operator_times(evaluator);
+  evaluate(evaluator);
+  FmmOperatorTimes *times = operator_times(evaluator);
 
-   if (times->length > 0) {
+  if (times->length > 0) {
     MortonKeys *leaves = leaves_target_tree(evaluator);
 
     printf("\n");

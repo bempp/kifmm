@@ -5,7 +5,6 @@ use mpi::{
     datatype::{Partition, PartitionMut},
     traits::Equivalence,
 };
-use num::Float;
 use rlst::RlstScalar;
 
 use crate::{
@@ -23,8 +22,8 @@ use crate::{
 impl<Scalar, Kernel, FieldTranslation> ChargeHandler
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence + Float,
-    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    Scalar: RlstScalar + Default + Equivalence,
+    <Scalar as RlstScalar>::Real: Default + Equivalence,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: GhostExchange,
