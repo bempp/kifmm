@@ -17,8 +17,19 @@ project(
 
 FetchContent_MakeAvailable(Corrosion)
 
-corrosion_import_crate(MANIFEST_PATH ../Cargo.toml CRATE_TYPES cdylib PROFILE release)
+# Find MPI
+find_package(MPI REQUIRED)
 
-add_executable(fmm_demo main.c)
-target_include_directories(fmm_demo PUBLIC ../include)
-target_link_libraries(fmm_demo PUBLIC kifmm)
+corrosion_import_crate(MANIFEST_PATH ../Cargo.toml CRATE_TYPES cdylib PROFILE release FEATURES mpi)
+
+# Single node demo
+add_executable(single_node_demo single_node.c)
+target_include_directories(single_node_demo PUBLIC ../include)
+target_link_libraries(single_node_demo PUBLIC kifmm)
+
+
+# Multi node demo (+link against MPI)
+add_executable(multi_node_demo multi_node.c)
+target_include_directories(multi_node_demo PUBLIC ../include)
+target_link_libraries(multi_node_demo PUBLIC kifmm MPI::MPI_C)
+target_include_directories(multi_node_demo PRIVATE ${MPI_C_INCLUDE_DIRS})

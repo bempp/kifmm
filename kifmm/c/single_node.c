@@ -1,6 +1,7 @@
-#include "kifmm_rs.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "kifmm_rs.h"
 
 const int n_sources = 100000;
 const int n_targets = 100000;
@@ -78,21 +79,21 @@ int main() {
     printf("\n");
     printf("Time Operators\n");
     for (uintptr_t i = 0; i < times->length; i++) {
-      FmmOperatorTime op_time = times->times[i];
-      printf("Time: %llu ms, Operator: ", op_time.time);
+      FmmOperatorEntry op_entry = times->times[i];
+      printf("Time: %llu ms, Operator: ", op_entry.time.time);
 
-      switch (op_time.operator_.tag) {
+      switch (op_entry.op_type.tag) {
       case FmmOperatorType_P2M:
         printf("P2M\n");
         break;
       case FmmOperatorType_M2M:
-        printf("M2M (%llu)\n", op_time.operator_.m2m);
+        printf("M2M (%llu)\n", op_entry.op_type.m2m);
         break;
       case FmmOperatorType_M2L:
-        printf("M2L (%llu)\n", op_time.operator_.m2l);
+        printf("M2L (%llu)\n", op_entry.op_type.m2l);
         break;
       case FmmOperatorType_L2L:
-        printf("L2L (%llu)\n", op_time.operator_.l2l);
+        printf("L2L (%llu)\n", op_entry.op_type.l2l);
         break;
       case FmmOperatorType_L2P:
         printf("L2P\n");

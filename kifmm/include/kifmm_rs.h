@@ -142,6 +142,15 @@ typedef struct FmmEvaluator {
 } FmmEvaluator;
 
 /**
+ * Runtime FMM type constructed from C
+ */
+typedef struct FmmEvaluatorMPI {
+  enum FmmCType ctype;
+  enum FmmTranslationCType ctranslation_type;
+  void *data;
+} FmmEvaluatorMPI;
+
+/**
  * C compatible struct for timing
  */
 typedef struct OperatorTime {
@@ -337,6 +346,16 @@ typedef struct Coordinates {
  * - The `fmm_p` pointer remains valid for the duration of the function call.
  */
 void free_fmm_evaluator(struct FmmEvaluator *fmm_p);
+
+/**
+ * Free the FmmEvaluatorMPI object
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - `fmm_p` is a valid pointer to a properly initialized `FmmEvaluator` instance.
+ * - The `fmm_p` pointer remains valid for the duration of the function call.
+ */
+void free_fmm_evaluator_mpi(struct FmmEvaluatorMPI *fmm_p);
 
 /**
  * Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
@@ -928,6 +947,628 @@ struct FmmEvaluator *helmholtz_fft_f64_alloc(bool timed,
                                              uint64_t n_crit,
                                              uint64_t depth,
                                              uintptr_t block_size);
+
+/**
+ * Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *laplace_blas_svd_f32_mpi_alloc(bool timed,
+                                                       const uintptr_t *expansion_order,
+                                                       uintptr_t n_expansion_order,
+                                                       bool eval_type,
+                                                       const void *sources,
+                                                       uintptr_t n_sources,
+                                                       const void *targets,
+                                                       uintptr_t n_targets,
+                                                       const void *charges,
+                                                       uintptr_t n_charges,
+                                                       bool prune_empty,
+                                                       uint64_t local_depth,
+                                                       uint64_t global_depth,
+                                                       float singular_value_threshold,
+                                                       uintptr_t surface_diff,
+                                                       uint64_t sort_kind,
+                                                       uintptr_t n_samples,
+                                                       const void *communicator);
+
+/**
+ * Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *laplace_blas_svd_f64_mpi_alloc(bool timed,
+                                                       const uintptr_t *expansion_order,
+                                                       uintptr_t n_expansion_order,
+                                                       bool eval_type,
+                                                       const void *sources,
+                                                       uintptr_t n_sources,
+                                                       const void *targets,
+                                                       uintptr_t n_targets,
+                                                       const void *charges,
+                                                       uintptr_t n_charges,
+                                                       bool prune_empty,
+                                                       uint64_t local_depth,
+                                                       uint64_t global_depth,
+                                                       double singular_value_threshold,
+                                                       uintptr_t surface_diff,
+                                                       uint64_t sort_kind,
+                                                       uintptr_t n_samples,
+                                                       const void *communicator);
+
+/**
+ * Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+ * with randomised SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+ * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *laplace_blas_rsvd_f32_mpi_alloc(bool timed,
+                                                        const uintptr_t *expansion_order,
+                                                        uintptr_t n_expansion_order,
+                                                        bool eval_type,
+                                                        const void *sources,
+                                                        uintptr_t n_sources,
+                                                        const void *targets,
+                                                        uintptr_t n_targets,
+                                                        const void *charges,
+                                                        uintptr_t n_charges,
+                                                        bool prune_empty,
+                                                        uint64_t local_depth,
+                                                        uint64_t global_depth,
+                                                        float singular_value_threshold,
+                                                        uintptr_t surface_diff,
+                                                        uintptr_t n_components,
+                                                        uintptr_t n_oversamples,
+                                                        uint64_t sort_kind,
+                                                        uintptr_t n_samples,
+                                                        const void *communicator);
+
+/**
+ * Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+ * with randomised SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+ * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *laplace_blas_rsvd_f64_mpi_alloc(bool timed,
+                                                        const uintptr_t *expansion_order,
+                                                        uintptr_t n_expansion_order,
+                                                        bool eval_type,
+                                                        const void *sources,
+                                                        uintptr_t n_sources,
+                                                        const void *targets,
+                                                        uintptr_t n_targets,
+                                                        const void *charges,
+                                                        uintptr_t n_charges,
+                                                        bool prune_empty,
+                                                        uint64_t local_depth,
+                                                        uint64_t global_depth,
+                                                        double singular_value_threshold,
+                                                        uintptr_t surface_diff,
+                                                        uintptr_t n_components,
+                                                        uintptr_t n_oversamples,
+                                                        uint64_t sort_kind,
+                                                        uintptr_t n_samples,
+                                                        const void *communicator);
+
+/**
+ * Constructor for F32 Laplace FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *laplace_fft_f32_mpi_alloc(bool timed,
+                                                  const uintptr_t *expansion_order,
+                                                  uintptr_t n_expansion_order,
+                                                  bool eval_type,
+                                                  const void *sources,
+                                                  uintptr_t n_sources,
+                                                  const void *targets,
+                                                  uintptr_t n_targets,
+                                                  const void *charges,
+                                                  uintptr_t n_charges,
+                                                  bool prune_empty,
+                                                  uint64_t local_depth,
+                                                  uint64_t global_depth,
+                                                  uintptr_t block_size,
+                                                  uint64_t sort_kind,
+                                                  uintptr_t n_samples,
+                                                  const void *communicator);
+
+/**
+ * Constructor for F64 Laplace FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *laplace_fft_f64_mpi_alloc(bool timed,
+                                                  const uintptr_t *expansion_order,
+                                                  uintptr_t n_expansion_order,
+                                                  bool eval_type,
+                                                  const void *sources,
+                                                  uintptr_t n_sources,
+                                                  const void *targets,
+                                                  uintptr_t n_targets,
+                                                  const void *charges,
+                                                  uintptr_t n_charges,
+                                                  bool prune_empty,
+                                                  uint64_t local_depth,
+                                                  uint64_t global_depth,
+                                                  uintptr_t block_size,
+                                                  uint64_t sort_kind,
+                                                  uintptr_t n_samples,
+                                                  const void *communicator);
+
+/**
+ * Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+ * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *helmholtz_blas_rsvd_f32_mpi_alloc(bool timed,
+                                                          const uintptr_t *expansion_order,
+                                                          uintptr_t n_expansion_order,
+                                                          bool eval_type,
+                                                          float wavenumber,
+                                                          const void *sources,
+                                                          uintptr_t n_sources,
+                                                          const void *targets,
+                                                          uintptr_t n_targets,
+                                                          const void *charges,
+                                                          uintptr_t n_charges,
+                                                          bool prune_empty,
+                                                          uint64_t local_depth,
+                                                          uint64_t global_depth,
+                                                          float singular_value_threshold,
+                                                          uintptr_t surface_diff,
+                                                          uintptr_t n_components,
+                                                          uintptr_t n_oversamples,
+                                                          uint64_t sort_kind,
+                                                          uintptr_t n_samples,
+                                                          const void *communicator);
+
+/**
+ * Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ * - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+ * - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *helmholtz_blas_rsvd_f64_mpi_alloc(bool timed,
+                                                          const uintptr_t *expansion_order,
+                                                          uintptr_t n_expansion_order,
+                                                          bool eval_type,
+                                                          double wavenumber,
+                                                          const void *sources,
+                                                          uintptr_t n_sources,
+                                                          const void *targets,
+                                                          uintptr_t n_targets,
+                                                          const void *charges,
+                                                          uintptr_t n_charges,
+                                                          bool prune_empty,
+                                                          uint64_t local_depth,
+                                                          uint64_t global_depth,
+                                                          double singular_value_threshold,
+                                                          uintptr_t surface_diff,
+                                                          uintptr_t n_components,
+                                                          uintptr_t n_oversamples,
+                                                          uint64_t sort_kind,
+                                                          uintptr_t n_samples,
+                                                          const void *communicator);
+
+/**
+ * Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *helmholtz_blas_svd_f32_mpi_alloc(bool timed,
+                                                         const uintptr_t *expansion_order,
+                                                         uintptr_t n_expansion_order,
+                                                         bool eval_type,
+                                                         float wavenumber,
+                                                         const void *sources,
+                                                         uintptr_t n_sources,
+                                                         const void *targets,
+                                                         uintptr_t n_targets,
+                                                         const void *charges,
+                                                         uintptr_t n_charges,
+                                                         bool prune_empty,
+                                                         uint64_t local_depth,
+                                                         uint64_t global_depth,
+                                                         float singular_value_threshold,
+                                                         uintptr_t surface_diff,
+                                                         uint64_t sort_kind,
+                                                         uintptr_t n_samples,
+                                                         const void *communicator);
+
+/**
+ * Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+ * with deterministic SVD.
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+ * - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *helmholtz_blas_svd_f64_mpi_alloc(bool timed,
+                                                         const uintptr_t *expansion_order,
+                                                         uintptr_t n_expansion_order,
+                                                         bool eval_type,
+                                                         double wavenumber,
+                                                         const void *sources,
+                                                         uintptr_t n_sources,
+                                                         const void *targets,
+                                                         uintptr_t n_targets,
+                                                         const void *charges,
+                                                         uintptr_t n_charges,
+                                                         bool prune_empty,
+                                                         uint64_t local_depth,
+                                                         uint64_t global_depth,
+                                                         double singular_value_threshold,
+                                                         uintptr_t surface_diff,
+                                                         uint64_t sort_kind,
+                                                         uintptr_t n_samples,
+                                                         const void *communicator);
+
+/**
+ * Constructor for F32 Helmholtz FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *helmholtz_fft_f32_mpi_alloc(bool timed,
+                                                    const uintptr_t *expansion_order,
+                                                    uintptr_t n_expansion_order,
+                                                    bool eval_type,
+                                                    float wavenumber,
+                                                    const void *sources,
+                                                    uintptr_t n_sources,
+                                                    const void *targets,
+                                                    uintptr_t n_targets,
+                                                    const void *charges,
+                                                    uintptr_t n_charges,
+                                                    bool prune_empty,
+                                                    uint64_t local_depth,
+                                                    uint64_t global_depth,
+                                                    uintptr_t block_size,
+                                                    uint64_t sort_kind,
+                                                    uintptr_t n_samples,
+                                                    const void *communicator);
+
+/**
+ * Constructor for F64 Helmholtz FMM with FFT based M2L translations
+ *
+ * Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+ * must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+ * at each level, and stored as a buffer of length `depth` + 1.
+ *
+ *
+ * # Parameters
+ * - `timed`: Modulates whether operators and metadata are timed.
+ * - `expansion_order`: A pointer to an array of expansion orders.
+ * - `n_expansion_order`: The number of expansion orders.
+ * - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+ * - `wavenumber`: The wavenumber.
+ * - `sources`: A pointer to the source points.
+ * - `n_sources`: The length of the source points buffer
+ * - `targets`: A pointer to the target points.
+ * - `n_targets`: The length of the target points buffer.
+ * - `charges`: A pointer to the charges associated with the source points.
+ * - `n_charges`: The length of the charges buffer.
+ * - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+ * - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+ *  reached based on a uniform particle distribution.
+ * - `depth`: The maximum depth of the tree, max supported depth is 16.
+ * - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+ *
+ * # Safety
+ * This function is intended to be called from C. The caller must ensure that:
+ * - Input data corresponds to valid pointers
+ * - That they remain valid for the duration of the function call
+ */
+struct FmmEvaluatorMPI *helmholtz_fft_f64_mpi_alloc(bool timed,
+                                                    const uintptr_t *expansion_order,
+                                                    uintptr_t n_expansion_order,
+                                                    bool eval_type,
+                                                    double wavenumber,
+                                                    const void *sources,
+                                                    uintptr_t n_sources,
+                                                    const void *targets,
+                                                    uintptr_t n_targets,
+                                                    const void *charges,
+                                                    uintptr_t n_charges,
+                                                    bool prune_empty,
+                                                    uint64_t n_crit,
+                                                    uint64_t depth,
+                                                    uintptr_t block_size);
 
 /**
  * Get the communication runtimes

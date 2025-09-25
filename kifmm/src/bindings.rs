@@ -175,6 +175,181 @@ pub mod types {
     }
 }
 
+#[cfg(feature = "mpi")]
+pub mod mpi_types {
+    use crate::KiFmmMulti;
+    use std::os::raw::c_void;
+
+    use super::{
+        c32, c64, BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation,
+        FmmCType, FmmTranslationCType, Helmholtz3dKernel, Laplace3dKernel,
+    };
+
+    /// Runtime FMM type constructed from C
+    #[repr(C)]
+    pub struct FmmEvaluatorMPI {
+        pub ctype: FmmCType,
+        pub ctranslation_type: FmmTranslationCType,
+        pub data: *mut c_void,
+    }
+
+    impl FmmEvaluatorMPI {
+        /// Get the static FMM type
+        pub fn get_ctype(&self) -> FmmCType {
+            self.ctype
+        }
+
+        /// Get the M2L field translation type
+        pub fn get_ctranslation_type(&self) -> FmmTranslationCType {
+            self.ctranslation_type
+        }
+
+        /// Get the pointer to underlying runtime object
+        pub fn get_pointer(&self) -> *mut c_void {
+            self.data
+        }
+    }
+
+    impl Drop for FmmEvaluatorMPI {
+        fn drop(&mut self) {
+            let Self {
+                ctype,
+                ctranslation_type,
+                data,
+            } = self;
+
+            match ctype {
+                FmmCType::Laplace32 => match ctranslation_type {
+                    FmmTranslationCType::Blas => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        f32,
+                                        Laplace3dKernel<f32>,
+                                        BlasFieldTranslationSaRcmp<f32>,
+                                    >,
+                            )
+                        });
+                    }
+
+                    FmmTranslationCType::Fft => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        f32,
+                                        Laplace3dKernel<f32>,
+                                        FftFieldTranslation<f32>,
+                                    >,
+                            )
+                        });
+                    }
+                },
+
+                FmmCType::Laplace64 => match ctranslation_type {
+                    FmmTranslationCType::Blas => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        f64,
+                                        Laplace3dKernel<f64>,
+                                        BlasFieldTranslationSaRcmp<f64>,
+                                    >,
+                            )
+                        });
+                    }
+
+                    FmmTranslationCType::Fft => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        f64,
+                                        Laplace3dKernel<f64>,
+                                        FftFieldTranslation<f64>,
+                                    >,
+                            )
+                        });
+                    }
+                },
+
+                FmmCType::Helmholtz32 => match ctranslation_type {
+                    FmmTranslationCType::Blas => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        c32,
+                                        Helmholtz3dKernel<c32>,
+                                        BlasFieldTranslationIa<c32>,
+                                    >,
+                            )
+                        });
+                    }
+
+                    FmmTranslationCType::Fft => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        c32,
+                                        Helmholtz3dKernel<c32>,
+                                        FftFieldTranslation<c32>,
+                                    >,
+                            )
+                        });
+                    }
+                },
+
+                FmmCType::Helmholtz64 => match ctranslation_type {
+                    FmmTranslationCType::Blas => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        c64,
+                                        Helmholtz3dKernel<c64>,
+                                        BlasFieldTranslationIa<c64>,
+                                    >,
+                            )
+                        });
+                    }
+
+                    FmmTranslationCType::Fft => {
+                        drop(unsafe {
+                            Box::from_raw(
+                                *data
+                                    as *mut KiFmmMulti<
+                                        c64,
+                                        Helmholtz3dKernel<c64>,
+                                        FftFieldTranslation<c64>,
+                                    >,
+                            )
+                        });
+                    }
+                },
+            }
+        }
+    }
+
+    /// Free the FmmEvaluatorMPI object
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - `fmm_p` is a valid pointer to a properly initialized `FmmEvaluator` instance.
+    /// - The `fmm_p` pointer remains valid for the duration of the function call.
+    #[no_mangle]
+    pub unsafe extern "C" fn free_fmm_evaluator_mpi(fmm_p: *mut FmmEvaluatorMPI) {
+        assert!(!fmm_p.is_null());
+        unsafe { drop(Box::from_raw(fmm_p)) }
+    }
+}
+
+#[cfg(feature = "mpi")]
+pub use mpi_types::*;
+
 impl Drop for MortonKeys {
     fn drop(&mut self) {
         let Self { len, data } = self;
@@ -1562,6 +1737,1673 @@ pub mod constructors {
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluator {
+            data,
+            ctype: FmmCType::Helmholtz64,
+            ctranslation_type: FmmTranslationCType::Fft,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+}
+
+/// All constructors
+#[cfg(feature = "mpi")]
+pub mod constructors_mpi {
+    use core::panic;
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
+    use mpi::ffi::ompi_communicator_t;
+    use mpi::raw::FromRaw;
+    use std::ffi::c_void;
+
+    use crate::{
+        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, FmmSvdMode,
+        MultiNodeBuilder,
+    };
+
+    use super::{
+        c32, c64, FmmCType, FmmEvaluatorMPI, FmmTranslationCType, Laplace3dKernel,
+        SingleNodeBuilder,
+    };
+
+    /// Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_blas_svd_f32_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f32,
+        surface_diff: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for Samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("Only '0' Simple Sort '1' SampleSort or '2' Hyksort are valid"),
+        };
+
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::Deterministic,
+        );
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Laplace32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_blas_svd_f64_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f64,
+        surface_diff: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for Samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("Only '0' Simple Sort '1' SampleSort or '2' Hyksort are valid"),
+        };
+
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::Deterministic,
+        );
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Laplace64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
+    /// with randomised SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_blas_rsvd_f32_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f32,
+        surface_diff: usize,
+        n_components: usize,
+        n_oversamples: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
+
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for Samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("Only '0' Simple Sort '1' SampleSort or '2' Hyksort are valid"),
+        };
+
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Laplace32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Laplace FMM with BLAS based M2L translations compressed
+    /// with randomised SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_blas_rsvd_f64_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f64,
+        surface_diff: usize,
+        n_components: usize,
+        n_oversamples: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
+
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for Samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("Only '0' Simple Sort '1' SampleSort or '2' Hyksort are valid"),
+        };
+
+        let field_translation = BlasFieldTranslationSaRcmp::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Laplace64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F32 Laplace FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_fft_f32_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        block_size: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let block_size = if block_size > 0 {
+            Some(block_size)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("only '0' simple sort '1' samplesort or '2' hyksort are valid"),
+        };
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                eval_type,
+                FftFieldTranslation::new(block_size),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Laplace32,
+            ctranslation_type: FmmTranslationCType::Fft,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Laplace FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn laplace_fft_f64_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        block_size: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const f64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let block_size = if block_size > 0 {
+            Some(block_size)
+        } else {
+            None
+        };
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for Samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("Only '0' Simple Sort '1' SampleSort or '2' Hyksort are valid"),
+        };
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Laplace3dKernel::new(),
+                eval_type,
+                FftFieldTranslation::new(block_size),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Laplace64,
+            ctranslation_type: FmmTranslationCType::Fft,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_blas_rsvd_f32_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f32,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f32,
+        surface_diff: usize,
+        n_components: usize,
+        n_oversamples: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
+
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
+
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("only '0' simple sort '1' samplesort or '2' hyksort are valid"),
+        };
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Helmholtz32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    /// - `n_components`: If known, can specify the rank of the M2L matrix for randomised range finding, otherwise set to 0.
+    /// - `n_oversamples`: Optionally choose the number of oversamples for randomised range finding, otherwise set to 10.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_blas_rsvd_f64_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f64,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f64,
+        surface_diff: usize,
+        n_components: usize,
+        n_oversamples: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+        let n_components = if n_components > 0 {
+            Some(n_components)
+        } else {
+            None
+        };
+
+        let n_oversamples = if n_oversamples > 0 {
+            Some(n_oversamples)
+        } else {
+            None
+        };
+
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            crate::fmm::types::FmmSvdMode::new(true, None, n_components, n_oversamples, None),
+        );
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("only '0' simple sort '1' samplesort or '2' hyksort are valid"),
+        };
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Helmholtz64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F32 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_blas_svd_f32_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f32,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f32,
+        surface_diff: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("only '0' simple sort '1' samplesort or '2' hyksort are valid"),
+        };
+
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            FmmSvdMode::Deterministic,
+        );
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Helmholtz32,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Helmholtz FMM with BLAS based M2L translations compressed
+    /// with deterministic SVD.
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `singular_value_threshold`: Threshold for singular values used in compressing M2L matrices.
+    /// - `surface_diff`: Set to 0 to disable, otherwise uses surface_diff+equivalent_surface_expansion_order = check_surface_expansion_order
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_blas_svd_f64_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f64,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        singular_value_threshold: f64,
+        surface_diff: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let singular_value_threshold = Some(singular_value_threshold);
+        let surface_diff = if surface_diff > 0 {
+            Some(surface_diff)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("only '0' simple sort '1' samplesort or '2' hyksort are valid"),
+        };
+
+        let field_translation = BlasFieldTranslationIa::new(
+            singular_value_threshold,
+            surface_diff,
+            FmmSvdMode::Deterministic,
+        );
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                field_translation,
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Helmholtz64,
+            ctranslation_type: FmmTranslationCType::Blas,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F32 Helmholtz FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_fft_f32_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f32,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        local_depth: u64,
+        global_depth: u64,
+        block_size: usize,
+        sort_kind: u64,
+        n_samples: usize,
+        communicator: *const c_void,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+        let communicator = unsafe {
+            mpi::topology::SimpleCommunicator::from_raw(communicator as *mut ompi_communicator_t)
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c32, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+
+        let local_depth = if local_depth > 0 {
+            local_depth
+        } else {
+            panic!("local_depth must be >= 1")
+        };
+
+        let global_depth = if global_depth > 0 {
+            global_depth
+        } else {
+            panic!("global_depth must be >= 1")
+        };
+
+        let block_size = if block_size > 0 {
+            Some(block_size)
+        } else {
+            None
+        };
+
+        let sort_kind = match sort_kind {
+            0 => crate::tree::SortKind::Simplesort,
+            1 => {
+                if n_samples < 1 {
+                    panic!("'n_samples' must be >= 1 for samplesort")
+                } else {
+                    crate::tree::SortKind::Samplesort { n_samples }
+                }
+            }
+            2 => crate::tree::SortKind::Hyksort { subcomm_size: 2 },
+            _ => panic!("only '0' simple sort '1' samplesort or '2' hyksort are valid"),
+        };
+
+        let fmm = MultiNodeBuilder::new(timed)
+            .tree(
+                &communicator,
+                sources,
+                targets,
+                local_depth,
+                global_depth,
+                prune_empty,
+                sort_kind,
+            )
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                FftFieldTranslation::new(block_size),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
+            data,
+            ctype: FmmCType::Helmholtz32,
+            ctranslation_type: FmmTranslationCType::Fft,
+        };
+
+        Box::into_raw(Box::new(evaluator))
+    }
+
+    /// Constructor for F64 Helmholtz FMM with FFT based M2L translations
+    ///
+    /// Note that either `n_crit` or `depth` must be specified. If `n_crit` is specified, depth
+    /// must be set to 0 and vice versa. If `depth` is specified, `expansion_order` must be specified
+    /// at each level, and stored as a buffer of length `depth` + 1.
+    ///
+    ///
+    /// # Parameters
+    /// - `timed`: Modulates whether operators and metadata are timed.
+    /// - `expansion_order`: A pointer to an array of expansion orders.
+    /// - `n_expansion_order`: The number of expansion orders.
+    /// - `eval_type`: true corresponds to evaluating potentials, false corresponds to evaluating potentials and potential derivatives
+    /// - `wavenumber`: The wavenumber.
+    /// - `sources`: A pointer to the source points.
+    /// - `n_sources`: The length of the source points buffer
+    /// - `targets`: A pointer to the target points.
+    /// - `n_targets`: The length of the target points buffer.
+    /// - `charges`: A pointer to the charges associated with the source points.
+    /// - `n_charges`: The length of the charges buffer.
+    /// - `prune_empty`: A boolean flag indicating whether to prune empty leaf nodes, and their ancestors.
+    /// - `n_crit`: Threshold for tree refinement, if set to 0 ignored. Otherwise will refine until threshold is
+    ///  reached based on a uniform particle distribution.
+    /// - `depth`: The maximum depth of the tree, max supported depth is 16.
+    /// - `block_size`: Parameter size controls cache utilisation in field translation, set to 0 to use default.
+    ///
+    /// # Safety
+    /// This function is intended to be called from C. The caller must ensure that:
+    /// - Input data corresponds to valid pointers
+    /// - That they remain valid for the duration of the function call
+    #[no_mangle]
+    pub unsafe extern "C" fn helmholtz_fft_f64_mpi_alloc(
+        timed: bool,
+        expansion_order: *const usize,
+        n_expansion_order: usize,
+        eval_type: bool,
+        wavenumber: f64,
+        sources: *const c_void,
+        n_sources: usize,
+        targets: *const c_void,
+        n_targets: usize,
+        charges: *const c_void,
+        n_charges: usize,
+        prune_empty: bool,
+        n_crit: u64,
+        depth: u64,
+        block_size: usize,
+    ) -> *mut FmmEvaluatorMPI {
+        let eval_type = if eval_type {
+            GreenKernelEvalType::Value
+        } else {
+            GreenKernelEvalType::ValueDeriv
+        };
+
+        let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
+        let targets = unsafe { std::slice::from_raw_parts(targets as *const f64, n_targets) };
+        let charges = unsafe { std::slice::from_raw_parts(charges as *const c64, n_charges) };
+
+        let expansion_order =
+            unsafe { std::slice::from_raw_parts(expansion_order, n_expansion_order) };
+        let n_crit = if n_crit > 0 { Some(n_crit) } else { None };
+        let depth = if depth > 0 { Some(depth) } else { None };
+        let block_size = if block_size > 0 {
+            Some(block_size)
+        } else {
+            None
+        };
+
+        let fmm = SingleNodeBuilder::new(timed)
+            .tree(sources, targets, n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges,
+                expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                eval_type,
+                FftFieldTranslation::new(block_size),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
+
+        let evaluator = FmmEvaluatorMPI {
             data,
             ctype: FmmCType::Helmholtz64,
             ctranslation_type: FmmTranslationCType::Fft,
