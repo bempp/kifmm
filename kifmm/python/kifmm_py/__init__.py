@@ -386,7 +386,7 @@ class MultiNodeTree:
         self.sources_c = ffi.cast("void* ", self.sources.ctypes.data)
         self.targets_c = ffi.cast("void* ", self.targets.ctypes.data)
         self.charges_c = ffi.cast("void* ", self.charges.ctypes.data)
-        self.communicator_c = ffi.cast("uintptr_t* ", communicator.py2f())
+        self.communicator_c = ffi.cast("void* ", int(communicator.handle))
 
     def new_charges(self, new_charges):
 
@@ -1319,11 +1319,24 @@ class KiFmmMulti:
         self.all_potentials = []
         self._morton_keys_refs = set()
 
+        # Build FMM runtime object
+        self._construct()
+        self._keys_target_tree()
+        self._keys_source_tree()
+        self._leaves_target_tree()
+        self._leaves_source_tree()
+        self._target_global_indices()
+        self._target_tree_local_depth()
+        self._source_tree_local_depth()
+        self._target_tree_global_depth()
+        self._source_tree_global_depth()
+
     def _construct(self):
         """Construct runtime FMM object"""
         if isinstance(self._field_translation, FftFieldTranslation):
             if isinstance(self._field_translation.kernel, LaplaceKernel):
                 if self._field_translation.kernel.dtype == np.float32:
+
                     self._fmm = lib.laplace_fft_f32_mpi_alloc(
                         self._timed,
                         self._expansion_order_c,
@@ -1339,9 +1352,9 @@ class KiFmmMulti:
                         self._tree.local_depth,
                         self._tree.global_depth,
                         self._field_translation.block_size,
-                        self._tree.sort_kind,
+                        self._tree.sort_kind.value,
                         self._tree.n_samples,
-                        ffi.cast("void*", self._tree.communicator_c),
+                        self._tree.communicator_c,
                     )
                     self.potential_dtype = np.float32
 
@@ -1361,9 +1374,9 @@ class KiFmmMulti:
                         self._tree.local_depth,
                         self._tree.global_depth,
                         self._field_translation.block_size,
-                        self._tree.sort_kind,
+                        self._tree.sort_kind.value,
                         self._tree.n_samples,
-                        ffi.cast("void*", self._tree.communicator_c),
+                        self._tree.communicator_c,
                     )
                     self.potential_dtype = np.float64
 
@@ -1388,9 +1401,9 @@ class KiFmmMulti:
                         self._tree.local_depth,
                         self._tree.global_depth,
                         self._field_translation.block_size,
-                        self._tree.sort_kind,
+                        self._tree.sort_kind.value,
                         self._tree.n_samples,
-                        ffi.cast("void*", self._tree.communicator_c),
+                        self._tree.communicator_c,
                     )
                     self.potential_dtype = np.complex64
 
@@ -1411,9 +1424,9 @@ class KiFmmMulti:
                         self._tree.local_depth,
                         self._tree.global_depth,
                         self._field_translation.block_size,
-                        self._tree.sort_kind,
+                        self._tree.sort_kind.value,
                         self._tree.n_samples,
-                        ffi.cast("void*", self._tree.communicator_c),
+                        self._tree.communicator_c,
                     )
                     self.potential_dtype = np.complex128
 
@@ -1654,9 +1667,10 @@ class KiFmmMulti:
             dtype=np.uint64,
         )
 
-        self.target_global_indices = np.zeros_like(tmp)
-        for i, j in enumerate(tmp):
-            self.target_global_indices[j] = i
+        self.target_global_indices = tmp
+        # self.target_global_indices = np.zeros_like(tmp)
+        # for i, j in enumerate(tmp):
+        #     self.target_global_indices[j] = i
 
     def _source_tree_local_depth(self):
         self.source_tree_local_depth = lib.source_tree_local_depth_mpi(self._fmm)
@@ -1719,18 +1733,18 @@ class KiFmmMulti:
             self.all_potentials = np.reshape(
                 all_potentials,
                 (
-                    self._n_evals,
-                    self._tree.n_targets // dim,
+                    # self._n_evals, TODO: multiple evals per run needs to be supported
+                    len(self.target_global_indices),
                     self._field_translation.kernel.eval_type_r.value,
                 ),
             )
 
-            self.all_potentials_u = np.zeros_like(self.all_potentials)
-
-            for i in range(0, self.all_potentials.shape[0]):
-                self.all_potentials_u[i] = self.all_potentials[i][
-                    self.target_global_indices
-                ]
+            # TODO: all potentials unordered needs to be fixed
+            # self.all_potentials_u = np.zeros_like(self.all_potentials)
+            # for i in range(0, self.all_potentials.shape[0]):
+            #     self.all_potentials_u[i] = self.all_potentials[i][
+            #         self.target_global_indices
+            #     ]
 
     @staticmethod
     def _cast_to_numpy_array(ptr, length, dtype, ffi):

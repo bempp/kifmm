@@ -347,9 +347,6 @@ pub mod mpi_types {
     }
 }
 
-#[cfg(feature = "mpi")]
-pub use mpi_types::*;
-
 impl Drop for MortonKeys {
     fn drop(&mut self) {
         let Self { len, data } = self;
@@ -1751,18 +1748,15 @@ pub mod constructors {
 pub mod constructors_mpi {
     use core::panic;
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
-    use mpi::raw::FromRaw;
-    use std::{ffi::c_void, ops::Mul};
+    use mpi::raw::{AsRaw, FromRaw};
+    use std::ffi::c_void;
 
     use crate::{
         BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, FmmSvdMode,
         MultiNodeBuilder,
     };
 
-    use super::{
-        c32, c64, FmmCType, FmmEvaluatorMPI, FmmTranslationCType, Laplace3dKernel,
-        SingleNodeBuilder,
-    };
+    use super::{c32, c64, FmmCType, FmmEvaluatorMPI, FmmTranslationCType, Laplace3dKernel};
 
     /// Constructor for F32 Laplace FMM with BLAS based M2L translations compressed
     /// with deterministic SVD.
@@ -2407,6 +2401,7 @@ pub mod constructors_mpi {
         let communicator = unsafe {
             mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
         };
+        println!("Got communicator: {:?}", communicator.as_raw());
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
         let targets = unsafe { std::slice::from_raw_parts(targets as *const f32, n_targets) };
@@ -13658,6 +13653,15 @@ pub mod api {
 pub use api::*;
 pub use constructors::*;
 pub use types::*;
+
+#[cfg(feature = "mpi")]
+pub use api_mpi::*;
+
+#[cfg(feature = "mpi")]
+pub use mpi_types::*;
+
+#[cfg(feature = "mpi")]
+pub use constructors_mpi::*;
 
 #[cfg(test)]
 mod test {

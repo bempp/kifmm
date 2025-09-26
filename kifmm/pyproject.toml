@@ -36,3 +36,5 @@ dependencies = [
 [tool.maturin]
 python-source = "python"
 module-name = "kifmm_py._kifmm_rs"
+features = ["mpi"]
+profile = "release"
