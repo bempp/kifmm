@@ -8,7 +8,7 @@
 const int n_sources = 100000;
 const int n_targets = 100000;
 
-double drand() { return (double)rand() / RAND_MAX; }
+double drand() { return (double)rand() / rand_max; }
 
 int main(int argc, char **argv) {
 

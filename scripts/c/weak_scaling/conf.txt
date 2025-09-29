@@ -1,0 +1,15 @@
+# Tree
+prune_empty=true
+local_depth=2
+global_depth=2
+sort_kind=1
+n_samples=200
+
+# Runtime
+eval_type=true
+timed=true
+n_sources=50000
+n_targets=50000
+
+# FMM
+expansion_order=6,8,10,12
