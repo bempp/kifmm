@@ -1,15 +1,17 @@
-//! Run a parametrised  distributed FMM with BLAS based M2L in f32
+//! Run a parametrised  distributed FMM with FFT based M2L in f32
 use clap::Parser;
-use green_kernels::laplace_3d::Laplace3dKernel;
+use green_kernels::{helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType};
+use itertools::{izip, Itertools};
 use kifmm::{
-    traits::types::{CommunicationType, FmmOperatorType, MetadataType},
+    traits::{tree::{MultiFmmTree, MultiTree}, types::{CommunicationType, FmmOperatorType, MetadataType}},
     tree::{helpers::points_fixture, types::SortKind},
-    BlasFieldTranslationSaRcmp, DataAccessMulti, EvaluateMulti, FmmSvdMode, MultiNodeBuilder,
+    DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
-use mpi::traits::*;
+use mpi::{datatype::PartitionMut, traits::*};
 use rayon::ThreadPoolBuilder;
-use rlst::RawAccess;
 use std::{collections::HashMap, time::Instant};
+use num::{complex::ComplexFloat, One};
+use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
 
 /// Struct for parsing command-line arguments
 #[derive(Parser)]
@@ -18,7 +20,13 @@ struct Args {
     id: String,
 
     #[arg(long, default_value_t = 3)]
-    expansion_order: usize,
+    leaf_expansion_order: usize,
+
+    #[arg(long, default_value_t = 1.0)]
+    expansion_order_multiplier: f64,
+
+    #[arg(long, default_value_t = 10.0)]
+    wave_number: f64,
 
     /// Whether to prune empty nodes
     #[arg(long, default_value_t = false)]
@@ -36,9 +44,9 @@ struct Args {
     #[arg(long, default_value_t = 1)]
     global_depth: u64,
 
-    /// Singular Value Cutoff
-    #[arg(long, default_value_t = 1e-7)]
-    threshold: f32,
+    /// FFT Hadamard Block Size
+    #[arg(long, default_value_t = 16)]
+    block_size: usize,
 
     /// Number of threads per MPI process
     #[arg(long, default_value_t = 1)]
@@ -58,34 +66,44 @@ fn main() {
 
     // Tree parameters
     let args = Args::parse();
-    let expansion_order = args.expansion_order;
+    let leaf_expansion_order = args.leaf_expansion_order;
     let prune_empty = args.prune_empty;
     let n_points = args.n_points;
     let local_depth = args.local_depth;
     let global_depth = args.global_depth;
-    let threshold = args.threshold;
+    let block_size = args.block_size;
     let n_threads = args.n_threads;
     let n_samples = args.n_samples;
     let id = args.id;
+    let wavenumber = args.wave_number;
+    let expansion_order_multiplier = args.expansion_order_multiplier;
 
     assert!(n_samples > 0 && n_samples < n_points);
 
     let sort_kind = SortKind::Samplesort { n_samples };
 
     // Fmm Parameters
-    let kernel = Laplace3dKernel::<f32>::new();
+    let expansion_order = std::iter::successors(Some(leaf_expansion_order), move |&prev| {
+        let result = (prev as f64 * expansion_order_multiplier).ceil() as usize;
+        Some(result)
+    })
+    .take((global_depth + local_depth + 1) as usize)
+    .collect_vec();
+
+    let kernel = Helmholtz3dKernel::new(wavenumber as f32);
 
     ThreadPoolBuilder::new()
         .num_threads(n_threads)
         .build_global()
         .unwrap();
 
-    let source_to_target =
-        BlasFieldTranslationSaRcmp::<f32>::new(Some(threshold), None, FmmSvdMode::Deterministic);
+    let source_to_target = FftFieldTranslation::new(Some(block_size));
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
-    let charges = vec![1f32; n_points];
+        let tmp = vec![c32::one(); n_points];
+        let mut charges = rlst_dynamic_array2!(c32, [n_points, 1]);
+        charges.data_mut().copy_from_slice(&tmp);
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
         .tree(
@@ -99,8 +117,8 @@ fn main() {
         )
         .unwrap()
         .parameters(
-            &charges,
-            &[expansion_order],
+            charges.data(),
+            &expansion_order,
             kernel.clone(),
             green_kernels::types::GreenKernelEvalType::Value,
             source_to_target,
@@ -109,9 +127,67 @@ fn main() {
         .build()
         .unwrap();
 
+    // Evaluate FMM
     let start = Instant::now();
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
+
+    // Run convergence test
+    // Need to gather the global problem at each rank and test
+    let size = multi_fmm.communicator().size() as usize;
+    let mut all_coords = vec![0f32; n_points * 3 * size];
+    let all_charges = vec![c32::one(); n_points * size];
+
+    let mut sources_counts = vec![0i32; size];
+    multi_fmm.communicator().all_gather_into(&(multi_fmm.tree().source_tree().all_coordinates().iter().len() as i32), &mut sources_counts);
+
+    let mut sources_displacements = Vec::new();
+    let mut counter = 0;
+    for &count in sources_counts.iter() {
+        sources_displacements.push(counter);
+        counter += count;
+    }
+
+    let mut partition = PartitionMut::new(
+        &mut all_coords, sources_counts, sources_displacements
+    );
+
+    multi_fmm.communicator().all_gather_varcount_into(multi_fmm.tree().source_tree().all_coordinates().unwrap(), &mut partition);
+
+    // Evaluate kernel multithreaded on each rank
+    let mut expected = vec![c32::default(); multi_fmm.tree().target_tree().all_coordinates().unwrap().len()/3];
+    multi_fmm.kernel().evaluate_mt(
+        GreenKernelEvalType::Value,
+        &all_coords,
+        multi_fmm.tree().target_tree().all_coordinates().unwrap(),
+        &all_charges,
+        &mut expected
+    );
+
+    // Calculate L2 error
+    let found = multi_fmm.potentials().unwrap();
+
+    let mut num = 0.0f32;
+    let mut den = 0.0f32;
+
+    for (expected, &found) in izip!(expected, found) {
+        // squared error in complex difference
+        let diff_re = expected.re() - found.re();
+        let diff_im = expected.im() - found.im();
+        num += RlstScalar::powf(diff_re, 2.0f32)
+            + RlstScalar::powf(diff_im, 2.0f32);
+
+        // squared magnitude of expected
+        den += RlstScalar::powf(expected.re(),2.0f32)
+            + RlstScalar::powf(expected.im(), 2.0f32);
+    }
+
+    // now take square root
+    let l2_error = if den != 0.0f32 {
+        RlstScalar::sqrt(num) / RlstScalar::sqrt(den)
+    } else {
+       0.0 // or handle division-by-zero error
+    };
 
     // Destructure operator times
     let mut operator_times = HashMap::new();
@@ -223,10 +299,11 @@ fn main() {
     }
 
     println!(
-        "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+        "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},\
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-         {:?},{:?},{:?},{:?},{:?},{:?}, {:?}, {:?}\
-         {:?},{:?},{:?},{:?},{:?},{:?},{:?}",
+         {:?},{:?},{:?},{:?},{:?},{:?}, {:?}, {:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?}, {:?}",
         id,
         multi_fmm.rank(),
         runtime,
@@ -255,12 +332,14 @@ fn main() {
         metadata_times.get("ghost_fmm_u").unwrap_or(&0),
         metadata_times.get("displacement_map").unwrap_or(&0),
         metadata_times.get("metadata_creation").unwrap_or(&0),
-        args.expansion_order,
+        args.leaf_expansion_order,
         args.n_points,
         args.local_depth,
         args.global_depth,
-        args.threshold,
+        args.block_size,
         args.n_threads,
-        args.n_samples
+        args.n_samples,
+        args.expansion_order_multiplier,
+        l2_error
     );
 }

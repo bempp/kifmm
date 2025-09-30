@@ -10,7 +10,7 @@ use kifmm::{
 use mpi::{datatype::PartitionMut, traits::*};
 use rayon::ThreadPoolBuilder;
 use std::{collections::HashMap, time::Instant};
-use num::{complex::ComplexFloat, FromPrimitive, One};
+use num::{complex::ComplexFloat, One};
 use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
 
 /// Struct for parsing command-line arguments
@@ -127,10 +127,12 @@ fn main() {
         .build()
         .unwrap();
 
+    // Evaluate FMM
     let start = Instant::now();
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
 
+    // Run convergence test
     // Need to gather the global problem at each rank and test
     let size = multi_fmm.communicator().size() as usize;
     let mut all_coords = vec![0f32; n_points * 3 * size];
