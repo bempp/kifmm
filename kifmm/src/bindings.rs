@@ -1752,8 +1752,7 @@ pub mod constructors_mpi {
     use std::ffi::c_void;
 
     use crate::{
-        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, FftFieldTranslation, FmmSvdMode,
-        MultiNodeBuilder,
+        BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, DataAccessMulti, FftFieldTranslation, FmmSvdMode, MultiNodeBuilder
     };
 
     use super::{c32, c64, FmmCType, FmmEvaluatorMPI, FmmTranslationCType, Laplace3dKernel};
@@ -2463,6 +2462,9 @@ pub mod constructors_mpi {
             .build()
             .unwrap();
 
+
+        println!("Built FMM at rank = {:?}", fmm.rank());
+
         let data = Box::into_raw(Box::new(fmm)) as *mut c_void;
 
         let evaluator = FmmEvaluatorMPI {
@@ -2470,6 +2472,9 @@ pub mod constructors_mpi {
             ctype: FmmCType::Laplace32,
             ctranslation_type: FmmTranslationCType::Fft,
         };
+
+        println!("Evaluated FMM at rank");
+
 
         Box::into_raw(Box::new(evaluator))
     }
