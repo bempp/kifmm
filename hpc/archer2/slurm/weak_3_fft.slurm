@@ -7,9 +7,9 @@
 
 # This should give a good baseline of what to expect when communication costs are minimal
 
-#SBATCH --job-name=weak_scaling
+#SBATCH --job-name=weak_scaling_fft
 #SBATCH --time=00:30:00
-#SBATCH --nodes=16
+#SBATCH --nodes=1024
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=4
 #SBATCH --contiguous
@@ -51,24 +51,25 @@ cd ${SCRATCH}
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 
 # Script being run, expected in the work directory
-script_name="fmm_m2l_blas_mpi_f32"
+script_name="fmm_m2l_fft_mpi_f32"
 
 # Set simulation parameters for FMM
 expansion_order=3
 n_points=250000 # points per MPI process (n_tasks)
-global_depth=(1 2 2 2 3 3 3) # Number of local roots
+global_depth=(4 4 4) # Number of local roots
 local_depth=4
 n_samples=5000
+block_size=128
 
 # Set parameters for weak scaling run
-n_tasks=(8 16 32 64 128 256 512)
-n_nodes=(1 1 1 2 4 8 16)
+n_tasks=(8192 16384 32768)
+n_nodes=(256 512 1024)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=4
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/weak_blas_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/weak_fft_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
@@ -88,6 +89,6 @@ for i in ${!n_tasks[@]}; do
         --global-depth ${global_depth[$i]} \
         --local-depth $local_depth \
         --n-samples $n_samples \
+        --block-size $block_size \
         --n-threads $n_threads >> ${OUTPUT}
 done
-
