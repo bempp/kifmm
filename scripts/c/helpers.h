@@ -80,6 +80,8 @@ void load_config(const char *filename, Config *cfg) {
                 cfg->prune_empty = (strcmp(val, "true") == 0);
             } else if (strcmp(key, "local_depth") == 0) {
                 cfg->local_depth = strtoull(val, NULL, 10);
+            } else if (strcmp(key, "nthreads") == 0) {
+                cfg->nthreads = strtoull(val, NULL, 1);
             } else if (strcmp(key, "global_depth") == 0) {
                 cfg->global_depth = strtoull(val, NULL, 10);
             } else if (strcmp(key, "sort_kind") == 0) {

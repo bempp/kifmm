@@ -77,6 +77,7 @@ int main(int argc, char **argv) {
     #endif
 
     // Collect timings
+    uint64_t runtime = (uint64_t)((t_end - t_start) * 1000.0); // milliseconds
     FmmOperatorTimes *op_times = operator_times_mpi(evaluator);
     CommunicationTimes *comm_times = communication_times_mpi(evaluator);
     MetadataTimes *meta_times = metadata_times_mpi(evaluator);
@@ -96,7 +97,6 @@ int main(int argc, char **argv) {
         &src_to_tgt, &src_data, &tgt_data, &glob_fmm,
         &ghost_fmm_v, &ghost_fmm_u, &disp_map, &meta_creation);
 
-    uint64_t runtime = (uint64_t)((t_end - t_start) * 1000.0); // milliseconds
     char *row = build_row("0", rank, runtime, p2m, m2m, l2l, m2l, p2p,
         src_tree, tgt_tree, src_dom, tgt_dom, layout, ghost_v, ghost_v_rt,
         ghost_u, gather_fmm, scatter_fmm, src_to_tgt, src_data, tgt_data,
