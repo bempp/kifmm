@@ -34,3 +34,13 @@ required-features = ["mpi"]
 name = "fmm_m2l_blas_mpi_f32"
 path = "src/bin/fmm_m2l_blas_mpi_f32.rs"
 required-features = ["mpi"]
+
+[[bin]]
+name = "helmholtz_m2l_fft_mpi_f32"
+path = "src/bin/helmholtz_m2l_fft_mpi_f32.rs"
+required-features = ["mpi"]
+
+[[bin]]
+name = "helmholtz_m2l_blas_mpi_f32"
+path = "src/bin/helmholtz_m2l_blas_mpi_f32.rs"
+required-features = ["mpi"]
