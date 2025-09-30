@@ -24,13 +24,29 @@ find_package(MPI REQUIRED)
 # --- Option to enable CrayPAT support ---
 option(ENABLE_CRAYPAT "Link against CrayPAT (pat_api.h, -lpat)" OFF)
 
-corrosion_import_crate(MANIFEST_PATH ../../../kifmm/Cargo.toml CRATE_TYPES cdylib PROFILE release FEATURES mpi)
+# --- Option to enable single/double
+option(USE_DOUBLE "Use double precision (default: single)" OFF)
+
+if(USE_DOUBLE)
+  add_compile_definitions(FMM_USE_DOUBLE)
+else()
+  add_compile_definitions(FMM_USE_FLOAT)
+endif()
+
+# Import Rust crate as static lib
+corrosion_import_crate(
+  MANIFEST_PATH ../../../kifmm/Cargo.toml
+  CRATE_TYPES staticlib
+  PROFILE release
+  FEATURES mpi
+)
 
 # Weak scaling script
-add_executable(weak_scaling weak_scaling.c)
-target_include_directories(weak_scaling PUBLIC ../../../kifmm/include)
-target_link_libraries(weak_scaling PUBLIC kifmm MPI::MPI_C)
-target_include_directories(weak_scaling PRIVATE ${MPI_C_INCLUDE_DIRS})
+add_executable(weak_scaling_fft weak_scaling_fft.c)
+target_include_directories(weak_scaling_fft PUBLIC ../../../kifmm/include)
+target_link_libraries(weak_scaling_fft PUBLIC kifmm MPI::MPI_C)
+target_include_directories(weak_scaling_fft PRIVATE ${MPI_C_INCLUDE_DIRS})
+target_include_directories(weak_scaling_fft PRIVATE ../../c) # Helper functions
 
 if(ENABLE_CRAYPAT)
   # Find pat_api.h
@@ -43,7 +59,7 @@ if(ENABLE_CRAYPAT)
     message(FATAL_ERROR "CrayPAT requested but not found (pat_api.h)")
   endif()
 
-  target_include_directories(weak_scaling PRIVATE ${CRAYPAT_INCLUDE_DIRS})
-  target_link_options(weak_scaling PRIVATE "-Wl,--allow-shlib-undefined")
+  target_include_directories(weak_scaling_fft PRIVATE ${CRAYPAT_INCLUDE_DIRS})
+  target_link_options(weak_scaling_fft PRIVATE "-Wl,--allow-shlib-undefined")
   message(STATUS "CrayPAT enabled: remember to run 'pat_build' and 'pat_run' on the executable.")
 endif()

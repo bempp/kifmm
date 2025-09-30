@@ -18,7 +18,8 @@ categories = ["mathematics", "science"]
 
 [lib]
 name = "kifmm"
-crate-type = ["cdylib", "lib"]
+# crate-type = ["cdylib", "lib"]
+crate-type = ["staticlib", "lib"]
 
 [dependencies]
 itertools = "0.13.*"
