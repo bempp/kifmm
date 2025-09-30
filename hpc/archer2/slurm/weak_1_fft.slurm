@@ -55,10 +55,10 @@ script_name="fmm_m2l_fft_mpi_f32"
 
 # Set simulation parameters for FMM
 expansion_order=3
-n_points=250000 # points per MPI process (n_tasks)
+n_points=5000000 # points per MPI process (n_tasks)
 global_depth=(1 2 2 2 3 3 3) # Number of local roots
-local_depth=4
-n_samples=5000
+local_depth=5
+n_samples=500
 block_size=128
 
 # Set parameters for weak scaling run
