@@ -19,7 +19,7 @@ Cargo.lock
 fftw-src/fftw-*
 
 # Data
-*.csv
+# *.csv
 
 # Python
 *.ipynb_checkpoints/
