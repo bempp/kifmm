@@ -10,7 +10,7 @@ use kifmm::{
     tree::{helpers::points_fixture, types::SortKind},
     DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
-use mpi::{datatype::PartitionMut, traits::*};
+use mpi::traits::*;
 use num::{complex::ComplexFloat, One};
 use rayon::ThreadPoolBuilder;
 use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
@@ -139,40 +139,22 @@ fn main() {
     let runtime = start.elapsed().as_millis();
 
     // Run convergence test on root node
-    let size = multi_fmm.communicator().size() as usize;
-    let sources_rank = multi_fmm.tree().source_tree().all_coordinates().unwrap();
-    let n_sources_rank = sources_rank.len() as i32;
-
-    let root_process = multi_fmm.communicator().process_at_rank(0);
-
     let mut l2_error = 0.0;
-
+    // Test on root rank only, regenerate test data to avoid communication of it
     if multi_fmm.rank() == 0 {
-        let mut sources_counts = vec![0i32; size];
 
-        root_process
-            .gather_into_root(&n_sources_rank, &mut sources_counts);
+        let size = multi_fmm.communicator().size();
+        let mut all_coordinates =  vec![0f32; 3 * n_points * (size as usize)];
 
-        let mut sources_displacements = Vec::new();
-        let mut counter = 0;
-        for &count in sources_counts.iter() {
-            sources_displacements.push(counter);
-            counter += count;
+        let mut offset = 0;
+        for seed in 0..size {
+            let block = points_fixture::<f32>(n_points, None, None, Some(seed as u64));
+            let new_offset = offset + n_points * 3;
+            all_coordinates[offset..new_offset].copy_from_slice(block.data());
+            offset = new_offset;
         }
 
-        let n_sources = sources_counts.iter().sum::<i32>();
-
-        let mut all_coordinates = vec![f32::default(); n_sources as usize];
-        let all_charges = vec![c32::one(); (n_sources as usize) / 3];
-
-        // Communicate coordinates
-        let mut partition = PartitionMut::new(
-            &mut all_coordinates,
-            sources_counts,
-            sources_displacements,
-        );
-
-        root_process.gather_varcount_into_root(sources_rank, &mut partition);
+        let all_charges = vec![c32::one(); n_points * size as usize];
 
         let targets_rank = multi_fmm.tree().target_tree().all_coordinates().unwrap();
         let n_targets = targets_rank.len() / 3;
@@ -208,11 +190,6 @@ fn main() {
         } else {
             0.0 // or handle division-by-zero error
         };
-    } else {
-        root_process.gather_into(&n_sources_rank);
-
-        // communicate coordinates
-        root_process.gather_varcount_into(sources_rank);
     }
 
     // Destructure operator times
