@@ -23,7 +23,7 @@ export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
 # Create a scratch directory for this run
-export SCRATCH=${WORK}/grid_search_helmholtz_${SLURM_JOBID}
+export SCRATCH=${WORK}/grid_search_helmholtz_f32_${SLURM_JOBID}
 
 # Load Spack
 source $HOME/spack/share/spack/setup-env.sh
@@ -48,7 +48,7 @@ export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 script_name="helmholtz_m2l_fft_mpi_f32"
 
 # Set simulation parameters
-n_points=(50000 100000) # points per MPI process
+n_points=(50000) # points per MPI process
 wavenumber=10
 n_tasks=32
 cpus_per_task=4
