@@ -138,8 +138,12 @@ fn main() {
     let mut all_coords = vec![0f32; n_points * 3 * size];
     let all_charges = vec![c32::one(); n_points * size];
 
+    let sources_rank = multi_fmm.tree().source_tree().all_coordinates().unwrap();
+    let targets_rank = multi_fmm.tree().target_tree().all_coordinates().unwrap();
+    let n_sources_rank = sources_rank.len();
+
     let mut sources_counts = vec![0i32; size];
-    multi_fmm.communicator().all_gather_into(&(multi_fmm.tree().source_tree().all_coordinates().iter().len() as i32), &mut sources_counts);
+    multi_fmm.communicator().all_gather_into(&(n_sources_rank as i32), &mut sources_counts);
 
     let mut sources_displacements = Vec::new();
     let mut counter = 0;
@@ -152,14 +156,14 @@ fn main() {
         &mut all_coords, sources_counts, sources_displacements
     );
 
-    multi_fmm.communicator().all_gather_varcount_into(multi_fmm.tree().source_tree().all_coordinates().unwrap(), &mut partition);
+    multi_fmm.communicator().all_gather_varcount_into(sources_rank, &mut partition);
 
     // Evaluate kernel multithreaded on each rank
     let mut expected = vec![c32::default(); multi_fmm.tree().target_tree().all_coordinates().unwrap().len()/3];
     multi_fmm.kernel().evaluate_mt(
         GreenKernelEvalType::Value,
         &all_coords,
-        multi_fmm.tree().target_tree().all_coordinates().unwrap(),
+        targets_rank,
         &all_charges,
         &mut expected
     );
