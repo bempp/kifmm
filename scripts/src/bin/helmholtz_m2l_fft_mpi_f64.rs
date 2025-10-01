@@ -10,8 +10,8 @@ use kifmm::{
 use mpi::{datatype::PartitionMut, traits::*};
 use rayon::ThreadPoolBuilder;
 use std::{collections::HashMap, time::Instant};
-use num::{complex::ComplexFloat, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
+use num::{complex::{ComplexFloat}, One};
+use rlst::{c64, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
 
 /// Struct for parsing command-line arguments
 #[derive(Parser)]
@@ -93,7 +93,7 @@ fn main() {
     .rev()
     .collect_vec();
 
-    let kernel = Helmholtz3dKernel::new(wavenumber as f32);
+    let kernel = Helmholtz3dKernel::new(wavenumber);
 
     ThreadPoolBuilder::new()
         .num_threads(n_threads)
@@ -103,10 +103,10 @@ fn main() {
     let source_to_target = FftFieldTranslation::new(Some(block_size));
 
     // Generate some random test data local to each process
-    let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
-        let tmp = vec![c32::one(); n_points];
-        let mut charges = rlst_dynamic_array2!(c32, [n_points, 1]);
-        charges.data_mut().copy_from_slice(&tmp);
+    let points = points_fixture::<f64>(n_points, None, None, Some(world.rank() as u64));
+    let tmp = vec![c64::one(); n_points];
+    let mut charges = rlst_dynamic_array2!(c64, [n_points, 1]);
+    charges.data_mut().copy_from_slice(&tmp);
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
         .tree(
@@ -138,8 +138,8 @@ fn main() {
     // Run convergence test
     // Need to gather the global problem at each rank and test
     let size = multi_fmm.communicator().size() as usize;
-    let mut all_coords = vec![0f32; n_points * 3 * size];
-    let all_charges = vec![c32::one(); n_points * size];
+    let mut all_coords = vec![0f64; n_points * 3 * size];
+    let all_charges = vec![c64::one(); n_points * size];
 
     let sources_rank = multi_fmm.tree().source_tree().all_coordinates().unwrap();
     let targets_rank = multi_fmm.tree().target_tree().all_coordinates().unwrap();
@@ -162,7 +162,7 @@ fn main() {
     multi_fmm.communicator().all_gather_varcount_into(sources_rank, &mut partition);
 
     // Evaluate kernel multithreaded on each rank
-    let mut expected = vec![c32::default(); multi_fmm.tree().target_tree().all_coordinates().unwrap().len()/3];
+    let mut expected = vec![c64::default(); multi_fmm.tree().target_tree().all_coordinates().unwrap().len()/3];
     multi_fmm.kernel().evaluate_mt(
         GreenKernelEvalType::Value,
         &all_coords,
@@ -174,23 +174,23 @@ fn main() {
     // Calculate L2 error
     let found = multi_fmm.potentials().unwrap();
 
-    let mut num = 0.0f32;
-    let mut den = 0.0f32;
+    let mut num = 0.0f64;
+    let mut den = 0.0f64;
 
     for (expected, &found) in izip!(expected, found) {
         // squared error in complex difference
         let diff_re = expected.re() - found.re();
         let diff_im = expected.im() - found.im();
-        num += RlstScalar::powf(diff_re, 2.0f32)
-            + RlstScalar::powf(diff_im, 2.0f32);
+        num += RlstScalar::powf(diff_re, 2.0)
+            + RlstScalar::powf(diff_im, 2.0);
 
         // squared magnitude of expected
-        den += RlstScalar::powf(expected.re(),2.0f32)
-            + RlstScalar::powf(expected.im(), 2.0f32);
+        den += RlstScalar::powf(expected.re(),2.0)
+            + RlstScalar::powf(expected.im(), 2.0);
     }
 
     // now take square root
-    let l2_error = if den != 0.0f32 {
+    let l2_error = if den != 0.0 {
         RlstScalar::sqrt(num) / RlstScalar::sqrt(den)
     } else {
        0.0 // or handle division-by-zero error

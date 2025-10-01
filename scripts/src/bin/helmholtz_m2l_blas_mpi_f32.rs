@@ -3,15 +3,18 @@ use clap::Parser;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType};
 use itertools::{izip, Itertools};
 use kifmm::{
-    traits::{tree::{MultiFmmTree, MultiTree}, types::{CommunicationType, FmmOperatorType, MetadataType}},
+    traits::{
+        tree::{MultiFmmTree, MultiTree},
+        types::{CommunicationType, FmmOperatorType, MetadataType},
+    },
     tree::{helpers::points_fixture, types::SortKind},
     DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
 use mpi::{datatype::PartitionMut, traits::*};
-use rayon::ThreadPoolBuilder;
-use std::{collections::HashMap, time::Instant};
 use num::{complex::ComplexFloat, One};
+use rayon::ThreadPoolBuilder;
 use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
+use std::{collections::HashMap, time::Instant};
 
 /// Struct for parsing command-line arguments
 #[derive(Parser)]
@@ -101,9 +104,9 @@ fn main() {
 
     // Generate some random test data local to each process
     let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
-        let tmp = vec![c32::one(); n_points];
-        let mut charges = rlst_dynamic_array2!(c32, [n_points, 1]);
-        charges.data_mut().copy_from_slice(&tmp);
+    let tmp = vec![c32::one(); n_points];
+    let mut charges = rlst_dynamic_array2!(c32, [n_points, 1]);
+    charges.data_mut().copy_from_slice(&tmp);
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
         .tree(
@@ -139,7 +142,15 @@ fn main() {
     let all_charges = vec![c32::one(); n_points * size];
 
     let mut sources_counts = vec![0i32; size];
-    multi_fmm.communicator().all_gather_into(&(multi_fmm.tree().source_tree().all_coordinates().iter().len() as i32), &mut sources_counts);
+    multi_fmm.communicator().all_gather_into(
+        &(multi_fmm
+            .tree()
+            .source_tree()
+            .all_coordinates()
+            .iter()
+            .len() as i32),
+        &mut sources_counts,
+    );
 
     let mut sources_displacements = Vec::new();
     let mut counter = 0;
@@ -148,20 +159,30 @@ fn main() {
         counter += count;
     }
 
-    let mut partition = PartitionMut::new(
-        &mut all_coords, sources_counts, sources_displacements
+    let mut partition = PartitionMut::new(&mut all_coords, sources_counts, sources_displacements);
+
+    multi_fmm.communicator().all_gather_varcount_into(
+        multi_fmm.tree().source_tree().all_coordinates().unwrap(),
+        &mut partition,
     );
 
-    multi_fmm.communicator().all_gather_varcount_into(multi_fmm.tree().source_tree().all_coordinates().unwrap(), &mut partition);
-
     // Evaluate kernel multithreaded on each rank
-    let mut expected = vec![c32::default(); multi_fmm.tree().target_tree().all_coordinates().unwrap().len()/3];
+    let mut expected = vec![
+        c32::default();
+        multi_fmm
+            .tree()
+            .target_tree()
+            .all_coordinates()
+            .unwrap()
+            .len()
+            / 3
+    ];
     multi_fmm.kernel().evaluate_mt(
         GreenKernelEvalType::Value,
         &all_coords,
         multi_fmm.tree().target_tree().all_coordinates().unwrap(),
         &all_charges,
-        &mut expected
+        &mut expected,
     );
 
     // Calculate L2 error
@@ -174,19 +195,17 @@ fn main() {
         // squared error in complex difference
         let diff_re = expected.re() - found.re();
         let diff_im = expected.im() - found.im();
-        num += RlstScalar::powf(diff_re, 2.0f32)
-            + RlstScalar::powf(diff_im, 2.0f32);
+        num += RlstScalar::powf(diff_re, 2.0f32) + RlstScalar::powf(diff_im, 2.0f32);
 
         // squared magnitude of expected
-        den += RlstScalar::powf(expected.re(),2.0f32)
-            + RlstScalar::powf(expected.im(), 2.0f32);
+        den += RlstScalar::powf(expected.re(), 2.0f32) + RlstScalar::powf(expected.im(), 2.0f32);
     }
 
     // now take square root
     let l2_error = if den != 0.0f32 {
         RlstScalar::sqrt(num) / RlstScalar::sqrt(den)
     } else {
-       0.0 // or handle division-by-zero error
+        0.0 // or handle division-by-zero error
     };
 
     // Destructure operator times
