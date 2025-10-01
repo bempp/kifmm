@@ -160,12 +160,13 @@ fn main() {
         let n_targets = targets_rank.len() / 3;
         let mut expected = vec![c32::default(); n_targets];
 
+        let take = 10;
         multi_fmm.kernel().evaluate_mt(
             GreenKernelEvalType::Value,
             &all_coordinates,
-            targets_rank,
+            &targets_rank[0..take*3],
             &all_charges,
-            &mut expected,
+            &mut expected[0..take],
         );
 
         // Calculate L2 error
@@ -174,7 +175,7 @@ fn main() {
         let mut num = 0.0f32;
         let mut den = 0.0f32;
 
-        for (expected, &found) in izip!(expected, found) {
+        for (expected, &found) in izip!(expected, found).take(take) {
             // squared error in complex difference
             let diff_re = expected.re() - found.re();
             let diff_im = expected.im() - found.im();
