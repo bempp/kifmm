@@ -86,13 +86,13 @@ for i in "${!local_depth[@]}"; do
           --id $experiment_id \
           --leaf-expansion-order ${leaf_expansion_order[$j]} \
           --expansion-order-multiplier ${expansion_order_multiplier[$k]} \
-          --wave-number $wavenumber \
+          --wavenumber $wavenumber \
           --prune-empty \
           --n-points ${n_points[$l]} \
           --local-depth ${local_depth[$i]} \
           --global-depth $global_depth \
           --n-threads $n_threads \
-          --n-samples $n_samples
+          --n-samples $n_samples >> ${OUTPUT}
       done
     done
   done
