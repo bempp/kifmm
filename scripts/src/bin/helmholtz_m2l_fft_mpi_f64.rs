@@ -3,15 +3,18 @@ use clap::Parser;
 use green_kernels::{helmholtz_3d::Helmholtz3dKernel, traits::Kernel, types::GreenKernelEvalType};
 use itertools::{izip, Itertools};
 use kifmm::{
-    traits::{tree::{MultiFmmTree, MultiTree}, types::{CommunicationType, FmmOperatorType, MetadataType}},
+    traits::{
+        tree::{MultiFmmTree, MultiTree},
+        types::{CommunicationType, FmmOperatorType, MetadataType},
+    },
     tree::{helpers::points_fixture, types::SortKind},
     DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
-use mpi::{datatype::PartitionMut, traits::*};
+use mpi::traits::*;
+use num::{complex::ComplexFloat, One};
 use rayon::ThreadPoolBuilder;
-use std::{collections::HashMap, time::Instant};
-use num::{complex::{ComplexFloat}, One};
 use rlst::{c64, rlst_dynamic_array2, RawAccess, RawAccessMut, RlstScalar};
+use std::{collections::HashMap, time::Instant};
 
 /// Struct for parsing command-line arguments
 #[derive(Parser)]
@@ -135,66 +138,60 @@ fn main() {
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
 
-    // Run convergence test
-    // Need to gather the global problem at each rank and test
-    let size = multi_fmm.communicator().size() as usize;
-    let mut all_coords = vec![0f64; n_points * 3 * size];
-    let all_charges = vec![c64::one(); n_points * size];
+    // Run convergence test on root node
+    let mut l2_error = 0.0;
+    // Test on root rank only, regenerate test data to avoid communication of it
+    if multi_fmm.rank() == 0 {
 
-    let sources_rank = multi_fmm.tree().source_tree().all_coordinates().unwrap();
-    let targets_rank = multi_fmm.tree().target_tree().all_coordinates().unwrap();
-    let n_sources_rank = sources_rank.len();
+        let size = multi_fmm.communicator().size();
+        let mut all_coordinates =  vec![0f64; 3 * n_points * (size as usize)];
 
-    let mut sources_counts = vec![0i32; size];
-    multi_fmm.communicator().all_gather_into(&(n_sources_rank as i32), &mut sources_counts);
+        let mut offset = 0;
+        for seed in 0..size {
+            let block = points_fixture::<f64>(n_points, None, None, Some(seed as u64));
+            let new_offset = offset + n_points * 3;
+            all_coordinates[offset..new_offset].copy_from_slice(block.data());
+            offset = new_offset;
+        }
 
-    let mut sources_displacements = Vec::new();
-    let mut counter = 0;
-    for &count in sources_counts.iter() {
-        sources_displacements.push(counter);
-        counter += count;
+        let all_charges = vec![c64::one(); n_points * size as usize];
+
+        let targets_rank = multi_fmm.tree().target_tree().all_coordinates().unwrap();
+        let n_targets = targets_rank.len() / 3;
+        let mut expected = vec![c64::default(); n_targets];
+
+        let take = 10;
+        multi_fmm.kernel().evaluate_mt(
+            GreenKernelEvalType::Value,
+            &all_coordinates,
+            &targets_rank[0..take*3],
+            &all_charges,
+            &mut expected[0..take],
+        );
+
+        // Calculate L2 error
+        let found = multi_fmm.potentials().unwrap();
+
+        let mut num = 0.0;
+        let mut den = 0.0;
+
+        for (expected, &found) in izip!(expected, found).take(take) {
+            // squared error in complex difference
+            let diff_re = expected.re() - found.re();
+            let diff_im = expected.im() - found.im();
+            num += RlstScalar::powf(diff_re, 2.0) + RlstScalar::powf(diff_im, 2.0);
+
+            // squared magnitude of expected
+            den += RlstScalar::powf(expected.re(), 2.0) + RlstScalar::powf(expected.im(), 2.0);
+        }
+
+        // now take square root
+        l2_error = if den != 0.0 {
+            RlstScalar::sqrt(num) / RlstScalar::sqrt(den)
+        } else {
+            0.0 // or handle division-by-zero error
+        };
     }
-
-    let mut partition = PartitionMut::new(
-        &mut all_coords, sources_counts, sources_displacements
-    );
-
-    multi_fmm.communicator().all_gather_varcount_into(sources_rank, &mut partition);
-
-    // Evaluate kernel multithreaded on each rank
-    let mut expected = vec![c64::default(); multi_fmm.tree().target_tree().all_coordinates().unwrap().len()/3];
-    multi_fmm.kernel().evaluate_mt(
-        GreenKernelEvalType::Value,
-        &all_coords,
-        targets_rank,
-        &all_charges,
-        &mut expected
-    );
-
-    // Calculate L2 error
-    let found = multi_fmm.potentials().unwrap();
-
-    let mut num = 0.0f64;
-    let mut den = 0.0f64;
-
-    for (expected, &found) in izip!(expected, found) {
-        // squared error in complex difference
-        let diff_re = expected.re() - found.re();
-        let diff_im = expected.im() - found.im();
-        num += RlstScalar::powf(diff_re, 2.0)
-            + RlstScalar::powf(diff_im, 2.0);
-
-        // squared magnitude of expected
-        den += RlstScalar::powf(expected.re(),2.0)
-            + RlstScalar::powf(expected.im(), 2.0);
-    }
-
-    // now take square root
-    let l2_error = if den != 0.0 {
-        RlstScalar::sqrt(num) / RlstScalar::sqrt(den)
-    } else {
-       0.0 // or handle division-by-zero error
-    };
 
     // Destructure operator times
     let mut operator_times = HashMap::new();

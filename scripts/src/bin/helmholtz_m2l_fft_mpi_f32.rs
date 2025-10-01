@@ -172,21 +172,21 @@ fn main() {
         // Calculate L2 error
         let found = multi_fmm.potentials().unwrap();
 
-        let mut num = 0.0f32;
-        let mut den = 0.0f32;
+        let mut num = 0.0;
+        let mut den = 0.0;
 
         for (expected, &found) in izip!(expected, found).take(take) {
             // squared error in complex difference
             let diff_re = expected.re() - found.re();
             let diff_im = expected.im() - found.im();
-            num += RlstScalar::powf(diff_re, 2.0f32) + RlstScalar::powf(diff_im, 2.0f32);
+            num += RlstScalar::powf(diff_re, 2.0) + RlstScalar::powf(diff_im, 2.0);
 
             // squared magnitude of expected
-            den += RlstScalar::powf(expected.re(), 2.0f32) + RlstScalar::powf(expected.im(), 2.0f32);
+            den += RlstScalar::powf(expected.re(), 2.0) + RlstScalar::powf(expected.im(), 2.0);
         }
 
         // now take square root
-        l2_error = if den != 0.0f32 {
+        l2_error = if den != 0.0 {
             RlstScalar::sqrt(num) / RlstScalar::sqrt(den)
         } else {
             0.0 // or handle division-by-zero error
