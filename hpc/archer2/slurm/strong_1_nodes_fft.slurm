@@ -5,7 +5,7 @@
 # the saturation point (in terms of nodes)
 
 #SBATCH --job-name=strong_scaling_fft
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --nodes=256
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=4
@@ -66,6 +66,7 @@ for i in ${!n_tasks[@]}; do
 
     experiment_id="${i}"
     srun --nodes=${n_nodes[$i]} --ntasks=${n_tasks[$i]} --cpus-per-task=$cpus_per_task --distribution=block:block --hint=nomultithread \
+        "${WORK}/${script_name}" --id $experiment_id --n-points ${n_points[$i]} \
         --expansion-order $expansion_order \
         --prune-empty \
         --global-depth ${global_depth[$i]} \
