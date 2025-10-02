@@ -15,10 +15,15 @@
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 
+# Restore AMD compiler env
+module load PrgEnv-aocc
+module load craype-network-ucx
+module load cray-mpich-ucx
+
 # Home and work directories
 export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
-TOTAL_POINTS=2048000000             # 2.048B points = 64M * 32 tasks (1 node) and stays constant
+TOTAL_POINTS=1.024B             # 1.024B points = 32M * 32 tasks (1 node) and stays constant
 
 # Script being run, expected in the work directory
 script_name="fmm_m2l_fft_mpi_f32" # must exist in $WORK
@@ -30,8 +35,8 @@ n_samples=500
 block_size=128
 
 # Set parameters for strong scaling run
-n_points=(64000000 32000000 16000000 8000000 4000000 2000000 1000000 500000 250000)
-local_depth=(6 6 5 5 5 4 4 4 3)
+n_points=(32000000 16000000  8000000  4000000  2000000  1000000   500000   250000 125000)
+local_depth=(5 5 4 4 4 3 3 3 3)
 n_tasks=(32 64 128 256 512 1024 2048 4096 8192) # Equal to the number of local trees
 n_nodes=(1 2 4 8 16 32 64 128 256)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
