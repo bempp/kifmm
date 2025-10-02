@@ -35,11 +35,12 @@ n_samples=500
 block_size=128
 
 # Set parameters for strong scaling run
-n_points=(9600000 4800000 2400000 1200000  600000  300000  150000   75000)
-local_depth=(5 4 4 4 3 3 3 3)
-n_tasks=(16   32   64  128  256  512 1024 2048) # Equal to the number of local trees
+n_points=(9600000 4800000 2400000 1200000 600000 300000 150000 75000)
+# local_depth=(5 4 4 4 3 3 3 3) slightly unbalanced
+local_depth=(5 5 5 4 4 4 3 2)
+n_tasks=(16 32 64 128 256 512 1024 2048) # Equal to the number of local trees
 n_nodes=(1 2 4 8 16 32 64 128)
-n_threads=8 # See if bandwidth saturates with different threading parameters for Rayon thread pool
+n_threads=8
 cpus_per_task=8
 
 # Create a scratch directory for this run
