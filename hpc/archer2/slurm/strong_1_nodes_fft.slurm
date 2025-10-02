@@ -1,10 +1,12 @@
 #!/bin/bash
-# Here, we perform a weak scaling run where the number of MPI processes are tied to CCX units, each of which
-# share an L3 cache, consist of 4 processors. There are 16 CCX regions per processor, and 32 per node (i.e. two AMD EPYC Rome units per node)
+# Here, we perform a strong scaling run where the number of MPI processes are tied to CCX units, each of which
+# share an L3 cache, consist of 4 cores. There are 16 CCX regions per processor, and 32 per node (i.e. two AMD EPYC Rome units per node)
+# We start with a large (>2.5B) point problem on a single fully utilised node, and gradually double the number of nodes to identify
+# the saturation point (in terms of nodes)
 
-#SBATCH --job-name=weak_scaling_fft
-#SBATCH --time=00:30:00
-#SBATCH --nodes=16
+#SBATCH --job-name=strong_scaling_fft
+#SBATCH --time=01:00:00
+#SBATCH --nodes=256
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=4
 #SBATCH --contiguous
@@ -21,40 +23,28 @@ module load cray-mpich-ucx
 # Home and work directories
 export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
+TOTAL_POINTS=1.024B             # 1.024B points = 32M * 32 tasks (1 node) and stays constant
 
 # Script being run, expected in the work directory
-script_name="fmm_m2l_fft_mpi_f32"
+script_name="fmm_m2l_fft_mpi_f32" # must exist in $WORK
 
 # Set simulation parameters for FMM
 expansion_order=3
-n_points=250000 # points per MPI process (n_tasks)
-global_depth=(1 2 2 2 3 3 3) # Number of local roots
-local_depth=4
+global_depth=(2 2 3 3 3 4 4 4 5) # Number of local roots
 n_samples=500
 block_size=128
 
-# Set parameters for weak scaling run
-n_tasks=(8 16 32 64 128 256 512)
-n_nodes=(1 1 1 2 4 8 16)
+# Set parameters for strong scaling run
+n_points=(32000000 16000000  8000000  4000000  2000000  1000000   500000   250000 125000)
+local_depth=(5 5 4 4 4 3 3 3 3)
+n_tasks=(32 64 128 256 512 1024 2048 4096 8192) # Equal to the number of local trees
+n_nodes=(1 2 4 8 16 32 64 128 256)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=4
 
 # Create a scratch directory for this run
 last_nodes=${n_nodes[@]: -1}
-export SCRATCH=${WORK}/weak_fft_n=${n_points}_p=${last_nodes}_${SLURM_JOBID}
-
-## Load Spack
-#source $HOME/spack/share/spack/setup-env.sh
-#. "$HOME/.cargo/env"
-#
-## Load BLAS
-#spack load openblas
-#
-## Ensure Rust can find the Cray libraries
-## export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
-## export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
-#export RUSTFLAGS="-L $(spack location -i openblas)/lib"
-#export LD_LIBRARY_PATH=$(spack location -i openblas)/lib:$LD_LIBRARY_PATH
+export SCRATCH=${WORK}/strong_fft_n=${TOTAL_POINTS}_p=${last_nodes}_${SLURM_JOBID}
 
 mkdir -p ${SCRATCH}
 cd ${SCRATCH}
@@ -65,7 +55,9 @@ export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/weak_fft_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/strong_fft_p=${TOTAL_POINTS}_n=${last_nodes}_${SLURM_JOBID}.csv
+
+# Create a CSV output file for analysis
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
@@ -75,15 +67,15 @@ source_to_target_data,source_data,target_data,global_fmm,ghost_fmm_v,ghost_fmm_u
 displacement_map,metadata_creation,\
 expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples" >> ${OUTPUT}
 
-# Perform weak scaling
 for i in ${!n_tasks[@]}; do
+
     experiment_id="${i}"
     srun --nodes=${n_nodes[$i]} --ntasks=${n_tasks[$i]} --cpus-per-task=$cpus_per_task --distribution=block:block --hint=nomultithread \
-        "${WORK}/${script_name}" --id $experiment_id --n-points $n_points \
+        "${WORK}/${script_name}" --id $experiment_id --n-points ${n_points[$i]} \
         --expansion-order $expansion_order \
         --prune-empty \
         --global-depth ${global_depth[$i]} \
-        --local-depth $local_depth \
+        --local-depth ${local_depth[$i]} \
         --n-samples $n_samples \
         --block-size $block_size \
         --n-threads $n_threads >> ${OUTPUT}
