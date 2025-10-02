@@ -6,9 +6,9 @@
 
 #SBATCH --job-name=strong_scaling_fft
 #SBATCH --time=01:00:00
-#SBATCH --nodes=256
-#SBATCH --ntasks-per-node=32
-#SBATCH --cpus-per-task=4
+#SBATCH --nodes=128
+#SBATCH --ntasks-per-node=16
+#SBATCH --cpus-per-task=8
 #SBATCH --contiguous
 
 #SBATCH --account=e738
@@ -23,24 +23,24 @@ module load cray-mpich-ucx
 # Home and work directories
 export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
-TOTAL_POINTS=1.024B             # 1.024B points = 32M * 32 tasks (1 node) and stays constant
+TOTAL_POINTS=153600000             # 150M points
 
 # Script being run, expected in the work directory
 script_name="fmm_m2l_fft_mpi_f32" # must exist in $WORK
 
 # Set simulation parameters for FMM
 expansion_order=3
-global_depth=(2 2 3 3 3 4 4 4 5) # Number of local roots
+global_depth=(2 2 2 3 3 3 4 4) # Number of local roots
 n_samples=500
 block_size=128
 
 # Set parameters for strong scaling run
-n_points=(32000000 16000000  8000000  4000000  2000000  1000000   500000   250000 125000)
-local_depth=(5 5 4 4 4 3 3 3 3)
-n_tasks=(32 64 128 256 512 1024 2048 4096 8192) # Equal to the number of local trees
-n_nodes=(1 2 4 8 16 32 64 128 256)
-n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
-cpus_per_task=4
+n_points=(9600000 4800000 2400000 1200000  600000  300000  150000   75000)
+local_depth=(5 4 4 4 3 3 3 3)
+n_tasks=(16   32   64  128  256  512 1024 2048) # Equal to the number of local trees
+n_nodes=(1 2 4 8 16 32 64 128)
+n_threads=8 # See if bandwidth saturates with different threading parameters for Rayon thread pool
+cpus_per_task=8
 
 # Create a scratch directory for this run
 last_nodes=${n_nodes[@]: -1}
@@ -78,5 +78,5 @@ for i in ${!n_tasks[@]}; do
         --local-depth ${local_depth[$i]} \
         --n-samples $n_samples \
         --block-size $block_size \
-        --n-threads $n_threads >> ${OUTPUT}
+        --n-threads $n_threads >> ${OUTPUT} 2> ${SCRATCH}/err_run_${i}.log
 done
