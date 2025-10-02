@@ -27,9 +27,9 @@ script_name="fmm_m2l_fft_mpi_f32"
 
 # Set simulation parameters for FMM
 expansion_order=3
-n_points=5000000 # points per MPI process (n_tasks)
+n_points=250000 # points per MPI process (n_tasks)
 global_depth=(1 2 2 2 3 3 3) # Number of local roots
-local_depth=5
+local_depth=4
 n_samples=500
 block_size=128
 
@@ -40,7 +40,8 @@ n_threads=4 # See if bandwidth saturates with different threading parameters for
 cpus_per_task=4
 
 # Create a scratch directory for this run
-export SCRATCH=${WORK}/weak_fft_p=${n_points}_n=${n_nodes[-1]}_${SLURM_JOBID}
+last_nodes=${n_nodes[@]: -1}
+export SCRATCH=${WORK}/weak_fft_n=${n_points}_p=${last_nodes}_${SLURM_JOBID}
 
 ## Load Spack
 #source $HOME/spack/share/spack/setup-env.sh

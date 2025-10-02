@@ -44,7 +44,7 @@ cpus_per_task=4
 
 # Create a scratch directory for this run
 last_nodes=${n_nodes[@]: -1}
-export SCRATCH=${WORK}/strong_fft_p=${TOTAL_POINTS}_n=${last_nodes}_${SLURM_JOBID}
+export SCRATCH=${WORK}/strong_fft_n=${TOTAL_POINTS}_p=${last_nodes}_${SLURM_JOBID}
 
 mkdir -p ${SCRATCH}
 cd ${SCRATCH}
