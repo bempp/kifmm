@@ -1,0 +1,2 @@
+depth,expansion_order,block_size,runtime,min_rel_err,mean_rel_err,max_rel_err,rel_l2_err,setup_time
+6,3,32,1367,0.0003791737,0.0004618011,0.000542133,0.00046473174,5127
