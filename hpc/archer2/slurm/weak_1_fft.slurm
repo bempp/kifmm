@@ -7,7 +7,7 @@
 #SBATCH --nodes=16
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=4
-#SBATCH --contiguous
+##SBATCH --contiguous
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
@@ -38,10 +38,11 @@ n_tasks=(8 16 32 64 128 256 512)
 n_nodes=(1 1 1 2 4 8 16)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=4
+max_points=$(echo {n_tasks[@]: -1} * ${n_points} | bc -l)
 
 # Create a scratch directory for this run
 last_nodes=${n_nodes[@]: -1}
-export SCRATCH=${WORK}/weak_fft_n=${n_points}_p=${last_nodes}_${SLURM_JOBID}
+export SCRATCH=${WORK}/weak_fft_n=${max_points}_p=${last_nodes}_${SLURM_JOBID}
 
 ## Load Spack
 #source $HOME/spack/share/spack/setup-env.sh
@@ -86,5 +87,5 @@ for i in ${!n_tasks[@]}; do
         --local-depth $local_depth \
         --n-samples $n_samples \
         --block-size $block_size \
-        --n-threads $n_threads >> ${OUTPUT}
+        --n-threads $n_threads >> ${OUTPUT} 2> ${SCRATCH}/err_run_${i}.log
 done

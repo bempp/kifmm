@@ -1,23 +1,18 @@
 #!/bin/bash
-# Here, we perform a weak scaling run where the number of MPI processes is set equal to the number of CCX units, each of which
-# share an L3 cache, conist of 4 processors. There are 16 CCX regions per processor, and 32 per node
+# Here, we perform a weak scaling run where the number of MPI processes are tied to CCX units, each of which
+# share an L3 cache, consist of 4 processors. There are 16 CCX regions per processor, and 32 per node (i.e. two AMD EPYC Rome units per node)
 
-# Running on just a single node, we try and examine the scaling performance as the number of tasks is increased
-# just to see what a single node is capable of (in the best parameter settings found)
-
-# This should give a good baseline of what to expect when communication costs are minimal
 
 #SBATCH --job-name=weak_scaling_fft
 #SBATCH --time=00:30:00
 #SBATCH --nodes=1024
 #SBATCH --ntasks-per-node=32
 #SBATCH --cpus-per-task=4
-#SBATCH --contiguous
+# #SBATCH --contiguous
 
 #SBATCH --account=e738
 #SBATCH --partition=standard
 #SBATCH --qos=standard
-# Development environment for KiFMM
 
 # Restore AMD compiler env
 module load PrgEnv-aocc
@@ -28,37 +23,15 @@ module load cray-mpich-ucx
 export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
-# Create a scratch directory for this run
-export SCRATCH=${WORK}/weak_${SLURM_JOBID}
-
-# Load Spack
-source $HOME/spack/share/spack/setup-env.sh
-. "$HOME/.cargo/env"
-
-# Load BLAS
-spack load openblas
-
-# Ensure Rust can find the Cray libraries
-# export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
-# export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
-export RUSTFLAGS="-L $(spack location -i openblas)/lib"
-export LD_LIBRARY_PATH=$(spack location -i openblas)/lib:$LD_LIBRARY_PATH
-
-mkdir -p ${SCRATCH}
-cd ${SCRATCH}
-
-# Pass variable to SRUN from SBATCH
-export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
-
 # Script being run, expected in the work directory
 script_name="fmm_m2l_fft_mpi_f32"
 
 # Set simulation parameters for FMM
 expansion_order=3
 n_points=250000 # points per MPI process (n_tasks)
-global_depth=(4 4 4) # Number of local roots
+global_depth=(5 5 5) # Number of local roots
 local_depth=4
-n_samples=5000
+n_samples=500
 block_size=128
 
 # Set parameters for weak scaling run
@@ -66,6 +39,30 @@ n_tasks=(8192 16384 32768)
 n_nodes=(256 512 1024)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=4
+
+# # Create a scratch directory for this run
+# export SCRATCH=${WORK}/weak_${SLURM_JOBID}
+#
+# # Load Spack
+# source $HOME/spack/share/spack/setup-env.sh
+# . "$HOME/.cargo/env"
+#
+# # Load BLAS
+# spack load openblas
+#
+# # Ensure Rust can find the Cray libraries
+# # export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
+# # export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+# export RUSTFLAGS="-L $(spack location -i openblas)/lib"
+# export LD_LIBRARY_PATH=$(spack location -i openblas)/lib:$LD_LIBRARY_PATH
+
+
+mkdir -p ${SCRATCH}
+cd ${SCRATCH}
+
+# Pass variable to SRUN from SBATCH
+export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
+
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
@@ -90,5 +87,5 @@ for i in ${!n_tasks[@]}; do
         --local-depth $local_depth \
         --n-samples $n_samples \
         --block-size $block_size \
-        --n-threads $n_threads >> ${OUTPUT}
+        --n-threads $n_threads >> ${OUTPUT} 2> ${SCRATCH}/err_run_${i}.log
 done
