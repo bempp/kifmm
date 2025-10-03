@@ -42,6 +42,10 @@ max_points=$(echo {n_tasks[@]: -1} * ${n_points} | bc -l)
 
 # Create a scratch directory for this run
 last_nodes=${n_nodes[@]: -1}
+last_tasks=${n_tasks[@]: -1}
+
+# Multiply
+max_points=$(( last_tasks * n_points ))
 export SCRATCH=${WORK}/weak_fft_n=${max_points}_p=${last_nodes}_${SLURM_JOBID}
 
 ## Load Spack
@@ -66,7 +70,7 @@ export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/weak_fft_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/weak_fft_n=${max_points}_p=${last_nodes}_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\

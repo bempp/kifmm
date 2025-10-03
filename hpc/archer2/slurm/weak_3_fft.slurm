@@ -40,22 +40,27 @@ n_nodes=(256 512 1024)
 n_threads=4 # See if bandwidth saturates with different threading parameters for Rayon thread pool
 cpus_per_task=4
 
-# # Create a scratch directory for this run
-# export SCRATCH=${WORK}/weak_${SLURM_JOBID}
-#
-# # Load Spack
-# source $HOME/spack/share/spack/setup-env.sh
-# . "$HOME/.cargo/env"
-#
-# # Load BLAS
-# spack load openblas
-#
-# # Ensure Rust can find the Cray libraries
-# # export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
-# # export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
-# export RUSTFLAGS="-L $(spack location -i openblas)/lib"
-# export LD_LIBRARY_PATH=$(spack location -i openblas)/lib:$LD_LIBRARY_PATH
 
+# Create a scratch directory for this run
+last_nodes=${n_nodes[@]: -1}
+last_tasks=${n_tasks[@]: -1}
+
+# Multiply
+max_points=$(( last_tasks * n_points ))
+export SCRATCH=${WORK}/weak_fft_n=${max_points}_p=${last_nodes}_${SLURM_JOBID}
+
+## Load Spack
+#source $HOME/spack/share/spack/setup-env.sh
+#. "$HOME/.cargo/env"
+#
+## Load BLAS
+#spack load openblas
+#
+## Ensure Rust can find the Cray libraries
+## export RUSTFLAGS="-L $(echo $CRAY_LD_LIBRARY_PATH)"
+## export LD_LIBRARY_PATH=$CRAY_LD_LIBRARY_PATH:$LD_LIBRARY_PATH
+#export RUSTFLAGS="-L $(spack location -i openblas)/lib"
+#export LD_LIBRARY_PATH=$(spack location -i openblas)/lib:$LD_LIBRARY_PATH
 
 mkdir -p ${SCRATCH}
 cd ${SCRATCH}
@@ -66,7 +71,7 @@ export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=1 # Need to set to 1 to avoid oversubsciption between Rayon and OpenMP
 
 # Create a CSV output file for analysis
-export OUTPUT=${SCRATCH}/weak_fft_${SLURM_JOBID}.csv
+export OUTPUT=${SCRATCH}/weak_fft_n=${max_points}_p=${last_nodes}_${SLURM_JOBID}.csv
 touch ${OUTPUT}
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
