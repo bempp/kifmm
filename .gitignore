@@ -12,6 +12,9 @@ Cargo.lock
 # nano swp files
 .*.swp
 
+# SLURM scripts
+*.slurm
+
 # Local VSCode files
 .vscode/
 
@@ -19,7 +22,7 @@ Cargo.lock
 fftw-src/fftw-*
 
 # Data
-# *.csv
+*.csv
 
 # Python
 *.ipynb_checkpoints/
