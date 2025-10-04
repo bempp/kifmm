@@ -2,7 +2,7 @@
 use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
-    traits::types::{CommunicationType, FmmOperatorType, MetadataType},
+    traits::{tree::MultiFmmTree, types::{CommunicationType, FmmOperatorType, MetadataType}},
     tree::{helpers::points_fixture, types::SortKind},
     DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
@@ -111,6 +111,40 @@ fn main() {
     let start = Instant::now();
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
+
+    let mut mean_roots_per_rank_source_tree  = 0.;
+    if multi_fmm.rank() == 0 {
+
+        let mut m: HashMap<i32, f64> = HashMap::new();
+        for x in multi_fmm.tree().source_tree().all_roots_ranks.iter() {
+            *m.entry(*x).or_default() += 1.0;
+        }
+
+        let n_ranks = m.len();
+        let mut tmp = 0.0;
+        for (_rank, n_keys) in m.iter() {
+            tmp += n_keys;
+        }
+
+        mean_roots_per_rank_source_tree = tmp / (n_ranks as f64);
+    }
+
+    let mut mean_roots_per_rank_target_tree= 0.;
+    if multi_fmm.rank() == 0 {
+
+        let mut m: HashMap<i32, f64> = HashMap::new();
+        for x in multi_fmm.tree().target_tree().all_roots_ranks.iter() {
+            *m.entry(*x).or_default() += 1.0;
+        }
+
+        let n_ranks = m.len();
+        let mut tmp = 0.0;
+        for (_rank, n_keys) in m.iter() {
+            tmp += n_keys;
+        }
+
+        mean_roots_per_rank_target_tree = tmp / (n_ranks as f64);
+    }
 
     // Destructure operator times
     let mut operator_times = HashMap::new();
@@ -225,7 +259,7 @@ fn main() {
         "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},\
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-         {:?},{:?},{:?},{:?},{:?},{:?},{:?}",
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}hpc/archer2/slurm/weak_1_fft.slurm",
         id,
         multi_fmm.rank(),
         runtime,
@@ -260,6 +294,8 @@ fn main() {
         args.global_depth,
         args.block_size,
         args.n_threads,
-        args.n_samples
+        args.n_samples,
+        mean_roots_per_rank_source_tree,
+        mean_roots_per_rank_target_tree
     );
 }

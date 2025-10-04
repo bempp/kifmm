@@ -79,7 +79,7 @@ source_tree,target_tree,source_domain,target_domain,layout,\
 ghost_exchange_v,ghost_exchange_v_runtime,ghost_exchange_u,gather_global_fmm,scatter_global_fmm,\
 source_to_target_data,source_data,target_data,global_fmm,ghost_fmm_v,ghost_fmm_u,\
 displacement_map,metadata_creation,\
-expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples" >> ${OUTPUT}
+expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples,source_local_trees_per_rank,target_local_trees_per_rank" >> ${OUTPUT}
 
 # Perform weak scaling
 for i in ${!n_tasks[@]}; do
