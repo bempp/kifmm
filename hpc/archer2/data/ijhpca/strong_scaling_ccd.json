@@ -1,8 +1,0 @@
-{
-    "min_nodes": 1,
-    "max_nodes": 64,
-    "ranks_per_node": 8,
-    "min_points_per_rank": 250000,
-    "local_depth": 3,
-    "output": "strong_scaling_ccd.slurm"
-}
