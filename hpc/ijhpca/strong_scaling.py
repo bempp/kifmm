@@ -175,14 +175,14 @@ export WORK="/work/e738/e738/skailasa"
 
 script_name="{script_name}"
 
-export SCRATCH=$WORK/strong_fft_n={max_points}_p={last_nodes}_${{SLURM_JOBID}}
+export SCRATCH=$WORK/strong_fft_n={max_points}_p={last_nodes}_points_per_rank={points_per_rank[-1]}_${{SLURM_JOBID}}
 mkdir -p $SCRATCH
 cd $SCRATCH
 
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=1
 
-export OUTPUT=$SCRATCH/strong_fft_n={max_points}_p={last_nodes}_${{SLURM_JOBID}}.csv
+export OUTPUT=$SCRATCH/strong_fft_n={max_points}_p={last_nodes}_points_per_rank={points_per_rank[-1]}_${{SLURM_JOBID}}.csv
 touch $OUTPUT
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\

@@ -115,7 +115,6 @@ def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, point
     block_size = 128
     cpus_per_task = int(max_threads)
 
-
     last_nodes = n_nodes[-1]
     last_tasks = n_tasks[-1]
     max_points = last_tasks * n_points
@@ -143,14 +142,14 @@ export WORK="/work/e738/e738/skailasa"
 
 script_name="{script_name}"
 
-export SCRATCH=$WORK/weak_fft_n={max_points}_p={last_nodes}_${{SLURM_JOBID}}
+export SCRATCH=$WORK/weak_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_${{SLURM_JOBID}}
 mkdir -p $SCRATCH
 cd $SCRATCH
 
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=1
 
-export OUTPUT=$SCRATCH/weak_fft_n={max_points}_p={last_nodes}_${{SLURM_JOBID}}.csv
+export OUTPUT=$SCRATCH/weak_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_${{SLURM_JOBID}}.csv
 touch $OUTPUT
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
