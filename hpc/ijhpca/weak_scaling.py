@@ -2,6 +2,24 @@
 import numpy as np
 import argparse
 from pathlib import Path
+import json
+
+AMD_EPYC_ROME = {
+        "cores_per_node": 128, # total number of CPU cores per node
+        "sockets_per_node": 2, # two sockets per node
+        "cores_per_socket": 64, # A socket consists of 8 CCDs (64 cores total) common IO/memory controllers
+        "cores_per_ccd": 8, # Each CCD is a processor die, consists of two CCDs which are infinity linked together and connected to io
+        "cores_per_ccx": 4, # Each CCX shares an L3 cache (16MB)
+        "ccx_per_ccd": 2
+    }
+
+def parse_process_mapping(arch):
+    ccd_threads_per_rank = arch["cores_per_ccd"]
+    ccx_threads_per_rank = arch["cores_per_ccx"]
+    ccd_max_ranks_per_node = arch["cores_per_node"] / arch["cores_per_ccd"] # Mapping each rank to a CCD
+    ccx_max_ranks_per_node = arch["cores_per_node"] / arch["cores_per_ccx"] # Mapping each rank to a CCX
+    socket_max_ranks_per_node = arch["cores_per_node"] / arch["cores_per_socket"] # Mapping each rank to a socket
+    return {"socket": socket_max_ranks_per_node, "ccd": ccd_max_ranks_per_node, "ccx": ccx_max_ranks_per_node}
 
 
 def global_depth(rank):
@@ -9,61 +27,85 @@ def global_depth(rank):
     Return the first power of 8 >= rank, the exponent (tree level).
     """
     level = 1
-    while True:
-        if rank <= 8**level:
-            return level
+    while rank > 8**level:
         level += 1
-
+    return level
 
 v_global_depth = np.vectorize(global_depth)
 
-
 def pow2(x):
     return np.log2(x).is_integer()
-
 
 def pow8(x):
     return np.emath.logn(8, x).is_integer()
 
 
-def experiment_parameters(min_nodes, max_nodes, ranks_per_node, points_per_rank, local_depth=4, scaling_func=pow8):
+def experiment_parameters(
+    min_nodes,
+    max_nodes,
+    max_ranks_per_node,
+    points_per_rank,
+    local_depth=4,
+    scaling_func=pow8,
+    arch=AMD_EPYC_ROME
+    ):
 
-    max_cpus=128 # AMD EPYC rome
+    max_cpus=arch["cores_per_node"]
 
-    total_ranks = ranks_per_node * max_nodes
+    # Calculate the min/max number of ranks required to scale this problem by scaling_func given
+    # the resources specified by min/max nodes
+    min_ranks = int(min_nodes*max_ranks_per_node)
+    max_ranks = int(max_nodes*max_ranks_per_node)
 
-    n = points_per_rank*total_ranks # total problem size
-    print(f"Total problem size n={n/1e9}B")
+    # Want to scale the resources (ranks) by scaling function between min/max ranks
+    n_ranks = []
+    curr = min_ranks
+    while curr <= max_ranks:
+        if scaling_func == pow2:
+            n_ranks.append(curr)
+            curr *= 2
 
-    points_per_node = points_per_rank * ranks_per_node
-    print(f"points per rank {points_per_rank/1e6}M")
-    print(f"points per node {points_per_node/1e6}M")
+        elif scaling_func == pow8:
+            n_ranks.append(curr)
+            curr *= 8
+        else:
+            raise ValueError("Unknown scaling func")
 
-    # Double number of nodes used until we reach max_nodes
-    n_nodes = np.array(list(filter(scaling_func, [i for i in range(min_nodes, max_nodes+1)])))
+    n_ranks = np.array(n_ranks)
 
-    # The global depth is a function of the ranks per node (as will need enough global leaves to cover this many ranks (local trees))
-    global_depth = v_global_depth(n_nodes*ranks_per_node)
+    # Can use the number of required ranks with this scaling function
+    # to calculate the number of required nodes
+    n_nodes = (n_ranks / max_ranks_per_node).astype(np.int32)
+
+    # we calculate the global depth as the least power of 8 smaller than or equal to the available
+    # ranks for each configuration
+    global_depth = v_global_depth(n_ranks)
+
+    local_trees_per_rank = 8**global_depth / n_ranks
+
+    # Problem size defined by largest valid rank set
+    n = points_per_rank * n_ranks[-1]
+
+    points_per_node = max_ranks_per_node*points_per_rank
+
+    points_per_leaf = points_per_rank / 8**local_depth
+
+    max_threads_per_rank = int(max_cpus/max_ranks_per_node)
+
+    print(f"Total problem size n={n/1e6}M")
     print(f"global depth {global_depth}")
     print(f"local depth {local_depth}")
-
-    # local depth is a constant, chosen to balance M2L and P2P
-    points_per_leaf = points_per_rank / 8**local_depth
+    print(f"total depth {local_depth+global_depth}")
+    print(f"max local trees per rank {local_trees_per_rank}")
+    print(f"number of nodes {n_nodes} max ranks per node {max_ranks_per_node}")
+    print(f"number of ranks {n_ranks}")
+    print(f"points per rank {points_per_rank}")
+    print(f"points per node {points_per_node}")
     print(f"points per leaf {points_per_leaf}")
-
-    n_tasks = n_nodes*ranks_per_node
-    print(f"MPI tasks {n_tasks}")
-
-    print(f"number of nodes {n_nodes}")
-
-    local_trees_per_rank = (8**global_depth)/(n_tasks)
-    print(f"local trees per rank {local_trees_per_rank}")
-
-    max_threads_per_rank = max_cpus/ranks_per_node
     print(f"max threads per rank {max_threads_per_rank}")
 
-    return n_nodes.tolist(), n_tasks.tolist(), global_depth.tolist(), max_threads_per_rank
 
+    return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), max_threads_per_rank
 
 
 def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, points_per_rank, local_depth, script_name="fmm_m2l_fft_mpi_f32"):
@@ -133,12 +175,15 @@ srun --nodes={nn} --ntasks={nt} --cpus-per-task={cpus_per_task} \\
 
 
 if __name__ == "__main__":
+
+    ranks_per_node = parse_process_mapping(AMD_EPYC_ROME)
+
     parser = argparse.ArgumentParser(description="Generate a SLURM script for weak scaling runs.")
     parser.add_argument("--min-nodes", type=int, default=1)
     parser.add_argument("--max-nodes", type=int, default=16)
-    parser.add_argument("--ranks-per-node", type=int, default=32)
     parser.add_argument("--points-per-rank", type=int, default=250000)
     parser.add_argument("--local-depth", type=int, default=4)
+    parser.add_argument("--method", type=str, default="ccx")
     parser.add_argument("--output", type=str, default="job.slurm")
     parser.add_argument("--config", action='append')
 
@@ -151,8 +196,21 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    n_nodes, n_tasks, global_depths, max_threads = experiment_parameters(
-        args.min_nodes, args.max_nodes, args.ranks_per_node, args.points_per_rank, args.local_depth
-    )
+    if args.scaling_func == 2:
+        scaling_func = pow2
+    elif args.scaling_func == 8:
+        scaling_func = pow8
+    else:
+        raise ValueError("Unknown scaling function")
 
-    write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth)
+
+    valid_methods = {"ccx", "ccd" "socket"}
+    if any(args.method in m for m in valid_methods):
+        n_nodes, n_tasks, global_depths, max_threads = experiment_parameters(
+            args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.points_per_rank, args.local_depth
+        )
+
+        write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth)
+
+    else:
+        raise ValueError("Unknown method")

@@ -4,8 +4,6 @@ import argparse
 from pathlib import Path
 import json
 
-
-
 AMD_EPYC_ROME = {
         "cores_per_node": 128, # total number of CPU cores per node
         "sockets_per_node": 2, # two sockets per node
@@ -64,10 +62,10 @@ def experiment_parameters(
     min_points_per_rank,
     min_local_depth=4,
     scaling_func=pow8,
-    max_local_trees_per_rank=1
+    arch=AMD_EPYC_ROME
 ):
 
-    max_cpus=AMD_EPYC_ROME["cores_per_node"]
+    max_cpus=arch["cores_per_node"]
 
     # Calculate the min/max number of ranks required to scale this problem by scaling_func given
     # the resources specified by min/max nodes
@@ -94,12 +92,9 @@ def experiment_parameters(
     # to calculate the number of required nodes
     n_nodes = (n_ranks / max_ranks_per_node).astype(np.int32)
 
-    # # Calculate the actual nodes required
-
     # we calculate the global depth as the least power of 8 smaller than or equal to the available
     # ranks for each configuration
     global_depth = v_global_depth(n_ranks)
-
 
     local_trees_per_rank = 8**global_depth / n_ranks
 
@@ -120,7 +115,6 @@ def experiment_parameters(
 
     points_per_node = np.array(points_per_node)
 
-
     ranks_per_node = n_ranks/n_nodes
     points_per_rank = np.int64(points_per_node/ranks_per_node)
 
@@ -140,6 +134,7 @@ def experiment_parameters(
     print(f"points per rank {points_per_rank}")
     print(f"points per node {points_per_node}")
     print(f"min points per leaf {min_points_per_leaf}")
+    print(f"max threads per rank {max_threads_per_rank}")
 
     # Test that same number of points being used in each experiment
     assert(np.allclose(points_per_rank*n_ranks, points_per_node*n_nodes))
@@ -239,24 +234,11 @@ if __name__ == "__main__":
     else:
         raise ValueError("Unknown scaling function")
 
-
-    if args.method == "ccx":
+    valid_methods = {"ccx", "ccd" "socket"}
+    if any(args.method in m for m in valid_methods):
         n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads = experiment_parameters(
-            args.min_nodes, args.max_nodes, ranks_per_node['ccx'], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
+            args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
         )
-        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank)
-
-    elif args.method == "ccd":
-        n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads = experiment_parameters(
-            args.min_nodes, args.max_nodes, ranks_per_node["ccd"], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
-        )
-        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank)
-
-    elif args.method == "socket":
-        n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads = experiment_parameters(
-            args.min_nodes, args.max_nodes, ranks_per_node["socket"], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
-        )
-
         write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank)
     else:
         raise ValueError("Unknown method")

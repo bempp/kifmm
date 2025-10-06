@@ -1,0 +1,10 @@
+{
+    "_comment": "Weak scaling",
+    "min_nodes": 1,
+    "max_nodes": 128,
+    "points_per_rank": 250000,
+    "local_depth": 4,
+    "output": "weak_scaling_ccx.slurm",
+    "method": "ccx",
+    "scaling_func": 8
+}
