@@ -133,7 +133,7 @@ def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, point
     if contiguous:
         slurm += "\n#SBATCH --contiguous\n"
 
-    slurm += """
+    slurm += f"""
 module load PrgEnv-aocc
 module load craype-network-ucx
 module load cray-mpich-ucx
