@@ -6,5 +6,6 @@
     "local_depth": 4,
     "output": "weak_scaling_ccx.slurm",
     "method": "ccx",
-    "scaling_func": 8
+    "scaling_func": 8,
+    "contiguous": false
 }

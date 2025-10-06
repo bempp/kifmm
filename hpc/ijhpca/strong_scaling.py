@@ -142,7 +142,7 @@ def experiment_parameters(
 
 
 
-def write_slurm(script_path, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, script_name="fmm_m2l_fft_mpi_f32"):
+def write_slurm(script_path, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=False, script_name="fmm_m2l_fft_mpi_f32"):
     expansion_order = 3
     n_samples = 500
     block_size = 128
@@ -161,7 +161,11 @@ def write_slurm(script_path, n_nodes, n_tasks, local_depths, global_depths, max_
 #SBATCH --account=e738
 #SBATCH --partition=standard
 #SBATCH --qos=standard
+"""
+    if contiguous:
+        slurm += "\n#SBATCH --contiguous\n"
 
+    slurm += """
 module load PrgEnv-aocc
 module load craype-network-ucx
 module load cray-mpich-ucx
@@ -215,6 +219,7 @@ if __name__ == "__main__":
     parser.add_argument("--min-local-depth", type=int, default=4)
     parser.add_argument("--scaling-func", type=int, default=2)
     parser.add_argument("--method", type=str, default="ccx")
+    parser.add_argument("--contiguous", type=bool, default=False)
     parser.add_argument("--output", type=str, default="job.slurm")
     parser.add_argument("--config", action='append')
 
@@ -239,6 +244,6 @@ if __name__ == "__main__":
         n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads = experiment_parameters(
             args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
         )
-        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank)
+        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=args.contiguous)
     else:
         raise ValueError("Unknown method")

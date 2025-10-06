@@ -6,5 +6,6 @@
     "local_depth": 5,
     "output": "weak_scaling_socket.slurm",
     "method": "socket",
-    "scaling_func": 8
+    "scaling_func": 8,
+    "contiguous": false
 }
