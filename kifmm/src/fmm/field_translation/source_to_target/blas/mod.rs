@@ -1,3 +1,3 @@
-#[cfg(feature = "mpi")]
-mod multi_node;
-mod single_node;
+//! BLAS based field translation, further specialised by compression strategy used
+mod aca;
+mod svd;

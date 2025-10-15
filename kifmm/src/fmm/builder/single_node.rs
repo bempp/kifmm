@@ -6,6 +6,7 @@ use itertools::Itertools;
 use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
+    fmm::types::PinvMode,
     fmm::{
         helpers::single_node::{map_charges, ncoeffs_kifmm, optionally_time},
         types::{FmmEvalType, Isa, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
@@ -30,7 +31,7 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
+        + SourceTranslationMetadata<Scalar, Kernel>
         + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>,
 {
@@ -310,7 +311,7 @@ where
             };
 
             // Calculate required metadata
-            let (_, duration) = optionally_time(timed, || result.source());
+            let (_, duration) = optionally_time(timed, || result.source(PinvMode::svd()));
 
             if let Some(d) = duration {
                 result

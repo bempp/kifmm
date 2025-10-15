@@ -613,7 +613,7 @@ where
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
+        + SourceTranslationMetadata<Scalar, Laplace3dKernel<Scalar>>
         + TargetTranslationMetadata,
 {
     fn fft_map_index(&self, level: u64) -> usize {
@@ -678,7 +678,7 @@ where
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>: DataAccess<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>
         + SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
+        + SourceTranslationMetadata<Scalar, Helmholtz3dKernel<Scalar>>
         + TargetTranslationMetadata,
 {
     fn fft_map_index(&self, level: u64) -> usize {

@@ -11,6 +11,7 @@ use rlst::{
 
 use crate::{
     fmm::helpers::single_node::ncoeffs_kifmm,
+    fmm::types::PinvMode,
     linalg::pinv::pinv,
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, SourceTranslationMetadata},
@@ -25,7 +26,7 @@ use crate::{
     KiFmm,
 };
 
-impl<Scalar, FieldTranslation> SourceTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Helmholtz3dKernel<Scalar>>
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
@@ -33,7 +34,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: DataAccess,
 {
-    fn source(&mut self) {
+    fn source(&mut self, pinv_mode: PinvMode<Scalar, Helmholtz3dKernel<Scalar>>) {
         let root = MortonKey::<Scalar::Real>::root();
 
         // Cast surface parameters

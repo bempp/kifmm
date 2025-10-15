@@ -12,6 +12,7 @@ use rlst::{MatrixSvd, RlstScalar};
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 use crate::{
+    fmm::types::PinvMode,
     fmm::{
         helpers::single_node::{level_index_pointer_single_node, ncoeffs_kifmm, optionally_time},
         types::{
@@ -42,12 +43,12 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default + Clone,
     KiFmmMulti<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
+        + SourceTranslationMetadata<Scalar, Kernel>
         + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>
         + MetadataAccess,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
+        + SourceTranslationMetadata<Scalar, Kernel>
         + TargetTranslationMetadata
         + Metadata<Scalar = Scalar>
         + MetadataAccess
@@ -419,7 +420,7 @@ where
             };
 
             // Calculate required metadata
-            let (_, duration) = optionally_time(timed, || result.source());
+            let (_, duration) = optionally_time(timed, || result.source(PinvMode::svd()));
 
             if let Some(d) = duration {
                 result

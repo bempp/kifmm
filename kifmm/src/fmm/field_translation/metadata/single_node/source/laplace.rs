@@ -10,6 +10,7 @@ use rlst::{
 
 use crate::{
     fmm::helpers::single_node::ncoeffs_kifmm,
+    fmm::types::PinvMode,
     linalg::pinv::pinv,
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, SourceTranslationMetadata},
@@ -24,7 +25,7 @@ use crate::{
     KiFmm,
 };
 
-impl<Scalar, FieldTranslation> SourceTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Laplace3dKernel<Scalar>>
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
@@ -32,7 +33,7 @@ where
     <Scalar as RlstScalar>::Real: Default,
     Self: DataAccess,
 {
-    fn source(&mut self) {
+    fn source(&mut self, pinv_mode: PinvMode<Scalar, Laplace3dKernel<Scalar>>) {
         let root = MortonKey::<Scalar::Real>::root();
         let depth = self.tree.source_tree.depth();
 

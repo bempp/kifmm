@@ -696,9 +696,31 @@ pub enum FmmSvdMode {
         random_state: Option<usize>,
     },
 
-    /// Use DGESVD from Lapack bindings
+    /// Use GESVD from LAPACK bindings
     #[default]
     Deterministic,
+}
+
+/// Variants of pseudo-inverse implementation, based either on the SVD with filtering
+/// scheme for components with small singular values, or
+#[derive(Default, Clone, Copy)]
+pub enum PinvMode<Scalar: RlstScalar, Kernel: KernelTrait<T = Scalar>> {
+    /// Use ACA+ algorithm, which is only implemented with reference to
+    /// an explicitly specified kernel
+    AcaPlus {
+        /// Greens fct kernel
+        kernel: Kernel,
+        /// Convergence criteria for ACA+ approximation factors
+        eps: Option<Scalar::Real>,
+        /// Maximum number of iterations
+        max_iter: Option<usize>,
+        /// Search radius for guided random walk used in pivot selection
+        local_radius: Option<usize>,
+    },
+
+    /// Use GESVD from LAPACK bindings
+    #[default]
+    Svd,
 }
 
 impl FmmSvdMode {
@@ -730,6 +752,32 @@ impl FmmSvdMode {
         } else {
             FmmSvdMode::Deterministic
         }
+    }
+}
+
+impl<Scalar, Kernel> PinvMode<Scalar, Kernel>
+where
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar>,
+{
+    /// Constructor for pseudo-inverse settings using ACA+
+    pub fn aca(
+        kernel: Kernel,
+        eps: Option<Scalar::Real>,
+        max_iter: Option<usize>,
+        local_radius: Option<usize>,
+    ) -> Self {
+        PinvMode::AcaPlus {
+            kernel,
+            eps,
+            max_iter,
+            local_radius,
+        }
+    }
+
+    /// Constructor for pseudo-inverse settings using SVD
+    pub fn svd() -> Self {
+        PinvMode::<Scalar, Kernel>::Svd
     }
 }
 

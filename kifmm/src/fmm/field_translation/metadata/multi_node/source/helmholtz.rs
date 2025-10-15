@@ -10,6 +10,7 @@ use rlst::{
 };
 
 use crate::{
+    fmm::types::PinvMode,
     fmm::{
         helpers::{
             multi_node::{
@@ -33,7 +34,7 @@ use crate::{
     },
 };
 
-impl<Scalar, FieldTranslation> SourceTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Helmholtz3dKernel<Scalar>>
     for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd + Equivalence,
@@ -41,7 +42,7 @@ where
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti + MetadataAccess,
 {
-    fn source(&mut self) {
+    fn source(&mut self, pinv_mode: PinvMode<Scalar, Helmholtz3dKernel<Scalar>>) {
         let root = MortonKey::<Scalar::Real>::root();
         let size = self.communicator.size();
         let rank = self.communicator.rank();

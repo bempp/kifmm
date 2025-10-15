@@ -1,6 +1,9 @@
 //! Field Traits
 
-use crate::traits::types::FmmError;
+use crate::{fmm::types::PinvMode, traits::types::FmmError};
+use green_kernels::traits::Kernel as KernelTrait;
+use rlst::RlstScalar;
+
 /// Marker trait for field translations
 pub trait FieldTranslation {
     /// Metadata for applying each to source to target translation, depends on both the kernel
@@ -15,9 +18,13 @@ pub trait FieldTranslation {
 }
 
 /// Source tree translation metadata
-pub trait SourceTranslationMetadata {
+pub trait SourceTranslationMetadata<Scalar, Kernel>
+where
+    Scalar: RlstScalar,
+    Kernel: KernelTrait<T = Scalar>,
+{
     /// Constructor
-    fn source(&mut self);
+    fn source(&mut self, pinv_mode: PinvMode<Scalar, Kernel>);
 }
 
 /// Target tree translation metadata

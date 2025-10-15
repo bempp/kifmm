@@ -133,9 +133,9 @@ pub use traits::fmm::DataAccessMulti;
 #[doc(inline)]
 pub use traits::fmm::ChargeHandler;
 
-#[cfg_attr(feature = "strict", deny(warnings))]
-#[warn(missing_docs)]
-pub mod bindings;
+// #[cfg_attr(feature = "strict", deny(warnings))]
+// // #[warn(missing_docs)]
+// // // pub mod bindings;
 
 /// Avoid CI errors for dependencies under feature flags
 use pulp as _;
