@@ -57,11 +57,10 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     let mut rng = StdRng::seed_from_u64(0);
     let pi = T::from(std::f64::consts::PI).unwrap();
     let two = T::from(2.0).unwrap();
-    let one = T::one();
 
-    // Uniform distributions for phi and cos(theta)
+    // Uniform distributions for phi and z = cos(theta)
     let phi_dist = Uniform::from(T::zero()..(two * pi));
-    let u_dist = Uniform::from(T::zero()..one);
+    let z_dist = Uniform::from(T::from(-1.0).unwrap()..T::from(1.0).unwrap());
 
     // Initialize points array
     let mut points = rlst_dynamic_array2!(T, [3, n_points]);
@@ -69,13 +68,12 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     for i in 0..n_points {
         // Generate random phi and theta
         let phi = phi_dist.sample(&mut rng);
-        let u = u_dist.sample(&mut rng);
-        let theta = (one - two * u).acos();
+        let z = z_dist.sample(&mut rng);
+        let r_xy = (T::one() - z * z).sqrt();
 
         // Compute Cartesian coordinates
-        let x = theta.sin() * phi.cos();
-        let y = theta.sin() * phi.sin();
-        let z = theta.cos();
+        let x = r_xy * phi.cos();
+        let y = r_xy * phi.sin();
 
         // Assign to points array
         points[[0, i]] = x;
