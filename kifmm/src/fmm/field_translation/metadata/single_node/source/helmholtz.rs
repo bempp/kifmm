@@ -31,7 +31,7 @@ impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Helmholtz3dKern
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
+    <Scalar as RlstScalar>::Real: Default + Epsilon,
     Self: DataAccess,
 {
     fn source(&mut self, pinv_mode: PinvMode<Scalar, Helmholtz3dKernel<Scalar>>) {

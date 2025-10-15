@@ -611,13 +611,22 @@ mod test {
     #[test]
     fn test_aca_plus() {
         // Test f32
-        let n_sources = 321;
-        let n_targets = 123;
+        let n_sources = 100;
+        let n_targets = 100;
         let sources = points_fixture::<f32>(n_sources, None, None, None);
         let mut targets = points_fixture::<f32>(n_targets, None, None, None);
         // Displace targets by a fixed amount to ensure that interaction is low rank
-        let displacement = 3.0;
+
+
+        let displacement = 2.0;
         targets.iter_mut().for_each(|t| *t += displacement);
+
+        let n = 100;
+        let sources = points_fixture::<f32>(n, Some(0.1), Some(0.9), None);
+        let targets = points_fixture::<f32>(n, Some(1.7), Some(2.5), None);
+        // targets.iter_mut().for_each(|t| *t += 1.5);
+
+
         let eps = 1e-6;
 
         // Test Laplace
@@ -700,6 +709,9 @@ mod test {
             let l2_error = l2_error(b_aca.data(), &b_true);
 
             assert!(l2_error < eps * 10.);
+
+            println!("FOO {:?}", l2_error);
+            assert!(false);
         }
     }
 }

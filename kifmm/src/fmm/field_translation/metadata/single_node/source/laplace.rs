@@ -28,9 +28,9 @@ use crate::{
 impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Laplace3dKernel<Scalar>>
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Epsilon,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
+    <Scalar as RlstScalar>::Real: Default + Epsilon,
     Self: DataAccess,
 {
     fn source(&mut self, pinv_mode: PinvMode<Scalar, Laplace3dKernel<Scalar>>) {

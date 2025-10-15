@@ -24,9 +24,9 @@ use crate::{
 impl<Scalar, FieldTranslation> TargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
+    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Epsilon,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
+    <Scalar as RlstScalar>::Real: Default + Epsilon,
     Self: DataAccess,
 {
     fn target(&mut self) {

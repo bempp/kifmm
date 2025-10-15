@@ -26,7 +26,7 @@ impl<Scalar, FieldTranslation> TargetTranslationMetadata
 where
     Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
+    <Scalar as RlstScalar>::Real: Default + Epsilon,
     Self: Evaluate,
 {
     fn target(&mut self) {

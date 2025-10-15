@@ -38,7 +38,7 @@ impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Laplace3dKernel
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
-    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float + Epsilon,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti + MetadataAccess,
 {

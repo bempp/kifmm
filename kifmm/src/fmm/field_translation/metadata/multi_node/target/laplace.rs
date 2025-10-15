@@ -37,7 +37,7 @@ impl<Scalar, FieldTranslation> TargetTranslationMetadata
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
-    <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
+    <Scalar as RlstScalar>::Real: Default + Equivalence + Float + Epsilon,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: MetadataAccess,
 {
