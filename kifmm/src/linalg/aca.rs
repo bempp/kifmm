@@ -89,8 +89,9 @@ where
 
         let mut cand;
         for _ in 0..20 {
-            let offset: isize = rng.gen_range(-1*(local_radius_rows as isize)..(local_radius_rows as isize));
-            cand = (base as isize + offset).rem_euclid(n_targets as isize)  as usize;
+            let offset: isize =
+                rng.gen_range(-1 * (local_radius_rows as isize)..(local_radius_rows as isize));
+            cand = (base as isize + offset).rem_euclid(n_targets as isize) as usize;
             if !prev_i_star.contains(&cand) {
                 *i_ref = cand;
                 break;
@@ -146,8 +147,9 @@ where
 
         let mut cand;
         for _ in 0..20 {
-            let offset: isize = rng.gen_range(-1*(local_radius_cols as isize)..(local_radius_cols as isize));
-            cand = (base as isize + offset).rem_euclid(n_sources as isize)  as usize;
+            let offset: isize =
+                rng.gen_range(-1 * (local_radius_cols as isize)..(local_radius_cols as isize));
+            cand = (base as isize + offset).rem_euclid(n_sources as isize) as usize;
             if !prev_j_star.contains(&cand) {
                 *j_ref = cand;
                 break;
@@ -505,13 +507,21 @@ where
         }
 
         if verbose {
-            let uu = u_new.iter().fold(Scalar::Real::zero(), |acc, x| acc + RlstScalar::pow(x.abs(), Scalar::real(2.0)));
-            let vv = v_new.iter().fold(Scalar::Real::zero(), |acc, x| acc + RlstScalar::pow(x.abs(), Scalar::real(2.0)));
+            let uu = u_new.iter().fold(Scalar::Real::zero(), |acc, x| {
+                acc + RlstScalar::pow(x.abs(), Scalar::real(2.0))
+            });
+            let vv = v_new.iter().fold(Scalar::Real::zero(), |acc, x| {
+                acc + RlstScalar::pow(x.abs(), Scalar::real(2.0))
+            });
             let step_size = (uu * vv).sqrt();
 
             println!(
                 "k={:?} pivot(row={:?}, col={:?}) |pivot|={:?} step={:?}",
-                k, i_star, j_star, pivot.abs(), step_size
+                k,
+                i_star,
+                j_star,
+                pivot.abs(),
+                step_size
             );
         }
     }
@@ -548,7 +558,8 @@ mod test {
     use green_kernels::laplace_3d::Laplace3dKernel;
 
     use rlst::{
-        empty_array, DefaultIterator, DefaultIteratorMut, MultIntoResize, RawAccess, RawAccessMut, Shape
+        empty_array, DefaultIterator, DefaultIteratorMut, MultIntoResize, RawAccess, RawAccessMut,
+        Shape,
     };
 
     use crate::{fmm::helpers::single_node::l2_error, tree::helpers::points_fixture};
@@ -614,6 +625,5 @@ mod test {
         let l2_error = l2_error(b_aca.data(), &b_true);
 
         assert!(l2_error < 1e-5);
-
     }
 }
