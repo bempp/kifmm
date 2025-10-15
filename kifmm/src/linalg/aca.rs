@@ -588,9 +588,9 @@ mod test {
         let found = argsort(&arr);
         let sorted = found.iter().map(|&i| arr[i]).collect_vec();
         let mut curr = sorted[0];
-        for i in 1..sorted.len() - 1 {
-            assert!(curr <= sorted[i]);
-            curr = sorted[i];
+        for &item in sorted.iter().take(sorted.len() - 1).skip(1) {
+            assert!(curr <= item);
+            curr = item;
         }
 
         // Test complex
@@ -599,9 +599,9 @@ mod test {
         let found = argsort(&arr);
         let sorted = found.iter().map(|&i| arr[i]).collect_vec();
         let mut curr = sorted[0];
-        for i in 1..sorted.len() - 1 {
-            assert!(curr.abs() <= sorted[i].abs());
-            curr = sorted[i];
+        for &item in sorted.iter().take(sorted.len() - 1).skip(1) {
+            assert!(curr.abs() <= item.abs());
+            curr = item;
         }
     }
 
@@ -625,10 +625,10 @@ mod test {
             let kernel = Laplace3dKernel::<f32>::new();
 
             let (u, v) = aca_plus(
-                &sources.data(),
-                &targets.data(),
+                sources.data(),
+                targets.data(),
                 kernel.clone(),
-                Some(eps.clone()),
+                Some(eps),
                 None,
                 None,
                 None,
@@ -645,9 +645,9 @@ mod test {
 
             kernel.evaluate_st(
                 green_kernels::types::GreenKernelEvalType::Value,
-                &sources.data(),
-                &targets.data(),
-                &x.data(),
+                sources.data(),
+                targets.data(),
+                x.data(),
                 &mut b_true,
             );
 
@@ -667,10 +667,10 @@ mod test {
             let kernel = Helmholtz3dKernel::<c32>::new(wavenumber);
 
             let (u, v) = aca_plus(
-                &sources.data(),
-                &targets.data(),
+                sources.data(),
+                targets.data(),
                 kernel.clone(),
-                Some(eps.clone()),
+                Some(eps),
                 None,
                 None,
                 None,
@@ -686,9 +686,9 @@ mod test {
 
             kernel.evaluate_st(
                 green_kernels::types::GreenKernelEvalType::Value,
-                &sources.data(),
-                &targets.data(),
-                &x.data(),
+                sources.data(),
+                targets.data(),
+                x.data(),
                 &mut b_true,
             );
 
