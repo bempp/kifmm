@@ -199,6 +199,7 @@ where
 ///
 /// # Arguments
 /// * `eps` - Convergence criteria for decomposition
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn pinv_aca_plus<T, K>(
     sources: &[T::Real],
     targets: &[T::Real],
@@ -228,7 +229,7 @@ where
 {
     let dim = 3;
 
-    if sources.len() == 0 || targets.len() == 0 {
+    if sources.is_empty() || targets.is_empty() {
         return Err(RlstError::MatrixIsEmpty((targets.len(), sources.len())));
     }
 
@@ -453,7 +454,7 @@ where
             }
         }
 
-        return Ok((s_c, right, left));
+        Ok((s_c, right, left))
     }
 }
 

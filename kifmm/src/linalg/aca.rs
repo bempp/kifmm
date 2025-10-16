@@ -196,6 +196,7 @@ where
 }
 
 /// Update a given row with current approximation terms (us, vs)
+#[allow(clippy::too_many_arguments)]
 fn calc_residual_rows<Scalar, Kernel>(
     sources: &[Scalar::Real],
     targets: &[Scalar::Real],
@@ -223,6 +224,7 @@ where
 }
 
 /// Update a given col with current approximation terms (us, vs)
+#[allow(clippy::too_many_arguments)]
 fn calc_residual_cols<Scalar, Kernel>(
     sources: &[Scalar::Real],
     targets: &[Scalar::Real],
