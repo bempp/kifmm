@@ -11,7 +11,7 @@ use kifmm::{
     traits::{
         fftw::Dft,
         fmm::{DataAccess, Evaluate},
-        general::single_node::{AsComplex, Epsilon, Hadamard8x8},
+        general::single_node::{ArgmaxValue, AsComplex, Cast, Epsilon, Hadamard8x8, Upcast},
         tree::{SingleFmmTree, SingleTree},
     },
     tree::helpers::points_fixture,
@@ -19,9 +19,21 @@ use kifmm::{
 };
 use num::Float;
 use rand::distributions::uniform::SampleUniform;
-use rlst::{rlst_dynamic_array2, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array2, MatrixQr, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
 
-fn grid_search_laplace_blas<T>(
+fn grid_search_laplace_blas<
+    T: RlstScalar<Real = T>
+        + Epsilon
+        + MatrixRsvd
+        + Float
+        + SampleUniform
+        + MatrixQr
+        + Default
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
+>(
     filename: String,
     n_points: usize,
     expansion_order_vec: &[usize],
@@ -30,7 +42,9 @@ fn grid_search_laplace_blas<T>(
     depth_vec: &[u64],
     rsvd_settings_vec: &[FmmSvdMode],
 ) where
-    T: RlstScalar<Real = T> + Epsilon + Float + Default + SampleUniform + MatrixRsvd,
+    <T as RlstScalar>::Real: Epsilon,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
 {
     // FMM parameters
     let prune_empty = true;
@@ -251,10 +265,17 @@ fn grid_search_laplace_fft<T>(
         + Float
         + Epsilon
         + AlignedAllocable
-        + MatrixSvd,
+        + MatrixSvd
+        + MatrixQr
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
     <T as AsComplex>::ComplexType:
         Hadamard8x8<Scalar = <T as AsComplex>::ComplexType> + AlignedAllocable,
     <T as Dft>::Plan: Sync,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
 {
     // FMM parameters
     let prune_empty = true;

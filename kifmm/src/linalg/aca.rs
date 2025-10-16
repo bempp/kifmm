@@ -5,39 +5,9 @@ use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use num::Zero;
 use rand::{rngs, Rng};
-use rlst::{c32, c64, rlst_dynamic_array2, Array, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array2, Array, RawAccessMut, RlstScalar};
 
-use crate::traits::general::single_node::Epsilon;
-
-/// Trait that abstracts over real/complex numbers for their magnitude
-pub(crate) trait ArgmaxValue<Scalar: RlstScalar> {
-    fn argmax_value(&self) -> <Scalar as RlstScalar>::Real;
-}
-
-macro_rules! impl_argmax_value {
-    // For real numbers, argmax defined by value
-    ($t:ty) => {
-        impl ArgmaxValue<$t> for $t {
-            fn argmax_value(&self) -> $t {
-                *self
-            }
-        }
-    };
-
-    // For complex numbers, argmax defined by magnitude
-    ($t:ty, $r:ty) => {
-        impl ArgmaxValue<$t> for $t {
-            fn argmax_value(&self) -> $r {
-                self.abs()
-            }
-        }
-    };
-}
-
-impl_argmax_value!(f32);
-impl_argmax_value!(f64);
-impl_argmax_value!(c32, f32);
-impl_argmax_value!(c64, f64);
+use crate::traits::general::single_node::{ArgmaxValue, Epsilon};
 
 /// Returns the index of the maximum value in a slice
 fn argmax<Scalar>(v: &[Scalar]) -> Option<usize>
@@ -629,7 +599,7 @@ mod test {
 
     use num::One;
     use rand::thread_rng;
-    use rlst::{c32, empty_array, DefaultIteratorMut, MultIntoResize, RawAccess, RawAccessMut};
+    use rlst::{c32, empty_array, MultIntoResize, RawAccess, RawAccessMut};
 
     use crate::{fmm::helpers::single_node::l2_error, tree::helpers::points_fixture};
 

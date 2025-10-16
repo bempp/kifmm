@@ -420,7 +420,7 @@ where
             };
 
             // Calculate required metadata
-            let (_, duration) = optionally_time(timed, || result.source(PinvMode::svd()));
+            let (_, duration) = optionally_time(timed, || result.source(PinvMode::svd(None, None)));
 
             if let Some(d) = duration {
                 result

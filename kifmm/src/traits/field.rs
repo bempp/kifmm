@@ -24,7 +24,7 @@ where
     Kernel: KernelTrait<T = Scalar>,
 {
     /// Constructor
-    fn source(&mut self, pinv_mode: PinvMode<Scalar, Kernel>);
+    fn source(&mut self, pinv_mode: PinvMode<Scalar>);
 }
 
 /// Target tree translation metadata

@@ -1,71 +1,16 @@
 //! Implementation of Moore-Penrose PseudoInverse
 use crate::{
-    linalg::aca::{aca_plus, ArgmaxValue},
-    traits::general::single_node::Epsilon,
+    linalg::aca::aca_plus,
+    traits::general::single_node::{ArgmaxValue, Cast, Epsilon, Upcast},
 };
 use coe::{is_same, Coerce};
 use green_kernels::traits::Kernel;
-use itertools::Itertools;
 use num::Zero;
 use rlst::{
     c32, c64, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQr, MatrixSvd, MultInto,
     MultIntoResize, QrDecomposition, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar,
     Shape, SvdMode, VectorContainer,
 };
-
-/// Cast between scalar types Self and T
-#[allow(dead_code)]
-pub(crate) trait Cast<T> {
-    fn cast(&self) -> T;
-}
-
-impl Cast<f32> for f64 {
-    fn cast(&self) -> f32 {
-        *self as f32
-    }
-}
-
-impl Cast<f32> for f32 {
-    fn cast(&self) -> f32 {
-        *self
-    }
-}
-
-impl Cast<f64> for f64 {
-    fn cast(&self) -> f64 {
-        *self
-    }
-}
-
-impl Cast<f64> for f32 {
-    fn cast(&self) -> f64 {
-        *self as f64
-    }
-}
-
-impl Cast<c32> for c64 {
-    fn cast(&self) -> c32 {
-        c32::new(self.re() as f32, self.im() as f32)
-    }
-}
-
-impl Cast<c32> for c32 {
-    fn cast(&self) -> c32 {
-        *self
-    }
-}
-
-impl Cast<c64> for c64 {
-    fn cast(&self) -> c64 {
-        *self
-    }
-}
-
-impl Cast<c64> for c32 {
-    fn cast(&self) -> c64 {
-        c64::new(self.re() as f64, self.im() as f64)
-    }
-}
 
 /// Matrix type
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -254,7 +199,7 @@ where
 ///
 /// # Arguments
 /// * `eps` - Convergence criteria for decomposition
-pub(crate) fn pinv_aca_plus<T, V, K>(
+pub(crate) fn pinv_aca_plus<T, K>(
     sources: &[T::Real],
     targets: &[T::Real],
     kernel: K,
@@ -266,10 +211,19 @@ pub(crate) fn pinv_aca_plus<T, V, K>(
     test: bool,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon + MatrixSvd + MatrixQr + ArgmaxValue<T> + Cast<V>,
-    <T as RlstScalar>::Real: ArgmaxValue<<T as RlstScalar>::Real> + Epsilon + Cast<V::Real>,
-    V: RlstScalar + MatrixSvd + Cast<T> + Epsilon,
-    <V as RlstScalar>::Real: Epsilon + Cast<T::Real>,
+    T: RlstScalar
+        + Epsilon
+        + MatrixSvd
+        + MatrixQr
+        + ArgmaxValue<T>
+        + Upcast
+        + Cast<<T as Upcast>::Higher>,
+    <T as RlstScalar>::Real: ArgmaxValue<<T as RlstScalar>::Real>
+        + Epsilon
+        + Upcast
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<T::Real>,
     K: Kernel<T = T>,
 {
     let dim = 3;
@@ -415,11 +369,11 @@ where
 
         // Upcast to V and SVD pinv on c
         let [c_m, c_n] = c.shape();
-        let mut c_64 = rlst_dynamic_array2!(V, [c_m, c_n]);
+        let mut c_64 = rlst_dynamic_array2!(<T as Upcast>::Higher, [c_m, c_n]);
         for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
             *dst = src.cast();
         }
-        let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None)?;
+        let (s_c_v, ut_c_v, v_c_v) = pinv::<<T as Upcast>::Higher>(&c_64, None, None)?;
 
         // Downcast back down to T
         let mut ut_c = rlst_dynamic_array2!(T, ut_c_v.shape());
@@ -431,7 +385,7 @@ where
         for (dst, src) in v_c.data_mut().iter_mut().zip(v_c_v.data().iter()) {
             *dst = src.cast();
         }
-        let mut s_c = vec![T::Real::zero(); s_c_v.len()];
+        let mut s_c: Vec<T::Real> = vec![T::Real::zero(); s_c_v.len()];
         for (dst, src) in s_c.iter_mut().zip(s_c_v.iter()) {
             *dst = src.cast();
         }
@@ -597,7 +551,7 @@ mod test {
         let kernel = Laplace3dKernel::<f64>::new();
         let eps = 1e-6;
 
-        let (_s, _ut, _v) = pinv_aca_plus::<f64, f64, _>(
+        let (_s, _ut, _v) = pinv_aca_plus(
             sources.data(),
             targets.data(),
             kernel.clone(),
@@ -613,7 +567,7 @@ mod test {
         // Test Helmholtz (low wavenumber)
         let kernel = Helmholtz3dKernel::<c64>::new(1.0);
         let eps = 1e-6;
-        let (_s, _ut, _v) = pinv_aca_plus::<c64, c64, _>(
+        let (_s, _ut, _v) = pinv_aca_plus(
             sources.data(),
             targets.data(),
             kernel.clone(),

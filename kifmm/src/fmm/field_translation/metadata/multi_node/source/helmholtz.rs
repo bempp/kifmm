@@ -3,14 +3,12 @@ use green_kernels::{
 };
 use itertools::Itertools;
 use mpi::traits::{Communicator, Equivalence};
-use num::Float;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
+    empty_array, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
     RlstScalar, Shape,
 };
 
 use crate::{
-    fmm::types::PinvMode,
     fmm::{
         helpers::{
             multi_node::{
@@ -19,13 +17,13 @@ use crate::{
             },
             single_node::ncoeffs_kifmm,
         },
-        types::KiFmmMulti,
+        types::{KiFmmMulti, PinvMode},
     },
-    linalg::pinv::pinv,
+    linalg::pinv::{pinv, pinv_aca_plus},
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, SourceTranslationMetadata},
         fmm::{DataAccessMulti, MetadataAccess},
-        general::single_node::Epsilon,
+        general::single_node::{ArgmaxValue, Cast, Epsilon, Upcast},
         tree::{FmmTreeNode, MultiFmmTree, MultiTree},
     },
     tree::{
@@ -37,12 +35,28 @@ use crate::{
 impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Helmholtz3dKernel<Scalar>>
     for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd + Equivalence + Epsilon,
-    <Scalar as RlstScalar>::Real: Default + Sync + Send + Default + Equivalence + Float + Epsilon,
+    Scalar: RlstScalar<Complex = Scalar>
+        + Default
+        + Epsilon
+        + MatrixSvd
+        + Epsilon
+        + MatrixQr
+        + Upcast
+        + ArgmaxValue<Scalar>
+        + Cast<<Scalar as Upcast>::Higher>
+        + Equivalence,
+    <Scalar as RlstScalar>::Real: Default
+        + Epsilon
+        + Upcast
+        + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
+        + ArgmaxValue<<Scalar as RlstScalar>::Real>
+        + Equivalence,
+    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar> + Equivalence,
+    <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real> + Equivalence,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti + MetadataAccess,
 {
-    fn source(&mut self, pinv_mode: PinvMode<Scalar, Helmholtz3dKernel<Scalar>>) {
+    fn source(&mut self, pinv_mode: PinvMode<Scalar>) {
         let root = MortonKey::<Scalar::Real>::root();
         let size = self.communicator.size();
         let rank = self.communicator.rank();
@@ -95,17 +109,42 @@ where
             let n_cols = ncoeffs_kifmm(equivalent_surface_order);
             let n_rows = ncoeffs_kifmm(check_surface_order);
 
-            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
-            // As well as estimating their inverses using SVD
-            let mut uc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
-            self.kernel.assemble_st(
-                GreenKernelEvalType::Value,
-                &upward_check_surface[..],
-                &upward_equivalent_surface[..],
-                uc2e.data_mut(),
-            );
+            // Compute pseudo-inverse
+            let s;
+            let ut;
+            let v;
+            match pinv_mode {
+                PinvMode::Svd { atol, rtol } => {
+                    let mut uc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
+                    self.kernel.assemble_st(
+                        GreenKernelEvalType::Value,
+                        &upward_check_surface[..],
+                        &upward_equivalent_surface[..],
+                        uc2e.data_mut(),
+                    );
+                    (s, ut, v) = pinv(&uc2e, atol, rtol).unwrap();
+                }
 
-            let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+                PinvMode::AcaPlus {
+                    eps,
+                    max_iter,
+                    local_radius,
+                    multithreaded,
+                } => {
+                    (s, ut, v) = pinv_aca_plus(
+                        &upward_check_surface,
+                        &upward_equivalent_surface,
+                        self.kernel.clone(),
+                        eps,
+                        max_iter,
+                        local_radius,
+                        false,
+                        multithreaded,
+                        false,
+                    )
+                    .unwrap();
+                }
+            }
 
             let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
             for i in 0..s.len() {
