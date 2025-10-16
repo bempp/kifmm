@@ -78,6 +78,7 @@ fn benchmark_fft_m2l<
             Laplace3dKernel::new(),
             GreenKernelEvalType::Value,
             FftFieldTranslation::<T>::new(block_size),
+            None,
         )
         .unwrap()
         .build()
@@ -156,6 +157,7 @@ fn benchmark_blas_m2l<
             Laplace3dKernel::new(),
             GreenKernelEvalType::Value,
             BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            None,
         )
         .unwrap()
         .build()

@@ -583,6 +583,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(Some(1e-5), None, FmmSvdMode::Deterministic),
+                None,
             )
             .unwrap()
             .build()
@@ -688,6 +689,7 @@ mod test {
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                None,
             )
             .unwrap()
             .build()
@@ -852,6 +854,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -1021,6 +1024,7 @@ mod test {
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()

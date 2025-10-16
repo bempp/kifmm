@@ -374,6 +374,9 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Pseudo-inverse strategy
+    pub pinv_mode: Option<PinvMode<Scalar>>,
+
     /// Whether construction and operators are timed
     pub timed: Option<bool>,
 

@@ -469,6 +469,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -489,6 +490,7 @@ mod test {
                     None,
                     crate::fmm::types::FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
@@ -537,6 +539,7 @@ mod test {
                     None,
                     crate::fmm::types::FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
@@ -581,6 +584,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+                None,
             )
             .unwrap()
             .build()
@@ -644,6 +648,7 @@ mod test {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -669,6 +674,7 @@ mod test {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -703,6 +709,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -732,6 +739,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -792,6 +800,7 @@ mod test {
                         surface_diff,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -822,6 +831,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -881,6 +891,7 @@ mod test {
                         surface_diff,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -942,6 +953,7 @@ mod test {
                         surface_diff,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -972,6 +984,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1023,6 +1036,7 @@ mod test {
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -1069,6 +1083,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1091,6 +1106,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1119,6 +1135,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1141,6 +1158,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1194,6 +1212,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1216,6 +1235,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1244,6 +1264,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1266,6 +1287,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1320,6 +1342,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1343,6 +1366,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1396,6 +1420,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1458,6 +1483,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1484,6 +1510,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1548,6 +1575,7 @@ mod test {
                         None,
                         FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1574,6 +1602,7 @@ mod test {
                         None,
                         FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()

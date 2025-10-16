@@ -33,6 +33,7 @@ fn main() {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -66,6 +67,7 @@ fn main() {
                     None,
                     kifmm::fmm::types::FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
@@ -95,6 +97,7 @@ fn main() {
                     None,
                     kifmm::fmm::types::FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
