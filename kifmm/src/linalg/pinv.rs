@@ -1,18 +1,71 @@
 //! Implementation of Moore-Penrose PseudoInverse
-use std::any::TypeId;
-
 use crate::{
     linalg::aca::{aca_plus, ArgmaxValue},
     traits::general::single_node::Epsilon,
 };
+use coe::{is_same, Coerce};
 use green_kernels::traits::Kernel;
 use itertools::Itertools;
-use num::{ToPrimitive, Zero};
+use num::Zero;
 use rlst::{
-    c32, c64, empty_array, rlst_dynamic_array1, rlst_dynamic_array2, Array, BaseArray,
-    DefaultIteratorMut, MatrixQr, MatrixSvd, MultInto, MultIntoResize, QrDecomposition, RawAccess,
-    RawAccessMut, RlstError, RlstResult, RlstScalar, Shape, SvdMode, VectorContainer,
+    c32, c64, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQr, MatrixSvd, MultInto,
+    MultIntoResize, QrDecomposition, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar,
+    Shape, SvdMode, VectorContainer,
 };
+
+/// Cast between scalar types Self and T
+#[allow(dead_code)]
+pub(crate) trait Cast<T> {
+    fn cast(&self) -> T;
+}
+
+impl Cast<f32> for f64 {
+    fn cast(&self) -> f32 {
+        *self as f32
+    }
+}
+
+impl Cast<f32> for f32 {
+    fn cast(&self) -> f32 {
+        *self
+    }
+}
+
+impl Cast<f64> for f64 {
+    fn cast(&self) -> f64 {
+        *self
+    }
+}
+
+impl Cast<f64> for f32 {
+    fn cast(&self) -> f64 {
+        *self as f64
+    }
+}
+
+impl Cast<c32> for c64 {
+    fn cast(&self) -> c32 {
+        c32::new(self.re() as f32, self.im() as f32)
+    }
+}
+
+impl Cast<c32> for c32 {
+    fn cast(&self) -> c32 {
+        *self
+    }
+}
+
+impl Cast<c64> for c64 {
+    fn cast(&self) -> c64 {
+        *self
+    }
+}
+
+impl Cast<c64> for c32 {
+    fn cast(&self) -> c64 {
+        c64::new(self.re() as f64, self.im() as f64)
+    }
+}
 
 /// Matrix type
 pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
@@ -201,17 +254,22 @@ where
 ///
 /// # Arguments
 /// * `eps` - Convergence criteria for decomposition
-pub(crate) fn pinv_aca_plus<T, K>(
+pub(crate) fn pinv_aca_plus<T, V, K>(
     sources: &[T::Real],
     targets: &[T::Real],
     kernel: K,
     eps: Option<T::Real>,
     max_iter: Option<usize>,
     local_radius: Option<usize>,
+    verbose: bool,
+    multithreaded: bool,
+    test: bool,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon + MatrixSvd + MatrixQr + ArgmaxValue<T>,
-    <T as RlstScalar>::Real: ArgmaxValue<<T as RlstScalar>::Real> + Epsilon,
+    T: RlstScalar + Epsilon + MatrixSvd + MatrixQr + ArgmaxValue<T> + Cast<V>,
+    <T as RlstScalar>::Real: ArgmaxValue<<T as RlstScalar>::Real> + Epsilon + Cast<V::Real>,
+    V: RlstScalar + MatrixSvd + Cast<T> + Epsilon,
+    <V as RlstScalar>::Real: Epsilon + Cast<T::Real>,
     K: Kernel<T = T>,
 {
     let dim = 3;
@@ -220,7 +278,7 @@ where
         return Err(RlstError::MatrixIsEmpty((targets.len(), sources.len())));
     }
 
-    // If we have a vector can compute directly at low cost
+    // TODO: If we have a vector can compute directly at low cost
     if targets.len() == dim || sources.len() == dim {
         Err(RlstError::SingleDimensionError {
             expected: 2,
@@ -236,19 +294,20 @@ where
             max_iter,
             local_radius,
             local_radius,
-            true,
+            verbose,
+            multithreaded,
         );
 
-        println!("Uaca {:?} VacaT {:?}", u_aca.shape(), v_aca_t.shape());
-
-        // Compute QR decomposition of result (HACK, because of RLST API)
+        // v_aca := v_aca^H
         let [m1, n1] = u_aca.shape();
         let [m2, n2] = v_aca_t.shape();
         let mut v_aca = rlst_dynamic_array2!(T, [n2, m2]);
         v_aca.fill_from(v_aca_t.r().conj().transpose());
         let [m3, n3] = v_aca.shape();
 
-        let mut qu = rlst_dynamic_array2!(T, [m1, n1]);
+        // Compute QR decomposition of result (HACK, because of RLST API)
+        let mut qu: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> =
+            rlst_dynamic_array2!(T, [m1, n1]);
         let mut ru = rlst_dynamic_array2!(T, [n1, n1]);
 
         let mut qv = rlst_dynamic_array2!(T, [m3, n3]);
@@ -257,141 +316,76 @@ where
         let qr_u_aca = u_aca.into_qr_alloc()?;
         let qr_v_aca = v_aca.into_qr_alloc()?;
 
-        // TODO: Tell Timo about API issues when using generic scalar type
-        if TypeId::of::<T>() == TypeId::of::<f64>() {
-            let qr_u_aca = unsafe {
-                &*(&qr_u_aca as *const _
-                    as *const QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>>)
-            };
-
-            let qr_v_aca = unsafe {
-                &*(&qr_v_aca as *const _
-                    as *const QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>>)
-            };
-
-            let ru = unsafe {
-                &mut *(&mut ru as *mut _
-                    as *mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>)
-            };
-            let qu = unsafe {
-                &mut *(&mut qu as *mut _
-                    as *mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>)
-            };
-
+        if is_same::<f64, T>() {
+            let qr_u_aca: &QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>> =
+                qr_u_aca.coerce();
+            let qu: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
+                (&mut qu).coerce();
+            let ru: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
+                (&mut ru).coerce();
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
 
-            let rv = unsafe {
-                &mut *(&mut rv as *mut _
-                    as *mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>)
-            };
-            let qv = unsafe {
-                &mut *(&mut qv as *mut _
-                    as *mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2>)
-            };
-
+            let qr_v_aca: &QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>> =
+                qr_v_aca.coerce();
+            let qv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
+                (&mut qv).coerce();
+            let rv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
+                (&mut rv).coerce();
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
-        } else if TypeId::of::<T>() == TypeId::of::<f32>() {
-            let qr_u_aca = unsafe {
-                &*(&qr_u_aca as *const _
-                    as *const QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>>)
-            };
-
-            let qr_v_aca = unsafe {
-                &*(&qr_v_aca as *const _
-                    as *const QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>>)
-            };
-
-            let ru = unsafe {
-                &mut *(&mut ru as *mut _
-                    as *mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>)
-            };
-            let qu = unsafe {
-                &mut *(&mut qu as *mut _
-                    as *mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>)
-            };
-
+        } else if is_same::<f32, T>() {
+            let qr_u_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
+                qr_u_aca.coerce();
+            let qu: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut qu).coerce();
+            let ru: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut ru).coerce();
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
 
-            let rv = unsafe {
-                &mut *(&mut rv as *mut _
-                    as *mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>)
-            };
-            let qv = unsafe {
-                &mut *(&mut qv as *mut _
-                    as *mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2>)
-            };
-
+            let qr_v_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
+                qr_v_aca.coerce();
+            let qv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut qv).coerce();
+            let rv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut rv).coerce();
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
-        } else if TypeId::of::<T>() == TypeId::of::<c64>() {
-            let qr_u_aca = unsafe {
-                &*(&qr_u_aca as *const _
-                    as *const QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>>)
-            };
-
-            let qr_v_aca = unsafe {
-                &*(&qr_v_aca as *const _
-                    as *const QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>>)
-            };
-
-            let ru = unsafe {
-                &mut *(&mut ru as *mut _
-                    as *mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2>)
-            };
-            let qu = unsafe {
-                &mut *(&mut qu as *mut _
-                    as *mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2>)
-            };
-
+        } else if is_same::<c32, T>() {
+            let qr_u_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
+                qr_u_aca.coerce();
+            let qu: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut qu).coerce();
+            let ru: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut ru).coerce();
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
 
-            let rv = unsafe {
-                &mut *(&mut rv as *mut _
-                    as *mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2>)
-            };
-            let qv = unsafe {
-                &mut *(&mut qv as *mut _
-                    as *mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2>)
-            };
-
+            let qr_v_aca: &QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>> =
+                qr_v_aca.coerce();
+            let qv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
+                (&mut qv).coerce();
+            let rv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
+                (&mut rv).coerce();
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
-        } else if TypeId::of::<T>() == TypeId::of::<c32>() {
-            let qr_u_aca = unsafe {
-                &*(&qr_u_aca as *const _
-                    as *const QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>>)
-            };
-
-            let qr_v_aca = unsafe {
-                &*(&qr_v_aca as *const _
-                    as *const QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>>)
-            };
-
-            let ru = unsafe {
-                &mut *(&mut ru as *mut _
-                    as *mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2>)
-            };
-            let qu = unsafe {
-                &mut *(&mut qu as *mut _
-                    as *mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2>)
-            };
-
+        } else if is_same::<c64, T>() {
+            let qr_u_aca: &QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>> =
+                qr_u_aca.coerce();
+            let qu: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
+                (&mut qu).coerce();
+            let ru: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
+                (&mut ru).coerce();
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
 
-            let rv = unsafe {
-                &mut *(&mut rv as *mut _
-                    as *mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2>)
-            };
-            let qv = unsafe {
-                &mut *(&mut qv as *mut _
-                    as *mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2>)
-            };
-
+            let qr_v_aca: &QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>> =
+                qr_v_aca.coerce();
+            let qv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
+                (&mut qv).coerce();
+            let rv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
+                (&mut rv).coerce();
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
         } else {
@@ -400,69 +394,70 @@ where
             ));
         }
 
-
-        println!("qu {:?} ru {:?}", qu.shape(), ru.shape());
-        println!("qv {:?} rv {:?}", qv.shape(), rv.shape());
-
+        // rvt := rv^H
         let [m, n] = rv.shape();
         let mut rvt = rlst_dynamic_array2!(T, [n, m]);
         rvt.fill_from(rv.conj().transpose());
 
+        // c := ru * rvt (single pre-allocated multiply)
+        let [ru_m, ru_n] = ru.shape();
+        let [rvt_m, rvt_n] = rvt.shape();
+        debug_assert_eq!(ru_n, rvt_m);
+        let mut c = rlst_dynamic_array2!(T, [ru_m, rvt_n]);
+        c.r_mut().simple_mult_into(ru.r(), rvt.r());
+
         // Compute SVD based pseudo-inverse on tiny core matrix formed from R factors
-        let c = empty_array::<T, 2>().simple_mult_into_resize(ru.r(), rvt.r());
 
-        // Have to compare with respect to the QR factors, not the original ones
-        let mut qv_t = rlst_dynamic_array2!(T, [qv.shape()[1], qv.shape()[0]]);
+        // qv_t := qv^H
+        let [qv_m, qv_n] = qv.shape();
+        let mut qv_t = rlst_dynamic_array2!(T, [qv_n, qv_m]);
         qv_t.fill_from(qv.r().conj().transpose());
-        let aca = empty_array::<T, 2>().simple_mult_into_resize(qu.r(), empty_array::<T, 2>().simple_mult_into_resize(c.r(), qv_t.r()));
 
-        println!("c shape {:?}", c.shape());
+        // Upcast to V and SVD pinv on c
+        let [c_m, c_n] = c.shape();
+        let mut c_64 = rlst_dynamic_array2!(V, [c_m, c_n]);
+        for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
+            *dst = src.cast();
+        }
+        let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None)?;
 
-        if TypeId::of::<T>() == TypeId::of::<f32>() || TypeId::of::<T>() == TypeId::of::<f64>() {
-            // upcast to f64 for svd
-            let mut c_64 = rlst_dynamic_array2!(f64, c.shape());
-            for (l, &r) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
-                *l = r.to_f64().unwrap();
-            }
-            let (s_c, ut_c, v_c) = pinv(&c_64, None, None)?;
+        // Downcast back down to T
+        let mut ut_c = rlst_dynamic_array2!(T, ut_c_v.shape());
+        for (dst, src) in ut_c.data_mut().iter_mut().zip(ut_c_v.data().iter()) {
+            *dst = src.cast();
+        }
 
-            // Downcast back down to T
-            let tmp = ut_c
-                .data()
-                .iter()
-                .map(|x| T::from(*x).unwrap())
-                .collect_vec();
-            let mut ut_c = rlst_dynamic_array2!(T, ut_c.shape());
-            ut_c.data_mut().copy_from_slice(&tmp);
+        let mut v_c = rlst_dynamic_array2!(T, v_c_v.shape());
+        for (dst, src) in v_c.data_mut().iter_mut().zip(v_c_v.data().iter()) {
+            *dst = src.cast();
+        }
+        let mut s_c = vec![T::Real::zero(); s_c_v.len()];
+        for (dst, src) in s_c.iter_mut().zip(s_c_v.iter()) {
+            *dst = src.cast();
+        }
 
-            let tmp = v_c
-                .data()
-                .iter()
-                .map(|x| T::from(*x).unwrap())
-                .collect_vec();
-            let mut v_c = rlst_dynamic_array2!(T, v_c.shape());
-            v_c.data_mut().copy_from_slice(&tmp);
+        // Form factors of pseudo inverse
+        let mut left = rlst_dynamic_array2!(T, [qv.shape()[0], v_c.shape()[1]]);
+        left.r_mut().simple_mult_into(qv.r(), v_c.r());
 
-            let tmp = s_c.iter().map(|x| T::from(*x).unwrap().re()).collect_vec();
-            let mut s_c = vec![T::Real::zero(); s_c.len()];
-            s_c.copy_from_slice(&tmp);
+        let [qu_m, qu_n] = qu.shape();
+        let mut qu_t = rlst_dynamic_array2!(T, [qu_n, qu_m]);
+        qu_t.r_mut().fill_from(qu.r().conj().transpose());
 
-            // Form factors of pseudo inverse
-            let left = empty_array::<T, 2>().simple_mult_into_resize(
-                qv.r(), v_c.r()
-            );
+        let mut right = rlst_dynamic_array2!(T, [ut_c.shape()[0], qu_t.shape()[1]]);
+        right.r_mut().simple_mult_into(ut_c.r(), qu_t.r());
 
-            let mut qu_t = rlst_dynamic_array2!(T, [qu.shape()[1], qu.shape()[0]]);
-            qu_t.fill_from(qu.conj().transpose().r());
-
-            let right = empty_array::<T, 2>().simple_mult_into_resize(
-                ut_c.r(), qu_t.r()
-            );
-
+        if test {
             let mut mat_s = rlst_dynamic_array2!(T, [s_c.len(), s_c.len()]);
             for i in 0..s_c.len() {
                 mat_s[[i, i]] = T::from(s_c[i]).unwrap();
             }
+
+            // Test Moore-Penrose residuals
+            let aca = empty_array::<T, 2>().simple_mult_into_resize(
+                qu.r(),
+                empty_array::<T, 2>().simple_mult_into_resize(c.r(), qv_t.r()),
+            );
 
             // Compute pseudo inverse
             let aca_pinv = empty_array::<T, 2>().simple_mult_into_resize(
@@ -470,82 +465,53 @@ where
                 empty_array::<T, 2>().simple_mult_into_resize(mat_s.r(), right.r()),
             );
 
-
+            // test in Frobenius norm
             let t1 = empty_array::<T, 2>().simple_mult_into_resize(
                 empty_array::<T, 2>().simple_mult_into_resize(aca.r(), aca_pinv.r()),
-                aca.r()
+                aca.r(),
             );
             let e1 = (t1.r() - aca.r()).norm_fro() / aca.r().norm_fro();
 
-            println!("E1 foo {:?} {:?}", e1,  &aca.r().norm_fro());
+            let t2 = empty_array::<T, 2>().simple_mult_into_resize(
+                empty_array::<T, 2>().simple_mult_into_resize(aca_pinv.r(), aca.r()),
+                aca_pinv.r(),
+            );
+            let e2 = (t2.r() - aca_pinv.r()).norm_fro() / aca_pinv.r().norm_fro();
 
-            // println!("HERE {:?} {:?} {:?}", v.shape(), mat_s.shape(), ut.shape());
+            let aca_aca_pinv = empty_array::<T, 2>().simple_mult_into_resize(aca.r(), aca_pinv.r());
+            let aca_pinv_aca = empty_array::<T, 2>().simple_mult_into_resize(aca_pinv.r(), aca.r());
 
-            return Ok((s_c, right, left));
-        } else if (TypeId::of::<T>() == TypeId::of::<c32>()
-            || TypeId::of::<T>() == TypeId::of::<c64>())
-        {
-            let mut c_64 = rlst_dynamic_array2!(c64, c.shape());
-            for (l, &r) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
-                *l = c64::new(r.re().to_f64().unwrap(), r.im().to_f64().unwrap());
+            let e3 = (aca_aca_pinv.r() - aca_aca_pinv.r().conj().transpose()).norm_fro()
+                / aca_aca_pinv.r().norm_fro();
+            let e4 = (aca_pinv_aca.r() - aca_pinv_aca.r().conj().transpose()).norm_fro()
+                / aca_pinv_aca.r().norm_fro();
+
+            assert!(e1 < eps.unwrap());
+            assert!(e2 < eps.unwrap());
+            assert!(e3 < eps.unwrap());
+            assert!(e4 < eps.unwrap());
+
+            if verbose {
+                println!("E1 = ||A A^+ A - A|| / ||A||             = {:?}", e1);
+                println!("E2 = ||A^+ A A^+ - A^+|| / ||A^+||       = {:?}", e2);
+                println!("E3 = ||(A A^+) - (A A^+)^T|| / ||A A^+|| = {:?}", e3);
+                println!("E4 = ||(A^+ A) - (A^+ A)^T|| / ||A^+ A|| = {:?}", e4);
             }
+        }
 
-            let (s_c, ut_c, v_c) = pinv(&c_64, None, None)?;
-
-            // Downcast back down to T
-            let tmp = ut_c
-                .data()
-                .iter()
-                .map(|x| T::from(*x).unwrap())
-                .collect_vec();
-            let mut ut_c = rlst_dynamic_array2!(T, ut_c.shape());
-            ut_c.data_mut().copy_from_slice(&tmp);
-
-            let tmp = v_c
-                .data()
-                .iter()
-                .map(|x| T::from(*x).unwrap())
-                .collect_vec();
-            let mut v_c = rlst_dynamic_array2!(T, v_c.shape());
-            v_c.data_mut().copy_from_slice(&tmp);
-
-            let tmp = s_c.iter().map(|x| T::from(*x).unwrap().re()).collect_vec();
-            let mut s_c = vec![T::Real::zero(); s_c.len()];
-            s_c.copy_from_slice(&tmp);
-
-            // Form factors of pseudo inverse
-            let left = empty_array::<T, 2>().simple_mult_into_resize(
-                qv.r(), v_c.r()
-            );
-
-            let mut qu_t = rlst_dynamic_array2!(T, [qu.shape()[1], qu.shape()[0]]);
-            qu_t.fill_from(qu.conj().transpose().r());
-
-            let right = empty_array::<T, 2>().simple_mult_into_resize(
-                ut_c.r(), qu_t.r()
-            );
-
-            return Ok((s_c, right, left));
-        } else {
-            return Err(RlstError::NotImplemented(
-                "Unsupported scalar type for this decomposition".to_string(),
-            ));
-        };
+        return Ok((s_c, right, left));
     }
 }
 
 #[cfg(test)]
 mod test {
 
-    use crate::{fmm::helpers::single_node::l2_error, tree::helpers::points_fixture};
+    use crate::tree::helpers::points_fixture;
 
     use super::*;
     use approx::assert_relative_eq;
-    use green_kernels::laplace_3d::Laplace3dKernel;
-    use rand::{thread_rng, Rng};
-    use rlst::{
-        empty_array, rlst_dynamic_array2, DefaultIterator, DefaultIteratorMut, MultIntoResize, RandomAccessByRef, RawAccess
-    };
+    use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
+    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RawAccess};
 
     #[test]
     fn test_pinv_square() {
@@ -626,83 +592,38 @@ mod test {
         let n = 100;
         let sources = points_fixture::<f64>(n, Some(0.1), Some(0.4), None);
         let targets = points_fixture::<f64>(n, Some(1.1), Some(2.2), None);
-        // targets.iter_mut().for_each(|t| *t += 1.5);
 
+        // Test Laplace
         let kernel = Laplace3dKernel::<f64>::new();
         let eps = 1e-6;
 
-        let (s, ut, v) = pinv_aca_plus(
+        let (_s, _ut, _v) = pinv_aca_plus::<f64, f64, _>(
             sources.data(),
             targets.data(),
             kernel.clone(),
             Some(eps),
             None,
             None,
+            true,
+            true,
+            true,
         )
         .unwrap();
 
-        // let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
-        // for i in 0..s.len() {
-        //     mat_s[[i, i]] = s[i];
-        // }
-
-        // // Compute pseudo inverse
-        // let aca_pinv = empty_array::<f64, 2>().simple_mult_into_resize(
-        //     v.r(),
-        //     empty_array::<f64, 2>().simple_mult_into_resize(mat_s.r(), ut.r()),
-        // );
-
-        // println!("HERE {:?} {:?} {:?}", v.shape(), mat_s.shape(), ut.shape());
-
-        // // Compute decomposition for testing
-        // let (u_aca, v_aca) = aca_plus(
-        //     sources.data(),
-        //     targets.data(),
-        //     kernel.clone(),
-        //     Some(eps),
-        //     None,
-        //     None,
-        //     None,
-        //     false,
-        // );
-
-
-
-        // let t2 = empty_array::<f64, 2>().simple_mult_into_resize(
-        //     empty_array::<f64, 2>().simple_mult_into_resize(aca_pinv.r(), aca.r()),
-        //     aca_pinv.r()
-        // );
-        // let e2 = (t2.r() - aca_pinv.r()).norm_fro() / &aca_pinv.r().norm_fro();
-        // println!("E2 {:?} {:?}", e2,  &aca.r().norm_fro());
-
-        // testing ACA reconstruction
-        // {
-        //     // generate a random vector
-        //     let mut rng = rand::thread_rng();
-        //     let mut x = rlst_dynamic_array2![f64, [n, 1]];
-        //     x.data_mut().iter_mut().for_each(|e| *e = rng.gen());
-
-        //     // Apply matrix to a random vector
-        //     let mut b_true = vec![0f64; n];
-
-        //     kernel.evaluate_st(
-        //         green_kernels::types::GreenKernelEvalType::Value,
-        //         sources.data(),
-        //         targets.data(),
-        //         x.data(),
-        //         &mut b_true,
-        //     );
-
-        //     let b_aca = empty_array::<f64, 2>().simple_mult_into_resize(
-        //         u_aca.r(),
-        //         empty_array::<f64, 2>().simple_mult_into_resize(v_aca.r(), x),
-        //     );
-
-        //     let l2_error = l2_error(b_aca.data(), &b_true);
-        //     println!("HERE L2 ERROR {:?}", l2_error);
-        // }
-
-        // print!("HERE {:?}", mat_s.shape());
-        assert!(false);
+        // Test Helmholtz (low wavenumber)
+        let kernel = Helmholtz3dKernel::<c64>::new(1.0);
+        let eps = 1e-6;
+        let (_s, _ut, _v) = pinv_aca_plus::<c64, c64, _>(
+            sources.data(),
+            targets.data(),
+            kernel.clone(),
+            Some(eps),
+            None,
+            None,
+            true,
+            true,
+            true,
+        )
+        .unwrap();
     }
 }
