@@ -25,7 +25,7 @@ use crate::{
     KiFmm,
 };
 
-impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Helmholtz3dKernel<Scalar>>
+impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar>
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
     Scalar: RlstScalar<Complex = Scalar>

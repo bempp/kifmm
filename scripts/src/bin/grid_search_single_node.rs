@@ -111,6 +111,7 @@ fn grid_search_laplace_blas<
                         Some(surface_diff),
                         *rsvd_settings,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -327,6 +328,7 @@ fn grid_search_laplace_fft<T>(
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(Some(block_size)),
+                    None,
                 )
                 .unwrap()
                 .build()

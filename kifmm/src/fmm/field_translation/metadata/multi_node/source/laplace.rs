@@ -32,11 +32,9 @@ use crate::{
     },
 };
 
-impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar, Laplace3dKernel<Scalar>>
+impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar>
     for KiFmmMulti<Scalar, Laplace3dKernel<Scalar>, FieldTranslation>
 where
-    // Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence + Float,
-    // <Scalar as RlstScalar>::Real: Default + Equivalence + Float + Epsilon,
     Scalar: RlstScalar
         + Default
         + Epsilon

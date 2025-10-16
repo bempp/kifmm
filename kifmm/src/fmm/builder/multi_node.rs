@@ -43,13 +43,13 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default + Clone,
     KiFmmMulti<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata<Scalar, Kernel>
-        + TargetTranslationMetadata
+        + SourceTranslationMetadata<Scalar>
+        + TargetTranslationMetadata<Scalar>
         + Metadata<Scalar = Scalar>
         + MetadataAccess,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata<Scalar, Kernel>
-        + TargetTranslationMetadata
+        + SourceTranslationMetadata<Scalar>
+        + TargetTranslationMetadata<Scalar>
         + Metadata<Scalar = Scalar>
         + MetadataAccess
         + GlobalFmmMetadata<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>,
@@ -428,7 +428,7 @@ where
                     .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
-            let (_, duration) = optionally_time(timed, || result.target());
+            let (_, duration) = optionally_time(timed, || result.target(PinvMode::svd(None, None)));
 
             if let Some(d) = duration {
                 result

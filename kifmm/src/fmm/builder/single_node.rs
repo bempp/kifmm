@@ -31,8 +31,8 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata<Scalar, Kernel>
-        + TargetTranslationMetadata
+        + SourceTranslationMetadata<Scalar>
+        + TargetTranslationMetadata<Scalar>
         + Metadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
@@ -329,7 +329,7 @@ where
                     .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
-            let (_, duration) = optionally_time(timed, || result.target());
+            let (_, duration) = optionally_time(timed, || result.target(pinv_mode));
 
             if let Some(d) = duration {
                 result
