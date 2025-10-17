@@ -140,8 +140,8 @@ where
                     multithreaded,
                 } => {
                     (s, ut, v) = pinv_aca_plus(
-                        &upward_check_surface,
                         &upward_equivalent_surface,
+                        &upward_check_surface,
                         self.kernel.clone(),
                         eps,
                         max_iter,

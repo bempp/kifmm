@@ -240,12 +240,18 @@ where
             actual: 1,
         })
     } else {
+        let eps = if let Some(eps) = eps {
+            eps
+        } else {
+            T::epsilon()
+        };
+
         // Compute ACA decomposition
         let (u_aca, v_aca_t) = aca_plus::<K, T>(
             sources,
             targets,
             kernel,
-            eps,
+            Some(eps),
             max_iter,
             local_radius,
             local_radius,
@@ -260,13 +266,20 @@ where
         v_aca.fill_from(v_aca_t.r().conj().transpose());
         let [m3, n3] = v_aca.shape();
 
-        // Compute QR decomposition of result (HACK, because of RLST API)
+        // Compute QR decomposition of result
+        let r = std::cmp::min(m1, n1);
         let mut qu: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> =
-            rlst_dynamic_array2!(T, [m1, n1]);
-        let mut ru = rlst_dynamic_array2!(T, [n1, n1]);
+            rlst_dynamic_array2!(T, [m1, r]);
+        let k = std::cmp::min(m1, n1);
+        let mut ru = rlst_dynamic_array2!(T, [k, n1]);
+        let mut pu = rlst_dynamic_array2!(T, [n1, n1]);
 
-        let mut qv = rlst_dynamic_array2!(T, [m3, n3]);
-        let mut rv = rlst_dynamic_array2!(T, [n3, n3]);
+        let r = std::cmp::min(m3, n3);
+        let mut qv: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> =
+            rlst_dynamic_array2!(T, [m3, r]);
+        let k = std::cmp::min(m3, n3);
+        let mut rv = rlst_dynamic_array2!(T, [k, n3]);
+        let mut pv = rlst_dynamic_array2!(T, [n3, n3]);
 
         let qr_u_aca = u_aca.into_qr_alloc()?;
         let qr_v_aca = v_aca.into_qr_alloc()?;
@@ -278,8 +291,12 @@ where
                 (&mut qu).coerce();
             let ru: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
                 (&mut ru).coerce();
+            let pu: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
+                (&mut pu).coerce();
+
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
+            qr_u_aca.get_p(pu.r_mut());
 
             let qr_v_aca: &QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>> =
                 qr_v_aca.coerce();
@@ -287,8 +304,11 @@ where
                 (&mut qv).coerce();
             let rv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
                 (&mut rv).coerce();
+            let pv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
+                (&mut pv).coerce();
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
+            qr_v_aca.get_p(pv.r_mut());
         } else if is_same::<f32, T>() {
             let qr_u_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
                 qr_u_aca.coerce();
@@ -296,8 +316,11 @@ where
                 (&mut qu).coerce();
             let ru: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
                 (&mut ru).coerce();
+            let pu: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut pu).coerce();
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
+            qr_u_aca.get_p(pu.r_mut());
 
             let qr_v_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
                 qr_v_aca.coerce();
@@ -305,17 +328,23 @@ where
                 (&mut qv).coerce();
             let rv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
                 (&mut rv).coerce();
+            let pv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+                (&mut pv).coerce();
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
+            qr_v_aca.get_p(pv.r_mut());
         } else if is_same::<c32, T>() {
-            let qr_u_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
+            let qr_u_aca: &QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>> =
                 qr_u_aca.coerce();
-            let qu: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+            let qu: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
                 (&mut qu).coerce();
-            let ru: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
+            let ru: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
                 (&mut ru).coerce();
+            let pu: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
+                (&mut pu).coerce();
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
+            qr_u_aca.get_p(pu.r_mut());
 
             let qr_v_aca: &QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>> =
                 qr_v_aca.coerce();
@@ -323,8 +352,12 @@ where
                 (&mut qv).coerce();
             let rv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
                 (&mut rv).coerce();
+            let pv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
+                (&mut pv).coerce();
+
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
+            qr_v_aca.get_p(pv.r_mut());
         } else if is_same::<c64, T>() {
             let qr_u_aca: &QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>> =
                 qr_u_aca.coerce();
@@ -332,8 +365,12 @@ where
                 (&mut qu).coerce();
             let ru: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
                 (&mut ru).coerce();
+            let pu: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
+                (&mut pu).coerce();
+
             qr_u_aca.get_r(ru.r_mut());
             qr_u_aca.get_q_alloc(qu.r_mut())?;
+            qr_u_aca.get_p(pu.r_mut());
 
             let qr_v_aca: &QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>> =
                 qr_v_aca.coerce();
@@ -341,42 +378,38 @@ where
                 (&mut qv).coerce();
             let rv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
                 (&mut rv).coerce();
+            let pv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
+                (&mut pv).coerce();
+
             qr_v_aca.get_r(rv.r_mut());
             qr_v_aca.get_q_alloc(qv.r_mut())?;
+            qr_v_aca.get_p(pv.r_mut());
         } else {
             return Err(RlstError::NotImplemented(
                 "Unsupported scalar type for this decomposition".to_string(),
             ));
         }
 
-        // rvt := rv^H
-        let [m, n] = rv.shape();
-        let mut rvt = rlst_dynamic_array2!(T, [n, m]);
-        rvt.fill_from(rv.conj().transpose());
-
-        // c := ru * rvt (single pre-allocated multiply)
-        let [ru_m, ru_n] = ru.shape();
-        let [rvt_m, rvt_n] = rvt.shape();
-        debug_assert_eq!(ru_n, rvt_m);
-        let mut c = rlst_dynamic_array2!(T, [ru_m, rvt_n]);
-        c.r_mut().simple_mult_into(ru.r(), rvt.r());
-
         // Compute SVD based pseudo-inverse on tiny core matrix formed from R factors
+        // First form core matrix from P and R factors
+        let mut pu_t = rlst_dynamic_array2!(T, [n1, n1]);
+        pu_t.r_mut().fill_from(pu.r().conj().transpose());
 
-        // qv_t := qv^H
-        let [qv_m, qv_n] = qv.shape();
-        let mut qv_t = rlst_dynamic_array2!(T, [qv_n, qv_m]);
-        qv_t.fill_from(qv.r().conj().transpose());
+        let ru_pu_t = empty_array::<T, 2>().simple_mult_into_resize(ru.r(), pu_t.r());
+        let mut rv_t = rlst_dynamic_array2!(T, [rv.r().shape()[1], rv.r().shape()[0]]);
+        rv_t.r_mut().fill_from(rv.transpose().conj());
+        let pv_rv_t = empty_array::<T, 2>().simple_mult_into_resize(pv.r(), rv_t.r());
 
-        // Upcast to V and SVD pinv on c
-        let [c_m, c_n] = c.shape();
-        let mut c_64 = rlst_dynamic_array2!(<T as Upcast>::Higher, [c_m, c_n]);
+        // Form core matrix and cast to higher precision if available for SVD step
+        let c = empty_array::<T, 2>().simple_mult_into_resize(ru_pu_t.r(), pv_rv_t.r());
+        let mut c_64 = rlst_dynamic_array2!(<T as Upcast>::Higher, c.shape());
         for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
             *dst = src.cast();
         }
-        let (s_c_v, ut_c_v, v_c_v) = pinv::<<T as Upcast>::Higher>(&c_64, None, None)?;
 
-        // Downcast back down to T
+        let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None).unwrap();
+
+        // Downcast back to T
         let mut ut_c = rlst_dynamic_array2!(T, ut_c_v.shape());
         for (dst, src) in ut_c.data_mut().iter_mut().zip(ut_c_v.data().iter()) {
             *dst = src.cast();
@@ -395,6 +428,7 @@ where
         let mut left = rlst_dynamic_array2!(T, [qv.shape()[0], v_c.shape()[1]]);
         left.r_mut().simple_mult_into(qv.r(), v_c.r());
 
+        // qu_t := qu^H
         let [qu_m, qu_n] = qu.shape();
         let mut qu_t = rlst_dynamic_array2!(T, [qu_n, qu_m]);
         qu_t.r_mut().fill_from(qu.r().conj().transpose());
@@ -403,6 +437,11 @@ where
         right.r_mut().simple_mult_into(ut_c.r(), qu_t.r());
 
         if test {
+            // qv_t := qv^H
+            let [qv_m, qv_n] = qv.shape();
+            let mut qv_t = rlst_dynamic_array2!(T, [qv_n, qv_m]);
+            qv_t.fill_from(qv.r().conj().transpose());
+
             let mut mat_s = rlst_dynamic_array2!(T, [s_c.len(), s_c.len()]);
             for i in 0..s_c.len() {
                 mat_s[[i, i]] = T::from(s_c[i]).unwrap();
@@ -441,10 +480,10 @@ where
             let e4 = (aca_pinv_aca.r() - aca_pinv_aca.r().conj().transpose()).norm_fro()
                 / aca_pinv_aca.r().norm_fro();
 
-            assert!(e1 < eps.unwrap());
-            assert!(e2 < eps.unwrap());
-            assert!(e3 < eps.unwrap());
-            assert!(e4 < eps.unwrap());
+            assert!(e1 < eps);
+            assert!(e2 < eps);
+            assert!(e3 < eps);
+            assert!(e4 < eps);
 
             if verbose {
                 println!("E1 = ||A A^+ A - A|| / ||A||             = {:?}", e1);

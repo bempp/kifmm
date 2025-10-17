@@ -127,7 +127,10 @@ mod test {
     };
 
     use crate::{
-        fmm::{helpers::single_node::l2_error, types::BlasFieldTranslationIa},
+        fmm::{
+            helpers::single_node::l2_error,
+            types::{BlasFieldTranslationIa, PinvMode},
+        },
         traits::{
             fmm::ChargeHandler,
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
@@ -324,6 +327,7 @@ mod test {
         );
 
         let l2_error = l2_error(&direct, potential);
+        println!("L2 Error = {:?}", l2_error);
         assert!(l2_error <= threshold);
     }
 
@@ -584,7 +588,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
-                None,
+                Some(PinvMode::aca(Some(1e-6), None, None, true)),
             )
             .unwrap()
             .build()
