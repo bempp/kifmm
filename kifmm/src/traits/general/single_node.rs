@@ -70,3 +70,114 @@ pub trait Hadamard8x8 {
         scale: Self::Scalar,
     );
 }
+
+/// Defines higher precision scalar type corresponding to Self
+pub trait Upcast
+where
+    Self: Sized,
+{
+    /// The higher precision type (e.g. f32->f64, c32->c64)
+    type Higher: RlstScalar + Cast<Self>;
+}
+
+impl Upcast for f32 {
+    type Higher = f64;
+}
+
+impl Upcast for f64 {
+    type Higher = f64;
+}
+
+impl Upcast for c32 {
+    type Higher = c64;
+}
+
+impl Upcast for c64 {
+    type Higher = c64;
+}
+
+/// Cast between scalar types Self and T
+#[allow(dead_code)]
+pub trait Cast<T> {
+    /// Return a new scalar, cast to T
+    fn cast(&self) -> T;
+}
+
+impl Cast<f32> for f64 {
+    fn cast(&self) -> f32 {
+        *self as f32
+    }
+}
+
+impl Cast<f32> for f32 {
+    fn cast(&self) -> f32 {
+        *self
+    }
+}
+
+impl Cast<f64> for f64 {
+    fn cast(&self) -> f64 {
+        *self
+    }
+}
+
+impl Cast<f64> for f32 {
+    fn cast(&self) -> f64 {
+        *self as f64
+    }
+}
+
+impl Cast<c32> for c64 {
+    fn cast(&self) -> c32 {
+        c32::new(self.re() as f32, self.im() as f32)
+    }
+}
+
+impl Cast<c32> for c32 {
+    fn cast(&self) -> c32 {
+        *self
+    }
+}
+
+impl Cast<c64> for c64 {
+    fn cast(&self) -> c64 {
+        *self
+    }
+}
+
+impl Cast<c64> for c32 {
+    fn cast(&self) -> c64 {
+        c64::new(self.re() as f64, self.im() as f64)
+    }
+}
+
+/// Trait that abstracts over real/complex numbers for their magnitude
+pub trait ArgmaxValue<Scalar: RlstScalar> {
+    /// Return the magnitude
+    fn argmax_value(&self) -> <Scalar as RlstScalar>::Real;
+}
+
+macro_rules! impl_argmax_value {
+    // For real numbers, argmax defined by value
+    ($t:ty) => {
+        impl ArgmaxValue<$t> for $t {
+            fn argmax_value(&self) -> $t {
+                *self
+            }
+        }
+    };
+
+    // For complex numbers, argmax defined by magnitude
+    ($t:ty, $r:ty) => {
+        impl ArgmaxValue<$t> for $t {
+            fn argmax_value(&self) -> $r {
+                self.abs()
+            }
+        }
+    };
+}
+
+impl_argmax_value!(f32);
+impl_argmax_value!(f64);
+impl_argmax_value!(c32, f32);
+impl_argmax_value!(c64, f64);

@@ -38,6 +38,7 @@ fn main() {
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -75,6 +76,7 @@ fn main() {
                     None,
                     FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
@@ -108,6 +110,7 @@ fn main() {
                     None,
                     FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()

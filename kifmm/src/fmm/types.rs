@@ -346,6 +346,7 @@ pub enum FmmEvalType {
 ///         Laplace3dKernel::new(),
 ///         GreenKernelEvalType::Value,
 ///         FftFieldTranslation::new(None),
+///         None,
 ///     )
 ///     .unwrap()
 ///     .build()
@@ -374,6 +375,9 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Pseudo-inverse strategy
+    pub pinv_mode: Option<PinvMode<Scalar>>,
+
     /// Whether construction and operators are timed
     pub timed: Option<bool>,
 
@@ -613,6 +617,27 @@ where
     pub svd_mode: FmmSvdMode,
 }
 
+/// TODO: document numerical method
+pub struct BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Cutoff for apprroximation
+    pub eps: Scalar::Real,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataAca<Scalar>>, // indexed by level
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
+    pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
+}
+
 impl<Scalar> Clone for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
@@ -696,9 +721,35 @@ pub enum FmmSvdMode {
         random_state: Option<usize>,
     },
 
-    /// Use DGESVD from Lapack bindings
+    /// Use GESVD from LAPACK bindings
     #[default]
     Deterministic,
+}
+
+/// Variants of pseudo-inverse implementation, based either on the SVD with filtering
+/// scheme for components with small singular values, or
+#[derive(Clone, Copy)]
+pub enum PinvMode<Scalar: RlstScalar> {
+    /// Use ACA+ algorithm, which is only implemented with reference to
+    /// an explicitly specified kernel
+    AcaPlus {
+        /// Convergence criteria for ACA+ approximation factors
+        eps: Option<Scalar::Real>,
+        /// Maximum number of iterations
+        max_iter: Option<usize>,
+        /// Search radius for guided random walk used in pivot selection
+        local_radius: Option<usize>,
+        /// Compute rows/columns using multithreaded kernel fct
+        multithreaded: bool,
+    },
+
+    /// Use GESVD from LAPACK bindings
+    Svd {
+        /// Absolute threshold term, default is 0.
+        atol: Option<Scalar::Real>,
+        /// Relative threshold term, default value is max(M, N) * eps
+        rtol: Option<Scalar::Real>,
+    },
 }
 
 impl FmmSvdMode {
@@ -730,6 +781,31 @@ impl FmmSvdMode {
         } else {
             FmmSvdMode::Deterministic
         }
+    }
+}
+
+impl<Scalar> PinvMode<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Constructor for pseudo-inverse settings using ACA+
+    pub fn aca(
+        eps: Option<Scalar::Real>,
+        max_iter: Option<usize>,
+        local_radius: Option<usize>,
+        multithreaded: bool,
+    ) -> Self {
+        PinvMode::AcaPlus {
+            eps,
+            max_iter,
+            local_radius,
+            multithreaded,
+        }
+    }
+
+    /// Constructor for pseudo-inverse settings using SVD
+    pub fn svd(atol: Option<Scalar::Real>, rtol: Option<Scalar::Real>) -> Self {
+        PinvMode::Svd { atol, rtol }
     }
 }
 
@@ -962,6 +1038,18 @@ where
             c_vt: Vec::default(),
         }
     }
+}
+
+/// TODO: Document numerical approach
+pub struct BlasMetadataAca<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Left basis vectors
+    pub u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+
+    /// Right basis vectors
+    pub vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 }
 
 /// Instruction set architecture

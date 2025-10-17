@@ -8,7 +8,7 @@ use criterion::{
 
 use num::Float;
 use rand_distr::uniform::SampleUniform;
-use rlst::{rlst_dynamic_array2, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array2, MatrixQr, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
 use serde_yaml::Value;
 
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
@@ -21,7 +21,7 @@ use kifmm::{
         fftw::Dft,
         field::{SourceToTargetTranslation, TargetTranslation},
         fmm::{DataAccess, Evaluate},
-        general::single_node::{AsComplex, Epsilon, Hadamard8x8},
+        general::single_node::{ArgmaxValue, AsComplex, Cast, Epsilon, Hadamard8x8, Upcast},
         tree::{SingleFmmTree, SingleTree},
     },
     tree::helpers::points_fixture,
@@ -33,10 +33,15 @@ fn benchmark_fft_m2l<
         + Float
         + Epsilon
         + MatrixSvd
+        + MatrixQr
         + AsComplex
         + Dft<InputType = T, OutputType = <T as AsComplex>::ComplexType>
         + Default
-        + AlignedAllocable,
+        + AlignedAllocable
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
     M: Measurement,
 >(
     group: &mut criterion::BenchmarkGroup<'_, M>,
@@ -50,6 +55,8 @@ fn benchmark_fft_m2l<
     <T as Dft>::Plan: Sync,
     <T as AsComplex>::ComplexType: AlignedAllocable,
     <T as AsComplex>::ComplexType: Hadamard8x8<Scalar = <T as AsComplex>::ComplexType>,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
 {
     // FFT based M2L for a vector of charges
     // FMM parameters
@@ -71,6 +78,7 @@ fn benchmark_fft_m2l<
             Laplace3dKernel::new(),
             GreenKernelEvalType::Value,
             FftFieldTranslation::<T>::new(block_size),
+            None,
         )
         .unwrap()
         .build()
@@ -100,7 +108,17 @@ fn benchmark_fft_m2l<
 
 #[allow(clippy::too_many_arguments)]
 fn benchmark_blas_m2l<
-    T: RlstScalar<Real = T> + Epsilon + MatrixRsvd + Float + SampleUniform,
+    T: RlstScalar<Real = T>
+        + Epsilon
+        + MatrixRsvd
+        + Float
+        + SampleUniform
+        + MatrixQr
+        + Default
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
     M: Measurement,
 >(
     group: &mut criterion::BenchmarkGroup<'_, M>,
@@ -114,6 +132,8 @@ fn benchmark_blas_m2l<
     svd_threshold: Option<T>,
 ) where
     <T as RlstScalar>::Real: Epsilon,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
 {
     let sources = points_fixture::<T>(n_points, None, None, Some(0));
     let targets = points_fixture::<T>(n_points, None, None, Some(1));
@@ -137,6 +157,7 @@ fn benchmark_blas_m2l<
             Laplace3dKernel::new(),
             GreenKernelEvalType::Value,
             BlasFieldTranslationSaRcmp::new(svd_threshold, surface_diff, svd_mode),
+            None,
         )
         .unwrap()
         .build()

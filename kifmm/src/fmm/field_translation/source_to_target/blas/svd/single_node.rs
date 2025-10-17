@@ -1,4 +1,4 @@
-//! Multipole to local field translation trait implementation using BLAS.
+//! Multipole to local field translation trait implementation using BLAS and (randomised) SVD compression.
 
 use std::sync::Mutex;
 

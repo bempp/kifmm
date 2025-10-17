@@ -5,39 +5,9 @@ use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use num::Zero;
 use rand::{rngs, Rng};
-use rlst::{c32, c64, rlst_dynamic_array2, Array, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array2, Array, RawAccessMut, RlstScalar};
 
-use crate::traits::general::single_node::Epsilon;
-
-/// Trait that abstracts over real/complex numbers for their magnitude
-pub(crate) trait ArgmaxValue<Scalar: RlstScalar> {
-    fn argmax_value(&self) -> <Scalar as RlstScalar>::Real;
-}
-
-macro_rules! impl_argmax_value {
-    // For real numbers, argmax defined by value
-    ($t:ty) => {
-        impl ArgmaxValue<$t> for $t {
-            fn argmax_value(&self) -> $t {
-                *self
-            }
-        }
-    };
-
-    // For complex numbers, argmax defined by magnitude
-    ($t:ty, $r:ty) => {
-        impl ArgmaxValue<$t> for $t {
-            fn argmax_value(&self) -> $r {
-                self.abs()
-            }
-        }
-    };
-}
-
-impl_argmax_value!(f32);
-impl_argmax_value!(f64);
-impl_argmax_value!(c32, f32);
-impl_argmax_value!(c64, f64);
+use crate::traits::general::single_node::{ArgmaxValue, Epsilon};
 
 /// Returns the index of the maximum value in a slice
 fn argmax<Scalar>(v: &[Scalar]) -> Option<usize>
@@ -117,6 +87,7 @@ fn reset_reference_row<Scalar, Kernel>(
     prev_i_star: &HashSet<usize>,
     us: &[Vec<Scalar>],
     vs: &[Vec<Scalar>],
+    multithreaded: bool,
 ) -> Vec<Scalar>
 where
     Scalar: RlstScalar,
@@ -151,7 +122,16 @@ where
         }
     }
 
-    calc_residual_rows(sources, targets, kernel, *i_ref, *i_ref + 1, us, vs)
+    calc_residual_rows(
+        sources,
+        targets,
+        kernel,
+        *i_ref,
+        *i_ref + 1,
+        us,
+        vs,
+        multithreaded,
+    )
 }
 
 /// Reset the current reference col index (j_ref), and return
@@ -169,6 +149,7 @@ fn reset_reference_col<Scalar, Kernel>(
     prev_j_star: &HashSet<usize>,
     us: &[Vec<Scalar>],
     vs: &[Vec<Scalar>],
+    multithreaded: bool,
 ) -> Vec<Scalar>
 where
     Scalar: RlstScalar,
@@ -202,10 +183,20 @@ where
         }
     }
 
-    calc_residual_cols(sources, targets, kernel, *j_ref, *j_ref + 1, us, vs)
+    calc_residual_cols(
+        sources,
+        targets,
+        kernel,
+        *j_ref,
+        *j_ref + 1,
+        us,
+        vs,
+        multithreaded,
+    )
 }
 
 /// Update a given row with current approximation terms (us, vs)
+#[allow(clippy::too_many_arguments)]
 fn calc_residual_rows<Scalar, Kernel>(
     sources: &[Scalar::Real],
     targets: &[Scalar::Real],
@@ -214,12 +205,13 @@ fn calc_residual_rows<Scalar, Kernel>(
     i_end: usize,
     us: &[Vec<Scalar>],
     vs: &[Vec<Scalar>],
+    multithreaded: bool,
 ) -> Vec<Scalar>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar>,
 {
-    let mut out = calc_rows(kernel, sources, targets, i_start, i_end);
+    let mut out = calc_rows(kernel, sources, targets, i_start, i_end, multithreaded);
 
     for i in 0..us.len() {
         let scale = us[i][i_start];
@@ -232,6 +224,7 @@ where
 }
 
 /// Update a given col with current approximation terms (us, vs)
+#[allow(clippy::too_many_arguments)]
 fn calc_residual_cols<Scalar, Kernel>(
     sources: &[Scalar::Real],
     targets: &[Scalar::Real],
@@ -240,12 +233,13 @@ fn calc_residual_cols<Scalar, Kernel>(
     j_end: usize,
     us: &[Vec<Scalar>],
     vs: &[Vec<Scalar>],
+    multithreaded: bool,
 ) -> Vec<Scalar>
 where
     Scalar: RlstScalar,
     Kernel: KernelTrait<T = Scalar>,
 {
-    let mut out = calc_cols(kernel, sources, targets, j_start, j_end);
+    let mut out = calc_cols(kernel, sources, targets, j_start, j_end, multithreaded);
     for i in 0..us.len() {
         let scale = vs[i][j_start];
         out.iter_mut().zip(us[i].iter()).for_each(|(o, &u)| {
@@ -263,6 +257,7 @@ fn calc_cols<Scalar, Kernel>(
     targets: &[Scalar::Real],
     j_start: usize,
     j_end: usize,
+    multithreaded: bool,
 ) -> Vec<Scalar>
 where
     Scalar: RlstScalar,
@@ -274,13 +269,24 @@ where
 
     let mut cols = vec![Scalar::default(); n_cols * n_targets];
     let charges = vec![Scalar::one(); j_end - j_start];
-    kernel.evaluate_mt(
-        green_kernels::types::GreenKernelEvalType::Value,
-        &sources[j_start * dim..j_end * dim],
-        targets,
-        &charges,
-        &mut cols,
-    );
+
+    if multithreaded {
+        kernel.evaluate_mt(
+            green_kernels::types::GreenKernelEvalType::Value,
+            &sources[j_start * dim..j_end * dim],
+            targets,
+            &charges,
+            &mut cols,
+        );
+    } else {
+        kernel.evaluate_st(
+            green_kernels::types::GreenKernelEvalType::Value,
+            &sources[j_start * dim..j_end * dim],
+            targets,
+            &charges,
+            &mut cols,
+        );
+    }
 
     cols
 }
@@ -292,6 +298,7 @@ fn calc_rows<Scalar, Kernel>(
     targets: &[Scalar::Real],
     i_start: usize,
     i_end: usize,
+    multithreaded: bool,
 ) -> Vec<Scalar>
 where
     Scalar: RlstScalar,
@@ -303,13 +310,24 @@ where
 
     let mut rows = vec![Scalar::default(); n_rows * n_sources];
     let charges = vec![Scalar::one(); i_end - i_start];
-    kernel.evaluate_mt(
-        green_kernels::types::GreenKernelEvalType::Value,
-        &targets[i_start * dim..i_end * dim],
-        sources,
-        &charges,
-        &mut rows,
-    );
+
+    if multithreaded {
+        kernel.evaluate_mt(
+            green_kernels::types::GreenKernelEvalType::Value,
+            &targets[i_start * dim..i_end * dim],
+            sources,
+            &charges,
+            &mut rows,
+        );
+    } else {
+        kernel.evaluate_st(
+            green_kernels::types::GreenKernelEvalType::Value,
+            &targets[i_start * dim..i_end * dim],
+            sources,
+            &charges,
+            &mut rows,
+        );
+    }
 
     rows
 }
@@ -326,6 +344,7 @@ pub(crate) fn aca_plus<Kernel, Scalar>(
     local_radius_rows: Option<usize>,
     local_radius_cols: Option<usize>,
     verbose: bool,
+    multithreaded: bool,
 ) -> (
     Array<Scalar, rlst::BaseArray<Scalar, rlst::VectorContainer<Scalar>, 2>, 2>,
     Array<Scalar, rlst::BaseArray<Scalar, rlst::VectorContainer<Scalar>, 2>, 2>,
@@ -381,6 +400,7 @@ where
         &prev_i_star,
         &us,
         &vs,
+        multithreaded,
     );
 
     let mut r_jref = reset_reference_col(
@@ -395,6 +415,7 @@ where
         &prev_j_star,
         &us,
         &vs,
+        multithreaded,
     );
 
     let mut i_star;
@@ -411,17 +432,53 @@ where
         // decide path based on larger reference entry
         if r_iref[j_star].abs() >= r_jref[i_star].abs() {
             // build residual column at j_star, find i_star
-            r_jstar = calc_residual_cols(sources, targets, &kernel, j_star, j_star + 1, &us, &vs);
+            r_jstar = calc_residual_cols(
+                sources,
+                targets,
+                &kernel,
+                j_star,
+                j_star + 1,
+                &us,
+                &vs,
+                multithreaded,
+            );
             let r_jstar_mag = r_jstar.iter().clone().map(|x| x.abs()).collect_vec();
             i_star = argmax(&r_jstar_mag).unwrap();
-            r_istar = calc_residual_rows(sources, targets, &kernel, i_star, i_star + 1, &us, &vs);
+            r_istar = calc_residual_rows(
+                sources,
+                targets,
+                &kernel,
+                i_star,
+                i_star + 1,
+                &us,
+                &vs,
+                multithreaded,
+            );
             pivot = r_istar[j_star];
         } else {
             // build residual row at i_star, find j_star
-            r_istar = calc_residual_rows(sources, targets, &kernel, i_star, i_star + 1, &us, &vs);
+            r_istar = calc_residual_rows(
+                sources,
+                targets,
+                &kernel,
+                i_star,
+                i_star + 1,
+                &us,
+                &vs,
+                multithreaded,
+            );
             let r_istar_mag = r_istar.iter().clone().map(|x| x.abs()).collect_vec();
             j_star = argmax(&r_istar_mag).unwrap();
-            r_jstar = calc_residual_cols(sources, targets, &kernel, j_star, j_star + 1, &us, &vs);
+            r_jstar = calc_residual_cols(
+                sources,
+                targets,
+                &kernel,
+                j_star,
+                j_star + 1,
+                &us,
+                &vs,
+                multithreaded,
+            );
             pivot = r_istar[j_star];
         }
 
@@ -470,6 +527,7 @@ where
                 &prev_i_star,
                 &us,
                 &vs,
+                multithreaded,
             )
         }
 
@@ -486,6 +544,7 @@ where
                 &prev_j_star,
                 &us,
                 &vs,
+                multithreaded,
             )
         }
 
@@ -542,7 +601,7 @@ mod test {
 
     use num::One;
     use rand::thread_rng;
-    use rlst::{c32, empty_array, DefaultIteratorMut, MultIntoResize, RawAccess, RawAccessMut};
+    use rlst::{c32, empty_array, MultIntoResize, RawAccess, RawAccessMut};
 
     use crate::{fmm::helpers::single_node::l2_error, tree::helpers::points_fixture};
 
@@ -611,13 +670,12 @@ mod test {
     #[test]
     fn test_aca_plus() {
         // Test f32
-        let n_sources = 321;
-        let n_targets = 123;
-        let sources = points_fixture::<f32>(n_sources, None, None, None);
-        let mut targets = points_fixture::<f32>(n_targets, None, None, None);
-        // Displace targets by a fixed amount to ensure that interaction is low rank
-        let displacement = 3.0;
-        targets.iter_mut().for_each(|t| *t += displacement);
+        let n_sources = 123;
+        let n_targets = 321;
+
+        let sources = points_fixture::<f32>(n_sources, Some(0.1), Some(0.9), None);
+        let targets = points_fixture::<f32>(n_targets, Some(1.7), Some(2.5), None);
+
         let eps = 1e-6;
 
         // Test Laplace
@@ -633,6 +691,7 @@ mod test {
                 None,
                 None,
                 false,
+                true,
             );
 
             // generate a random vector
@@ -675,6 +734,7 @@ mod test {
                 None,
                 None,
                 false,
+                true,
             );
 
             // generate a test vector

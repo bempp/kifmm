@@ -52,6 +52,7 @@
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             GreenKernelEvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
 //!             FftFieldTranslation::new(None), // Choose a field translation method, could replace with BLAS field translation
+//!             None,
 //!         )
 //!         .unwrap()
 //!         .build()
@@ -133,9 +134,9 @@ pub use traits::fmm::DataAccessMulti;
 #[doc(inline)]
 pub use traits::fmm::ChargeHandler;
 
-#[cfg_attr(feature = "strict", deny(warnings))]
-#[warn(missing_docs)]
-pub mod bindings;
+// #[cfg_attr(feature = "strict", deny(warnings))]
+// // #[warn(missing_docs)]
+// // // pub mod bindings;
 
 /// Avoid CI errors for dependencies under feature flags
 use pulp as _;

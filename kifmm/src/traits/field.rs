@@ -1,6 +1,8 @@
 //! Field Traits
 
-use crate::traits::types::FmmError;
+use crate::{fmm::types::PinvMode, traits::types::FmmError};
+use rlst::RlstScalar;
+
 /// Marker trait for field translations
 pub trait FieldTranslation {
     /// Metadata for applying each to source to target translation, depends on both the kernel
@@ -15,15 +17,21 @@ pub trait FieldTranslation {
 }
 
 /// Source tree translation metadata
-pub trait SourceTranslationMetadata {
+pub trait SourceTranslationMetadata<Scalar>
+where
+    Scalar: RlstScalar,
+{
     /// Constructor
-    fn source(&mut self);
+    fn source(&mut self, pinv_mode: PinvMode<Scalar>);
 }
 
 /// Target tree translation metadata
-pub trait TargetTranslationMetadata {
+pub trait TargetTranslationMetadata<Scalar>
+where
+    Scalar: RlstScalar,
+{
     /// Constructor
-    fn target(&mut self);
+    fn target(&mut self, pinv_mode: PinvMode<Scalar>);
 }
 
 /// Set M2L metadata associated with a kernel

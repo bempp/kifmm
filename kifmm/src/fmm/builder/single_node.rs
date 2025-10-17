@@ -6,6 +6,7 @@ use itertools::Itertools;
 use rlst::{MatrixSvd, RlstScalar};
 
 use crate::{
+    fmm::types::PinvMode,
     fmm::{
         helpers::single_node::{map_charges, ncoeffs_kifmm, optionally_time},
         types::{FmmEvalType, Isa, KiFmm, SingleNodeBuilder, SingleNodeFmmTree},
@@ -30,13 +31,14 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
-        + TargetTranslationMetadata
+        + SourceTranslationMetadata<Scalar>
+        + TargetTranslationMetadata<Scalar>
         + Metadata<Scalar = Scalar>,
 {
     /// Initialise an empty kernel independent FMM builder
     pub fn new(timed: bool) -> Self {
         Self {
+            pinv_mode: None,
             timed: Some(timed),
             communication_times: None,
             isa: None,
@@ -181,6 +183,7 @@ where
     /// * `kernel` - The kernel associated with this FMM
     /// * `eval_type` - Either `ValueDeriv` - to evaluate potentials and gradients, or `Value` to evaluate potentials alone
     /// * `source_to_target` - A field translation method.
+    /// * `pinv_mode` - Pseudo-inverse mode
     pub fn parameters(
         mut self,
         charges: &[Scalar],
@@ -188,6 +191,7 @@ where
         kernel: Kernel,
         eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
+        pinv_mode: Option<PinvMode<Scalar>>,
     ) -> Result<Self, std::io::Error> {
         if self.tree.is_none() {
             Err(std::io::Error::new(
@@ -272,6 +276,7 @@ where
             self.kernel = Some(kernel);
             self.kernel_eval_type = Some(eval_type);
             self.source_to_target = Some(source_to_target);
+            self.pinv_mode = pinv_mode;
 
             Ok(self)
         }
@@ -290,6 +295,12 @@ where
             let dim = kernel.space_dimension();
             let timed = self.timed.unwrap();
             let communication_times = self.communication_times.unwrap();
+            let pinv_mode = if let Some(p) = self.pinv_mode {
+                p
+            } else {
+                // Default to SVD mode with no parameters set
+                PinvMode::svd(None, None)
+            };
 
             let mut result = KiFmm {
                 timed,
@@ -310,7 +321,7 @@ where
             };
 
             // Calculate required metadata
-            let (_, duration) = optionally_time(timed, || result.source());
+            let (_, duration) = optionally_time(timed, || result.source(pinv_mode));
 
             if let Some(d) = duration {
                 result
@@ -318,7 +329,7 @@ where
                     .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
-            let (_, duration) = optionally_time(timed, || result.target());
+            let (_, duration) = optionally_time(timed, || result.target(pinv_mode));
 
             if let Some(d) = duration {
                 result
