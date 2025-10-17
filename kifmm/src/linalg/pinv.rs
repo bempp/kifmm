@@ -5,7 +5,7 @@ use crate::{
 };
 use coe::{is_same, Coerce};
 use green_kernels::traits::Kernel;
-use num::Zero;
+use num::{One, Zero};
 use rlst::{
     c32, c64, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQr, MatrixSvd, MultInto,
     MultIntoResize, QrDecomposition, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar,
@@ -33,7 +33,7 @@ pub(crate) fn pinv<T>(
     rtol: Option<T::Real>,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon + MatrixSvd + Epsilon,
+    T: RlstScalar + Epsilon + MatrixSvd,
     <T as RlstScalar>::Real: Epsilon,
 {
     let shape = mat.shape();
@@ -42,15 +42,13 @@ where
         return Err(RlstError::MatrixIsEmpty((shape[0], shape[1])));
     }
 
+    let eps = T::real(T::epsilon());
+    let max_dim = T::real(std::cmp::max(shape[0], shape[1]));
+    let atol = atol.unwrap_or(T::zero().re());
+    let rtol = rtol.unwrap_or(max_dim * eps);
+
     if shape[0] == 1 || shape[1] == 1 {
         // If we have a vector
-
-        let eps = T::real(T::epsilon());
-        let max_dim = T::real(std::cmp::max(shape[0], shape[1]));
-
-        let atol = atol.unwrap_or(T::zero().re());
-        let rtol = rtol.unwrap_or(max_dim * eps);
-
         if shape[0] == 1 {
             // Row vector
             let l2_norm = mat
@@ -60,7 +58,10 @@ where
                 .sum::<T::Real>()
                 .sqrt();
 
-            if l2_norm <= <T::Real as Epsilon>::epsilon() {
+            let max_s = l2_norm;
+            let threshold = (atol + rtol) * max_s;
+
+            if l2_norm <= threshold {
                 // Zero vector, so pseudo-inverse is zero
                 let zero_s = vec![T::Real::zero()];
                 let v = rlst_dynamic_array2!(T, [shape[1], 1]);
@@ -69,32 +70,14 @@ where
             }
 
             // Compute SVD of row vector
-            let mut s = vec![l2_norm];
-            let mut u = rlst_dynamic_array2!(T, [1, 1]);
-            u[[0, 0]] = T::one();
-            let mut vt = rlst_dynamic_array2!(T, [1, shape[1]]);
-            vt.data_mut()
-                .iter_mut()
-                .zip(mat.data().iter())
-                .for_each(|(v, x)| *v = *x / T::from_real(l2_norm));
-
-            // Compute pseudo inverse
-            let max_s = s[0];
-            let threshold = T::real(atol + rtol) * T::real(max_s);
-
-            // Filter singular values below this threshold
-            for s in s.iter_mut() {
-                if *s > threshold {
-                    *s = T::real(1.0) / T::real(*s);
-                } else {
-                    *s = T::real(0.)
-                }
+            let s = vec![T::Real::one() / l2_norm];
+            let mut v = rlst_dynamic_array2!(T, [shape[1], 1]);
+            for (i, &x) in mat.data().iter().enumerate() {
+                v[[i, 0]] = x.conj() / T::from_real(l2_norm);
             }
 
-            let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
-            let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
-            v.fill_from(vt.conj().transpose());
-            ut.fill_from(u.conj().transpose());
+            let mut ut = rlst_dynamic_array2!(T, [1, 1]);
+            ut[[0, 0]] = T::one();
 
             Ok((s, ut, v))
         } else if shape[1] == 1 {
@@ -106,7 +89,10 @@ where
                 .sum::<T::Real>()
                 .sqrt();
 
-            if l2_norm <= <T::Real as Epsilon>::epsilon() {
+            let max_s = l2_norm;
+            let threshold = (atol + rtol) * max_s;
+
+            if l2_norm <= threshold {
                 // Zero vector, so pseudo-inverse is zero
                 let zero_s = vec![T::Real::zero()];
                 let v = rlst_dynamic_array2!(T, [1, 1]);
@@ -115,32 +101,14 @@ where
             }
 
             // Compute SVD of column vector
-            let mut s = vec![l2_norm];
-            let mut u = rlst_dynamic_array2!(T, [shape[0], 1]);
-            u.data_mut()
-                .iter_mut()
-                .zip(mat.data().iter())
-                .for_each(|(u, x)| *u = *x / T::from_real(l2_norm));
-            let mut vt = rlst_dynamic_array2!(T, [1, 1]);
-            vt[[0, 0]] = T::one();
-
-            // Compute pseudo inverse
-            let max_s = s[0];
-            let threshold = T::real(atol + rtol) * T::real(max_s);
-
-            // Filter singular values below this threshold
-            for s in s.iter_mut() {
-                if *s > threshold {
-                    *s = T::real(1.0) / T::real(*s);
-                } else {
-                    *s = T::real(0.)
-                }
+            let s = vec![T::Real::one() / l2_norm];
+            let mut ut = rlst_dynamic_array2!(T, [1, shape[0]]);
+            for (j, &x) in mat.data().iter().enumerate() {
+                ut[[0, j]] = x.conj() / T::from_real(l2_norm);
             }
 
-            let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
-            let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
-            v.fill_from(vt.conj().transpose());
-            ut.fill_from(u.conj().transpose());
+            let mut v = rlst_dynamic_array2!(T, [1, 1]);
+            v[[0, 0]] = T::one();
 
             Ok((s, ut, v))
         } else {
@@ -158,25 +126,23 @@ where
 
         let mut mat_copy = rlst_dynamic_array2!(T, shape);
         mat_copy.fill_from(mat.r());
+
         mat_copy
             .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
             .unwrap();
 
-        let eps = T::real(T::epsilon());
-        let max_dim = T::real(std::cmp::max(shape[0], shape[1]));
-
-        let atol = atol.unwrap_or(T::zero().re());
-        let rtol = rtol.unwrap_or(max_dim * eps);
-
-        let max_s = s[0];
+        let max_s = s
+            .iter()
+            .copied()
+            .fold(T::Real::zero(), |mx, si| if si > mx { si } else { mx });
         let threshold = T::real(atol + rtol) * T::real(max_s);
 
         // Filter singular values below this threshold
-        for s in s.iter_mut() {
-            if *s > threshold {
-                *s = T::real(1.0) / T::real(*s);
+        for si in s.iter_mut() {
+            if *si > threshold {
+                *si = T::real(1.0) / *si;
             } else {
-                *s = T::real(0.)
+                *si = T::real(0.)
             }
         }
 
@@ -188,6 +154,26 @@ where
 
         Ok((s, ut, v))
     }
+}
+
+macro_rules! extract_qrp_typed {
+    ($qr_u:expr, $qr_v:expr, $qu:expr, $ru:expr, $pu_vec:expr, $qv:expr, $rv:expr, $pv_vec:expr, $ty:ty) => {{
+        let qr_u: &QrDecomposition<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>> = $qr_u.coerce();
+        let qu: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $qu).coerce();
+        let ru: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $ru).coerce();
+
+        qr_u.get_r(ru.r_mut());
+        qr_u.get_q_alloc(qu.r_mut())?;
+        *$pu_vec = qr_u.get_perm();
+
+        let qr_v: &QrDecomposition<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>> = $qr_v.coerce();
+        let qv: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $qv).coerce();
+        let rv: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $rv).coerce();
+
+        qr_v.get_r(rv.r_mut());
+        qr_v.get_q_alloc(qv.r_mut())?;
+        *$pv_vec = qr_v.get_perm();
+    }};
 }
 
 /// Compute the (Moore-Penrose) pseudo-inverse of a 3D Greens fct matrix based on ACA+ for finding factored matrix
@@ -272,156 +258,133 @@ where
             rlst_dynamic_array2!(T, [m1, r]);
         let k = std::cmp::min(m1, n1);
         let mut ru = rlst_dynamic_array2!(T, [k, n1]);
-        let mut pu = rlst_dynamic_array2!(T, [n1, n1]);
+        let mut pu_vec = Vec::new();
 
         let r = std::cmp::min(m3, n3);
         let mut qv: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> =
             rlst_dynamic_array2!(T, [m3, r]);
         let k = std::cmp::min(m3, n3);
         let mut rv = rlst_dynamic_array2!(T, [k, n3]);
-        let mut pv = rlst_dynamic_array2!(T, [n3, n3]);
+        let mut pv_vec = Vec::new();
 
         let qr_u_aca = u_aca.into_qr_alloc()?;
         let qr_v_aca = v_aca.into_qr_alloc()?;
 
         if is_same::<f64, T>() {
-            let qr_u_aca: &QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>> =
-                qr_u_aca.coerce();
-            let qu: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
-                (&mut qu).coerce();
-            let ru: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
-                (&mut ru).coerce();
-            let pu: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
-                (&mut pu).coerce();
-
-            qr_u_aca.get_r(ru.r_mut());
-            qr_u_aca.get_q_alloc(qu.r_mut())?;
-            qr_u_aca.get_p(pu.r_mut());
-
-            let qr_v_aca: &QrDecomposition<f64, BaseArray<f64, VectorContainer<f64>, 2>> =
-                qr_v_aca.coerce();
-            let qv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
-                (&mut qv).coerce();
-            let rv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
-                (&mut rv).coerce();
-            let pv: &mut Array<f64, BaseArray<f64, VectorContainer<f64>, 2>, 2> =
-                (&mut pv).coerce();
-            qr_v_aca.get_r(rv.r_mut());
-            qr_v_aca.get_q_alloc(qv.r_mut())?;
-            qr_v_aca.get_p(pv.r_mut());
+            extract_qrp_typed!(
+                qr_u_aca,
+                qr_v_aca,
+                qu,
+                ru,
+                &mut pu_vec,
+                qv,
+                rv,
+                &mut pv_vec,
+                f64
+            );
         } else if is_same::<f32, T>() {
-            let qr_u_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
-                qr_u_aca.coerce();
-            let qu: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
-                (&mut qu).coerce();
-            let ru: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
-                (&mut ru).coerce();
-            let pu: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
-                (&mut pu).coerce();
-            qr_u_aca.get_r(ru.r_mut());
-            qr_u_aca.get_q_alloc(qu.r_mut())?;
-            qr_u_aca.get_p(pu.r_mut());
-
-            let qr_v_aca: &QrDecomposition<f32, BaseArray<f32, VectorContainer<f32>, 2>> =
-                qr_v_aca.coerce();
-            let qv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
-                (&mut qv).coerce();
-            let rv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
-                (&mut rv).coerce();
-            let pv: &mut Array<f32, BaseArray<f32, VectorContainer<f32>, 2>, 2> =
-                (&mut pv).coerce();
-            qr_v_aca.get_r(rv.r_mut());
-            qr_v_aca.get_q_alloc(qv.r_mut())?;
-            qr_v_aca.get_p(pv.r_mut());
+            extract_qrp_typed!(
+                qr_u_aca,
+                qr_v_aca,
+                qu,
+                ru,
+                &mut pu_vec,
+                qv,
+                rv,
+                &mut pv_vec,
+                f32
+            );
         } else if is_same::<c32, T>() {
-            let qr_u_aca: &QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>> =
-                qr_u_aca.coerce();
-            let qu: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
-                (&mut qu).coerce();
-            let ru: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
-                (&mut ru).coerce();
-            let pu: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
-                (&mut pu).coerce();
-            qr_u_aca.get_r(ru.r_mut());
-            qr_u_aca.get_q_alloc(qu.r_mut())?;
-            qr_u_aca.get_p(pu.r_mut());
-
-            let qr_v_aca: &QrDecomposition<c32, BaseArray<c32, VectorContainer<c32>, 2>> =
-                qr_v_aca.coerce();
-            let qv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
-                (&mut qv).coerce();
-            let rv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
-                (&mut rv).coerce();
-            let pv: &mut Array<c32, BaseArray<c32, VectorContainer<c32>, 2>, 2> =
-                (&mut pv).coerce();
-
-            qr_v_aca.get_r(rv.r_mut());
-            qr_v_aca.get_q_alloc(qv.r_mut())?;
-            qr_v_aca.get_p(pv.r_mut());
+            extract_qrp_typed!(
+                qr_u_aca,
+                qr_v_aca,
+                qu,
+                ru,
+                &mut pu_vec,
+                qv,
+                rv,
+                &mut pv_vec,
+                c32
+            );
         } else if is_same::<c64, T>() {
-            let qr_u_aca: &QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>> =
-                qr_u_aca.coerce();
-            let qu: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
-                (&mut qu).coerce();
-            let ru: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
-                (&mut ru).coerce();
-            let pu: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
-                (&mut pu).coerce();
-
-            qr_u_aca.get_r(ru.r_mut());
-            qr_u_aca.get_q_alloc(qu.r_mut())?;
-            qr_u_aca.get_p(pu.r_mut());
-
-            let qr_v_aca: &QrDecomposition<c64, BaseArray<c64, VectorContainer<c64>, 2>> =
-                qr_v_aca.coerce();
-            let qv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
-                (&mut qv).coerce();
-            let rv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
-                (&mut rv).coerce();
-            let pv: &mut Array<c64, BaseArray<c64, VectorContainer<c64>, 2>, 2> =
-                (&mut pv).coerce();
-
-            qr_v_aca.get_r(rv.r_mut());
-            qr_v_aca.get_q_alloc(qv.r_mut())?;
-            qr_v_aca.get_p(pv.r_mut());
+            extract_qrp_typed!(
+                qr_u_aca,
+                qr_v_aca,
+                qu,
+                ru,
+                &mut pu_vec,
+                qv,
+                rv,
+                &mut pv_vec,
+                c64
+            );
         } else {
-            return Err(RlstError::NotImplemented(
-                "Unsupported scalar type for this decomposition".to_string(),
-            ));
+            return Err(RlstError::NotImplemented("Unsupported scalar type".into()));
         }
 
         // Compute SVD based pseudo-inverse on tiny core matrix formed from R factors
-        // First form core matrix from P and R factors
-        let mut pu_t = rlst_dynamic_array2!(T, [n1, n1]);
-        pu_t.r_mut().fill_from(pu.r().conj().transpose());
+        // First form core matrix from P and R factors of QR decomposition
+        // ru_pu_t = ru * pu^T
+        let mut ru_pu_t = rlst_dynamic_array2!(T, ru.shape());
 
-        let ru_pu_t = empty_array::<T, 2>().simple_mult_into_resize(ru.r(), pu_t.r());
-        let mut rv_t = rlst_dynamic_array2!(T, [rv.r().shape()[1], rv.r().shape()[0]]);
-        rv_t.r_mut().fill_from(rv.transpose().conj());
-        let pv_rv_t = empty_array::<T, 2>().simple_mult_into_resize(pv.r(), rv_t.r());
+        // Iterate over pu_t matrix
+        for (old_j, &new_j) in pu_vec.iter().enumerate() {
+            // Iterate over rows of output
+            for i in 0..ru_pu_t.shape()[0] {
+                ru_pu_t[[i, new_j]] = ru[[i, old_j]]
+            }
+        }
+
+        // pv_rv_t = pv * rv^H
+        let mut rv_t = rlst_dynamic_array2!(T, [rv.shape()[1], rv.shape()[0]]);
+        rv_t.fill_from(rv.r().transpose().conj());
+
+        let mut pv_rv_t = rlst_dynamic_array2!(T, rv_t.shape());
+
+        for (old_i, &new_i) in pv_vec.iter().enumerate() {
+            // Iterate over columns of output
+            for j in 0..pv_rv_t.shape()[1] {
+                pv_rv_t[[new_i, j]] = rv_t[[old_i, j]]
+            }
+        }
+
+        // Ref: computing same permutation with GEMM
+        // let mut pu_t = rlst_dynamic_array2!(T, [n1, n1]);
+        // pu_t.r_mut().fill_from(pu.r().conj().transpose());
+        // let ru_pu_t = empty_array::<T, 2>().simple_mult_into_resize(ru.r(), pu_t.r());
+        // let pv_rv_t = empty_array::<T, 2>().simple_mult_into_resize(pv.r(), rv_t.r());
 
         // Form core matrix and cast to higher precision if available for SVD step
         let c = empty_array::<T, 2>().simple_mult_into_resize(ru_pu_t.r(), pv_rv_t.r());
-        let mut c_64 = rlst_dynamic_array2!(<T as Upcast>::Higher, c.shape());
-        for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
-            *dst = src.cast();
-        }
 
-        let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None).unwrap();
+        let mut s_c;
+        let mut v_c;
+        let mut ut_c;
+        if is_same::<T, <T as Upcast>::Higher>() {
+            // No casting needed
+            (s_c, ut_c, v_c) = pinv(&c, None, None).unwrap()
+        } else {
+            // Casting required
+            let mut c_64 = rlst_dynamic_array2!(<T as Upcast>::Higher, c.shape());
+            for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
+                *dst = src.cast();
+            }
+            let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None).unwrap();
 
-        // Downcast back to T
-        let mut ut_c = rlst_dynamic_array2!(T, ut_c_v.shape());
-        for (dst, src) in ut_c.data_mut().iter_mut().zip(ut_c_v.data().iter()) {
-            *dst = src.cast();
-        }
+            // Downcast back to T
+            ut_c = rlst_dynamic_array2!(T, ut_c_v.shape());
+            for (dst, src) in ut_c.data_mut().iter_mut().zip(ut_c_v.data().iter()) {
+                *dst = src.cast();
+            }
 
-        let mut v_c = rlst_dynamic_array2!(T, v_c_v.shape());
-        for (dst, src) in v_c.data_mut().iter_mut().zip(v_c_v.data().iter()) {
-            *dst = src.cast();
-        }
-        let mut s_c: Vec<T::Real> = vec![T::Real::zero(); s_c_v.len()];
-        for (dst, src) in s_c.iter_mut().zip(s_c_v.iter()) {
-            *dst = src.cast();
+            v_c = rlst_dynamic_array2!(T, v_c_v.shape());
+            for (dst, src) in v_c.data_mut().iter_mut().zip(v_c_v.data().iter()) {
+                *dst = src.cast();
+            }
+            s_c = vec![T::Real::zero(); s_c_v.len()];
+            for (dst, src) in s_c.iter_mut().zip(s_c_v.iter()) {
+                *dst = src.cast();
+            }
         }
 
         // Form factors of pseudo inverse
@@ -447,7 +410,7 @@ where
                 mat_s[[i, i]] = T::from(s_c[i]).unwrap();
             }
 
-            // Test Moore-Penrose residuals
+            // Test Moore-Penrose residuals in Frobenius norm
             let aca = empty_array::<T, 2>().simple_mult_into_resize(
                 qu.r(),
                 empty_array::<T, 2>().simple_mult_into_resize(c.r(), qv_t.r()),
@@ -459,7 +422,6 @@ where
                 empty_array::<T, 2>().simple_mult_into_resize(mat_s.r(), right.r()),
             );
 
-            // test in Frobenius norm
             let t1 = empty_array::<T, 2>().simple_mult_into_resize(
                 empty_array::<T, 2>().simple_mult_into_resize(aca.r(), aca_pinv.r()),
                 aca.r(),
