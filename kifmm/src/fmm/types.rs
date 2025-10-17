@@ -346,6 +346,7 @@ pub enum FmmEvalType {
 ///         Laplace3dKernel::new(),
 ///         GreenKernelEvalType::Value,
 ///         FftFieldTranslation::new(None),
+///         None,
 ///     )
 ///     .unwrap()
 ///     .build()
