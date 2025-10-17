@@ -198,8 +198,8 @@ mod test {
         let root = MortonKey::<f64>::root();
 
         // Cast surface parameters
-        let alpha_outer = f64::from(ALPHA_OUTER);
-        let alpha_inner = f64::from(ALPHA_INNER);
+        let alpha_outer = ALPHA_OUTER;
+        let alpha_inner = ALPHA_INNER;
         let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
 
         let equivalent_surface_order = 10;

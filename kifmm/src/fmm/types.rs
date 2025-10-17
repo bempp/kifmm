@@ -616,6 +616,27 @@ where
     pub svd_mode: FmmSvdMode,
 }
 
+/// TODO: document numerical method
+pub struct BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Cutoff for apprroximation
+    pub eps: Scalar::Real,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataAca<Scalar>>, // indexed by level
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
+    pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
+}
+
 impl<Scalar> Clone for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
@@ -1016,6 +1037,18 @@ where
             c_vt: Vec::default(),
         }
     }
+}
+
+/// TODO: Document numerical approach
+pub struct BlasMetadataAca<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Left basis vectors
+    pub u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+
+    /// Right basis vectors
+    pub vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 }
 
 /// Instruction set architecture
