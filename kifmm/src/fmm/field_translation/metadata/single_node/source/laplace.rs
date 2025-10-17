@@ -190,219 +190,12 @@ mod test {
     use rlst::Shape;
 
     use super::*;
-    use crate::{linalg::aca::aca_plus, tree::Domain};
-
-    #[test]
-    fn test_m2m_direct() {
-        let kernel = Laplace3dKernel::<f64>::new();
-        let root = MortonKey::<f64>::root();
-
-        // Cast surface parameters
-        let alpha_outer = f64::from(ALPHA_OUTER);
-        let alpha_inner = f64::from(ALPHA_INNER);
-        let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
-
-        let equivalent_surface_order = 10;
-        let check_surface_order = equivalent_surface_order;
-
-        // let pinv_mode = PinvMode::<f64>::svd(None, None);
-        let pinv_mode = PinvMode::<f64>::aca(Some(1e-6), None, None, true);
-
-        // Compute required surfaces
-        let upward_equivalent_surface =
-            root.surface_grid(equivalent_surface_order, &domain, alpha_inner);
-        let upward_check_surface = root.surface_grid(check_surface_order, &domain, alpha_outer);
-
-        let n_equiv_surface = ncoeffs_kifmm(equivalent_surface_order);
-        let n_check_surface = ncoeffs_kifmm(check_surface_order);
-
-        // Compute pseudo-inverse
-        // let s;
-        // let ut;
-        // let v;
-
-        let local_radius = None;
-        let eps = Some(1e-6);
-        let max_iter = None;
-
-        // Calculate ACA factors
-        let (mut u_aca, mut v_aca_t) = aca_plus(
-            &upward_equivalent_surface,
-            &upward_check_surface,
-            kernel.clone(),
-            eps,
-            max_iter,
-            local_radius,
-            local_radius,
-            true,
-            false,
-        );
-
-        // Now calculate pseudo inverse manually
-        let [m1, n1] = u_aca.shape();
-        let [m2, n2] = v_aca_t.shape();
-        let mut v_aca = rlst_dynamic_array2!(f64, [n2, m2]);
-        v_aca.fill_from(v_aca_t.r().conj().transpose());
-        let [m3, n3] = v_aca.shape();
-
-        // Allocate memory for QR
-        let r = std::cmp::min(m1, n1);
-        let mut qu = rlst_dynamic_array2!(f64, [m1, r]);
-        let k = std::cmp::min(m1, n1);
-        let mut ru = rlst_dynamic_array2!(f64, [k, n1]);
-        let mut pu = rlst_dynamic_array2!(f64, [n1, n1]);
-
-        // perform QR
-        let qr_u_aca = u_aca.r_mut().into_qr_alloc().unwrap();
-        qr_u_aca.get_r(ru.r_mut());
-        qr_u_aca.get_q_alloc(qu.r_mut()).unwrap();
-        qr_u_aca.get_p(pu.r_mut());
-
-        // transpose pivot matrix
-        let mut pu_t = rlst_dynamic_array2!(f64, [n1, n1]);
-        pu_t.r_mut().fill_from(pu.r().transpose());
-
-        let ru_pu_t = empty_array::<f64, 2>().simple_mult_into_resize(ru.r(), pu_t.r());
-
-        println!(
-            "U_aca: A {:?} q {:?} r {:?} p {:?} rp^T {:?}",
-            u_aca.shape(),
-            qu.shape(),
-            ru.shape(),
-            pu.shape(),
-            ru_pu_t.shape()
-        );
-        // Allocate memory for QR
-        let r = std::cmp::min(m3, n3);
-        let mut qv = rlst_dynamic_array2!(f64, [m3, r]);
-        let k = std::cmp::min(m3, n3);
-        let mut rv = rlst_dynamic_array2!(f64, [k, n3]);
-        let mut pv = rlst_dynamic_array2!(f64, [n3, n3]);
-
-        // perform QR
-        let qr_v_aca = v_aca.r_mut().into_qr_alloc().unwrap();
-        qr_v_aca.get_r(rv.r_mut());
-        qr_v_aca.get_q_alloc(qv.r_mut()).unwrap();
-        qr_v_aca.get_p(pv.r_mut());
-
-        // transpose pivot matrix
-        let mut rv_t = rlst_dynamic_array2!(f64, [n3, k]);
-        rv_t.r_mut().fill_from(rv.r().transpose().conj());
-
-        let pv_rv_t = empty_array::<f64, 2>().simple_mult_into_resize(pv.r(), rv_t.r());
-
-        let mut c = empty_array::<f64, 2>().simple_mult_into_resize(ru_pu_t.r(), pv_rv_t.r());
-
-        let (s, ut, v) = pinv(&c, None, None).unwrap();
-
-        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
-        for i in 0..s.len() {
-            mat_s[[i, i]] = s[i];
-        }
-
-        let c_inv = empty_array::<f64, 2>().simple_mult_into_resize(
-            v.r(),
-            empty_array::<f64, 2>().simple_mult_into_resize(mat_s.r(), ut.r()),
-        );
-
-        let mut qu_t = rlst_dynamic_array2!(f64, [qu.shape()[1], qu.shape()[0]]);
-        qu_t.fill_from(qu.r().transpose().conj());
-
-        let uc2e_inv = empty_array::<f64, 2>().simple_mult_into_resize(
-            empty_array::<f64, 2>().simple_mult_into_resize(qv.r(), c_inv.r()),
-            qu_t.r(),
-        );
-
-        let check_surface_order_parent = check_surface_order;
-        let equivalent_surface_order_parent = equivalent_surface_order;
-        let equivalent_surface_order_child = equivalent_surface_order;
-
-        let parent_upward_check_surface =
-            root.surface_grid(check_surface_order_parent, &domain, alpha_outer);
-        let parent_upward_equivalent_surface =
-            root.surface_grid(equivalent_surface_order_parent, &domain, alpha_inner);
-
-        let children = root.children();
-        let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
-        let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
-        let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
-
-        // let mut m2m_level =
-        //     rlst_dynamic_array2!(f64, [n_equiv_surface_parent, n_equiv_surface_child]);
-        // let mut m2m_vec = Vec::new();
-
-        let mut child_equivalent_surfaces = Vec::new();
-        let mut ce2pc_vec = Vec::new();
-
-        for (i, child) in children.iter().enumerate().take(1) {
-            let child_upward_equivalent_surface =
-                child.surface_grid(equivalent_surface_order_child, &domain, alpha_inner);
-            child_equivalent_surfaces.push(child_upward_equivalent_surface.clone());
-
-            let mut ce2pc =
-                rlst_dynamic_array2!(f64, [n_check_surface_parent, n_equiv_surface_child]);
-
-            // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
-            kernel.assemble_st(
-                GreenKernelEvalType::Value,
-                &parent_upward_check_surface,
-                &child_upward_equivalent_surface,
-                ce2pc.data_mut(),
-            );
-
-            // let tmp = empty_array::<f64, 2>().simple_mult_into_resize(
-            //     uc2e_inv_1.r(),
-            //     empty_array::<f64, 2>().simple_mult_into_resize(
-            //         uc2e_inv_2.r(),
-            //         ce2pc.r(),
-            //     )
-            // );
-
-            ce2pc_vec.push(ce2pc);
-            // m2m_vec.push(tmp);
-        }
-
-        // Calculate truth at far field point
-        let mut rng = thread_rng();
-        let mut x = rlst_dynamic_array2![f64, [n_equiv_surface, 1]]; // random column vector, i.e. multipoles on child check surface
-        x.data_mut().iter_mut().for_each(|x| *x = rng.gen());
-
-        let far_field = vec![100., 0., 0.];
-        let mut truth = vec![0.];
-        kernel.evaluate_st(
-            GreenKernelEvalType::Value,
-            &child_equivalent_surfaces[0],
-            &far_field,
-            x.data(),
-            &mut truth,
-        );
-
-        // Calculate the result from translated field
-        let b = empty_array::<f64, 2>().simple_mult_into_resize(
-            uc2e_inv.r(),
-            empty_array::<f64, 2>().simple_mult_into_resize(ce2pc_vec[0].r(), x.r()),
-        );
-
-        let mut found = vec![0.];
-        kernel.evaluate_st(
-            GreenKernelEvalType::Value,
-            &parent_upward_equivalent_surface,
-            &far_field,
-            b.data(),
-            &mut found,
-        );
-
-        // println!("HERE {:?}", s);
-        println!("Truth = {:?}", truth);
-        println!("Found = {:?} {:?}", found, b.shape());
-        assert!(false);
-    }
+    use crate::tree::Domain;
 
     #[test]
     fn test_m2m() {
         let kernel = Laplace3dKernel::<f64>::new();
         let root = MortonKey::<f64>::root();
-        let depth = 3;
 
         // Cast surface parameters
         let alpha_outer = f64::from(ALPHA_OUTER);
@@ -481,16 +274,13 @@ mod test {
         let children = root.children();
         let n_check_surface_parent = ncoeffs_kifmm(check_surface_order_parent);
         let n_equiv_surface_child = ncoeffs_kifmm(equivalent_surface_order_child);
-        let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
-        // let mut m2m_level =
-        //     rlst_dynamic_array2!(f64, [n_equiv_surface_parent, n_equiv_surface_child]);
         let mut m2m_vec = Vec::new();
 
         let mut child_equivalent_surfaces = Vec::new();
         let mut ce2pc_vec = Vec::new();
 
-        for (i, child) in children.iter().enumerate().take(1) {
+        for (_i, child) in children.iter().enumerate().take(1) {
             let child_upward_equivalent_surface =
                 child.surface_grid(equivalent_surface_order_child, &domain, alpha_inner);
             child_equivalent_surfaces.push(child_upward_equivalent_surface.clone());
@@ -548,7 +338,6 @@ mod test {
             &mut found,
         );
 
-        // println!("HERE {:?}", s);
         println!("Truth = {:?}", truth);
         println!("Found = {:?} {:?}", found, b.shape());
         println!("Err = {:?}", (truth[0] - found[0]).abs());
