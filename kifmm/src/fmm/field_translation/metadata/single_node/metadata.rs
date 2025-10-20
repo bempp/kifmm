@@ -15,8 +15,8 @@ use crate::{
             level_index_pointer_single_node, potential_pointers_single_node,
         },
         types::{
-            BlasFieldTranslationIa, BlasFieldTranslationSaRcmp, BlasMetadataSaRcmp,
-            FftFieldTranslation, FftMetadata, FmmSvdMode,
+            BlasFieldTranslationAca, BlasFieldTranslationIa, BlasFieldTranslationSaRcmp,
+            BlasMetadataAca, BlasMetadataSaRcmp, FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
     },
     traits::{
@@ -455,7 +455,7 @@ where
 
         Self {
             threshold: threshold.unwrap_or(tmp),
-            transfer_vectors: compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap(),
+            transfer_vectors: compute_transfer_vectors_at_level(3).unwrap(),
             surface_diff: surface_diff.unwrap_or_default(),
             svd_mode,
             ..Default::default()
@@ -513,6 +513,43 @@ where
 
     fn surface_diff(&self) -> usize {
         self.surface_diff
+    }
+}
+
+impl<Scalar> FieldTranslationTrait for BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    type Metadata = BlasMetadataAca<Scalar>;
+
+    fn overdetermined(&self) -> bool {
+        true
+    }
+
+    fn surface_diff(&self) -> usize {
+        self.surface_diff
+    }
+}
+
+impl<Scalar> BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar + Epsilon,
+{
+    /// Constructor for BLAS + ACA+ field translations
+    pub fn new(
+        eps: Option<Scalar::Real>,
+        surface_diff: Option<usize>,
+        multithreaded: Option<bool>,
+    ) -> Self {
+        let tmp = Scalar::epsilon().re();
+
+        BlasFieldTranslationAca {
+            eps: eps.unwrap_or(tmp),
+            transfer_vectors: compute_transfer_vectors_at_level(3).unwrap(),
+            surface_diff: surface_diff.unwrap_or_default(),
+            multithreaded: multithreaded.unwrap_or(false),
+            ..Default::default()
+        }
     }
 }
 

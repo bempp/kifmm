@@ -618,11 +618,12 @@ where
 }
 
 /// TODO: document numerical method
+#[derive(Default)]
 pub struct BlasFieldTranslationAca<Scalar>
 where
     Scalar: RlstScalar,
 {
-    /// Cutoff for apprroximation
+    /// Cutoff for approximation
     pub eps: Scalar::Real,
 
     /// Precomputed metadata
@@ -636,6 +637,9 @@ where
 
     /// Difference in expansion order between check and equivalent surface, defaults to 0
     pub surface_diff: usize,
+
+    /// Compute ACA+ in multithreaded mode
+    pub multithreaded: bool,
 }
 
 impl<Scalar> Clone for BlasFieldTranslationSaRcmp<Scalar>
@@ -703,6 +707,35 @@ where
     }
 }
 
+impl<Scalar> Clone for BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar,
+    Scalar::Real: Clone,
+    BlasMetadataAca<Scalar>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+{
+    fn clone(&self) -> Self {
+        BlasFieldTranslationAca {
+            eps: self.eps,
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<i32> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+            surface_diff: self.surface_diff,
+            multithreaded: self.multithreaded,
+        }
+    }
+}
 /// Variants of SVD algorithms
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
@@ -981,6 +1014,22 @@ where
     }
 }
 
+impl<T> Default for BlasMetadataSaRcmp<T>
+where
+    T: RlstScalar,
+{
+    fn default() -> Self {
+        let u = rlst_dynamic_array2!(T, [1, 1]);
+        let st = rlst_dynamic_array2!(T, [1, 1]);
+
+        BlasMetadataSaRcmp {
+            u,
+            st,
+            c_u: Vec::default(),
+            c_vt: Vec::default(),
+        }
+    }
+}
 /// Stores metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
@@ -1023,37 +1072,44 @@ where
     }
 }
 
-impl<T> Default for BlasMetadataSaRcmp<T>
-where
-    T: RlstScalar,
-{
-    fn default() -> Self {
-        let u = rlst_dynamic_array2!(T, [1, 1]);
-        let st = rlst_dynamic_array2!(T, [1, 1]);
-
-        BlasMetadataSaRcmp {
-            u,
-            st,
-            c_u: Vec::default(),
-            c_vt: Vec::default(),
-        }
-    }
-}
-
 /// TODO: Document numerical approach
+#[derive(Default)]
 pub struct BlasMetadataAca<Scalar>
 where
     Scalar: RlstScalar,
 {
-    /// Left basis vectors
+    /// Left basis vectors (indexed by transfer vector)
     pub u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
-    /// Right basis vectors
+    /// Right basis vectors (indexed by transfer vector)
     pub vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 }
 
-/// Instruction set architecture
+impl<Scalar> Clone for BlasMetadataAca<Scalar>
+where
+    Scalar: RlstScalar + Clone,
+{
+    fn clone(&self) -> Self {
+        let mut u = Vec::new();
+        let mut vt = Vec::new();
 
+        for item in self.u.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            u.push(tmp);
+        }
+
+        for item in self.vt.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            vt.push(tmp);
+        }
+
+        Self { u, vt }
+    }
+}
+
+/// Instruction set architecture
 #[derive(Default, Clone, Copy, Debug)]
 pub enum Isa {
     /// Neon FCMA ISA, extension which provides floating point complex multiply-add instructions.
