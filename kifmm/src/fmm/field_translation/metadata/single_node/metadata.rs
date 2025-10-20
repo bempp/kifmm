@@ -545,7 +545,6 @@ where
 
         BlasFieldTranslationAca {
             eps: eps.unwrap_or(tmp),
-            transfer_vectors: compute_transfer_vectors_at_level(3).unwrap(),
             surface_diff: surface_diff.unwrap_or_default(),
             multithreaded: multithreaded.unwrap_or(false),
             ..Default::default()

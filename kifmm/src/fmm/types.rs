@@ -630,7 +630,7 @@ where
     pub metadata: Vec<BlasMetadataAca<Scalar>>, // indexed by level
 
     /// Unique transfer vectors corresponding to each metadata
-    pub transfer_vectors: Vec<TransferVector<Scalar::Real>>,
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
 
     /// The map between sources/targets in the field translation, indexed by level, then by source index.
     pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,

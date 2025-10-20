@@ -18,6 +18,7 @@ use rlst::{
 
 use crate::{
     fmm::{
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::single_node::{find_cutoff_rank, flip3, ncoeffs_kifmm},
         types::{
             BlasFieldTranslationAca, BlasFieldTranslationSaRcmp, BlasMetadataAca,
@@ -28,7 +29,7 @@ use crate::{
     traits::{
         fftw::{Dft, DftType},
         field::{FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata},
-        fmm::DataAccess,
+        fmm::{DataAccess, MetadataAccess},
         general::single_node::{ArgmaxValue, AsComplex, Cast, Epsilon, Upcast},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
@@ -66,6 +67,7 @@ where
 
         for level in start_level..=self.tree.source_tree().depth() {
             let mut result = Vec::default();
+            let m2l_operator_index = self.m2l_operator_index(level);
 
             if let Some(sources) = self.tree.source_tree().keys(level) {
                 let n_sources = sources.len();
@@ -109,8 +111,10 @@ where
                             transfer_vectors.into_iter().collect();
 
                         // Mark items in interaction list for scattering
-                        for (tv_idx, tv) in
-                            self.source_to_target.transfer_vectors.iter().enumerate()
+                        for (tv_idx, tv) in self.source_to_target.transfer_vectors
+                            [m2l_operator_index]
+                            .iter()
+                            .enumerate()
                         {
                             let mut result_lock = result[tv_idx].write().unwrap();
                             if transfer_vectors_set.contains(&tv.hash) {
@@ -133,29 +137,36 @@ where
     }
 
     fn source_to_target(&mut self) {
+        let depth = self.tree.source_tree().depth();
+
         let iterator = if self.variable_expansion_order() {
-            self.equivalent_surface_order
-                .iter()
-                .skip(2)
-                .cloned()
+            (2..=depth)
+                .zip(self.equivalent_surface_order.iter().skip(2).cloned())
                 .zip(self.check_surface_order.iter().skip(2).cloned())
                 .collect_vec()
         } else {
-            vec![(
-                self.equivalent_surface_order[0],
-                self.check_surface_order[0],
-            )]
+            (2..=depth)
+                .zip(vec![
+                    *self.equivalent_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .zip(vec![
+                    *self.check_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .collect_vec()
         };
 
         let alpha = Scalar::real(ALPHA_INNER);
 
-        for (equivalent_surface_order, check_surface_order) in iterator {
+        for ((_level, equivalent_surface_order), check_surface_order) in iterator {
             // Compute surfaces for each transfer vector
+            let transfer_vectors = compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap();
 
             let mut u = Vec::new();
             let mut vt = Vec::new();
 
-            for t in self.source_to_target.transfer_vectors.iter() {
+            for t in transfer_vectors.iter() {
                 let source_equivalent_surface = t.source.surface_grid(
                     equivalent_surface_order,
                     self.tree.source_tree().domain(),
@@ -184,6 +195,10 @@ where
                 u.push(u_i);
                 vt.push(vt_i);
             }
+
+            self.source_to_target
+                .transfer_vectors
+                .push(transfer_vectors);
 
             // Add each M2L matrix to metadata, indexed by transfer vector
             self.source_to_target

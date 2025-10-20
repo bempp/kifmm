@@ -102,9 +102,9 @@ where
                         eps,
                         max_iter,
                         local_radius,
-                        true,
+                        false,
                         multithreaded,
-                        true,
+                        false,
                     )
                     .unwrap();
                 }
