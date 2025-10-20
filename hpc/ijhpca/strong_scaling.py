@@ -13,6 +13,11 @@ AMD_EPYC_ROME = {
         "ccx_per_ccd": 2
     }
 
+DISTRIBUTION = {
+    "uniform": 0,
+    "sphere": 1
+}
+
 def global_depth(rank):
     """
     will return the first power of 8 less than rank, the power corresponding to the level
@@ -62,7 +67,8 @@ def experiment_parameters(
     min_points_per_rank,
     min_local_depth=4,
     scaling_func=pow8,
-    arch=AMD_EPYC_ROME
+    arch=AMD_EPYC_ROME,
+    distribution="uniform"
 ):
 
     max_cpus=arch["cores_per_node"]
@@ -135,14 +141,15 @@ def experiment_parameters(
     print(f"points per node {points_per_node}")
     print(f"min points per leaf {min_points_per_leaf}")
     print(f"max threads per rank {max_threads_per_rank}")
+    print(f"distribution {distribution}")
 
     # Test that same number of points being used in each experiment
     assert(np.allclose(points_per_rank*n_ranks, points_per_node*n_nodes))
-    return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), local_depth.tolist(), points_per_rank, max_threads_per_rank
+    return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), local_depth.tolist(), points_per_rank, max_threads_per_rank, distribution
 
 
 
-def write_slurm(script_path, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=False, script_name="fmm_m2l_fft_mpi_f32"):
+def write_slurm(script_path, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=False, script_name="fmm_m2l_fft_mpi_f32", distribution="uniform"):
     expansion_order = 3
     n_samples = 500
     block_size = 128
@@ -202,7 +209,7 @@ srun --nodes={nn} --ntasks={nt} --cpus-per-task={cpus_per_task} \\
      $WORK/$script_name --id {i} --n-points {ppr} \\
      --expansion-order {expansion_order} --prune-empty \\
      --global-depth {gd} --local-depth {ld} \\
-     --n-samples {n_samples} --block-size {block_size} --n-threads {int(max_threads)} \\
+     --n-samples {n_samples} --block-size {block_size} --n-threads {int(max_threads)} --distribution {DISTRIBUTION[distribution]} \\
      >> $OUTPUT 2> $SCRATCH/err_run_{i}.log
 """
 
@@ -221,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument("--method", type=str, default="ccx")
     parser.add_argument("--contiguous", type=bool, default=False)
     parser.add_argument("--output", type=str, default="job.slurm")
+    parser.add_argument("--distribution", type=str, default="uniform")
     parser.add_argument("--config", action='append')
 
     args = parser.parse_args()
@@ -241,9 +249,9 @@ if __name__ == "__main__":
 
     valid_methods = {"ccx", "ccd" "socket"}
     if any(args.method in m for m in valid_methods):
-        n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads = experiment_parameters(
+        n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads, distribution = experiment_parameters(
             args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
         )
-        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=args.contiguous)
+        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=args.contiguous, distribution=distribution)
     else:
         raise ValueError("Unknown method")
