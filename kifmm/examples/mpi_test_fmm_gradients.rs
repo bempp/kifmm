@@ -143,6 +143,7 @@ fn main() {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -278,6 +279,7 @@ fn main() {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()

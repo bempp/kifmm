@@ -147,6 +147,7 @@ fn main() {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()

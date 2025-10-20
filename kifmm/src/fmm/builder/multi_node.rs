@@ -12,6 +12,7 @@ use rlst::{MatrixSvd, RlstScalar};
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 use crate::{
+    fmm::types::PinvMode,
     fmm::{
         helpers::single_node::{level_index_pointer_single_node, ncoeffs_kifmm, optionally_time},
         types::{
@@ -42,13 +43,13 @@ where
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default + Clone,
     KiFmmMulti<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
-        + TargetTranslationMetadata
+        + SourceTranslationMetadata<Scalar>
+        + TargetTranslationMetadata<Scalar>
         + Metadata<Scalar = Scalar>
         + MetadataAccess,
     KiFmm<Scalar, Kernel, FieldTranslation>: SourceToTargetTranslationMetadata
-        + SourceTranslationMetadata
-        + TargetTranslationMetadata
+        + SourceTranslationMetadata<Scalar>
+        + TargetTranslationMetadata<Scalar>
         + Metadata<Scalar = Scalar>
         + MetadataAccess
         + GlobalFmmMetadata<Scalar = Scalar, Tree = SingleNodeFmmTree<Scalar::Real>>,
@@ -419,7 +420,7 @@ where
             };
 
             // Calculate required metadata
-            let (_, duration) = optionally_time(timed, || result.source());
+            let (_, duration) = optionally_time(timed, || result.source(PinvMode::svd(None, None)));
 
             if let Some(d) = duration {
                 result
@@ -427,7 +428,7 @@ where
                     .insert(MetadataType::SourceData, OperatorTime::from_duration(d));
             }
 
-            let (_, duration) = optionally_time(timed, || result.target());
+            let (_, duration) = optionally_time(timed, || result.target(PinvMode::svd(None, None)));
 
             if let Some(d) = duration {
                 result

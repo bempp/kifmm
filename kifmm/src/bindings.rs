@@ -583,6 +583,7 @@ pub mod constructors {
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -684,6 +685,7 @@ pub mod constructors {
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -801,6 +803,7 @@ pub mod constructors {
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -918,6 +921,7 @@ pub mod constructors {
                 Laplace3dKernel::new(),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -1008,6 +1012,7 @@ pub mod constructors {
                 Laplace3dKernel::new(),
                 eval_type,
                 FftFieldTranslation::new(block_size),
+                None,
             )
             .unwrap()
             .build()
@@ -1097,6 +1102,7 @@ pub mod constructors {
                 Laplace3dKernel::new(),
                 eval_type,
                 FftFieldTranslation::new(block_size),
+                None,
             )
             .unwrap()
             .build()
@@ -1216,6 +1222,7 @@ pub mod constructors {
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -1335,6 +1342,7 @@ pub mod constructors {
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -1438,6 +1446,7 @@ pub mod constructors {
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -1542,6 +1551,7 @@ pub mod constructors {
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 field_translation,
+                None,
             )
             .unwrap()
             .build()
@@ -1634,6 +1644,7 @@ pub mod constructors {
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 FftFieldTranslation::new(block_size),
+                None,
             )
             .unwrap()
             .build()
@@ -1726,6 +1737,7 @@ pub mod constructors {
                 Helmholtz3dKernel::new(wavenumber),
                 eval_type,
                 FftFieldTranslation::new(block_size),
+                None,
             )
             .unwrap()
             .build()

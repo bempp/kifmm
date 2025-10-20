@@ -19,7 +19,7 @@ use crate::{
 
 #[allow(dead_code)]
 /// Compute the L2 norm of the relative error between two sequences
-pub(crate) fn l2_error<T: RlstScalar>(found: &[T], expected: &[T]) -> T::Real {
+pub fn l2_error<T: RlstScalar>(found: &[T], expected: &[T]) -> T::Real {
     let mut num = T::Real::zero();
     let mut den = T::Real::zero();
 

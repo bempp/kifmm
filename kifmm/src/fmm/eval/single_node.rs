@@ -127,7 +127,10 @@ mod test {
     };
 
     use crate::{
-        fmm::{helpers::single_node::l2_error, types::BlasFieldTranslationIa},
+        fmm::{
+            helpers::single_node::l2_error,
+            types::{BlasFieldTranslationAca, BlasFieldTranslationIa, PinvMode},
+        },
         traits::{
             fmm::ChargeHandler,
             tree::{FmmTreeNode, SingleFmmTree, SingleTree},
@@ -272,18 +275,10 @@ mod test {
             &mut direct,
         );
 
-        direct.iter().zip(potential).for_each(|(&d, &p)| {
-            let abs_error = (d - p).abs();
-            let rel_error = abs_error / p.abs();
+        let l2_error = l2_error(&direct, potential);
 
-            println!(
-                "err {:?} \nd {:?} \np {:?}",
-                rel_error,
-                &direct[0..5],
-                &potential[0..5]
-            );
-            assert!(rel_error <= threshold)
-        });
+        println!("L2 Error {:?}", l2_error);
+        assert!(l2_error <= threshold);
     }
 
     fn test_single_node_laplace_fmm_vector_helper<T: RlstScalar + Float + Default>(
@@ -324,6 +319,7 @@ mod test {
         );
 
         let l2_error = l2_error(&direct, potential);
+        println!("L2 Error = {:?}", l2_error);
         assert!(l2_error <= threshold);
     }
 
@@ -469,6 +465,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -489,6 +486,7 @@ mod test {
                     None,
                     crate::fmm::types::FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
@@ -537,6 +535,7 @@ mod test {
                     None,
                     crate::fmm::types::FmmSvdMode::Deterministic,
                 ),
+                None,
             )
             .unwrap()
             .build()
@@ -581,6 +580,7 @@ mod test {
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
                 BlasFieldTranslationSaRcmp::new(None, None, svd_mode),
+                Some(PinvMode::aca(Some(1e-6), None, None, true)),
             )
             .unwrap()
             .build()
@@ -596,6 +596,114 @@ mod test {
 
         let fmm = Box::new(fmm);
         test_single_node_laplace_fmm_vector_helper::<f64>(
+            fmm,
+            GreenKernelEvalType::Value,
+            &sources,
+            &charges,
+            threshold_pot,
+        );
+    }
+
+    #[test]
+    fn test_laplace_aca_plus() {
+        // Setup random sources and targets
+        let n_sources = 9000;
+        let n_targets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [5];
+        let prune_empty = true;
+        let threshold_pot = 1e-5;
+
+        // Set charge data and evaluate an FMM
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        let mut fmm = SingleNodeBuilder::new(false)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Laplace3dKernel::new(),
+                GreenKernelEvalType::Value,
+                BlasFieldTranslationAca::new(Some(1e-6), None, Some(true)),
+                Some(PinvMode::aca(Some(1e-6), None, None, true)),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        fmm.evaluate().unwrap();
+
+        let fmm = Box::new(fmm);
+        test_single_node_laplace_fmm_vector_helper::<f64>(
+            fmm,
+            GreenKernelEvalType::Value,
+            &sources,
+            &charges,
+            threshold_pot,
+        );
+    }
+
+    #[test]
+    fn test_helmholtz_aca_plus() {
+        // Setup random sources and targets
+        let n_sources = 9000;
+        let n_targets = 10000;
+
+        let min = None;
+        let max = None;
+        let sources = points_fixture::<f64>(n_sources, min, max, Some(0));
+        let targets = points_fixture::<f64>(n_targets, min, max, Some(1));
+
+        // FMM parameters
+        let n_crit = None;
+        let depth = Some(3);
+        let expansion_order = [5];
+        let prune_empty = true;
+        let threshold_pot = 1e-5;
+        let wavenumber = 2.5;
+
+        // Set charge data and evaluate an FMM
+        let nvecs = 1;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+
+        let mut fmm = SingleNodeBuilder::new(false)
+            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .unwrap()
+            .parameters(
+                charges.data(),
+                &expansion_order,
+                Helmholtz3dKernel::new(wavenumber),
+                GreenKernelEvalType::Value,
+                BlasFieldTranslationAca::new(Some(1e-12), None, Some(true)),
+                Some(PinvMode::AcaPlus {
+                    eps: Some(1e-6),
+                    max_iter: None,
+                    local_radius: None,
+                    multithreaded: true,
+                }),
+            )
+            .unwrap()
+            .build()
+            .unwrap();
+
+        fmm.evaluate().unwrap();
+
+        let fmm = Box::new(fmm);
+        test_single_node_helmholtz_fmm_vector_helper::<c64>(
             fmm,
             GreenKernelEvalType::Value,
             &sources,
@@ -644,6 +752,7 @@ mod test {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -669,6 +778,7 @@ mod test {
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -703,6 +813,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -732,6 +843,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -792,6 +904,7 @@ mod test {
                         surface_diff,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -822,6 +935,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -881,6 +995,7 @@ mod test {
                         surface_diff,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -942,6 +1057,7 @@ mod test {
                         surface_diff,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -972,6 +1088,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1023,6 +1140,7 @@ mod test {
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
                 FftFieldTranslation::new(None),
+                None,
             )
             .unwrap()
             .build()
@@ -1069,6 +1187,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1091,6 +1210,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1119,6 +1239,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1141,6 +1262,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1194,6 +1316,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1216,6 +1339,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1244,6 +1368,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1266,6 +1391,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     FftFieldTranslation::new(None),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1320,6 +1446,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1343,6 +1470,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
                     BlasFieldTranslationIa::new(None, None, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1396,6 +1524,7 @@ mod test {
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
                     BlasFieldTranslationIa::new(None, surface_diff, FmmSvdMode::Deterministic),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1458,6 +1587,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1484,6 +1614,7 @@ mod test {
                         None,
                         crate::fmm::types::FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1548,6 +1679,7 @@ mod test {
                         None,
                         FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -1574,6 +1706,7 @@ mod test {
                         None,
                         FmmSvdMode::Deterministic,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()

@@ -346,6 +346,7 @@ pub enum FmmEvalType {
 ///         Laplace3dKernel::new(),
 ///         GreenKernelEvalType::Value,
 ///         FftFieldTranslation::new(None),
+///         None,
 ///     )
 ///     .unwrap()
 ///     .build()
@@ -374,6 +375,9 @@ where
     FieldTranslation: FieldTranslationTrait,
     <Scalar as RlstScalar>::Real: Default,
 {
+    /// Pseudo-inverse strategy
+    pub pinv_mode: Option<PinvMode<Scalar>>,
+
     /// Whether construction and operators are timed
     pub timed: Option<bool>,
 
@@ -613,6 +617,31 @@ where
     pub svd_mode: FmmSvdMode,
 }
 
+/// TODO: document numerical method
+#[derive(Default)]
+pub struct BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Cutoff for approximation
+    pub eps: Scalar::Real,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataAca<Scalar>>, // indexed by level
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
+
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
+    pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
+
+    /// Compute ACA+ in multithreaded mode
+    pub multithreaded: bool,
+}
+
 impl<Scalar> Clone for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
@@ -678,6 +707,35 @@ where
     }
 }
 
+impl<Scalar> Clone for BlasFieldTranslationAca<Scalar>
+where
+    Scalar: RlstScalar,
+    Scalar::Real: Clone,
+    BlasMetadataAca<Scalar>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+{
+    fn clone(&self) -> Self {
+        BlasFieldTranslationAca {
+            eps: self.eps,
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<i32> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+            surface_diff: self.surface_diff,
+            multithreaded: self.multithreaded,
+        }
+    }
+}
 /// Variants of SVD algorithms
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
@@ -696,9 +754,35 @@ pub enum FmmSvdMode {
         random_state: Option<usize>,
     },
 
-    /// Use DGESVD from Lapack bindings
+    /// Use GESVD from LAPACK bindings
     #[default]
     Deterministic,
+}
+
+/// Variants of pseudo-inverse implementation, based either on the SVD with filtering
+/// scheme for components with small singular values, or
+#[derive(Clone, Copy)]
+pub enum PinvMode<Scalar: RlstScalar> {
+    /// Use ACA+ algorithm, which is only implemented with reference to
+    /// an explicitly specified kernel
+    AcaPlus {
+        /// Convergence criteria for ACA+ approximation factors
+        eps: Option<Scalar::Real>,
+        /// Maximum number of iterations
+        max_iter: Option<usize>,
+        /// Search radius for guided random walk used in pivot selection
+        local_radius: Option<usize>,
+        /// Compute rows/columns using multithreaded kernel fct
+        multithreaded: bool,
+    },
+
+    /// Use GESVD from LAPACK bindings
+    Svd {
+        /// Absolute threshold term, default is 0.
+        atol: Option<Scalar::Real>,
+        /// Relative threshold term, default value is max(M, N) * eps
+        rtol: Option<Scalar::Real>,
+    },
 }
 
 impl FmmSvdMode {
@@ -730,6 +814,31 @@ impl FmmSvdMode {
         } else {
             FmmSvdMode::Deterministic
         }
+    }
+}
+
+impl<Scalar> PinvMode<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Constructor for pseudo-inverse settings using ACA+
+    pub fn aca(
+        eps: Option<Scalar::Real>,
+        max_iter: Option<usize>,
+        local_radius: Option<usize>,
+        multithreaded: bool,
+    ) -> Self {
+        PinvMode::AcaPlus {
+            eps,
+            max_iter,
+            local_radius,
+            multithreaded,
+        }
+    }
+
+    /// Constructor for pseudo-inverse settings using SVD
+    pub fn svd(atol: Option<Scalar::Real>, rtol: Option<Scalar::Real>) -> Self {
+        PinvMode::Svd { atol, rtol }
     }
 }
 
@@ -905,6 +1014,22 @@ where
     }
 }
 
+impl<T> Default for BlasMetadataSaRcmp<T>
+where
+    T: RlstScalar,
+{
+    fn default() -> Self {
+        let u = rlst_dynamic_array2!(T, [1, 1]);
+        let st = rlst_dynamic_array2!(T, [1, 1]);
+
+        BlasMetadataSaRcmp {
+            u,
+            st,
+            c_u: Vec::default(),
+            c_vt: Vec::default(),
+        }
+    }
+}
 /// Stores metadata for BLAS based acceleration scheme for field translation.
 ///
 /// Each interaction, identified by a unique transfer vector, $t \in T$, at a given level, $l$, corresponds to
@@ -947,25 +1072,44 @@ where
     }
 }
 
-impl<T> Default for BlasMetadataSaRcmp<T>
+/// TODO: Document numerical approach
+#[derive(Default)]
+pub struct BlasMetadataAca<Scalar>
 where
-    T: RlstScalar,
+    Scalar: RlstScalar,
 {
-    fn default() -> Self {
-        let u = rlst_dynamic_array2!(T, [1, 1]);
-        let st = rlst_dynamic_array2!(T, [1, 1]);
+    /// Left basis vectors (indexed by transfer vector)
+    pub u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 
-        BlasMetadataSaRcmp {
-            u,
-            st,
-            c_u: Vec::default(),
-            c_vt: Vec::default(),
+    /// Right basis vectors (indexed by transfer vector)
+    pub vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+}
+
+impl<Scalar> Clone for BlasMetadataAca<Scalar>
+where
+    Scalar: RlstScalar + Clone,
+{
+    fn clone(&self) -> Self {
+        let mut u = Vec::new();
+        let mut vt = Vec::new();
+
+        for item in self.u.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            u.push(tmp);
         }
+
+        for item in self.vt.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            vt.push(tmp);
+        }
+
+        Self { u, vt }
     }
 }
 
 /// Instruction set architecture
-
 #[derive(Default, Clone, Copy, Debug)]
 pub enum Isa {
     /// Neon FCMA ISA, extension which provides floating point complex multiply-add instructions.
