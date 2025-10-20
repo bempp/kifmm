@@ -6,22 +6,225 @@ use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKer
 use itertools::{iproduct, Itertools};
 use kifmm::{
     fftw::array::AlignedAllocable,
-    fmm::types::FmmSvdMode,
+    fmm::{
+        helpers::single_node::l2_error,
+        types::{FmmSvdMode, PinvMode},
+    },
     linalg::rsvd::{MatrixRsvd, Normaliser},
     traits::{
         fftw::Dft,
         fmm::{DataAccess, Evaluate},
-        general::single_node::{AsComplex, Epsilon, Hadamard8x8},
+        general::single_node::{ArgmaxValue, AsComplex, Cast, Epsilon, Hadamard8x8, Upcast},
         tree::{SingleFmmTree, SingleTree},
     },
     tree::helpers::points_fixture,
-    BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder,
+    BlasFieldTranslationAca, BlasFieldTranslationSaRcmp, FftFieldTranslation, SingleNodeBuilder,
 };
 use num::Float;
 use rand::distributions::uniform::SampleUniform;
-use rlst::{rlst_dynamic_array2, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array2, MatrixQr, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
 
-fn grid_search_laplace_blas<T>(
+#[allow(dead_code)]
+fn grid_search_laplace_blas_aca<
+    T: RlstScalar<Real = T>
+        + Epsilon
+        + MatrixRsvd
+        + Float
+        + SampleUniform
+        + MatrixQr
+        + Default
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
+>(
+    filename: String,
+    n_points: usize,
+    expansion_order_vec: &[usize],
+    eps_vec: &[Option<T>],
+    surface_diff_vec: &[usize],
+    depth_vec: &[u64],
+) where
+    <T as RlstScalar>::Real: Epsilon,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
+{
+    // FMM parameters
+    let prune_empty = true;
+
+    let parameters = iproduct!(
+        surface_diff_vec.iter(),
+        eps_vec.iter(),
+        depth_vec.iter(),
+        expansion_order_vec.iter(),
+    )
+    .map(|(surface_diff, eps_threshold, depth, expansion_order)| {
+        (*surface_diff, *eps_threshold, *depth, *expansion_order)
+    })
+    .collect_vec();
+
+    let parameters_cloned = parameters.iter().cloned().collect_vec();
+
+    let mut fmms = Vec::new();
+    let mut progress = 0usize;
+
+    let n_params = parameters.len();
+
+    // Setup random sources and targets
+    let n_sources = n_points;
+    let n_targets = n_points;
+    let sources = points_fixture::<T::Real>(n_sources, None, None, Some(0));
+    let targets = points_fixture::<T::Real>(n_targets, None, None, Some(1));
+    let n_vecs = 1;
+    let tmp = vec![T::one(); n_sources * n_vecs];
+    let mut charges = rlst_dynamic_array2!(T, [n_sources, n_vecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let s = Instant::now();
+    parameters.into_iter().enumerate().for_each(
+        |(i, (surface_diff, eps, depth, expansion_order))| {
+            let expansion_order = vec![expansion_order; (depth + 1) as usize];
+
+            let s = Instant::now();
+            let fmm = SingleNodeBuilder::new(true)
+                .tree(
+                    sources.data(),
+                    targets.data(),
+                    None,
+                    Some(depth),
+                    prune_empty,
+                )
+                .unwrap()
+                .parameters(
+                    charges.data(),
+                    &expansion_order,
+                    Laplace3dKernel::new(),
+                    GreenKernelEvalType::Value,
+                    BlasFieldTranslationAca::new(eps, Some(surface_diff), Some(true)),
+                    Some(PinvMode::aca(eps, None, None, true)),
+                )
+                .unwrap()
+                .build()
+                .unwrap();
+            let setup_time = s.elapsed();
+            fmms.push((i, fmm, setup_time));
+            progress += 1;
+
+            println!("BLAS ACA+ Pre-computed {:?}/{:?}", progress, n_params);
+        },
+    );
+
+    let file = File::create(format!("{filename}.csv")).unwrap();
+    let mut writer = Writer::from_writer(file);
+    writer
+        .write_record(&[
+            "depth".to_string(),
+            "surface_diff".to_string(),
+            "svd_threshold".to_string(),
+            "expansion_order".to_string(),
+            "runtime".to_string(),
+            "min_rel_err".to_string(),
+            "mean_rel_err".to_string(),
+            "max_rel_err".to_string(),
+            "l2_error".to_string(),
+            "setup_time".to_string(),
+        ])
+        .unwrap();
+
+    println!(
+        "BLAS Pre-computation Time Elapsed {:?}",
+        s.elapsed().as_secs()
+    );
+
+    // Setup random sources and targets
+    let n_sources = 1000000;
+    let sources = points_fixture::<T::Real>(n_sources, None, None, Some(0));
+    let n_vecs = 1;
+    let tmp = vec![T::one(); n_sources * n_vecs];
+    let mut charges = rlst_dynamic_array2!(T, [n_sources, n_vecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    let mut progress = 0;
+    for (i, fmm, setup_time) in fmms.iter_mut() {
+        let (surface_diff, eps, depth, expansion_order) = parameters_cloned[*i];
+
+        let eps = eps.unwrap_or(T::zero().re());
+
+        let s = Instant::now();
+        fmm.evaluate().unwrap();
+        let time = s.elapsed().as_millis() as f32;
+        progress += 1;
+        println!("BLAS Evaluated {progress:?}/{n_params:?}");
+
+        let leaf_idx = 1;
+        let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
+        let potential = fmm.potential(&leaf).unwrap()[0];
+        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
+        let n_targets = leaf_targets.len() / fmm.dim();
+        let mut direct = vec![T::zero(); n_targets];
+        fmm.kernel().evaluate_st(
+            GreenKernelEvalType::Value,
+            sources.data(),
+            leaf_targets,
+            charges.data(),
+            &mut direct,
+        );
+
+        let rel_error = direct
+            .iter()
+            .zip(potential)
+            .map(|(&d, &p)| {
+                let abs_error = RlstScalar::abs(d - p);
+                abs_error / p
+            })
+            .collect_vec();
+
+        let min_rel_err = rel_error
+            .iter()
+            .filter(|&&x| !x.is_nan())
+            .cloned()
+            .min_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+        let max_rel_err = rel_error
+            .iter()
+            .filter(|&&x| !x.is_nan())
+            .cloned()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap();
+
+        let mean_rel_err: T = rel_error.into_iter().sum::<T>() / T::from(direct.len()).unwrap();
+        let l2_error = l2_error(&direct, potential);
+
+        writer
+            .write_record(&[
+                depth.to_string(),
+                surface_diff.to_string(),
+                eps.to_string(),
+                expansion_order.to_string(),
+                time.to_string(),
+                min_rel_err.to_string(),
+                mean_rel_err.to_string(),
+                max_rel_err.to_string(),
+                l2_error.to_string(),
+                (setup_time.as_millis() as f32).to_string(),
+            ])
+            .unwrap();
+    }
+}
+
+fn grid_search_laplace_blas_svd<
+    T: RlstScalar<Real = T>
+        + Epsilon
+        + MatrixRsvd
+        + Float
+        + SampleUniform
+        + MatrixQr
+        + Default
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
+>(
     filename: String,
     n_points: usize,
     expansion_order_vec: &[usize],
@@ -30,7 +233,9 @@ fn grid_search_laplace_blas<T>(
     depth_vec: &[u64],
     rsvd_settings_vec: &[FmmSvdMode],
 ) where
-    T: RlstScalar<Real = T> + Epsilon + Float + Default + SampleUniform + MatrixRsvd,
+    <T as RlstScalar>::Real: Epsilon,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
 {
     // FMM parameters
     let prune_empty = true;
@@ -97,6 +302,7 @@ fn grid_search_laplace_blas<T>(
                         Some(surface_diff),
                         *rsvd_settings,
                     ),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -251,10 +457,17 @@ fn grid_search_laplace_fft<T>(
         + Float
         + Epsilon
         + AlignedAllocable
-        + MatrixSvd,
+        + MatrixSvd
+        + MatrixQr
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
     <T as AsComplex>::ComplexType:
         Hadamard8x8<Scalar = <T as AsComplex>::ComplexType> + AlignedAllocable,
     <T as Dft>::Plan: Sync,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
 {
     // FMM parameters
     let prune_empty = true;
@@ -306,6 +519,7 @@ fn grid_search_laplace_fft<T>(
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
                     FftFieldTranslation::new(Some(block_size)),
+                    None,
                 )
                 .unwrap()
                 .build()
@@ -436,7 +650,7 @@ fn main() {
         );
 
         for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
-            grid_search_laplace_blas::<f32>(
+            grid_search_laplace_blas_svd::<f32>(
                 format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
                 n_points,
                 &expansion_order_vec,

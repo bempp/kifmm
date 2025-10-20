@@ -5,7 +5,7 @@ use std::{
 };
 
 use itertools::{izip, Itertools};
-use num::traits::Float;
+use num::traits::{Float, Zero};
 use rlst::{
     rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape,
     VectorContainer,
@@ -19,16 +19,19 @@ use crate::{
 
 #[allow(dead_code)]
 /// Compute the L2 norm of the relative error between two sequences
-pub(crate) fn l2_error<T: RlstScalar<Real = T>>(found: &[T], expected: &[T]) -> T {
-    let mut num = T::zero();
-    let mut den = T::zero();
+pub fn l2_error<T: RlstScalar>(found: &[T], expected: &[T]) -> T::Real {
+    let mut num = T::Real::zero();
+    let mut den = T::Real::zero();
 
     for (&l, &r) in izip!(found, expected) {
-        num += RlstScalar::powf(RlstScalar::abs(l - r), T::real(2.0));
-        den += RlstScalar::powf(RlstScalar::abs(r), T::real(2.0));
+        let diff = RlstScalar::abs(l - r);
+        let refv = RlstScalar::abs(r);
+        num += diff * diff;
+        den += refv * refv;
     }
 
-    RlstScalar::powf(num / den, T::from(0.5).unwrap().re())
+    // Return sqrt(num / den)
+    RlstScalar::sqrt(num / den)
 }
 
 /// Optionally time a function call

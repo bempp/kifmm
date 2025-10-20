@@ -11,25 +11,26 @@ use itertools::Itertools;
 use num::Zero;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, MultIntoResize,
-    RawAccess, RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessByRef,
-    UnsafeRandomAccessMut,
+    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, MatrixQr,
+    MatrixSvd, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, SvdMode,
+    UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
 };
 
 use crate::{
     fmm::{
+        field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::single_node::{find_cutoff_rank, flip3, ncoeffs_kifmm},
         types::{
-            BlasFieldTranslationSaRcmp, BlasMetadataSaRcmp, FftFieldTranslation, FftMetadata,
-            FmmSvdMode,
+            BlasFieldTranslationAca, BlasFieldTranslationSaRcmp, BlasMetadataAca,
+            BlasMetadataSaRcmp, FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
     },
-    linalg::rsvd::MatrixRsvd,
+    linalg::{aca::aca_plus, rsvd::MatrixRsvd},
     traits::{
         fftw::{Dft, DftType},
         field::{FieldTranslation as FieldTranslationTrait, SourceToTargetTranslationMetadata},
-        fmm::DataAccess,
-        general::single_node::AsComplex,
+        fmm::{DataAccess, MetadataAccess},
+        general::single_node::{ArgmaxValue, AsComplex, Cast, Epsilon, Upcast},
         tree::{Domain as DomainTrait, FmmTreeNode, SingleFmmTree, SingleTree},
     },
     tree::{
@@ -39,6 +40,173 @@ use crate::{
     },
     KiFmm,
 };
+
+impl<Scalar> SourceToTargetTranslationMetadata
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationAca<Scalar>>
+where
+    Scalar: RlstScalar
+        + Default
+        + Epsilon
+        + MatrixSvd
+        + Epsilon
+        + MatrixQr
+        + Upcast
+        + ArgmaxValue<Scalar>
+        + Cast<<Scalar as Upcast>::Higher>,
+    <Scalar as RlstScalar>::Real: Default
+        + Epsilon
+        + Upcast
+        + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
+        + ArgmaxValue<<Scalar as RlstScalar>::Real>,
+    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
+{
+    fn displacements(&mut self, start_level: Option<u64>) {
+        let mut displacements = Vec::new();
+        let start_level = start_level.unwrap_or(2).max(2);
+
+        for level in start_level..=self.tree.source_tree().depth() {
+            let mut result = Vec::default();
+            let m2l_operator_index = self.m2l_operator_index(level);
+
+            if let Some(sources) = self.tree.source_tree().keys(level) {
+                let n_sources = sources.len();
+                let sentinel = -1i32;
+
+                let tmp = vec![vec![sentinel; n_sources]; 316];
+                result = tmp.into_iter().map(RwLock::new).collect_vec();
+
+                sources
+                    .into_par_iter()
+                    .enumerate()
+                    .for_each(|(source_idx, source)| {
+                        // Find interaction list of each source, as this defines scatter locations
+                        let interaction_list = source
+                            .parent()
+                            .neighbors()
+                            .iter()
+                            .flat_map(|pn| pn.children())
+                            .filter(|pnc| {
+                                !source.is_adjacent(pnc)
+                                    && self
+                                        .tree
+                                        .target_tree()
+                                        .all_keys_set()
+                                        .unwrap()
+                                        .contains(pnc)
+                            })
+                            .collect_vec();
+
+                        let transfer_vectors = interaction_list
+                            .iter()
+                            .map(|target| source.find_transfer_vector(target).unwrap())
+                            .collect_vec();
+
+                        let mut transfer_vectors_map = HashMap::new();
+                        for (i, &v) in transfer_vectors.iter().enumerate() {
+                            transfer_vectors_map.insert(v, i);
+                        }
+
+                        let transfer_vectors_set: HashSet<_> =
+                            transfer_vectors.into_iter().collect();
+
+                        // Mark items in interaction list for scattering
+                        for (tv_idx, tv) in self.source_to_target.transfer_vectors
+                            [m2l_operator_index]
+                            .iter()
+                            .enumerate()
+                        {
+                            let mut result_lock = result[tv_idx].write().unwrap();
+                            if transfer_vectors_set.contains(&tv.hash) {
+                                // Look up scatter location in target tree
+                                let target =
+                                    &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                                let &target_idx = self.level_index_pointer_locals[level as usize]
+                                    .get(target)
+                                    .unwrap();
+                                result_lock[source_idx] = target_idx as i32;
+                            }
+                        }
+                    });
+            }
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
+    fn source_to_target(&mut self) {
+        let depth = self.tree.source_tree().depth();
+
+        let iterator = if self.variable_expansion_order() {
+            (2..=depth)
+                .zip(self.equivalent_surface_order.iter().skip(2).cloned())
+                .zip(self.check_surface_order.iter().skip(2).cloned())
+                .collect_vec()
+        } else {
+            (2..=depth)
+                .zip(vec![
+                    *self.equivalent_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .zip(vec![
+                    *self.check_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .collect_vec()
+        };
+
+        let alpha = Scalar::real(ALPHA_INNER);
+
+        for ((_level, equivalent_surface_order), check_surface_order) in iterator {
+            // Compute surfaces for each transfer vector
+            let transfer_vectors = compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap();
+
+            let mut u = Vec::new();
+            let mut vt = Vec::new();
+
+            for t in transfer_vectors.iter() {
+                let source_equivalent_surface = t.source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+
+                let target_check_surface = t.target.surface_grid(
+                    check_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+
+                // Compute ACA+ decomposition of M2L matrix
+                let (u_i, vt_i) = aca_plus(
+                    &source_equivalent_surface,
+                    &target_check_surface,
+                    self.kernel.clone(),
+                    Some(self.source_to_target.eps),
+                    None,
+                    None,
+                    None,
+                    false,
+                    self.source_to_target.multithreaded,
+                );
+
+                u.push(u_i);
+                vt.push(vt_i);
+            }
+
+            self.source_to_target
+                .transfer_vectors
+                .push(transfer_vectors);
+
+            // Add each M2L matrix to metadata, indexed by transfer vector
+            self.source_to_target
+                .metadata
+                .push(BlasMetadataAca { u, vt });
+        }
+    }
+}
 
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationSaRcmp<Scalar>>

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: Please cite the following works when using this software.
+type: software
+authors:
+  - family-names: Kailasa
+    given-names: Srinath
+    orcid: https://orcid.org/0000-0001-9734-8318
+doi: 10.21105/joss.07124
+identifiers:
+  - type: doi
+    value: 10.21105/joss.07124
+  - type: url
+    value: http://dx.doi.org/10.21105/joss.07124
+  - type: other
+    value: urn:issn:2475-9066
+title: 'kifmm-rs: A Kernel-Independent Fast Multipole Framework in Rust'
+url: http://dx.doi.org/10.21105/joss.07124

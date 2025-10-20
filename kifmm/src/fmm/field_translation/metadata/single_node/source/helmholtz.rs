@@ -5,17 +5,17 @@ use green_kernels::{
 };
 use itertools::Itertools;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
+    empty_array, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
     RlstScalar,
 };
 
 use crate::{
-    fmm::helpers::single_node::ncoeffs_kifmm,
-    linalg::pinv::pinv,
+    fmm::{helpers::single_node::ncoeffs_kifmm, types::PinvMode},
+    linalg::pinv::{pinv, pinv_aca_plus},
     traits::{
         field::{FieldTranslation as FieldTranslationTrait, SourceTranslationMetadata},
         fmm::DataAccess,
-        general::single_node::Epsilon,
+        general::single_node::{ArgmaxValue, Cast, Epsilon, Upcast},
         tree::{FmmTreeNode, SingleFmmTree, SingleTree},
     },
     tree::{
@@ -25,15 +25,29 @@ use crate::{
     KiFmm,
 };
 
-impl<Scalar, FieldTranslation> SourceTranslationMetadata
+impl<Scalar, FieldTranslation> SourceTranslationMetadata<Scalar>
     for KiFmm<Scalar, Helmholtz3dKernel<Scalar>, FieldTranslation>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + Epsilon + MatrixSvd,
+    Scalar: RlstScalar<Complex = Scalar>
+        + Default
+        + Epsilon
+        + MatrixSvd
+        + Epsilon
+        + MatrixQr
+        + Upcast
+        + ArgmaxValue<Scalar>
+        + Cast<<Scalar as Upcast>::Higher>,
+    <Scalar as RlstScalar>::Real: Default
+        + Epsilon
+        + Upcast
+        + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
+        + ArgmaxValue<<Scalar as RlstScalar>::Real>,
+    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
-    <Scalar as RlstScalar>::Real: Default,
     Self: DataAccess,
 {
-    fn source(&mut self) {
+    fn source(&mut self, pinv_mode: PinvMode<Scalar>) {
         let root = MortonKey::<Scalar::Real>::root();
 
         // Cast surface parameters
@@ -73,17 +87,42 @@ where
             let n_cols = ncoeffs_kifmm(equivalent_surface_order);
             let n_rows = ncoeffs_kifmm(check_surface_order);
 
-            // Assemble matrix of kernel evaluations between upward check to equivalent, and downward check to equivalent matrices
-            // As well as estimating their inverses using SVD
-            let mut uc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
-            self.kernel.assemble_st(
-                GreenKernelEvalType::Value,
-                &upward_check_surface[..],
-                &upward_equivalent_surface[..],
-                uc2e.data_mut(),
-            );
+            // Compute pseudo-inverse
+            let s;
+            let ut;
+            let v;
+            match pinv_mode {
+                PinvMode::Svd { atol, rtol } => {
+                    let mut uc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
+                    self.kernel.assemble_st(
+                        GreenKernelEvalType::Value,
+                        &upward_check_surface[..],
+                        &upward_equivalent_surface[..],
+                        uc2e.data_mut(),
+                    );
+                    (s, ut, v) = pinv(&uc2e, atol, rtol).unwrap();
+                }
 
-            let (s, ut, v) = pinv(&uc2e, None, None).unwrap();
+                PinvMode::AcaPlus {
+                    eps,
+                    max_iter,
+                    local_radius,
+                    multithreaded,
+                } => {
+                    (s, ut, v) = pinv_aca_plus(
+                        &upward_equivalent_surface,
+                        &upward_check_surface,
+                        self.kernel.clone(),
+                        eps,
+                        max_iter,
+                        local_radius,
+                        false,
+                        multithreaded,
+                        false,
+                    )
+                    .unwrap();
+                }
+            }
 
             let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
             for i in 0..s.len() {

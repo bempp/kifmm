@@ -52,6 +52,7 @@
 //!             Laplace3dKernel::new(), // Set the kernel
 //!             GreenKernelEvalType::Value, // Set the type of evaluation, either just potentials or potentials + potential gradients
 //!             FftFieldTranslation::new(None), // Choose a field translation method, could replace with BLAS field translation
+//!             None,
 //!         )
 //!         .unwrap()
 //!         .build()
@@ -88,6 +89,8 @@ use bytemuck as _;
 use serde_yaml as _;
 
 // Public API
+#[doc(inline)]
+pub use fmm::types::BlasFieldTranslationAca;
 #[doc(inline)]
 pub use fmm::types::BlasFieldTranslationIa;
 #[doc(inline)]
