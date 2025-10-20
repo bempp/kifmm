@@ -3,7 +3,10 @@ use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
     traits::types::{CommunicationType, FmmOperatorType, MetadataType},
-    tree::{helpers::points_fixture, types::SortKind},
+    tree::{
+        helpers::{points_fixture, points_fixture_sphere},
+        types::SortKind,
+    },
     BlasFieldTranslationSaRcmp, DataAccessMulti, EvaluateMulti, FmmSvdMode, MultiNodeBuilder,
 };
 use mpi::traits::*;
@@ -48,6 +51,10 @@ struct Args {
     /// less than the number of samples and greater than 0
     #[arg(long, default_value_t = 10)]
     n_samples: usize,
+
+    /// Particle distribution (0 - uniform, 1 - sphere)
+    #[arg(long, default_value_t = 0)]
+    distribution: u64,
 }
 
 fn main() {
@@ -67,6 +74,7 @@ fn main() {
     let n_threads = args.n_threads;
     let n_samples = args.n_samples;
     let id = args.id;
+    let distribution = args.distribution;
 
     assert!(n_samples > 0 && n_samples < n_points);
 
@@ -84,7 +92,15 @@ fn main() {
         BlasFieldTranslationSaRcmp::<f32>::new(Some(threshold), None, FmmSvdMode::Deterministic);
 
     // Generate some random test data local to each process
-    let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    let points;
+    if distribution == 0 {
+        points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    } else if distribution == 1 {
+        points = points_fixture_sphere::<f32>(n_points)
+    } else {
+        panic!("Unknown distribution")
+    }
+
     let charges = vec![1f32; n_points];
 
     let mut multi_fmm = MultiNodeBuilder::new(true)

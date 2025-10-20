@@ -7,5 +7,6 @@
     "output": "weak_scaling_ccx.slurm",
     "method": "ccx",
     "scaling_func": 8,
-    "contiguous": false
+    "contiguous": false,
+    "distribution": "uniform"
 }

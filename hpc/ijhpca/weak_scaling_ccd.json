@@ -7,5 +7,6 @@
     "output": "weak_scaling_ccd.slurm",
     "method": "ccd",
     "scaling_func": 8,
-    "contiguous": false
+    "contiguous": false,
+    "distribution": "uniform"
 }

@@ -2,8 +2,14 @@
 use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
-    traits::{tree::MultiFmmTree, types::{CommunicationType, FmmOperatorType, MetadataType}},
-    tree::{helpers::points_fixture, types::SortKind},
+    traits::{
+        tree::MultiFmmTree,
+        types::{CommunicationType, FmmOperatorType, MetadataType},
+    },
+    tree::{
+        helpers::{points_fixture, points_fixture_sphere},
+        types::SortKind,
+    },
     DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
 use mpi::traits::*;
@@ -48,6 +54,10 @@ struct Args {
     /// less than the number of samples and greater than 0
     #[arg(long, default_value_t = 10)]
     n_samples: usize,
+
+    /// Particle distribution (0 - uniform, 1 - sphere)
+    #[arg(long, default_value_t = 0)]
+    distribution: u64,
 }
 
 fn main() {
@@ -66,6 +76,7 @@ fn main() {
     let block_size = args.block_size;
     let n_threads = args.n_threads;
     let n_samples = args.n_samples;
+    let distribution = args.distribution;
     let id = args.id;
 
     assert!(n_samples > 0 && n_samples < n_points);
@@ -83,7 +94,16 @@ fn main() {
     let source_to_target = FftFieldTranslation::<f32>::new(Some(block_size));
 
     // Generate some random test data local to each process
-    let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+
+    let points;
+    if distribution == 0 {
+        points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    } else if distribution == 1 {
+        points = points_fixture_sphere::<f32>(n_points)
+    } else {
+        panic!("Unknown distribution")
+    }
+
     let charges = vec![1f32; n_points];
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
@@ -112,9 +132,8 @@ fn main() {
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
 
-    let mut mean_roots_per_rank_source_tree  = 0.;
+    let mut mean_roots_per_rank_source_tree = 0.;
     if multi_fmm.rank() == 0 {
-
         let mut m: HashMap<i32, f64> = HashMap::new();
         for x in multi_fmm.tree().source_tree().all_roots_ranks.iter() {
             *m.entry(*x).or_default() += 1.0;
@@ -129,9 +148,8 @@ fn main() {
         mean_roots_per_rank_source_tree = tmp / (n_ranks as f64);
     }
 
-    let mut mean_roots_per_rank_target_tree= 0.;
+    let mut mean_roots_per_rank_target_tree = 0.;
     if multi_fmm.rank() == 0 {
-
         let mut m: HashMap<i32, f64> = HashMap::new();
         for x in multi_fmm.tree().target_tree().all_roots_ranks.iter() {
             *m.entry(*x).or_default() += 1.0;

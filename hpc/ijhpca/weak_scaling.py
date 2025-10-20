@@ -13,6 +13,11 @@ AMD_EPYC_ROME = {
         "ccx_per_ccd": 2
     }
 
+DISTRIBUTION = {
+    "uniform": 0,
+    "sphere": 1
+}
+
 def parse_process_mapping(arch):
     ccd_threads_per_rank = arch["cores_per_ccd"]
     ccx_threads_per_rank = arch["cores_per_ccx"]
@@ -47,7 +52,8 @@ def experiment_parameters(
     points_per_rank,
     local_depth=4,
     scaling_func=pow8,
-    arch=AMD_EPYC_ROME
+    arch=AMD_EPYC_ROME,
+    distribution="uniform"
     ):
 
     max_cpus=arch["cores_per_node"]
@@ -103,12 +109,12 @@ def experiment_parameters(
     print(f"points per node {points_per_node}")
     print(f"points per leaf {points_per_leaf}")
     print(f"max threads per rank {max_threads_per_rank}")
+    print(f"distribution {distribution}")
+
+    return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), max_threads_per_rank, distribution
 
 
-    return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), max_threads_per_rank
-
-
-def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, points_per_rank, local_depth, contiguous=False, script_name="fmm_m2l_fft_mpi_f32"):
+def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, points_per_rank, local_depth, distribution="uniform", contiguous=False, script_name="fmm_m2l_fft_mpi_f32"):
     expansion_order = 3
     n_points = points_per_rank
     n_samples = 500
@@ -142,14 +148,14 @@ export WORK="/work/e738/e738/skailasa"
 
 script_name="{script_name}"
 
-export SCRATCH=$WORK/weak_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_${{SLURM_JOBID}}
+export SCRATCH=$WORK/weak_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_distribution={distribution}_${{SLURM_JOBID}}
 mkdir -p $SCRATCH
 cd $SCRATCH
 
 export SRUN_CPUS_PER_TASK=$SLURM_CPUS_PER_TASK
 export OMP_NUM_THREADS=1
 
-export OUTPUT=$SCRATCH/weak_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_${{SLURM_JOBID}}.csv
+export OUTPUT=$SCRATCH/weak_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_distribution={distribution}_${{SLURM_JOBID}}.csv
 touch $OUTPUT
 echo "
 experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
@@ -169,7 +175,7 @@ srun --nodes={nn} --ntasks={nt} --cpus-per-task={cpus_per_task} \\
      $WORK/$script_name --id {i} --n-points {n_points} \\
      --expansion-order {expansion_order} --prune-empty \\
      --global-depth {gd} --local-depth {local_depth} \\
-     --n-samples {n_samples} --block-size {block_size} --n-threads {int(max_threads)} \\
+     --n-samples {n_samples} --block-size {block_size} --n-threads {int(max_threads)} --distribution {DISTRIBUTION[distribution]} \\
      >> $OUTPUT 2> $SCRATCH/err_run_{i}.log
 """
 
@@ -189,6 +195,7 @@ if __name__ == "__main__":
     parser.add_argument("--method", type=str, default="ccx")
     parser.add_argument("--contiguous", type=bool, default=False)
     parser.add_argument("--output", type=str, default="job.slurm")
+    parser.add_argument("--distribution", type=str, default="uniform")
     parser.add_argument("--config", action='append')
 
     args = parser.parse_args()
@@ -210,11 +217,11 @@ if __name__ == "__main__":
 
     valid_methods = {"ccx", "ccd" "socket"}
     if any(args.method in m for m in valid_methods):
-        n_nodes, n_tasks, global_depths, max_threads = experiment_parameters(
-            args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.points_per_rank, args.local_depth
+        n_nodes, n_tasks, global_depths, max_threads, distribution = experiment_parameters(
+            args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.points_per_rank, args.local_depth, distribution=args.distribution
         )
 
-        write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth, contiguous=args.contiguous)
+        write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth, contiguous=args.contiguous, distribution=distribution)
 
     else:
         raise ValueError("Unknown method")
