@@ -2,6 +2,8 @@
 # Treat warnings as a build error.
 strict = []
 mpi = ["dep:mpi", "dep:superslice", "dep:memoffset", "dep:mpi-sys", "rlst/mpi"]
+nvidia = []
+amd = []
 
 [package]
 name = "kifmm"

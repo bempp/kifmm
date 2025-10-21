@@ -80,6 +80,7 @@
 pub mod fftw;
 pub mod fmm;
 pub mod linalg;
+pub mod gpu;
 #[cfg(feature = "mpi")]
 pub mod sorting;
 pub mod traits;
