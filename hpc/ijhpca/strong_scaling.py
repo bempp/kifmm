@@ -250,7 +250,7 @@ if __name__ == "__main__":
     valid_methods = {"ccx", "ccd" "socket"}
     if any(args.method in m for m in valid_methods):
         n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads, distribution = experiment_parameters(
-            args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func
+            args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func, distribution=args.distribution
         )
         write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, contiguous=args.contiguous, distribution=distribution)
     else:
