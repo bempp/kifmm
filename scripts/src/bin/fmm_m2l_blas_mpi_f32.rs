@@ -96,7 +96,7 @@ fn main() {
     if distribution == 0 {
         points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
     } else if distribution == 1 {
-        points = points_fixture_sphere::<f32>(n_points)
+        points = points_fixture_sphere::<f32>(n_points, Some(world.rank() as u64));
     } else {
         panic!("Unknown distribution")
     }
