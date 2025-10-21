@@ -4,6 +4,7 @@ use std::{
     sync::{Mutex, RwLock},
 };
 
+use coe::is_same;
 use green_kernels::{
     laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
@@ -17,11 +18,13 @@ use rlst::{
 };
 
 use crate::{
+    extract_qrp_typed,
     fmm::{
         field_translation::source_to_target::transfer_vector::compute_transfer_vectors_at_level,
         helpers::single_node::{find_cutoff_rank, flip3, ncoeffs_kifmm},
         types::{
-            BlasFieldTranslationAca, BlasFieldTranslationSaRcmp, BlasMetadataAca,
+            BlasFieldTranslationAca, BlasFieldTranslationAcaRecompressed,
+            BlasFieldTranslationSaRcmp, BlasMetadataAca, BlasMetadataAcaRecompressed,
             BlasMetadataSaRcmp, FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
     },
@@ -204,6 +207,286 @@ where
             self.source_to_target
                 .metadata
                 .push(BlasMetadataAca { u, vt });
+        }
+    }
+}
+
+impl<Scalar> SourceToTargetTranslationMetadata
+    for KiFmm<Scalar, Laplace3dKernel<Scalar>, BlasFieldTranslationAcaRecompressed<Scalar>>
+where
+    Scalar: RlstScalar
+        + Default
+        + Epsilon
+        + MatrixSvd
+        + Epsilon
+        + MatrixQr
+        + Upcast
+        + ArgmaxValue<Scalar>
+        + Cast<<Scalar as Upcast>::Higher>,
+    <Scalar as RlstScalar>::Real: Default
+        + Epsilon
+        + Upcast
+        + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
+        + ArgmaxValue<<Scalar as RlstScalar>::Real>,
+    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
+{
+    fn displacements(&mut self, start_level: Option<u64>) {
+        let mut displacements = Vec::new();
+        let start_level = start_level.unwrap_or(2).max(2);
+
+        for level in start_level..=self.tree.source_tree().depth() {
+            let mut result = Vec::default();
+            let m2l_operator_index = self.m2l_operator_index(level);
+
+            if let Some(sources) = self.tree.source_tree().keys(level) {
+                let n_sources = sources.len();
+                let sentinel = -1i32;
+
+                let tmp = vec![vec![sentinel; n_sources]; 316];
+                result = tmp.into_iter().map(RwLock::new).collect_vec();
+
+                sources
+                    .into_par_iter()
+                    .enumerate()
+                    .for_each(|(source_idx, source)| {
+                        // Find interaction list of each source, as this defines scatter locations
+                        let interaction_list = source
+                            .parent()
+                            .neighbors()
+                            .iter()
+                            .flat_map(|pn| pn.children())
+                            .filter(|pnc| {
+                                !source.is_adjacent(pnc)
+                                    && self
+                                        .tree
+                                        .target_tree()
+                                        .all_keys_set()
+                                        .unwrap()
+                                        .contains(pnc)
+                            })
+                            .collect_vec();
+
+                        let transfer_vectors = interaction_list
+                            .iter()
+                            .map(|target| source.find_transfer_vector(target).unwrap())
+                            .collect_vec();
+
+                        let mut transfer_vectors_map = HashMap::new();
+                        for (i, &v) in transfer_vectors.iter().enumerate() {
+                            transfer_vectors_map.insert(v, i);
+                        }
+
+                        let transfer_vectors_set: HashSet<_> =
+                            transfer_vectors.into_iter().collect();
+
+                        // Mark items in interaction list for scattering
+                        for (tv_idx, tv) in self.source_to_target.transfer_vectors
+                            [m2l_operator_index]
+                            .iter()
+                            .enumerate()
+                        {
+                            let mut result_lock = result[tv_idx].write().unwrap();
+                            if transfer_vectors_set.contains(&tv.hash) {
+                                // Look up scatter location in target tree
+                                let target =
+                                    &interaction_list[*transfer_vectors_map.get(&tv.hash).unwrap()];
+                                let &target_idx = self.level_index_pointer_locals[level as usize]
+                                    .get(target)
+                                    .unwrap();
+                                result_lock[source_idx] = target_idx as i32;
+                            }
+                        }
+                    });
+            }
+
+            displacements.push(result);
+        }
+
+        self.source_to_target.displacements = displacements;
+    }
+
+    fn source_to_target(&mut self) {
+        let depth = self.tree.source_tree().depth();
+
+        let iterator = if self.variable_expansion_order() {
+            (2..=depth)
+                .zip(self.equivalent_surface_order.iter().skip(2).cloned())
+                .zip(self.check_surface_order.iter().skip(2).cloned())
+                .collect_vec()
+        } else {
+            (2..=depth)
+                .zip(vec![
+                    *self.equivalent_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .zip(vec![
+                    *self.check_surface_order.last().unwrap();
+                    (depth - 1) as usize
+                ])
+                .collect_vec()
+        };
+
+        let alpha = Scalar::real(ALPHA_INNER);
+
+        for ((_level, equivalent_surface_order), check_surface_order) in iterator {
+            // Compute surfaces for each transfer vector
+            let transfer_vectors = compute_transfer_vectors_at_level::<Scalar::Real>(3).unwrap();
+
+            let mut qu_vec = Vec::new();
+            let mut qvt_vec = Vec::new();
+            let mut cu_vec = Vec::new();
+            let mut cvt_vec = Vec::new();
+
+            for t in transfer_vectors.iter() {
+                let source_equivalent_surface = t.source.surface_grid(
+                    equivalent_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+
+                let target_check_surface = t.target.surface_grid(
+                    check_surface_order,
+                    self.tree.source_tree().domain(),
+                    alpha,
+                );
+
+                // Compute ACA+ decomposition of M2L matrix
+                let (u_i, vt_i) = aca_plus(
+                    &source_equivalent_surface,
+                    &target_check_surface,
+                    self.kernel.clone(),
+                    Some(self.source_to_target.eps),
+                    None,
+                    None,
+                    None,
+                    false,
+                    self.source_to_target.multithreaded,
+                );
+
+                // Recompress using QR and SVD
+                let [m1, n1] = u_i.shape();
+                let [m2, n2] = vt_i.shape();
+                let mut v_i = rlst_dynamic_array2!(Scalar, [n2, m2]);
+                v_i.fill_from(vt_i.r().conj().transpose());
+                let [m3, n3] = v_i.shape();
+
+                // Compute QR decomposition of result
+                let r = std::cmp::min(m1, n1);
+                let mut qu = rlst_dynamic_array2!(Scalar, [m1, r]);
+                let k = std::cmp::min(m1, n1);
+                let mut ru = rlst_dynamic_array2!(Scalar, [k, n1]);
+                let mut pu_vec = Vec::new();
+
+                let r = std::cmp::min(m3, n3);
+                let mut qv = rlst_dynamic_array2!(Scalar, [m3, r]);
+                let k = std::cmp::min(m3, n3);
+                let mut rv = rlst_dynamic_array2!(Scalar, [k, n3]);
+                let mut pv_vec = Vec::new();
+
+                let qr_u_i = u_i.into_qr_alloc().unwrap();
+                let qr_v_i = v_i.into_qr_alloc().unwrap();
+
+                if is_same::<f64, Scalar>() {
+                    extract_qrp_typed!(
+                        qr_u_i,
+                        qr_v_i,
+                        qu,
+                        ru,
+                        &mut pu_vec,
+                        qv,
+                        rv,
+                        &mut pv_vec,
+                        f64
+                    );
+                } else if is_same::<f32, Scalar>() {
+                    extract_qrp_typed!(
+                        qr_u_i,
+                        qr_v_i,
+                        qu,
+                        ru,
+                        &mut pu_vec,
+                        qv,
+                        rv,
+                        &mut pv_vec,
+                        f32
+                    );
+                }
+
+                // Compute SVD on tiny core matrix formed from R factors
+                // First form core matrix from P and R factors of QR decomposition
+                // ru_pu_t = ru * pu^T
+                let mut ru_pu_t = rlst_dynamic_array2!(Scalar, ru.shape());
+
+                // Iterate over pu_t matrix
+                for (old_j, &new_j) in pu_vec.iter().enumerate() {
+                    // Iterate over rows of output
+                    for i in 0..ru_pu_t.shape()[0] {
+                        ru_pu_t[[i, new_j]] = ru[[i, old_j]]
+                    }
+                }
+
+                // pv_rv_t = pv * rv^H
+                let mut rv_t = rlst_dynamic_array2!(Scalar, [rv.shape()[1], rv.shape()[0]]);
+                rv_t.fill_from(rv.r().transpose().conj());
+
+                let mut pv_rv_t = rlst_dynamic_array2!(Scalar, rv_t.shape());
+
+                for (old_i, &new_i) in pv_vec.iter().enumerate() {
+                    // Iterate over columns of output
+                    for j in 0..pv_rv_t.shape()[1] {
+                        pv_rv_t[[new_i, j]] = rv_t[[old_i, j]]
+                    }
+                }
+
+                // Form core matrix
+                let c =
+                    empty_array::<Scalar, 2>().simple_mult_into_resize(ru_pu_t.r(), pv_rv_t.r());
+
+                // Compute SVD of core matrix only
+                let shape = c.shape();
+                let k = std::cmp::min(shape[0], shape[1]);
+                let mut u = rlst_dynamic_array2!(Scalar, [shape[0], k]);
+                let mut s = vec![Scalar::zero().re(); k];
+                let mut vt = rlst_dynamic_array2!(Scalar, [k, shape[1]]);
+                c.into_svd_alloc(u.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
+                    .unwrap();
+
+                // Store in Metadata
+                let mut s_mat = rlst_dynamic_array2!(Scalar, [k, k]);
+
+                for (j, s) in s.iter().enumerate().take(k) {
+                    unsafe {
+                        *s_mat.get_unchecked_mut([j, j]) = Scalar::from(*s).unwrap();
+                    }
+                }
+
+                // Fold singular values into right singular vectors
+                let vt = empty_array::<Scalar, 2>().simple_mult_into_resize(s_mat.r(), vt.r());
+
+                let mut qv_t = rlst_dynamic_array2!(Scalar, [qv.shape()[1], qv.shape()[0]]);
+                qv_t.r_mut().fill_from(qv.r().transpose());
+
+                // Store data for this transfer vector
+                qu_vec.push(qu);
+                qvt_vec.push(qv_t);
+                cu_vec.push(u);
+                cvt_vec.push(vt);
+            }
+
+            self.source_to_target
+                .transfer_vectors
+                .push(transfer_vectors);
+
+            // Add each M2L matrix to metadata, indexed by transfer vector
+            self.source_to_target
+                .metadata
+                .push(BlasMetadataAcaRecompressed {
+                    q_u: qu_vec,
+                    q_vt: qvt_vec,
+                    c_u: cu_vec,
+                    c_vt: cvt_vec,
+                });
         }
     }
 }

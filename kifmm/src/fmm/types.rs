@@ -642,6 +642,31 @@ where
     pub multithreaded: bool,
 }
 
+/// TODO: document numerical method
+#[derive(Default)]
+pub struct BlasFieldTranslationAcaRecompressed<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Cutoff for approximation
+    pub eps: Scalar::Real,
+
+    /// Precomputed metadata
+    pub metadata: Vec<BlasMetadataAcaRecompressed<Scalar>>, // indexed by level
+
+    /// Unique transfer vectors corresponding to each metadata
+    pub transfer_vectors: Vec<Vec<TransferVector<Scalar::Real>>>,
+
+    /// The map between sources/targets in the field translation, indexed by level, then by source index.
+    pub displacements: Vec<Vec<RwLock<Vec<i32>>>>,
+
+    /// Difference in expansion order between check and equivalent surface, defaults to 0
+    pub surface_diff: usize,
+
+    /// Compute ACA+ in multithreaded mode
+    pub multithreaded: bool,
+}
+
 impl<Scalar> Clone for BlasFieldTranslationSaRcmp<Scalar>
 where
     Scalar: RlstScalar,
@@ -736,6 +761,37 @@ where
         }
     }
 }
+
+impl<Scalar> Clone for BlasFieldTranslationAcaRecompressed<Scalar>
+where
+    Scalar: RlstScalar,
+    Scalar::Real: Clone,
+    BlasMetadataAcaRecompressed<Scalar>: Clone,
+    TransferVector<Scalar::Real>: Clone,
+{
+    fn clone(&self) -> Self {
+        BlasFieldTranslationAcaRecompressed {
+            eps: self.eps,
+            metadata: self.metadata.clone(),
+            transfer_vectors: self.transfer_vectors.clone(),
+            displacements: self
+                .displacements
+                .iter()
+                .map(|vec| {
+                    vec.iter()
+                        .map(|lock| {
+                            // Lock the RwLock to get access to the inner Vec<i32> and clone it
+                            RwLock::new(lock.read().unwrap().clone())
+                        })
+                        .collect()
+                })
+                .collect(),
+            surface_diff: self.surface_diff,
+            multithreaded: self.multithreaded,
+        }
+    }
+}
+
 /// Variants of SVD algorithms
 #[derive(Default, Clone, Copy)]
 pub enum FmmSvdMode {
@@ -1085,6 +1141,25 @@ where
     pub vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
 }
 
+/// TODO: Document numerical approach
+#[derive(Default)]
+pub struct BlasMetadataAcaRecompressed<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    /// Left Q_u R_u := QR(U_aca)
+    pub q_u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+
+    /// Left Q_v R_v := QR(V_aca)
+    pub q_vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+
+    /// Left singular vectors of C := R_u * R_v^T
+    pub c_u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+
+    /// Right singular vectors of C := R_u * R_v^T
+    pub c_vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+}
+
 impl<Scalar> Clone for BlasMetadataAca<Scalar>
 where
     Scalar: RlstScalar + Clone,
@@ -1106,6 +1181,49 @@ where
         }
 
         Self { u, vt }
+    }
+}
+
+impl<Scalar> Clone for BlasMetadataAcaRecompressed<Scalar>
+where
+    Scalar: RlstScalar + Clone,
+{
+    fn clone(&self) -> Self {
+        let mut q_u = Vec::new();
+        let mut q_vt = Vec::new();
+        let mut c_u = Vec::new();
+        let mut c_vt = Vec::new();
+
+        for item in self.q_u.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            q_u.push(tmp);
+        }
+
+        for item in self.q_vt.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            q_vt.push(tmp);
+        }
+
+        for item in self.c_u.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            c_u.push(tmp);
+        }
+
+        for item in self.c_vt.iter() {
+            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            tmp.data_mut().copy_from_slice(item.data());
+            c_vt.push(tmp);
+        }
+
+        Self {
+            q_u,
+            q_vt,
+            c_u,
+            c_vt,
+        }
     }
 }
 

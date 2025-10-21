@@ -15,8 +15,9 @@ use crate::{
             level_index_pointer_single_node, potential_pointers_single_node,
         },
         types::{
-            BlasFieldTranslationAca, BlasFieldTranslationIa, BlasFieldTranslationSaRcmp,
-            BlasMetadataAca, BlasMetadataSaRcmp, FftFieldTranslation, FftMetadata, FmmSvdMode,
+            BlasFieldTranslationAca, BlasFieldTranslationAcaRecompressed, BlasFieldTranslationIa,
+            BlasFieldTranslationSaRcmp, BlasMetadataAca, BlasMetadataAcaRecompressed,
+            BlasMetadataSaRcmp, FftFieldTranslation, FftMetadata, FmmSvdMode,
         },
     },
     traits::{
@@ -531,6 +532,21 @@ where
     }
 }
 
+impl<Scalar> FieldTranslationTrait for BlasFieldTranslationAcaRecompressed<Scalar>
+where
+    Scalar: RlstScalar,
+{
+    type Metadata = BlasMetadataAcaRecompressed<Scalar>;
+
+    fn overdetermined(&self) -> bool {
+        true
+    }
+
+    fn surface_diff(&self) -> usize {
+        self.surface_diff
+    }
+}
+
 impl<Scalar> BlasFieldTranslationAca<Scalar>
 where
     Scalar: RlstScalar + Epsilon,
@@ -544,6 +560,27 @@ where
         let tmp = Scalar::epsilon().re();
 
         BlasFieldTranslationAca {
+            eps: eps.unwrap_or(tmp),
+            surface_diff: surface_diff.unwrap_or_default(),
+            multithreaded: multithreaded.unwrap_or(false),
+            ..Default::default()
+        }
+    }
+}
+
+impl<Scalar> BlasFieldTranslationAcaRecompressed<Scalar>
+where
+    Scalar: RlstScalar + Epsilon,
+{
+    /// Constructor for BLAS + ACA+ field translations
+    pub fn new(
+        eps: Option<Scalar::Real>,
+        surface_diff: Option<usize>,
+        multithreaded: Option<bool>,
+    ) -> Self {
+        let tmp = Scalar::epsilon().re();
+
+        BlasFieldTranslationAcaRecompressed {
             eps: eps.unwrap_or(tmp),
             surface_diff: surface_diff.unwrap_or_default(),
             multithreaded: multithreaded.unwrap_or(false),

@@ -3,13 +3,13 @@ use crate::{
     linalg::aca::aca_plus,
     traits::general::single_node::{ArgmaxValue, Cast, Epsilon, Upcast},
 };
-use coe::{is_same, Coerce};
+use coe::is_same;
 use green_kernels::traits::Kernel;
 use num::{One, Zero};
 use rlst::{
     c32, c64, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQr, MatrixSvd, MultInto,
-    MultIntoResize, QrDecomposition, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar,
-    Shape, SvdMode, VectorContainer,
+    MultIntoResize, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar, Shape, SvdMode,
+    VectorContainer,
 };
 
 /// Matrix type
@@ -156,14 +156,19 @@ where
     }
 }
 
+/// TODO: Docs, extracts QR decomposition in functions templated over scalar type
+#[macro_export]
 macro_rules! extract_qrp_typed {
     ($qr_u:expr, $qr_v:expr, $qu:expr, $ru:expr, $pu_vec:expr, $qv:expr, $rv:expr, $pv_vec:expr, $ty:ty) => {{
+        use coe::Coerce;
+        use rlst::{Array, BaseArray, QrDecomposition, VectorContainer};
+
         let qr_u: &QrDecomposition<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>> = $qr_u.coerce();
         let qu: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $qu).coerce();
         let ru: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $ru).coerce();
 
         qr_u.get_r(ru.r_mut());
-        qr_u.get_q_alloc(qu.r_mut())?;
+        qr_u.get_q_alloc(qu.r_mut()).unwrap();
         *$pu_vec = qr_u.get_perm();
 
         let qr_v: &QrDecomposition<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>> = $qr_v.coerce();
@@ -171,7 +176,7 @@ macro_rules! extract_qrp_typed {
         let rv: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $rv).coerce();
 
         qr_v.get_r(rv.r_mut());
-        qr_v.get_q_alloc(qv.r_mut())?;
+        qr_v.get_q_alloc(qv.r_mut()).unwrap();
         *$pv_vec = qr_v.get_perm();
     }};
 }
