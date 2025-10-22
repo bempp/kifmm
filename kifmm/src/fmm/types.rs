@@ -21,7 +21,7 @@ use crate::{
 };
 
 #[cfg(feature = "mpi")]
-use crate::tree::MultiNodeTree;
+use crate::{traits::types::MPICollectiveType, tree::MultiNodeTree};
 
 #[cfg(feature = "mpi")]
 use std::collections::HashSet;
@@ -521,6 +521,9 @@ pub struct MultiNodeFmmTree<T: RlstScalar + Float + Equivalence, C: Communicator
 
     /// U list query
     pub u_list_query: Query,
+
+    /// MPI Collective Times
+    pub mpi_times: HashMap<MPICollectiveType, OperatorTime>,
 }
 
 /// Stores data and metadata for FFT based acceleration scheme for field translation.
@@ -1143,6 +1146,9 @@ where
 
     /// Metadata runtimes
     pub metadata_times: HashMap<MetadataType, OperatorTime>,
+
+    /// MPI Collective walltimes
+    pub mpi_times: HashMap<MPICollectiveType, OperatorTime>,
 
     /// Set to true if expansion order varies by level
     pub(crate) variable_expansion_order: bool,

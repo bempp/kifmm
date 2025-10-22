@@ -52,9 +52,8 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
 /// * `max` - The maximum coordinate value along each axis.
 pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
     n_points: usize,
-    seed: Option<u64>
+    seed: Option<u64>,
 ) -> PointsMat<T> {
-
     let seed = seed.unwrap_or(0);
     // Seeded random number generator for reproducibility
     let mut rng = StdRng::seed_from_u64(seed);

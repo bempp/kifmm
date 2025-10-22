@@ -4,7 +4,7 @@ use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
     traits::{
         tree::MultiFmmTree,
-        types::{CommunicationType, FmmOperatorType, MetadataType},
+        types::{CommunicationType, FmmOperatorType, MPICollectiveType, MetadataType},
     },
     tree::{
         helpers::{points_fixture, points_fixture_sphere},
@@ -167,6 +167,103 @@ fn main() {
     // Destructure operator times
     let mut operator_times = HashMap::new();
 
+    // Destructure FMM MPI times
+    let mut mpi_times = HashMap::new();
+
+    for (&op_type, op_time) in multi_fmm.mpi_times.iter() {
+        match op_type {
+            MPICollectiveType::AlltoAll => {
+                mpi_times.insert("all_to_all", op_time.time);
+            }
+            MPICollectiveType::AlltoAllV => {
+                mpi_times.insert("all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::NeighbourAlltoAll => {
+                mpi_times.insert("neighbour_all_to_all", op_time.time);
+            }
+            MPICollectiveType::NeighbourAlltoAllv => {
+                mpi_times.insert("neighbour_all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::Gather => {
+                mpi_times.insert("gather", op_time.time);
+            }
+            MPICollectiveType::Scatter => {
+                mpi_times.insert("scatter", op_time.time);
+            }
+
+            MPICollectiveType::GatherV => {
+                mpi_times.insert("gather_v", op_time.time);
+            }
+            MPICollectiveType::ScatterV => {
+                mpi_times.insert("scatter_v", op_time.time);
+            }
+
+            MPICollectiveType::AllGather => {
+                mpi_times.insert("all_gather", op_time.time);
+            }
+            MPICollectiveType::AllGatherV => {
+                mpi_times.insert("all_gather_v", op_time.time);
+            }
+
+            MPICollectiveType::DistGraphCreate => {
+                mpi_times.insert("dist_graph_create", op_time.time);
+            }
+
+            MPICollectiveType::Sort => {
+                mpi_times.insert("sort", op_time.time);
+            }
+        }
+    }
+
+    for (&op_type, op_time) in multi_fmm.tree.mpi_times.iter() {
+        match op_type {
+            MPICollectiveType::AlltoAll => {
+                mpi_times.insert("tree_all_to_all", op_time.time);
+            }
+            MPICollectiveType::AlltoAllV => {
+                mpi_times.insert("tree_all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::NeighbourAlltoAll => {
+                mpi_times.insert("tree_neighbour_all_to_all", op_time.time);
+            }
+            MPICollectiveType::NeighbourAlltoAllv => {
+                mpi_times.insert("tree_neighbour_all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::Gather => {
+                mpi_times.insert("tree_gather", op_time.time);
+            }
+            MPICollectiveType::Scatter => {
+                mpi_times.insert("tree_scatter", op_time.time);
+            }
+
+            MPICollectiveType::GatherV => {
+                mpi_times.insert("tree_gather_v", op_time.time);
+            }
+            MPICollectiveType::ScatterV => {
+                mpi_times.insert("tree_scatter_v", op_time.time);
+            }
+
+            MPICollectiveType::AllGather => {
+                mpi_times.insert("tree_all_gather", op_time.time);
+            }
+            MPICollectiveType::AllGatherV => {
+                mpi_times.insert("tree_all_gather_v", op_time.time);
+            }
+
+            MPICollectiveType::DistGraphCreate => {
+                mpi_times.insert("tree_dist_graph_create", op_time.time);
+            }
+
+            MPICollectiveType::Sort => {
+                mpi_times.insert("tree_sort", op_time.time);
+            }
+        }
+    }
+
     for (&op_type, op_time) in multi_fmm.operator_times.iter() {
         match op_type {
             FmmOperatorType::P2M => {
@@ -277,7 +374,9 @@ fn main() {
         "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},\
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}hpc/archer2/slurm/weak_1_fft.slurm",
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}",
         id,
         multi_fmm.rank(),
         runtime,
@@ -314,6 +413,30 @@ fn main() {
         args.n_threads,
         args.n_samples,
         mean_roots_per_rank_source_tree,
-        mean_roots_per_rank_target_tree
+        mean_roots_per_rank_target_tree,
+        mpi_times.get("all_to_all").unwrap_or(&0),
+        mpi_times.get("all_to_all_v").unwrap_or(&0),
+        mpi_times.get("neighbour_all_to_all").unwrap_or(&0),
+        mpi_times.get("neighbour_all_to_all_v").unwrap_or(&0),
+        mpi_times.get("gather").unwrap_or(&0),
+        mpi_times.get("scatter").unwrap_or(&0),
+        mpi_times.get("gather_v").unwrap_or(&0),
+        mpi_times.get("scatter_v").unwrap_or(&0),
+        mpi_times.get("all_gather").unwrap_or(&0),
+        mpi_times.get("all_gather_v").unwrap_or(&0),
+        mpi_times.get("dist_graph_create").unwrap_or(&0),
+        mpi_times.get("sort").unwrap_or(&0),
+        mpi_times.get("tree_all_to_all").unwrap_or(&0),
+        mpi_times.get("tree_all_to_all_v").unwrap_or(&0),
+        mpi_times.get("tree_neighbour_all_to_all").unwrap_or(&0),
+        mpi_times.get("tree_neighbour_all_to_all_v").unwrap_or(&0),
+        mpi_times.get("tree_gather").unwrap_or(&0),
+        mpi_times.get("tree_scatter").unwrap_or(&0),
+        mpi_times.get("tree_gather_v").unwrap_or(&0),
+        mpi_times.get("tree_scatter_v").unwrap_or(&0),
+        mpi_times.get("tree_all_gather").unwrap_or(&0),
+        mpi_times.get("tree_all_gather_v").unwrap_or(&0),
+        mpi_times.get("tree_dist_graph_create").unwrap_or(&0),
+        mpi_times.get("tree_sort").unwrap_or(&0),
     );
 }
