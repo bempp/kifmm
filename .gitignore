@@ -40,3 +40,5 @@ kifmm/python/kifmm_py/_kifmm_rs/**/*.py
 *.o
 **/build/*
 *.clang-format
+
+*.log
