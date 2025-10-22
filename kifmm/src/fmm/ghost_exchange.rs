@@ -99,7 +99,7 @@ where
             let st = Instant::now();
             root_process.gather_varcount_into_root(&multipoles, &mut partition);
             self.mpi_times
-                .entry(MPICollectiveType::GatherV)
+                .entry(MPICollectiveType::GatherVRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,
@@ -124,7 +124,7 @@ where
             let st = Instant::now();
             root_process.gather_varcount_into(&multipoles);
             self.mpi_times
-                .entry(MPICollectiveType::GatherV)
+                .entry(MPICollectiveType::GatherVRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,
@@ -186,7 +186,7 @@ where
             let st = Instant::now();
             root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
             self.mpi_times
-                .entry(MPICollectiveType::ScatterV)
+                .entry(MPICollectiveType::ScatterVRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,
@@ -201,7 +201,7 @@ where
             let st = Instant::now();
             root_process.scatter_varcount_into_root(&partition, &mut expected_roots);
             self.mpi_times
-                .entry(MPICollectiveType::ScatterV)
+                .entry(MPICollectiveType::ScatterVRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,
@@ -210,7 +210,7 @@ where
             let st = Instant::now();
             root_process.scatter_varcount_into(&mut receive_buffer);
             self.mpi_times
-                .entry(MPICollectiveType::ScatterV)
+                .entry(MPICollectiveType::ScatterVRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,
@@ -218,7 +218,7 @@ where
             let st = Instant::now();
             root_process.scatter_varcount_into(&mut expected_roots);
             self.mpi_times
-                .entry(MPICollectiveType::ScatterV)
+                .entry(MPICollectiveType::ScatterVRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,
@@ -992,7 +992,7 @@ where
             self.neighbourhood_communicator_v
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
             self.mpi_times
-                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .entry(MPICollectiveType::NeighbourAlltoAllvRuntime)
                 .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
                 .or_insert(OperatorTime {
                     time: st.elapsed().as_millis() as u64,

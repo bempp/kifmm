@@ -186,6 +186,10 @@ fn main() {
                 mpi_times.insert("neighbour_all_to_all_v", op_time.time);
             }
 
+            MPICollectiveType::NeighbourAlltoAllvRuntime => {
+                mpi_times.insert("neighbour_all_to_all_v_runtime", op_time.time);
+            }
+
             MPICollectiveType::Gather => {
                 mpi_times.insert("gather", op_time.time);
             }
@@ -198,6 +202,13 @@ fn main() {
             }
             MPICollectiveType::ScatterV => {
                 mpi_times.insert("scatter_v", op_time.time);
+            }
+
+            MPICollectiveType::GatherVRuntime => {
+                mpi_times.insert("gather_v_runtime", op_time.time);
+            }
+            MPICollectiveType::ScatterVRuntime => {
+                mpi_times.insert("scatter_v_runtime", op_time.time);
             }
 
             MPICollectiveType::AllGather => {
@@ -231,6 +242,16 @@ fn main() {
             }
             MPICollectiveType::NeighbourAlltoAllv => {
                 mpi_times.insert("tree_neighbour_all_to_all_v", op_time.time);
+            }
+            MPICollectiveType::NeighbourAlltoAllvRuntime => {
+                mpi_times.insert("tree_neighbour_all_to_all_v_runtime", op_time.time);
+            }
+
+            MPICollectiveType::GatherVRuntime => {
+                mpi_times.insert("tree_gather_v_runtime", op_time.time);
+            }
+            MPICollectiveType::ScatterVRuntime => {
+                mpi_times.insert("tree_scatter_v_runtime", op_time.time);
             }
 
             MPICollectiveType::Gather => {
@@ -375,8 +396,8 @@ fn main() {
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}",
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}\
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}",
         id,
         multi_fmm.rank(),
         runtime,
@@ -418,10 +439,15 @@ fn main() {
         mpi_times.get("all_to_all_v").unwrap_or(&0),
         mpi_times.get("neighbour_all_to_all").unwrap_or(&0),
         mpi_times.get("neighbour_all_to_all_v").unwrap_or(&0),
+        mpi_times
+            .get("neighbour_all_to_all_v_runtime")
+            .unwrap_or(&0),
         mpi_times.get("gather").unwrap_or(&0),
         mpi_times.get("scatter").unwrap_or(&0),
         mpi_times.get("gather_v").unwrap_or(&0),
         mpi_times.get("scatter_v").unwrap_or(&0),
+        mpi_times.get("gather_v_runtime").unwrap_or(&0),
+        mpi_times.get("scatter_v_runtime").unwrap_or(&0),
         mpi_times.get("all_gather").unwrap_or(&0),
         mpi_times.get("all_gather_v").unwrap_or(&0),
         mpi_times.get("dist_graph_create").unwrap_or(&0),
@@ -430,10 +456,15 @@ fn main() {
         mpi_times.get("tree_all_to_all_v").unwrap_or(&0),
         mpi_times.get("tree_neighbour_all_to_all").unwrap_or(&0),
         mpi_times.get("tree_neighbour_all_to_all_v").unwrap_or(&0),
+        mpi_times
+            .get("tree_neighbour_all_to_all_v_runtime")
+            .unwrap_or(&0),
         mpi_times.get("tree_gather").unwrap_or(&0),
         mpi_times.get("tree_scatter").unwrap_or(&0),
         mpi_times.get("tree_gather_v").unwrap_or(&0),
         mpi_times.get("tree_scatter_v").unwrap_or(&0),
+        mpi_times.get("tree_gather_v_runtime").unwrap_or(&0),
+        mpi_times.get("tree_scatter_v_runtime").unwrap_or(&0),
         mpi_times.get("tree_all_gather").unwrap_or(&0),
         mpi_times.get("tree_all_gather_v").unwrap_or(&0),
         mpi_times.get("tree_dist_graph_create").unwrap_or(&0),

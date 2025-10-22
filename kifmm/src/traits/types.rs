@@ -56,6 +56,9 @@ pub enum MPICollectiveType {
     /// Neighbour All to All V
     NeighbourAlltoAllv,
 
+    /// Neighbour All to All V
+    NeighbourAlltoAllvRuntime,
+
     /// Gather
     Gather,
 
@@ -67,6 +70,12 @@ pub enum MPICollectiveType {
 
     /// Scatter
     ScatterV,
+
+    /// Gather
+    GatherVRuntime,
+
+    /// Scatter
+    ScatterVRuntime,
 
     /// All Gather
     AllGather,
