@@ -4,8 +4,8 @@
     "max_nodes": 512,
     "points_per_rank": 500000,
     "local_depth": 4,
-    "output": "weak_scaling_ccd_uniform.slurm",
+    "output": "weak_scaling_ccd_sphere.slurm",
     "method": "ccd",
     "scaling_func": 8,
-    "distribution": "uniform"
+    "distribution": "sphere"
 }

@@ -2,10 +2,10 @@
     "_comment": "Weak scaling",
     "min_nodes": 1,
     "max_nodes": 512,
-    "points_per_rank": 500000,
-    "local_depth": 4,
-    "output": "weak_scaling_ccd_uniform.slurm",
-    "method": "ccd",
+    "points_per_rank": 32000000,
+    "local_depth": 5,
+    "output": "weak_scaling_socket_32B.slurm",
+    "method": "socket",
     "scaling_func": 8,
     "distribution": "uniform"
 }

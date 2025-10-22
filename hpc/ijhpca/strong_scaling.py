@@ -188,13 +188,7 @@ export OMP_NUM_THREADS=1
 
 export OUTPUT=$SCRATCH/strong_fft_n={max_points}_p={last_nodes}_points_per_rank={points_per_rank[-1]}_distribution={distribution}_${{SLURM_JOBID}}.csv
 touch $OUTPUT
-echo "
-experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,\
-source_tree,target_tree,source_domain,target_domain,layout,\
-ghost_exchange_v,ghost_exchange_v_runtime,ghost_exchange_u,gather_global_fmm,scatter_global_fmm,\
-source_to_target_data,source_data,target_data,global_fmm,ghost_fmm_v,ghost_fmm_u,\
-displacement_map,metadata_creation,\
-expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples,source_local_trees_per_rank,target_local_trees_per_rank" >> ${{OUTPUT}}
+echo "experiment_id,rank,runtime,p2m,m2m,l2l,m2l,p2p,source_tree,target_tree,source_domain,target_domain,layout,ghost_exchange_v,ghost_exchange_v_runtime,ghost_exchange_u,gather_global_fmm,scatter_global_fmm,source_to_target_data,source_data,target_data,global_fmm,ghost_fmm_v,ghost_fmm_u,displacement_map,metadata_creation,expansion_order,n_points,local_depth,global_depth,block_size,n_threads,n_samples,source_local_trees_per_rank,target_local_trees_per_rank,all_to_all,all_to_all_v,neighbour_all_to_all,neighbour_all_to_all_v,neighbour_all_to_all_v_runtime,gather,scatter,gather_v,scatter_v,gather_v_runtime,scatter_v_runtime,all_gather,all_gather_v,dist_graph_create,sort,tree_all_to_all,tree_all_to_all_v,tree_neighbour_all_to_all,tree_neighbour_all_to_all_v,tree_neighbour_all_to_all_v_runtime,tree_gather,tree_scatter,tree_gather_v,tree_scatter_v,tree_gather_v_runtime,tree_scatter_v_runtime,tree_all_gather,tree_all_gather_v,tree_dist_graph_create,tree_sort"
 """
 
     # loop of runs
@@ -248,6 +242,6 @@ if __name__ == "__main__":
         n_nodes, n_tasks, global_depths, local_depths, points_per_rank, max_threads, distribution = experiment_parameters(
             args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.min_points_per_rank, args.min_local_depth, scaling_func=scaling_func, distribution=args.distribution
         )
-        write_slurm(f"{args.method}_"+args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, distribution=distribution)
+        write_slurm(args.output, n_nodes, n_tasks, local_depths, global_depths, max_threads, points_per_rank, distribution=distribution)
     else:
         raise ValueError("Unknown method")
