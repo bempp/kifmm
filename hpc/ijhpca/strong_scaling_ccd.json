@@ -7,6 +7,5 @@
     "output": "strong_scaling_ccd_sphere.slurm",
     "method": "ccd",
     "scaling_func": 8,
-    "contiguous": true,
     "distribution": "sphere"
 }

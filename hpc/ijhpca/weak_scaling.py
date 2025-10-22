@@ -114,7 +114,7 @@ def experiment_parameters(
     return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), max_threads_per_rank, distribution
 
 
-def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, points_per_rank, local_depth, distribution="uniform", contiguous=False, script_name="fmm_m2l_fft_mpi_f32"):
+def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, points_per_rank, local_depth, distribution="uniform", script_name="fmm_m2l_fft_mpi_f32"):
     expansion_order = 3
     n_points = points_per_rank
     n_samples = 500
@@ -135,14 +135,12 @@ def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, point
 #SBATCH --partition=standard
 #SBATCH --qos=standard
 """
-    if contiguous:
-        slurm += "\n#SBATCH --contiguous\n"
-
     slurm += f"""
 module load PrgEnv-aocc
 module load craype-network-ucx
 module load cray-mpich-ucx
 
+export UCX_UD_TIMEOUT=20m
 export HOME="/home/e738/e738/skailasa"
 export WORK="/work/e738/e738/skailasa"
 
@@ -193,7 +191,6 @@ if __name__ == "__main__":
     parser.add_argument("--points-per-rank", type=int, default=250000)
     parser.add_argument("--local-depth", type=int, default=4)
     parser.add_argument("--method", type=str, default="ccx")
-    parser.add_argument("--contiguous", type=bool, default=False)
     parser.add_argument("--output", type=str, default="job.slurm")
     parser.add_argument("--distribution", type=str, default="uniform")
     parser.add_argument("--config", action='append')
@@ -221,7 +218,7 @@ if __name__ == "__main__":
             args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.points_per_rank, args.local_depth, distribution=args.distribution
         )
 
-        write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth, contiguous=args.contiguous, distribution=distribution)
+        write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth, distribution=distribution)
 
     else:
         raise ValueError("Unknown method")

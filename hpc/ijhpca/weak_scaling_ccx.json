@@ -7,6 +7,5 @@
     "output": "weak_scaling_ccx_sphere.slurm",
     "method": "ccx",
     "scaling_func": 8,
-    "contiguous": false,
     "distribution": "sphere"
 }
