@@ -18,6 +18,18 @@ DISTRIBUTION = {
     "sphere": 1
 }
 
+MACHINE = {
+    "lumi": {
+        "project": "65001872",
+        "partition": "standard"
+    },
+
+    "archer2": {
+        "project": "e738",
+        "partition": "standard"
+    }
+}
+
 def parse_process_mapping(arch):
     ccd_threads_per_rank = arch["cores_per_ccd"]
     ccx_threads_per_rank = arch["cores_per_ccx"]
@@ -114,7 +126,20 @@ def experiment_parameters(
     return n_nodes.tolist(), n_ranks.tolist(), global_depth.tolist(), max_threads_per_rank, distribution
 
 
-def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, points_per_rank, local_depth, distribution="uniform", script_name="fmm_m2l_fft_mpi_f32"):
+def write_slurm(
+    machine,
+    script_path,
+    n_nodes,
+    n_tasks,
+    global_depths,
+    max_threads,
+    points_per_rank,
+    local_depth,
+    hrs,
+    mins,
+    distribution="uniform",
+    script_name="fmm_m2l_fft_mpi_f32",
+    ):
     expansion_order = 3
     n_points = points_per_rank
     n_samples = 500
@@ -126,13 +151,13 @@ def write_slurm(script_path, n_nodes, n_tasks, global_depths, max_threads, point
     max_points = last_tasks * n_points
 
     slurm = f"""#!/bin/bash
-#SBATCH --job-name=weak_scaling_fft
-#SBATCH --time=00:30:00
+#SBATCH --job-name=weak_scaling_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_distribution={distribution}
+#SBATCH --time={hrs}:{mins}:00
 #SBATCH --nodes={last_nodes}
 #SBATCH --ntasks-per-node={int(n_tasks[-1] // n_nodes[-1])}
 #SBATCH --cpus-per-task={cpus_per_task}
-#SBATCH --account=e738
-#SBATCH --partition=standard
+#SBATCH --account={MACHINE[machine]["project"]}
+#SBATCH --partition={MACHINE[machine]["partition"]}
 #SBATCH --qos=standard
 """
     slurm += f"""
@@ -141,8 +166,6 @@ module load craype-network-ucx
 module load cray-mpich-ucx
 
 export UCX_UD_TIMEOUT=20m
-export HOME="/home/e738/e738/skailasa"
-export WORK="/work/e738/e738/skailasa"
 
 script_name="{script_name}"
 
@@ -187,6 +210,10 @@ if __name__ == "__main__":
     parser.add_argument("--method", type=str, default="ccx")
     parser.add_argument("--output", type=str, default="job.slurm")
     parser.add_argument("--distribution", type=str, default="uniform")
+    parser.add_argument("--machine", type=str, default="archer2")
+    parser.add_argument("--hrs", type=str, default="00")
+    parser.add_argument("--mins", type=str, default="30")
+
     parser.add_argument("--config", action='append')
 
     args = parser.parse_args()
@@ -212,7 +239,7 @@ if __name__ == "__main__":
             args.min_nodes, args.max_nodes, ranks_per_node[args.method], args.points_per_rank, args.local_depth, distribution=args.distribution
         )
 
-        write_slurm(args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth, distribution=distribution)
+        write_slurm(args.machine, args.output, n_nodes, n_tasks, global_depths, max_threads, args.points_per_rank, args.local_depth, args.hrs, args.mins, distribution=distribution)
 
     else:
         raise ValueError("Unknown method")

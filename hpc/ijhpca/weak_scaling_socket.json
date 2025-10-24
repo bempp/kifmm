@@ -7,5 +7,8 @@
     "output": "weak_scaling_socket_uniform.slurm",
     "method": "socket",
     "scaling_func": 8,
-    "distribution": "uniform"
+    "distribution": "uniform",
+    "machine": "archer2",
+    "hrs": "0",
+    "mins": "30"
 }
