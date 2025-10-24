@@ -13,6 +13,9 @@ use mpi::{
 use num::Float;
 use rlst::RlstScalar;
 
+#[cfg(feature = "mpi")]
+use crate::traits::types::{MPICollectiveType, OperatorTime};
+
 /// Represents a three-dimensional box characterized by its origin and side-length along the Cartesian axes.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Default)]
@@ -147,6 +150,9 @@ where
 {
     /// Roots associated with trees at this rank
     pub roots: Vec<MortonKey<T>>,
+
+    /// MPI collective times
+    pub mpi_times: HashMap<MPICollectiveType, OperatorTime>,
 
     /// All global roots, only populated at nominated rank
     pub all_roots: Vec<MortonKey<T>>,

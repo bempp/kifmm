@@ -1,5 +1,5 @@
 //! Builder for constructing FMMs on multi-node.
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Instant};
 
 use itertools::Itertools;
 use mpi::{
@@ -12,12 +12,11 @@ use rlst::{MatrixSvd, RlstScalar};
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
 use crate::{
-    fmm::types::PinvMode,
     fmm::{
         helpers::single_node::{level_index_pointer_single_node, ncoeffs_kifmm, optionally_time},
         types::{
             FmmEvalType, Isa, KiFmmMulti, Layout, MultiNodeBuilder, NeighbourhoodCommunicator,
-            Query,
+            PinvMode, Query,
         },
     },
     traits::{
@@ -27,7 +26,7 @@ use crate::{
         },
         fmm::{HomogenousKernel, Metadata, MetadataAccess},
         general::{multi_node::GlobalFmmMetadata, single_node::Epsilon},
-        types::{CommunicationType, MetadataType, OperatorTime},
+        types::{CommunicationType, MPICollectiveType, MetadataType, OperatorTime},
     },
     tree::{
         types::{Domain, SortKind},
@@ -186,6 +185,7 @@ where
                 source_layout: Layout::default(),
                 v_list_query: Query::default(),
                 u_list_query: Query::default(),
+                mpi_times: HashMap::default(),
             };
 
             // Global communication to set the source layout required
@@ -200,6 +200,14 @@ where
             // as manually constructs interaction lists
             fmm_tree.set_queries(true);
             fmm_tree.set_queries(false);
+
+            // TODO Fix timing (adding tree setup times to fmm tree reported times)
+            for (&op_type, op_time) in fmm_tree.source_tree.mpi_times.iter() {
+                fmm_tree
+                    .mpi_times
+                    .entry(op_type)
+                    .and_modify(|t| t.time += op_time.time);
+            }
 
             self.communicator = Some(global_communicator.duplicate());
             self.tree = Some(fmm_tree);
@@ -289,10 +297,14 @@ where
         } else {
             let kernel = self.kernel.unwrap();
             let communicator = self.communicator.unwrap();
+
+            // TODO: clean operator times
+            let s = Instant::now();
             let neighbourhood_communicator_v = NeighbourhoodCommunicator::from_comm(&communicator);
             let neighbourhood_communicator_u = NeighbourhoodCommunicator::from_comm(&communicator);
             let neighbourhood_communicator_charge =
                 NeighbourhoodCommunicator::from_comm(&communicator);
+            let e = s.elapsed().as_millis() as u64;
             let rank = communicator.rank();
             let source_to_target = self.source_to_target.unwrap();
             let fmm_eval_type = self.fmm_eval_type.unwrap();
@@ -399,6 +411,7 @@ where
                 level_index_pointer_multipoles: Vec::default(),
                 potentials_send_pointers: Vec::default(),
                 metadata_times: HashMap::default(),
+                mpi_times: HashMap::default(),
                 ghost_requested_queries_v: Vec::default(),
                 ghost_requested_queries_key_to_index_v: HashMap::default(),
                 ghost_requested_queries_counts_v: Vec::default(),
@@ -418,6 +431,13 @@ where
                 ghost_received_queries_charge_counts: Vec::default(),
                 ghost_received_queries_charge_displacements: Vec::default(),
             };
+
+            // TODO: cleanup timing
+            result
+                .mpi_times
+                .entry(MPICollectiveType::DistGraphCreate)
+                .and_modify(|t| t.time += s.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime { time: e });
 
             // Calculate required metadata
             let (_, duration) = optionally_time(timed, || result.source(PinvMode::svd(None, None)));

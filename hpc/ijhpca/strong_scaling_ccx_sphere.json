@@ -1,0 +1,11 @@
+{
+    "_comment": "Strong scaling",
+    "min_nodes": 1,
+    "max_nodes": 128,
+    "min_points_per_rank": 62500,
+    "min_local_depth": 3,
+    "output": "strong_scaling_ccx_sphere.slurm",
+    "method": "ccx",
+    "scaling_func": 8,
+    "distribution": "sphere"
+}

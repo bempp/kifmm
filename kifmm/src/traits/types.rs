@@ -40,6 +40,56 @@ pub enum FmmOperatorType {
     P2P,
 }
 
+/// Enumeration of MPI collective types for timing
+#[repr(C)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub enum MPICollectiveType {
+    /// All to All
+    AlltoAll,
+
+    /// All to All V
+    AlltoAllV,
+
+    /// Neighbour All to All
+    NeighbourAlltoAll,
+
+    /// Neighbour All to All V
+    NeighbourAlltoAllv,
+
+    /// Neighbour All to All V
+    NeighbourAlltoAllvRuntime,
+
+    /// Gather
+    Gather,
+
+    /// Scatter
+    Scatter,
+
+    /// Gather
+    GatherV,
+
+    /// Scatter
+    ScatterV,
+
+    /// Gather
+    GatherVRuntime,
+
+    /// Scatter
+    ScatterVRuntime,
+
+    /// All Gather
+    AllGather,
+
+    /// All Gather V
+    AllGatherV,
+
+    /// Cart dist-graph create
+    DistGraphCreate,
+
+    /// Parallel sort
+    Sort,
+}
+
 /// Enumeration of communication types for timing
 #[repr(C)]
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
@@ -97,7 +147,7 @@ pub enum MetadataType {
     /// Ghost FMM U
     GhostFmmU,
 
-    /// Pointer and Buffer Creation
+    /// Pointer and Buffer Creationmp
     MetadataCreation,
 
     /// Displacement Map Creation
