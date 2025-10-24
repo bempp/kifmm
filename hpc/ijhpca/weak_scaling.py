@@ -20,7 +20,7 @@ DISTRIBUTION = {
 
 MACHINE = {
     "lumi": {
-        "project": "65001872",
+        "project": "project_465001872",
         "partition": "standard"
     },
 
@@ -150,6 +150,7 @@ def write_slurm(
     last_tasks = n_tasks[-1]
     max_points = last_tasks * n_points
 
+
     slurm = f"""#!/bin/bash
 #SBATCH --job-name=weak_scaling_fft_n={max_points}_p={last_nodes}_points_per_rank={n_points}_distribution={distribution}
 #SBATCH --time={hrs}:{mins}:00
@@ -158,8 +159,12 @@ def write_slurm(
 #SBATCH --cpus-per-task={cpus_per_task}
 #SBATCH --account={MACHINE[machine]["project"]}
 #SBATCH --partition={MACHINE[machine]["partition"]}
-#SBATCH --qos=standard
 """
+    if machine == "archer2":
+        slurm += """
+#SBATCH --qos=standard
+    """
+
     slurm += f"""
 module load PrgEnv-aocc
 module load craype-network-ucx
