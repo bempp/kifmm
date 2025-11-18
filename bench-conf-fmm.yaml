@@ -34,7 +34,7 @@ kernel:
                   3:
                     order: 3
                     depth: 5
-                    eps: 0.001
+                    eps: 0.0000001
                     surface_diff: null
                   4:
                     order: 3

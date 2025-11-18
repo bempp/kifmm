@@ -137,7 +137,6 @@ fn grid_search_laplace_blas_aca<
     );
 
     // Setup random sources and targets
-    let n_sources = 1000000;
     let sources = points_fixture::<T::Real>(n_sources, None, None, Some(0));
     let n_vecs = 1;
     let tmp = vec![T::one(); n_sources * n_vecs];
@@ -156,16 +155,24 @@ fn grid_search_laplace_blas_aca<
         progress += 1;
         println!("BLAS ACA+ Evaluated {progress:?}/{n_params:?}");
 
-        let leaf_idx = 1;
+        let mut leaf_idx = 1;
+        let mut leaf_targets = Vec::new();
+        for (i, leaf) in fmm.tree().target_tree().all_leaves().unwrap().iter().enumerate() {
+            if let Some(targets) = fmm.tree().target_tree().coordinates(leaf) {
+                leaf_idx = i;
+                leaf_targets = targets.to_vec();
+                break;
+            }
+        }
+
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
         let potential = fmm.potential(&leaf).unwrap()[0];
-        let leaf_targets = fmm.tree().target_tree().coordinates(&leaf).unwrap();
         let n_targets = leaf_targets.len() / fmm.dim();
         let mut direct = vec![T::zero(); n_targets];
         fmm.kernel().evaluate_st(
             GreenKernelEvalType::Value,
             sources.data(),
-            leaf_targets,
+            &leaf_targets,
             charges.data(),
             &mut direct,
         );
@@ -630,25 +637,72 @@ fn main() {
     let max_m2l_fft_block_size_vec = vec![16, 32, 64, 128];
     let rsvd_settings_vec = [FmmSvdMode::new(false, None, None, None, None)];
 
-    // Single Precision
+    // // Single Precision
+    // {
+    //     // let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
+    //     let expansion_order_vec: Vec<usize> = vec![5];
+
+    //     let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3)];
+
+    //     let surface_diff_vec: Vec<usize> = vec![0, 1];
+    //     // let depth_vec: Vec<u64> = vec![5, 6];
+    //     let depth_vec: Vec<u64> = vec![6];
+
+    //     let n_points = 8000000;
+
+    //     grid_search_laplace_blas_aca(
+    //         "grid_search_laplace_blas_aca_m1_3".to_string(),
+    //         n_points,
+    //         &expansion_order_vec,
+    //         &svd_threshold_vec,
+    //         &surface_diff_vec,
+    //         &depth_vec
+    //     );
+
+    //     // grid_search_laplace_fft::<f32>(
+    //     //     "grid_search_laplace_fft_f32_m1".to_string(),
+    //     //     n_points,
+    //     //     &expansion_order_vec,
+    //     //     &depth_vec,
+    //     //     &max_m2l_fft_block_size_vec,
+    //     // );
+
+    //     // for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
+    //     //     grid_search_laplace_blas_svd::<f32>(
+    //     //         format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
+    //     //         n_points,
+    //     //         &expansion_order_vec,
+    //     //         &svd_threshold_vec,
+    //     //         &surface_diff_vec,
+    //     //         &depth_vec,
+    //     //         &[rsvd_settings],
+    //     //     );
+    //     // }
+    // }
+
+    // Double Precision
     {
-        let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
+        let expansion_order_vec: Vec<usize> = vec![5, 6, 7, 8, 9, 10];
 
-        let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3), Some(1e-1)];
+        let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3)];
 
-        let surface_diff_vec: Vec<usize> = vec![0, 1, 2];
-        let depth_vec: Vec<u64> = vec![4, 5];
+        let surface_diff_vec: Vec<usize> = vec![0, 1];
+        // let depth_vec: Vec<u64> = vec![5, 6];
+        let depth_vec: Vec<u64> = vec![5];
 
-        let n_points = 10000;
+        let n_points = 1000000;
 
-        grid_search_laplace_blas_aca(
-            "grid_search_laplace_blas_aca_m1".to_string(),
-            n_points,
-            &expansion_order_vec,
-            &svd_threshold_vec,
-            &surface_diff_vec,
-            &depth_vec
-        );
+
+        for (i, &expansion_order) in expansion_order_vec.iter().enumerate() {
+            grid_search_laplace_blas_aca(
+                format!("fp64_grid_search_laplace_blas_aca_m1_{i}").to_string(),
+                n_points,
+                &[expansion_order],
+                &svd_threshold_vec,
+                &surface_diff_vec,
+                &depth_vec
+            );
+        }
 
         // grid_search_laplace_fft::<f32>(
         //     "grid_search_laplace_fft_f32_m1".to_string(),
