@@ -120,7 +120,7 @@ fn grid_search_laplace_blas_aca<
         .write_record(&[
             "depth".to_string(),
             "surface_diff".to_string(),
-            "svd_threshold".to_string(),
+            "eps".to_string(),
             "expansion_order".to_string(),
             "runtime".to_string(),
             "min_rel_err".to_string(),
@@ -132,7 +132,7 @@ fn grid_search_laplace_blas_aca<
         .unwrap();
 
     println!(
-        "BLAS Pre-computation Time Elapsed {:?}",
+        "BLAS ACA+ Pre-computation Time Elapsed {:?}",
         s.elapsed().as_secs()
     );
 
@@ -154,7 +154,7 @@ fn grid_search_laplace_blas_aca<
         fmm.evaluate().unwrap();
         let time = s.elapsed().as_millis() as f32;
         progress += 1;
-        println!("BLAS Evaluated {progress:?}/{n_params:?}");
+        println!("BLAS ACA+ Evaluated {progress:?}/{n_params:?}");
 
         let leaf_idx = 1;
         let leaf = fmm.tree().target_tree().all_leaves().unwrap()[leaf_idx];
@@ -632,7 +632,7 @@ fn main() {
 
     // Single Precision
     {
-        let expansion_order_vec: Vec<usize> = vec![3];
+        let expansion_order_vec: Vec<usize> = vec![3, 4, 5];
 
         let svd_threshold_vec = vec![None, Some(1e-7), Some(1e-5), Some(1e-3), Some(1e-1)];
 
@@ -641,24 +641,33 @@ fn main() {
 
         let n_points = 10000;
 
-        grid_search_laplace_fft::<f32>(
-            "grid_search_laplace_fft_f32_m1".to_string(),
+        grid_search_laplace_blas_aca(
+            "grid_search_laplace_blas_aca_m1".to_string(),
             n_points,
             &expansion_order_vec,
-            &depth_vec,
-            &max_m2l_fft_block_size_vec,
+            &svd_threshold_vec,
+            &surface_diff_vec,
+            &depth_vec
         );
 
-        for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
-            grid_search_laplace_blas_svd::<f32>(
-                format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
-                n_points,
-                &expansion_order_vec,
-                &svd_threshold_vec,
-                &surface_diff_vec,
-                &depth_vec,
-                &[rsvd_settings],
-            );
-        }
+        // grid_search_laplace_fft::<f32>(
+        //     "grid_search_laplace_fft_f32_m1".to_string(),
+        //     n_points,
+        //     &expansion_order_vec,
+        //     &depth_vec,
+        //     &max_m2l_fft_block_size_vec,
+        // );
+
+        // for (i, &rsvd_settings) in rsvd_settings_vec.iter().enumerate() {
+        //     grid_search_laplace_blas_svd::<f32>(
+        //         format!("grid_search_laplace_blas_f32_m1_{i}").to_string(),
+        //         n_points,
+        //         &expansion_order_vec,
+        //         &svd_threshold_vec,
+        //         &surface_diff_vec,
+        //         &depth_vec,
+        //         &[rsvd_settings],
+        //     );
+        // }
     }
 }
