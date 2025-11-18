@@ -8,14 +8,14 @@ use criterion::{
 
 use num::Float;
 use rand_distr::uniform::SampleUniform;
-use rlst::{rlst_dynamic_array2, MatrixQr, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{MatrixQr, MatrixSvd, RawAccess, RawAccessMut, RlstScalar, dense::linalg::svd, rlst_dynamic_array2};
 use serde_yaml::Value;
 
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 
 use kifmm::{
     fftw::array::AlignedAllocable,
-    fmm::types::{BlasFieldTranslationSaRcmp, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder},
+    fmm::types::{BlasFieldTranslationSaRcmp, BlasFieldTranslationAca, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder},
     linalg::rsvd::MatrixRsvd,
     traits::{
         fftw::Dft,
@@ -107,7 +107,7 @@ fn benchmark_fft_m2l<
 }
 
 #[allow(clippy::too_many_arguments)]
-fn benchmark_blas_m2l<
+fn benchmark_blas_m2l_rsvd<
     T: RlstScalar<Real = T>
         + Epsilon
         + MatrixRsvd
@@ -184,6 +184,87 @@ fn benchmark_blas_m2l<
         |b| b.iter(|| fmm_blas.p2p().unwrap()),
     );
 }
+
+
+
+#[allow(clippy::too_many_arguments)]
+fn benchmark_blas_m2l_aca<
+    T: RlstScalar<Real = T>
+        + Epsilon
+        + MatrixRsvd
+        + Float
+        + SampleUniform
+        + MatrixQr
+        + Default
+        + Upcast
+        + ArgmaxValue<T>
+        + Cast<<T as Upcast>::Higher>
+        + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
+    M: Measurement,
+>(
+    group: &mut criterion::BenchmarkGroup<'_, M>,
+    digits: usize,
+    n_points: usize,
+    n_vecs: usize,
+    e: usize,
+    surface_diff: Option<usize>,
+    depth: Option<u64>,
+    eps: Option<T>,
+) where
+    <T as RlstScalar>::Real: Epsilon,
+    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
+{
+    let sources = points_fixture::<T>(n_points, None, None, Some(0));
+    let targets = points_fixture::<T>(n_points, None, None, Some(1));
+
+    let tmp = vec![T::one(); n_points * n_vecs];
+    let mut charges = rlst_dynamic_array2!(T, [n_points, n_vecs]);
+    charges.data_mut().copy_from_slice(&tmp);
+
+    // BLAS based M2L for a vector of charges
+    // FMM parameters
+    let n_crit = None;
+    let expansion_order = vec![e; depth.unwrap() as usize + 1];
+    let prune_empty = true;
+
+    let mut fmm_blas = SingleNodeBuilder::new(false)
+        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+        .unwrap()
+        .parameters(
+            charges.data(),
+            &expansion_order,
+            Laplace3dKernel::new(),
+            GreenKernelEvalType::Value,
+            BlasFieldTranslationAca::new(eps, surface_diff, Some(true)),
+            None,
+        )
+        .unwrap()
+        .build()
+        .unwrap();
+
+    group.bench_function(
+        format!("M2L=BLAS ACA digits={digits} n_points={n_points} n_vecs={n_vecs}",),
+        |b| b.iter(|| fmm_blas.evaluate()),
+    );
+
+    group.bench_function(
+        format!("M2L=BLAS ACA digits={digits} n_points={n_points} n_vecs={n_vecs}, M2L",),
+        |b| {
+            b.iter(|| {
+                for level in 2..=fmm_blas.tree().target_tree().depth() {
+                    fmm_blas.m2l(level).unwrap();
+                }
+            })
+        },
+    );
+
+    group.bench_function(
+        format!("M2L=BLAS ACA digits={digits} n_points={n_points} n_vecs={n_vecs}, P2P",),
+        |b| b.iter(|| fmm_blas.p2p().unwrap()),
+    );
+}
+
 
 fn laplace_potentials(c: &mut Criterion) {
     let mut group = c.benchmark_group("Potentials");
@@ -280,13 +361,72 @@ fn laplace_potentials(c: &mut Criterion) {
             }
         }
 
-        // Parse the BLAS M2L parameters
-        let blas_m2l = data
-            .get("blas")
+        let blas_aca_m2l = data.get("blas_aca").and_then(Value::as_mapping).expect("Expected 'blas_aca' to be a mapping");
+        let n_points_map = blas_aca_m2l
+            .get("n_points")
             .and_then(Value::as_mapping)
-            .expect("Expected 'blas' to be a mapping");
+            .expect("Expected 'n_points' to be a mapping");
 
-        let n_points_map = blas_m2l
+        for (n_points_key, n_points_val) in n_points_map {
+            let n_points = n_points_key.as_u64().unwrap_or(0);
+
+            if let Some(digits_map) = n_points_val.get("digits").and_then(Value::as_mapping) {
+                for (digit_key, params_val) in digits_map {
+                    let digits = digit_key.as_i64().unwrap_or(0) as usize;
+                    let e = params_val.get("order").and_then(Value::as_u64).unwrap_or(0);
+
+                    let surface_diff = params_val
+                        .get("surface_diff")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0);
+                    let eps = params_val
+                        .get("eps")
+                        .and_then(Value::as_f64)
+                        .unwrap_or(0.);
+                    let depth = params_val.get("depth").and_then(Value::as_u64).unwrap_or(0);
+
+                    println!(
+                        "precision: {precision}, m2l: blas_aca, n_points: {n_points}, digits: {digits}"
+                    );
+
+                    if precision == "fp32" {
+                        benchmark_blas_m2l_aca::<f32, WallTime>(
+                            &mut group,
+                            digits,
+                            n_points.try_into().unwrap(),
+                            1,
+                            e.try_into().unwrap(),
+                            Some(surface_diff.try_into().unwrap()),
+                            Some(depth),
+                            Some(eps as f32)
+                        );
+                    } else {
+                        benchmark_blas_m2l_aca::<f64, WallTime>(
+                            &mut group,
+                            digits,
+                            n_points.try_into().unwrap(),
+                            1,
+                            e.try_into().unwrap(),
+                            Some(surface_diff.try_into().unwrap()),
+                            Some(depth),
+                            Some(eps as f64)
+                        );
+
+                    }
+
+                }
+            }
+        }
+
+
+
+        // Parse the BLAS M2L parameters
+        let blas_rsvd_m2l = data
+            .get("blas_rsvd")
+            .and_then(Value::as_mapping)
+            .expect("Expected 'blas_rsvd' to be a mapping");
+
+        let n_points_map = blas_rsvd_m2l
             .get("n_points")
             .and_then(Value::as_mapping)
             .expect("Expected 'n_points' to be a mapping");
@@ -314,11 +454,11 @@ fn laplace_potentials(c: &mut Criterion) {
                     let depth = params_val.get("depth").and_then(Value::as_u64).unwrap_or(0);
 
                     println!(
-                        "precision: {precision}, m2l: blas, n_points: {n_points}, digits: {digits}"
+                        "precision: {precision}, m2l: blas_rsvd, n_points: {n_points}, digits: {digits}"
                     );
 
                     if precision == "fp32" {
-                        benchmark_blas_m2l::<f32, WallTime>(
+                        benchmark_blas_m2l_rsvd::<f32, WallTime>(
                             &mut group,
                             digits,
                             n_points.try_into().unwrap(),
@@ -336,7 +476,7 @@ fn laplace_potentials(c: &mut Criterion) {
                             Some(svd_threshold as f32),
                         );
                     } else {
-                        benchmark_blas_m2l::<f64, WallTime>(
+                        benchmark_blas_m2l_rsvd::<f64, WallTime>(
                             &mut group,
                             digits,
                             n_points.try_into().unwrap(),

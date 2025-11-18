@@ -3,7 +3,7 @@ kernel:
     arch:
       APPLE_M1:
         fp32:
-          blas:
+          blas_rsvd:
             n_points:
               1000000:
                 digits:
@@ -27,6 +27,27 @@ kernel:
                     svd_threshold: 1e-7
                     surface_diff: null
                     n_oversamples: 10
+          blas_aca:
+            n_points:
+              1000000:
+                digits:
+                  3:
+                    order: 3
+                    depth: 5
+                    eps: 0.001
+                    surface_diff: null
+                  4:
+                    order: 3
+                    depth: 5
+                    eps: null
+                    surface_diff: 1
+              8000000:
+                digits:
+                  3:
+                    order: 3
+                    depth: 6
+                    eps: 1e-7
+                    surface_diff: null
 
           fft:
             n_points:
@@ -84,7 +105,7 @@ kernel:
                     block_size: 32
                     depth: 5
 
-          blas:
+          blas_rsvd:
             n_points:
               1000000:
                 digits:
@@ -133,9 +154,51 @@ kernel:
                     surface_diff: 2
                     n_oversamples: 20
                     svd_threshold: 1e-7
+          blas_aca:
+            n_points:
+              1000000:
+                digits:
+                  6:
+                    order: 5
+                    depth: 5
+                    surface_diff: 1
+                    eps: 0.001
+                  8:
+                    order: 8
+                    depth: 5
+                    surface_diff: 2
+                    eps: 0.001
+                  10:
+                    order: 9
+                    depth: 4
+                    surface_diff: 2
+                    eps: 1e-7
+
+              8000000:
+                digits:
+                  4:
+                    order: 3
+                    depth: 6
+                    surface_diff: 2
+                    eps: 0.001
+                  6:
+                    order: 5
+                    depth: 5
+                    surface_diff: 1
+                    eps: 0.001
+                  8:
+                    order: 7
+                    depth: 5
+                    surface_diff: 1
+                    eps: 0.00001
+                  10:
+                    order: 9
+                    depth: 5
+                    surface_diff: 2
+                    eps: 1e-7
       AMD_3790X:
         fp32:
-          blas:
+          blas_rsvd:
             n_points:
               1000000:
                 digits:
@@ -188,8 +251,35 @@ kernel:
                     order: 4
                     depth: 5
                     block_size: 32
+          blas_aca:
+            n_points:
+              1000000:
+                digits:
+                  3:
+                    order: 3
+                    depth: 4
+                    eps: null
+                    eps: 0.001
+                  4:
+                    order: 3
+                    depth: 4
+                    surface_diff: 2
+                    eps: 1e-7
+              8000000:
+                digits:
+                  3:
+                    order: 3
+                    depth: 5
+                    surface_diff: null
+                    eps: null
+                  4:
+                    order: 3
+                    depth: 5
+                    surface_diff: 2
+                    eps: 0.001
+
         fp64:
-          blas:
+          blas_rsvd:
             n_points:
               1000000:
                 digits:
@@ -231,6 +321,42 @@ kernel:
                     surface_diff: 2
                     n_oversamples: 20
                     svd_threshold: 1e-7
+          blas_aca:
+            n_points:
+              1000000:
+                digits:
+                  6:
+                    order: 5
+                    depth: 4
+                    surface_diff: 1
+                    eps: 0.00001
+                  8:
+                    order: 7
+                    depth: 4
+                    surface_diff: 1
+                    eps: 0.00001
+                  10:
+                    order: 9
+                    depth: 4
+                    surface_diff: 2
+                    eps: 1e-7
+              8000000:
+                digits:
+                  6:
+                    order: 5
+                    depth: 5
+                    surface_diff: 1
+                    eps: 0.00001
+                  8:
+                    order: 7
+                    depth: 5
+                    surface_diff: 1
+                    eps: 0.00001
+                  10:
+                    order: 9
+                    depth: 5
+                    surface_diff: 2
+                    eps: 1e-7
 
           fft:
             n_points:
