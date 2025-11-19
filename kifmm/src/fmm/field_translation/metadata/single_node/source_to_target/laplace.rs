@@ -828,10 +828,14 @@ where
             // For each halo position
             for i in 0..halo_children.len() {
                 // For each unique interaction
-                for j in 0..NSIBLINGS_SQUARED {
+                for (j, kernel_data_ij) in kernel_data_vec[i]
+                    .iter()
+                    .enumerate()
+                    .take(NSIBLINGS_SQUARED)
+                {
                     let offset = j * transform_size;
                     kernel_data[i][offset..offset + transform_size]
-                        .copy_from_slice(kernel_data_vec[i][j].data())
+                        .copy_from_slice(kernel_data_ij.data())
                 }
             }
 

@@ -985,9 +985,8 @@ where
             // Iterate over each set of convolutions in the halo (26)
             for i in 0..NHALO {
                 // Iterate over each unique convolution between sibling set, and halo siblings (64)
-                for j in 0..NSIBLINGS_SQUARED {
-                    let tv = transfer_vector_index[i][j];
-                    let (source, target) = tv_source_target_pair_map.get(&tv).unwrap();
+                for tv_ij in transfer_vector_index[i].iter().take(NSIBLINGS_SQUARED) {
+                    let (source, target) = tv_source_target_pair_map.get(tv_ij).unwrap();
 
                     let source_equivalent_surface = source.surface_grid(
                         equivalent_surface_order,
@@ -1081,10 +1080,14 @@ where
             // For each halo position
             for i in 0..halo_children.len() {
                 // For each unique interaction
-                for j in 0..NSIBLINGS_SQUARED {
+                for (j, kernel_data_ij) in kernel_data_vec[i]
+                    .iter()
+                    .enumerate()
+                    .take(NSIBLINGS_SQUARED)
+                {
                     let offset = j * transform_size;
                     kernel_data[i][offset..offset + transform_size]
-                        .copy_from_slice(kernel_data_vec[i][j].data())
+                        .copy_from_slice(kernel_data_ij.data())
                 }
             }
 
@@ -1300,10 +1303,14 @@ where
                 // For each halo position
                 for i in 0..halo_children.len() {
                     // For each unique interaction
-                    for j in 0..NSIBLINGS_SQUARED {
+                    for (j, kernel_data_ij) in kernel_data_vec[i]
+                        .iter()
+                        .enumerate()
+                        .take(NSIBLINGS_SQUARED)
+                    {
                         let offset = j * transform_size;
                         kernel_data[i][offset..offset + transform_size]
-                            .copy_from_slice(kernel_data_vec[i][j].data())
+                            .copy_from_slice(kernel_data_ij.data())
                     }
                 }
 
