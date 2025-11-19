@@ -400,6 +400,7 @@ pub mod aarch64 {
     }
 }
 
+#[allow(clippy::missing_transmute_annotations)]
 #[cfg(all(target_arch = "x86_64", target_feature = "avx2"))]
 pub mod x86 {
     use super::{c32, c64, Hadamard8x8Data};
