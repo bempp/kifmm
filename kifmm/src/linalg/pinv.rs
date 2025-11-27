@@ -7,13 +7,14 @@ use coe::{is_same, Coerce};
 use green_kernels::traits::Kernel;
 use num::{One, Zero};
 use rlst::{
-    c32, c64, empty_array, rlst_dynamic_array2, Array, BaseArray, MatrixQr, MatrixSvd, MultInto,
-    MultIntoResize, QrDecomposition, RawAccess, RawAccessMut, RlstError, RlstResult, RlstScalar,
-    Shape, SvdMode, VectorContainer,
+    c32, c64,
+    dense::linalg::lapack::{qr::QrDecomposition, singular_value_decomposition::SvdMode},
+    empty_array, rlst_dynamic_array, DynArray, Lapack, MultInto, MultIntoResize, RawAccess,
+    RawAccessMut, RlstError, RlstResult, RlstScalar, Shape,
 };
 
 /// Matrix type
-pub type PinvMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type PinvMatrix<T> = DynArray<T, 2>;
 
 type PinvReturnType<T> = RlstResult<(Vec<<T as RlstScalar>::Real>, PinvMatrix<T>, PinvMatrix<T>)>;
 
@@ -33,7 +34,7 @@ pub(crate) fn pinv<T>(
     rtol: Option<T::Real>,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon + MatrixSvd,
+    T: RlstScalar + Epsilon + Lapack,
     <T as RlstScalar>::Real: Epsilon,
 {
     let shape = mat.shape();
@@ -64,19 +65,19 @@ where
             if l2_norm <= threshold {
                 // Zero vector, so pseudo-inverse is zero
                 let zero_s = vec![T::Real::zero()];
-                let v = rlst_dynamic_array2!(T, [shape[1], 1]);
-                let ut = rlst_dynamic_array2!(T, [1, 1]);
+                let v = rlst_dynamic_array!(T, [shape[1], 1]);
+                let ut = rlst_dynamic_array!(T, [1, 1]);
                 return Ok((zero_s, ut, v));
             }
 
             // Compute SVD of row vector
             let s = vec![T::Real::one() / l2_norm];
-            let mut v = rlst_dynamic_array2!(T, [shape[1], 1]);
+            let mut v = rlst_dynamic_array!(T, [shape[1], 1]);
             for (i, &x) in mat.data().iter().enumerate() {
                 v[[i, 0]] = x.conj() / T::from_real(l2_norm);
             }
 
-            let mut ut = rlst_dynamic_array2!(T, [1, 1]);
+            let mut ut = rlst_dynamic_array!(T, [1, 1]);
             ut[[0, 0]] = T::one();
 
             Ok((s, ut, v))
@@ -95,19 +96,19 @@ where
             if l2_norm <= threshold {
                 // Zero vector, so pseudo-inverse is zero
                 let zero_s = vec![T::Real::zero()];
-                let v = rlst_dynamic_array2!(T, [1, 1]);
-                let ut = rlst_dynamic_array2!(T, [1, shape[0]]);
+                let v = rlst_dynamic_array!(T, [1, 1]);
+                let ut = rlst_dynamic_array!(T, [1, shape[0]]);
                 return Ok((zero_s, ut, v));
             }
 
             // Compute SVD of column vector
             let s = vec![T::Real::one() / l2_norm];
-            let mut ut = rlst_dynamic_array2!(T, [1, shape[0]]);
+            let mut ut = rlst_dynamic_array!(T, [1, shape[0]]);
             for (j, &x) in mat.data().iter().enumerate() {
                 ut[[0, j]] = x.conj() / T::from_real(l2_norm);
             }
 
-            let mut v = rlst_dynamic_array2!(T, [1, 1]);
+            let mut v = rlst_dynamic_array!(T, [1, 1]);
             v[[0, 0]] = T::one();
 
             Ok((s, ut, v))
@@ -120,11 +121,11 @@ where
     } else {
         // For matrices compute the full SVD
         let k = std::cmp::min(shape[0], shape[1]);
-        let mut u = rlst_dynamic_array2!(T, [shape[0], k]);
+        let mut u = rlst_dynamic_array!(T, [shape[0], k]);
         let mut s = vec![T::zero().re(); k];
-        let mut vt = rlst_dynamic_array2!(T, [k, shape[1]]);
+        let mut vt = rlst_dynamic_array!(T, [k, shape[1]]);
 
-        let mut mat_copy = rlst_dynamic_array2!(T, shape);
+        let mut mat_copy = DynArray::<T>::from_shape(shape);
         mat_copy.fill_from(mat.r());
 
         mat_copy
@@ -147,8 +148,8 @@ where
         }
 
         // Return pseudo-inverse in component form
-        let mut v = rlst_dynamic_array2!(T, [vt.shape()[1], vt.shape()[0]]);
-        let mut ut = rlst_dynamic_array2!(T, [u.shape()[1], u.shape()[0]]);
+        let mut v = rlst_dynamic_array!(T, [vt.shape()[1], vt.shape()[0]]);
+        let mut ut = rlst_dynamic_array!(T, [u.shape()[1], u.shape()[0]]);
         v.fill_from(vt.conj().transpose());
         ut.fill_from(u.conj().transpose());
 
@@ -158,17 +159,17 @@ where
 
 macro_rules! extract_qrp_typed {
     ($qr_u:expr, $qr_v:expr, $qu:expr, $ru:expr, $pu_vec:expr, $qv:expr, $rv:expr, $pv_vec:expr, $ty:ty) => {{
-        let qr_u: &QrDecomposition<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>> = $qr_u.coerce();
-        let qu: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $qu).coerce();
-        let ru: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $ru).coerce();
+        let qr_u: &QrDecomposition<$ty> = $qr_u.coerce();
+        let qu: &mut DynArray<$ty, 2> = (&mut $qu).coerce();
+        let ru: &mut DynArray<$ty, 2> = (&mut $ru).coerce();
 
         qr_u.get_r(ru.r_mut());
         qr_u.get_q_alloc(qu.r_mut())?;
         *$pu_vec = qr_u.get_perm();
 
-        let qr_v: &QrDecomposition<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>> = $qr_v.coerce();
-        let qv: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $qv).coerce();
-        let rv: &mut Array<$ty, BaseArray<$ty, VectorContainer<$ty>, 2>, 2> = (&mut $rv).coerce();
+        let qr_v: &QrDecomposition<$ty> = $qr_v.coerce();
+        let qv: &mut DynArray<$ty, 2> = (&mut $qv).coerce();
+        let rv: &mut DynArray<$ty, 2> = (&mut $rv).coerce();
 
         qr_v.get_r(rv.r_mut());
         qr_v.get_q_alloc(qv.r_mut())?;
@@ -198,18 +199,12 @@ pub(crate) fn pinv_aca_plus<T, K>(
     test: bool,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar
-        + Epsilon
-        + MatrixSvd
-        + MatrixQr
-        + ArgmaxValue<T>
-        + Upcast
-        + Cast<<T as Upcast>::Higher>,
+    T: RlstScalar + Epsilon + Lapack + ArgmaxValue<T> + Upcast + Cast<<T as Upcast>::Higher>,
     <T as RlstScalar>::Real: ArgmaxValue<<T as RlstScalar>::Real>
         + Epsilon
         + Upcast
         + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
-    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
+    <T as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<T>,
     <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<T::Real>,
     K: Kernel<T = T>,
 {
@@ -248,23 +243,21 @@ where
         // v_aca := v_aca^H
         let [m1, n1] = u_aca.shape();
         let [m2, n2] = v_aca_t.shape();
-        let mut v_aca = rlst_dynamic_array2!(T, [n2, m2]);
+        let mut v_aca = rlst_dynamic_array!(T, [n2, m2]);
         v_aca.fill_from(v_aca_t.r().conj().transpose());
         let [m3, n3] = v_aca.shape();
 
         // Compute QR decomposition of result
         let r = std::cmp::min(m1, n1);
-        let mut qu: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> =
-            rlst_dynamic_array2!(T, [m1, r]);
+        let mut qu: DynArray<T, 2> = rlst_dynamic_array!(T, [m1, r]);
         let k = std::cmp::min(m1, n1);
-        let mut ru = rlst_dynamic_array2!(T, [k, n1]);
+        let mut ru = rlst_dynamic_array!(T, [k, n1]);
         let mut pu_vec = Vec::new();
 
         let r = std::cmp::min(m3, n3);
-        let mut qv: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2> =
-            rlst_dynamic_array2!(T, [m3, r]);
+        let mut qv: DynArray<T, 2> = rlst_dynamic_array!(T, [m3, r]);
         let k = std::cmp::min(m3, n3);
-        let mut rv = rlst_dynamic_array2!(T, [k, n3]);
+        let mut rv = rlst_dynamic_array!(T, [k, n3]);
         let mut pv_vec = Vec::new();
 
         let qr_u_aca = u_aca.into_qr_alloc()?;
@@ -325,7 +318,7 @@ where
         // Compute SVD based pseudo-inverse on tiny core matrix formed from R factors
         // First form core matrix from P and R factors of QR decomposition
         // ru_pu_t = ru * pu^T
-        let mut ru_pu_t = rlst_dynamic_array2!(T, ru.shape());
+        let mut ru_pu_t = DynArray::<T>::from_shape(ru.shape());
 
         // Iterate over pu_t matrix
         for (old_j, &new_j) in pu_vec.iter().enumerate() {
@@ -336,10 +329,10 @@ where
         }
 
         // pv_rv_t = pv * rv^H
-        let mut rv_t = rlst_dynamic_array2!(T, [rv.shape()[1], rv.shape()[0]]);
+        let mut rv_t = rlst_dynamic_array!(T, [rv.shape()[1], rv.shape()[0]]);
         rv_t.fill_from(rv.r().transpose().conj());
 
-        let mut pv_rv_t = rlst_dynamic_array2!(T, rv_t.shape());
+        let mut pv_rv_t = DynArray::<T>::from_shape(rv_t.shape());
 
         for (old_i, &new_i) in pv_vec.iter().enumerate() {
             // Iterate over columns of output
@@ -365,19 +358,19 @@ where
             (s_c, ut_c, v_c) = pinv(&c, None, None).unwrap()
         } else {
             // Casting required
-            let mut c_64 = rlst_dynamic_array2!(<T as Upcast>::Higher, c.shape());
+            let mut c_64 = DynArray::<<T as Upcast>::Higher>::from_shape(c.shape());
             for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
                 *dst = src.cast();
             }
             let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None).unwrap();
 
             // Downcast back to T
-            ut_c = rlst_dynamic_array2!(T, ut_c_v.shape());
+            ut_c = DynArray::<T>::from_shape(ut_c_v.shape());
             for (dst, src) in ut_c.data_mut().iter_mut().zip(ut_c_v.data().iter()) {
                 *dst = src.cast();
             }
 
-            v_c = rlst_dynamic_array2!(T, v_c_v.shape());
+            v_c = DynArray::<T>::from_shape(v_c_v.shape());
             for (dst, src) in v_c.data_mut().iter_mut().zip(v_c_v.data().iter()) {
                 *dst = src.cast();
             }
@@ -388,24 +381,24 @@ where
         }
 
         // Form factors of pseudo inverse
-        let mut left = rlst_dynamic_array2!(T, [qv.shape()[0], v_c.shape()[1]]);
+        let mut left = rlst_dynamic_array!(T, [qv.shape()[0], v_c.shape()[1]]);
         left.r_mut().simple_mult_into(qv.r(), v_c.r());
 
         // qu_t := qu^H
         let [qu_m, qu_n] = qu.shape();
-        let mut qu_t = rlst_dynamic_array2!(T, [qu_n, qu_m]);
+        let mut qu_t = rlst_dynamic_array!(T, [qu_n, qu_m]);
         qu_t.r_mut().fill_from(qu.r().conj().transpose());
 
-        let mut right = rlst_dynamic_array2!(T, [ut_c.shape()[0], qu_t.shape()[1]]);
+        let mut right = rlst_dynamic_array!(T, [ut_c.shape()[0], qu_t.shape()[1]]);
         right.r_mut().simple_mult_into(ut_c.r(), qu_t.r());
 
         if test {
             // qv_t := qv^H
             let [qv_m, qv_n] = qv.shape();
-            let mut qv_t = rlst_dynamic_array2!(T, [qv_n, qv_m]);
+            let mut qv_t = rlst_dynamic_array!(T, [qv_n, qv_m]);
             qv_t.fill_from(qv.r().conj().transpose());
 
-            let mut mat_s = rlst_dynamic_array2!(T, [s_c.len(), s_c.len()]);
+            let mut mat_s = rlst_dynamic_array!(T, [s_c.len(), s_c.len()]);
             for i in 0..s_c.len() {
                 mat_s[[i, i]] = T::from(s_c[i]).unwrap();
             }
@@ -467,17 +460,17 @@ mod test {
     use super::*;
     use approx::assert_relative_eq;
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
-    use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessByRef, RawAccess};
+    use rlst::{empty_array, MultIntoResize, RandomAccessByRef, RawAccess};
 
     #[test]
     fn test_pinv_square() {
         let dim: usize = 5;
-        let mut mat = rlst_dynamic_array2!(f64, [dim, dim]);
+        let mut mat = rlst_dynamic_array!(f64, [dim, dim]);
         mat.fill_from_seed_equally_distributed(0);
 
         let (s, ut, v) = pinv::<f64>(&mat, None, None).unwrap();
 
-        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
+        let mut mat_s = rlst_dynamic_array!(f64, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
@@ -490,7 +483,7 @@ mod test {
         let actual = empty_array::<f64, 2>().simple_mult_into_resize(inv.r(), mat.r());
 
         // Expect the identity matrix
-        let mut expected = rlst_dynamic_array2!(f64, actual.shape());
+        let mut expected = DynArray::<f64>::from_shape(actual.shape());
         for i in 0..dim {
             expected[[i, i]] = 1.0
         }
@@ -509,12 +502,12 @@ mod test {
     #[test]
     fn test_pinv_rectangle() {
         let dim: usize = 5;
-        let mut mat = rlst_dynamic_array2!(f64, [dim, dim + 1]);
+        let mut mat = rlst_dynamic_array!(f64, [dim, dim + 1]);
         mat.fill_from_seed_equally_distributed(0);
 
         let (s, ut, v) = pinv::<f64>(&mat, None, None).unwrap();
 
-        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
+        let mut mat_s = rlst_dynamic_array!(f64, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
@@ -527,7 +520,7 @@ mod test {
         let actual = empty_array::<f64, 2>().simple_mult_into_resize(mat.r(), inv.r());
 
         // Expect the identity matrix
-        let mut expected = rlst_dynamic_array2!(f64, actual.shape());
+        let mut expected = DynArray::<f64>::from_shape(actual.shape());
         for i in 0..dim {
             expected[[i, i]] = 1.0
         }

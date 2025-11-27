@@ -3,11 +3,11 @@
 
 use itertools::Itertools;
 use num::Float;
-use rand::{distributions::Uniform, prelude::*, rngs::StdRng, SeedableRng};
-use rlst::{rlst_dynamic_array2, Array, BaseArray, RlstScalar, VectorContainer};
+use rand::{distr::StandardUniform, prelude::*, rngs::StdRng, SeedableRng};
+use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
 /// Alias for an rlst container for point data, expected with shape [n_points, 3];
-pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type PointsMat<T> = DynArray<T, 2>;
 
 /// Points fixture for testing, uniformly samples in each axis from min to max.
 ///
@@ -16,7 +16,7 @@ pub type PointsMat<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
 /// * `min` - The minimum coordinate value along each axis, defaults to 1
 /// * `max` - The maximum coordinate value along each axis, defaults to 0.
 /// * `seed` - Random seed, defaults to 0.
-pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture<T: Float + RlstScalar + rand::distr::uniform::SampleUniform>(
     n_points: usize,
     min: Option<T>,
     max: Option<T>,
@@ -28,12 +28,12 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
 
     let between;
     if let (Some(min), Some(max)) = (min, max) {
-        between = rand::distributions::Uniform::from(min..max);
+        between = rand::distr::StandardUniform::from(min..max);
     } else {
-        between = rand::distributions::Uniform::from(T::zero()..T::one());
+        between = rand::distr::StandardUniform::from(T::zero()..T::one());
     }
 
-    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
+    let mut points = rlst_dynamic_array!(T, [3, n_points]);
 
     for i in 0..n_points {
         points[[0, i]] = between.sample(&mut range);
@@ -50,7 +50,7 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distributions::uniform::Samp
 /// * `n_points` - The number of points to sample.
 /// * `min` - The minimum coordinate value along each axis.
 /// * `max` - The maximum coordinate value along each axis.
-pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture_sphere<T: RlstScalar + rand::distr::uniform::SampleUniform>(
     n_points: usize,
 ) -> PointsMat<T> {
     // Seeded random number generator for reproducibility
@@ -59,11 +59,11 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
     let two = T::from(2.0).unwrap();
 
     // Uniform distributions for phi and z = cos(theta)
-    let phi_dist = Uniform::from(T::zero()..(two * pi));
-    let z_dist = Uniform::from(T::from(-1.0).unwrap()..T::from(1.0).unwrap());
+    let phi_dist = StandardUniform::from(T::zero()..(two * pi));
+    let z_dist = StandardUniform::from(T::from(-1.0).unwrap()..T::from(1.0).unwrap());
 
     // Initialize points array
-    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
+    let mut points = rlst_dynamic_array!(T, [3, n_points]);
 
     for i in 0..n_points {
         // Generate random phi and theta
@@ -90,9 +90,7 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distributions::uniform::Sampl
 /// * `n_points` - The number of points to sample.
 /// * `a` - Semi-axis length along x- and y-axes.
 /// * `c` -  Semi-axis length along the z-axis.
-pub fn points_fixture_oblate_spheroid<
-    T: RlstScalar + rand::distributions::uniform::SampleUniform,
->(
+pub fn points_fixture_oblate_spheroid<T: RlstScalar + rand::distr::uniform::SampleUniform>(
     n_points: usize,
     a: T,
     c: T,
@@ -102,10 +100,10 @@ pub fn points_fixture_oblate_spheroid<
     let two = T::from(2.0).unwrap();
     let one = T::one();
 
-    let phi_dist = Uniform::from(T::zero()..(two * pi)); // Azimuthal angle
-    let cos_theta_dist = Uniform::from(-one..one); // Cosine of polar angle
+    let phi_dist = StandardUniform::from(T::zero()..(two * pi)); // Azimuthal angle
+    let cos_theta_dist = StandardUniform::from(-one..one); // Cosine of polar angle
 
-    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
+    let mut points = rlst_dynamic_array!(T, [3, n_points]);
 
     for i in 0..n_points {
         let phi = phi_dist.sample(&mut rng); // Random azimuthal angle
@@ -126,16 +124,16 @@ pub fn points_fixture_oblate_spheroid<
 ///
 /// # Arguments
 /// * `n_points` - The number of points to sample.
-pub fn points_fixture_col<T: Float + RlstScalar + rand::distributions::uniform::SampleUniform>(
+pub fn points_fixture_col<T: Float + RlstScalar + rand::distr::uniform::SampleUniform>(
     n_points: usize,
 ) -> PointsMat<T> {
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
 
-    let between1 = rand::distributions::Uniform::from(T::zero()..T::from(0.1).unwrap());
-    let between2 = rand::distributions::Uniform::from(T::zero()..T::from(500).unwrap());
+    let between1 = rand::distr::StandardUniform::from(T::zero()..T::from(0.1).unwrap());
+    let between2 = rand::distr::StandardUniform::from(T::zero()..T::from(500).unwrap());
 
-    let mut points = rlst_dynamic_array2!(T, [3, n_points]);
+    let mut points = rlst_dynamic_array!(T, [3, n_points]);
 
     for i in 0..n_points {
         // One axis has a different sampling

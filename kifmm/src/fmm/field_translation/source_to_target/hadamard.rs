@@ -154,7 +154,7 @@ impl Hadamard8x8 for c64 {
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod aarch64 {
     use super::{c32, c64, Hadamard8x8Data};
-    use pulp::{f32x4, f64x2, Simd};
+    use pulp::{f32x4, f64x2};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
     impl pulp::NullaryFnOnce for Hadamard8x8Data<'_, c64> {

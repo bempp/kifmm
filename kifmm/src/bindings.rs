@@ -1761,6 +1761,7 @@ pub mod constructors_mpi {
     use core::panic;
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, types::GreenKernelEvalType};
     use mpi::raw::{AsRaw, FromRaw};
+    use mpi_sys::MPI_Comm;
     use std::ffi::c_void;
 
     use crate::{
@@ -1827,7 +1828,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
@@ -1966,7 +1969,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
@@ -2108,7 +2113,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
@@ -2263,7 +2270,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
@@ -2411,7 +2420,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
         println!("Got communicator: {:?}", communicator.as_raw());
 
@@ -2540,7 +2551,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
@@ -2665,7 +2678,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
@@ -2822,7 +2837,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
@@ -2974,7 +2991,9 @@ pub mod constructors_mpi {
             GreenKernelEvalType::ValueDeriv
         };
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
@@ -3114,7 +3133,9 @@ pub mod constructors_mpi {
             GreenKernelEvalType::ValueDeriv
         };
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
@@ -3252,7 +3273,9 @@ pub mod constructors_mpi {
             GreenKernelEvalType::ValueDeriv
         };
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f32, n_sources) };
@@ -3383,7 +3406,9 @@ pub mod constructors_mpi {
         };
 
         let communicator = unsafe {
-            mpi::topology::SimpleCommunicator::from_raw(communicator as mpi_sys::MPI_Comm)
+            mpi::topology::SimpleCommunicator::from_raw(MPI_Comm(
+                communicator as *mut mpi_sys::ompi_communicator_t,
+            ))
         };
 
         let sources = unsafe { std::slice::from_raw_parts(sources as *const f64, n_sources) };
@@ -13680,7 +13705,6 @@ mod test {
     use std::ffi::c_void;
 
     use num::{Complex, One};
-    use rlst::RawAccess;
 
     use crate::tree::helpers::points_fixture;
 
@@ -13702,10 +13726,10 @@ mod test {
             let charges = vec![1.0; n_points];
 
             let n_sources = n_points * 3;
-            let sources_p = sources.data().as_ptr() as *const c_void;
+            let sources_p = sources.data().unwrap().as_ptr() as *const c_void;
 
             let n_targets = n_points * 3;
-            let targets_p = targets.data().as_ptr() as *const c_void;
+            let targets_p = targets.data().unwrap().as_ptr() as *const c_void;
 
             let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
@@ -13792,10 +13816,10 @@ mod test {
             let charges = vec![1.0; n_points];
 
             let n_sources = n_points * 3;
-            let sources_p = sources.data().as_ptr() as *const c_void;
+            let sources_p = sources.data().unwrap().as_ptr() as *const c_void;
 
             let n_targets = n_points * 3;
-            let targets_p = targets.data().as_ptr() as *const c_void;
+            let targets_p = targets.data().unwrap().as_ptr() as *const c_void;
 
             let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
@@ -13887,10 +13911,10 @@ mod test {
             let wavenumber = 10.;
 
             let n_sources = n_points * 3;
-            let sources_p = sources.data().as_ptr() as *const c_void;
+            let sources_p = sources.data().unwrap().as_ptr() as *const c_void;
 
             let n_targets = n_points * 3;
-            let targets_p = targets.data().as_ptr() as *const c_void;
+            let targets_p = targets.data().unwrap().as_ptr() as *const c_void;
 
             let n_charges = n_points;
             let charges_p = charges.as_ptr() as *const c_void;
@@ -13956,10 +13980,10 @@ mod test {
             let wavenumber = 10.;
 
             let n_sources = n_points * 3;
-            let sources_p = sources.data().as_ptr() as *const c_void;
+            let sources_p = sources.data().unwrap().as_ptr() as *const c_void;
 
             let n_targets = n_points * 3;
-            let targets_p = targets.data().as_ptr() as *const c_void;
+            let targets_p = targets.data().unwrap().as_ptr() as *const c_void;
 
             let n_charges = n_points * 2;
             let charges_p = charges.as_ptr() as *const c_void;

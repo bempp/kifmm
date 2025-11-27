@@ -3,10 +3,7 @@ use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use num::traits::Float;
-use rlst::{
-    rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
-    SliceContainer, VectorContainer,
-};
+use rlst::{rlst_dynamic_array, DynArray, RawAccess, RawAccessMut, RlstScalar, Shape, SliceArray};
 
 use crate::{
     linalg::rsvd::Normaliser,
@@ -37,15 +34,15 @@ use mpi::{
 
 /// Represents charge data in a two-dimensional array with shape `[ncharges, nvecs]`,
 /// organized in row-major order.
-pub type Charges<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type Charges<T> = DynArray<T, 2>;
 
 /// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
 /// stored in row-major order.
-pub type Coordinates<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type Coordinates<T> = DynArray<T, 2>;
 
 /// Represents coordinate data in a two-dimensional array with shape `[dim, n_coords]`,
 /// stored in row-major order.
-pub type CoordinatesSlice<'slc, T> = Array<T, BaseArray<T, SliceContainer<'slc, T>, 2>, 2>;
+pub type CoordinatesSlice<'slc, T> = SliceArray<'slc, T, 2>;
 
 /// Represents a threadsafe mutable raw pointer to`T`.
 ///
@@ -162,33 +159,31 @@ where
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub(crate) uc2e_inv_1: Vec<DynArray<Scalar, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub(crate) uc2e_inv_2: Vec<DynArray<Scalar, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub(crate) dc2e_inv_1: Vec<DynArray<Scalar, 2>>, // index corresponds to level
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub(crate) dc2e_inv_2: Vec<DynArray<Scalar, 2>>, // index corresponds to level
 
     /// Data and metadata for field translations
     pub(crate) source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub(crate) source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>, // index corresponds to level
+    pub(crate) source: Vec<DynArray<Scalar, 2>>, // index corresponds to level
 
     /// The metadata required for source to source translation
-    pub(crate) source_vec:
-        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+    pub(crate) source_vec: Vec<Vec<DynArray<Scalar, 2>>>, // index corresponds to level
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub(crate) target_vec:
-        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>, // index corresponds to level
+    pub(crate) target_vec: Vec<Vec<DynArray<Scalar, 2>>>, // index corresponds to level
 
     /// The multipole expansion data at each box.
     pub(crate) multipoles: Vec<Scalar>,
@@ -972,16 +967,16 @@ where
     T: RlstScalar,
 {
     /// Left singular vectors from SVD of $K_{\text{fat}}$, truncated to correspond to a maximum cutoff rank of $k$.
-    pub u: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+    pub u: DynArray<T, 2>,
 
     /// Right singular vectors from the SVD of the $K_{\text{thin}}$, truncated to correspond to a maximum cutoff rank of $k$.
-    pub st: Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+    pub st: DynArray<T, 2>,
 
     /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_u: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+    pub c_u: DynArray<T, 2>,
 
     /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+    pub c_vt: DynArray<T, 2>,
 }
 
 impl<Scalar> Clone for BlasMetadataSaRcmp<Scalar>
@@ -989,23 +984,23 @@ where
     Scalar: RlstScalar + Clone,
 {
     fn clone(&self) -> Self {
-        let mut u = rlst_dynamic_array2!(Scalar, self.u.shape());
+        let mut u = DynArray::<Scalar>::from_shape(self.u.shape());
         u.data_mut().copy_from_slice(self.u.data());
 
-        let mut st = rlst_dynamic_array2!(Scalar, self.st.shape());
+        let mut st = DynArray::<Scalar>::from_shape(self.st.shape());
         st.data_mut().copy_from_slice(self.st.data());
 
         let mut c_u = Vec::new();
         let mut c_vt = Vec::new();
 
         for item in self.c_u.iter() {
-            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
             tmp.data_mut().copy_from_slice(item.data());
             c_u.push(tmp);
         }
 
         for item in self.c_vt.iter() {
-            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
             tmp.data_mut().copy_from_slice(item.data());
             c_vt.push(tmp);
         }
@@ -1019,8 +1014,8 @@ where
     T: RlstScalar,
 {
     fn default() -> Self {
-        let u = rlst_dynamic_array2!(T, [1, 1]);
-        let st = rlst_dynamic_array2!(T, [1, 1]);
+        let u = rlst_dynamic_array!(T, [1, 1]);
+        let st = rlst_dynamic_array!(T, [1, 1]);
 
         BlasMetadataSaRcmp {
             u,
@@ -1042,10 +1037,10 @@ where
     T: RlstScalar,
 {
     /// Left singular vectors from SVD of compressed M2L matrix, truncated to a maximum cutoff rank
-    pub u: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+    pub u: Vec<DynArray<T, 2>>,
 
     /// Right singular vectors of compressed M2L matrix, truncated to a maximum cutoff rank
-    pub vt: Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>,
+    pub vt: Vec<DynArray<T, 2>>,
 }
 
 impl<Scalar> Clone for BlasMetadataIa<Scalar>
@@ -1057,13 +1052,13 @@ where
         let mut vt = Vec::new();
 
         for item in self.u.iter() {
-            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
             tmp.data_mut().copy_from_slice(item.data());
             u.push(tmp);
         }
 
         for item in self.vt.iter() {
-            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
             tmp.data_mut().copy_from_slice(item.data());
             vt.push(tmp);
         }
@@ -1079,10 +1074,10 @@ where
     Scalar: RlstScalar,
 {
     /// Left basis vectors (indexed by transfer vector)
-    pub u: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub u: Vec<DynArray<Scalar, 2>>,
 
     /// Right basis vectors (indexed by transfer vector)
-    pub vt: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub vt: Vec<DynArray<Scalar, 2>>,
 }
 
 impl<Scalar> Clone for BlasMetadataAca<Scalar>
@@ -1094,13 +1089,13 @@ where
         let mut vt = Vec::new();
 
         for item in self.u.iter() {
-            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
             tmp.data_mut().copy_from_slice(item.data());
             u.push(tmp);
         }
 
         for item in self.vt.iter() {
-            let mut tmp = rlst_dynamic_array2!(Scalar, item.shape());
+            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
             tmp.data_mut().copy_from_slice(item.data());
             vt.push(tmp);
         }
@@ -1218,33 +1213,31 @@ where
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) uc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) uc2e_inv_1: Vec<DynArray<Scalar, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the upward check and upward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) uc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) uc2e_inv_2: Vec<DynArray<Scalar, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) dc2e_inv_1: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) dc2e_inv_1: Vec<DynArray<Scalar, 2>>,
 
     /// The pseudo-inverse of the dense interaction matrix between the downward check and downward equivalent surfaces.
     /// Store in two parts to avoid propagating error from computing pseudo-inverse
-    pub(crate) dc2e_inv_2: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) dc2e_inv_2: Vec<DynArray<Scalar, 2>>,
 
     /// Data and metadata for field translations
     pub(crate) source_to_target: FieldTranslation,
 
     /// The multipole translation matrices, for a cluster of eight children and their parent. Stored in Morton order.
-    pub(crate) source: Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>,
+    pub(crate) source: Vec<DynArray<Scalar, 2>>,
 
     /// The metadata required for source to source translation
-    pub(crate) source_vec:
-        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
+    pub(crate) source_vec: Vec<Vec<DynArray<Scalar, 2>>>,
 
     /// The local to local operator matrices, each index is associated with a child box (in sequential Morton order).
-    pub(crate) target_vec:
-        Vec<Vec<Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 2>, 2>>>,
+    pub(crate) target_vec: Vec<Vec<DynArray<Scalar, 2>>>,
 
     /// Multipoles associated with locally owned data
     pub(crate) multipoles: Vec<Scalar>,

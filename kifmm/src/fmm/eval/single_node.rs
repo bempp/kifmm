@@ -168,11 +168,11 @@ mod test {
 
         for i in 0..n_matvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let charges_i = &charges.data().unwrap()[n_sources * i..n_sources * (i + 1)];
             let mut direct_i = vec![T::Real::zero(); n_targets * eval_size];
             fmm.kernel().evaluate_st(
                 eval_type,
-                sources.data(),
+                sources.data().unwrap(),
                 leaf_targets,
                 charges_i,
                 &mut direct_i,
@@ -216,11 +216,11 @@ mod test {
 
         for i in 0..n_matvecs {
             let potential_i = fmm.potential(&leaf).unwrap()[i];
-            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let charges_i = &charges.data().unwrap()[n_sources * i..n_sources * (i + 1)];
             let mut direct_i = vec![T::zero(); n_targets * eval_size];
             fmm.kernel().evaluate_st(
                 eval_type,
-                sources.data(),
+                sources.data().unwrap(),
                 leaf_targets,
                 charges_i,
                 &mut direct_i,
@@ -266,9 +266,9 @@ mod test {
 
         fmm.kernel().evaluate_st(
             eval_type,
-            sources.data(),
+            sources.data().unwrap(),
             leaf_targets,
-            charges.data(),
+            charges.data().unwrap(),
             &mut direct,
         );
 
@@ -309,9 +309,9 @@ mod test {
 
         fmm.kernel().evaluate_st(
             eval_type,
-            sources.data(),
+            sources.data().unwrap(),
             leaf_targets,
-            charges.data(),
+            charges.data().unwrap(),
             &mut direct,
         );
 
@@ -352,7 +352,7 @@ mod test {
         let [n_sources, nvecs] = charges.shape();
 
         for i in 0..nvecs {
-            let charges_i = &charges.data()[n_sources * i..n_sources * (i + 1)];
+            let charges_i = &charges.data().unwrap()[n_sources * i..n_sources * (i + 1)];
             let multipole_i = &multipoles[ncoeffs * i..(i + 1) * ncoeffs];
 
             println!(
@@ -364,7 +364,7 @@ mod test {
 
             fmm.kernel().evaluate_st(
                 GreenKernelEvalType::Value,
-                sources.data(),
+                sources.data().unwrap(),
                 &test_point,
                 charges_i,
                 &mut expected,
@@ -412,9 +412,9 @@ mod test {
 
         fmm.kernel().evaluate_st(
             GreenKernelEvalType::Value,
-            sources.data(),
+            sources.data().unwrap(),
             &test_point,
-            charges.data(),
+            charges.data().unwrap(),
             &mut expected,
         );
 
@@ -451,13 +451,23 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -471,10 +481,16 @@ mod test {
 
         let svd_threshold = Some(1e-5);
         let mut fmm_svd = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -516,14 +532,24 @@ mod test {
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
         let mut fmm_svd = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -565,14 +591,24 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
         let mut fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -586,9 +622,13 @@ mod test {
         fmm.evaluate().unwrap();
         // Reset Charge data and re-evaluate potential
         let mut rng = StdRng::seed_from_u64(1);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
-        let _ = fmm.attach_charges_unordered(charges.data());
+        let _ = fmm.attach_charges_unordered(charges.data().unwrap());
         fmm.evaluate().unwrap();
 
         let fmm = Box::new(fmm);
@@ -623,13 +663,23 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         let mut fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -675,7 +725,11 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex<f64>::new(rng.random(), rng.random()));
 
         let mut fmm = SingleNodeBuilder::new(false)
             .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)

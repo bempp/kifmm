@@ -1,14 +1,16 @@
 //! Implementation of randomised SVD using BLAS3
 use num::traits::FloatConst;
-use rand_distr::{Standard, StandardNormal};
+use rand::distr::StandardUniform;
+use rand_distr::StandardNormal;
 use rlst::{
-    c32, c64, dense::tools::RandScalar, empty_array, rlst_dynamic_array2, Array, BaseArray,
-    MatrixSvd, MultIntoResize, QrDecomposition, RawAccess, RlstResult, RlstScalar, Shape,
-    VectorContainer,
+    c32, c64,
+    dense::linalg::lapack::{qr::QrDecomposition, singular_value_decomposition::SvdMode},
+    empty_array, rlst_dynamic_array, DynArray, Lapack, MultIntoResize, RawAccess, RlstResult,
+    RlstScalar, Shape,
 };
 
 /// Matrix type
-pub type RsvdMatrix<T> = Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>;
+pub type RsvdMatrix<T> = DynArray<T, 2>;
 
 type RsvdReturnType<T> = RlstResult<(Vec<<T as RlstScalar>::Real>, RsvdMatrix<T>, RsvdMatrix<T>)>;
 
@@ -22,7 +24,7 @@ pub enum Normaliser {
 /// Trait for rSVD implementation
 pub trait MatrixRsvd
 where
-    Self: RlstScalar + RandScalar + MatrixSvd,
+    Self: RlstScalar + Lapack,
 {
     /// Compute randomised SVD when target rank is known.
     fn rsvd_fixed_rank(
@@ -46,7 +48,7 @@ macro_rules! impl_matrix_rsvd {
     ($ty:ty, $fixed_rank:ident, $fixed_err:ident) => {
         impl MatrixRsvd for $ty
         where
-            $ty: RlstScalar + RandScalar + MatrixSvd,
+            $ty: RlstScalar + Lapack,
         {
             fn rsvd_fixed_rank(
                 mat: &RsvdMatrix<Self>,
@@ -93,30 +95,29 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
         where
             $ty: RlstScalar,
             StandardNormal: rand_distr::Distribution<<$ty as RlstScalar>::Real>,
-            Standard: rand_distr::Distribution<<$ty as RlstScalar>::Real>,
+            StandardUniform: rand_distr::Distribution<<$ty as RlstScalar>::Real>,
         {
-            let mut mat_transpose = rlst_dynamic_array2!($ty, [mat.shape()[1], mat.shape()[0]]);
+            let mut mat_transpose = rlst_dynamic_array!($ty, [mat.shape()[1], mat.shape()[0]]);
             mat_transpose.fill_from(mat.r().transpose());
 
             // Input matrix of size [m, n]. Draw Gaussian matrix of size [n, size].
-            let mut omega = rlst_dynamic_array2!($ty, [mat.shape()[1], size]);
+            let mut omega = rlst_dynamic_array!($ty, [mat.shape()[1], size]);
             let random_state = random_state.unwrap_or(0);
             omega.fill_from_seed_normally_distributed(random_state);
 
             if let Some(normaliser) = power_iteration_normaliser {
                 match normaliser {
                     Normaliser::Qr(n_iter) => {
-                        let mut q1 = rlst_dynamic_array2!($ty, [mat.shape()[0], size]);
+                        let mut q1 = rlst_dynamic_array!($ty, [mat.shape()[0], size]);
 
                         // Compute sample matrix of size [m, size]
                         let y = empty_array::<$ty, 2>().simple_mult_into_resize(mat.r(), omega.r());
 
                         // Ortho-normalise columns using QR
-                        let qr =
-                            QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
+                        let qr = QrDecomposition::<$ty>::new(y).expect("QR Decomposition failed");
                         qr.get_q_alloc(q1.r_mut()).unwrap();
 
-                        let mut q2 = rlst_dynamic_array2!($ty, [mat.shape()[1], size]);
+                        let mut q2 = rlst_dynamic_array!($ty, [mat.shape()[1], size]);
 
                         // Perform power iterations
                         for _ in 0..n_iter {
@@ -151,7 +152,7 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             let y = empty_array::<$ty, 2>().simple_mult_into_resize(mat.r(), omega.r());
 
             // Ortho-normalise columns using QR
-            let mut q = rlst_dynamic_array2!($ty, y.shape());
+            let mut q = DynArray::<$ty>::from_shape(y.shape());
             let qr = QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
             qr.get_q_alloc(q.r_mut()).unwrap();
 
@@ -176,27 +177,27 @@ macro_rules! generate_rsvd_fixed_rank {
             random_state: Option<usize>,
         ) -> RsvdReturnType<$ty>
         where
-            $ty: MatrixSvd,
+            $ty: Lapack,
         {
             let n_oversamples = n_oversamples.unwrap_or(10);
             let n_random = n_components + n_oversamples;
 
             let q =
                 $randomised_range_finder(mat, n_random, power_iteration_normaliser, random_state);
-            let mut q_transpose = rlst_dynamic_array2!($ty, [q.shape()[1], q.shape()[0]]);
+            let mut q_transpose = rlst_dynamic_array!($ty, [q.shape()[1], q.shape()[0]]);
             q_transpose.fill_from(q.r().conj().transpose());
             let b = empty_array::<$ty, 2>().simple_mult_into_resize(q_transpose.r(), mat.r());
 
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
-            let mut uhat = rlst_dynamic_array2!($ty, [b.shape()[0], k]);
+            let mut uhat = rlst_dynamic_array!($ty, [b.shape()[0], k]);
             let mut s = vec![<$ty as RlstScalar>::Real::from(0.); k];
-            let mut vt = rlst_dynamic_array2!($ty, [k, b.shape()[1]]);
+            let mut vt = rlst_dynamic_array!($ty, [k, b.shape()[1]]);
 
-            let mut b_copy = rlst_dynamic_array2!($ty, b.shape());
+            let mut b_copy = DynArray::<$ty>::from_shape(b.shape());
             b_copy.fill_from(b.r());
             b_copy
-                .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], rlst::SvdMode::Reduced)
+                .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
                 .unwrap();
             let u = empty_array::<$ty, 2>().simple_mult_into_resize(q.r(), uhat.r());
 
@@ -236,7 +237,7 @@ macro_rules! generate_randomised_range_finder_fixed_error {
             random_state: Option<usize>,
         ) -> RsvdMatrix<$type>
         where
-            $type: RlstScalar + MatrixSvd,
+            $type: RlstScalar + Lapack,
         {
             let [_m, n] = mat.shape();
 
@@ -246,33 +247,33 @@ macro_rules! generate_randomised_range_finder_fixed_error {
             let tol = tol / (10. * (2. / <<$type as RlstScalar>::Real>::PI()).sqrt());
 
             // Build random matrix
-            let mut omega = rlst_dynamic_array2!($type, [n, kblock]);
+            let mut omega = rlst_dynamic_array!($type, [n, kblock]);
             let random_state = random_state.unwrap_or(0);
             omega.fill_from_seed_normally_distributed(random_state);
 
             // Find random samples
             let y = empty_array::<$type, 2>().simple_mult_into_resize(mat.r(), omega.r());
             let y_shape = y.shape();
-            let mut y_copy = rlst_dynamic_array2!($type, y.shape());
+            let mut y_copy = DynArray::<$type>::from_shape(y.shape());
             y_copy.r_mut().fill_from(y.r());
 
-            let mut q_curr = rlst_dynamic_array2!($type, y_shape);
+            let mut q_curr = DynArray::<$type>::from_shape(y_shape);
 
             let mut done = false;
             while !done {
                 // Sketch Q
                 let y_shape = y_copy.shape();
-                let mut q = rlst_dynamic_array2!($type, y_shape);
-                let mut qt = rlst_dynamic_array2!($type, [q.shape()[1], q.shape()[0]]);
+                let mut q = DynArray::<$type>::from_shape(y_shape);
+                let mut qt = DynArray::<$type>::from_shape([q.shape()[1], q.shape()[0]]);
 
                 // Copy local loop variable, as ownership passes to QR decomposition
-                let mut y_loop = rlst_dynamic_array2!($type, y_shape);
+                let mut y_loop = DynArray::<$type>::from_shape(y_shape);
                 y_loop.r_mut().fill_from(y_copy.r());
 
                 let qr = QrDecomposition::<$type, _>::new(y_loop).unwrap();
                 qr.get_q_alloc(q.r_mut()).unwrap();
                 qt.r_mut().fill_from(q.r().conj().transpose());
-                q_curr = rlst_dynamic_array2!($type, q.shape());
+                q_curr = DynArray::<$type>::from_shape(q.shape());
                 q_curr.r_mut().fill_from(q.r());
 
                 // Calculate QQ^TM
@@ -292,7 +293,7 @@ macro_rules! generate_randomised_range_finder_fixed_error {
                     let mut y_big_data = Vec::new();
                     y_big_data.extend_from_slice(y_copy.data());
                     y_big_data.extend_from_slice(y_new.data());
-                    let y_big = rlst_dynamic_array2!(
+                    let y_big = rlst_dynamic_array!(
                         $type,
                         [y_copy.shape()[0], y_copy.shape()[1] + y_new.shape()[1]]
                     );
@@ -322,11 +323,11 @@ macro_rules! generate_rsvd_fixed_error {
             random_state: Option<usize>,
         ) -> RsvdReturnType<$type>
         where
-            $type: RlstScalar + MatrixSvd,
+            $type: RlstScalar + Lapack,
         {
             let q = $randomised_range_finder(mat, tol, k_block, random_state);
 
-            let mut q_transpose = rlst_dynamic_array2!($type, [q.shape()[1], q.shape()[0]]);
+            let mut q_transpose = rlst_dynamic_array!($type, [q.shape()[1], q.shape()[0]]);
             q_transpose.fill_from(q.r().conj().transpose());
 
             // Project matrix to (k+p) dimensional space using orthonormal basis
@@ -334,14 +335,14 @@ macro_rules! generate_rsvd_fixed_error {
 
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
-            let mut uhat = rlst_dynamic_array2!($type, [b.shape()[0], k]);
+            let mut uhat = rlst_dynamic_array!($type, [b.shape()[0], k]);
             let mut s = vec![<$type as RlstScalar>::Real::from(0.); k];
-            let mut vt = rlst_dynamic_array2!($type, [k, b.shape()[1]]);
+            let mut vt = DynArray::<$type>::from_shape([k, b.shape()[1]]);
 
-            let mut b_copy = rlst_dynamic_array2!($type, b.shape());
+            let mut b_copy = DynArray::<$type>::from_shape(b.shape());
             b_copy.fill_from(b.r());
             b_copy
-                .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], rlst::SvdMode::Reduced)
+                .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
                 .unwrap();
 
             let u = empty_array::<$type, 2>().simple_mult_into_resize(q.r(), uhat.r());
@@ -377,7 +378,7 @@ generate_rsvd_fixed_error!(
 #[cfg(test)]
 mod test {
     use rlst::{
-        assert_array_abs_diff_eq, empty_array, rlst_dynamic_array2, DefaultIterator,
+        assert_array_abs_diff_eq, empty_array, rlst_dynamic_array, ArrayIteratorByValue,
         MultIntoResize, RawAccessMut, Shape,
     };
 
@@ -386,7 +387,7 @@ mod test {
 
     #[test]
     fn test_rsvd_fixed_error_f32() {
-        let mut mat = rlst_dynamic_array2!(f32, [5, 6]);
+        let mut mat = rlst_dynamic_array!(f32, [5, 6]);
 
         mat.data_mut()
             .iter_mut()
@@ -398,7 +399,7 @@ mod test {
 
         let (s, u, vt) = f32::rsvd_fixed_error(&mat, tol, k_block, random_state).unwrap();
 
-        let mut mat_s = rlst_dynamic_array2!(f32, [s.len(), s.len()]);
+        let mut mat_s = rlst_dynamic_array!(f32, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
@@ -413,7 +414,7 @@ mod test {
 
     #[test]
     fn test_rsvd_f32() {
-        let mut mat = rlst_dynamic_array2!(f32, [5, 6]);
+        let mut mat = rlst_dynamic_array!(f32, [5, 6]);
 
         mat.data_mut()
             .iter_mut()
@@ -433,7 +434,7 @@ mod test {
         )
         .unwrap();
 
-        let mut mat_s = rlst_dynamic_array2!(f32, [s.len(), s.len()]);
+        let mut mat_s = rlst_dynamic_array!(f32, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
@@ -448,7 +449,7 @@ mod test {
 
     #[test]
     fn test_rsvd_f64() {
-        let mut mat = rlst_dynamic_array2!(f64, [5, 6]);
+        let mut mat = rlst_dynamic_array!(f64, [5, 6]);
 
         mat.data_mut()
             .iter_mut()
@@ -468,7 +469,7 @@ mod test {
         )
         .unwrap();
 
-        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
+        let mut mat_s = rlst_dynamic_array!(f64, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }

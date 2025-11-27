@@ -6,10 +6,7 @@ use std::{
 
 use itertools::{izip, Itertools};
 use num::traits::{Float, Zero};
-use rlst::{
-    rlst_dynamic_array3, Array, BaseArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape,
-    VectorContainer,
-};
+use rlst::{DynArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape};
 
 use crate::{
     fmm::types::SendPtrMut,
@@ -352,13 +349,11 @@ pub(crate) fn map_charges<T: RlstScalar>(
 ///
 /// # Arguments
 /// * `arr` - An array to be flipped.
-pub(crate) fn flip3<T>(
-    arr: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-) -> Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>
+pub(crate) fn flip3<T>(arr: &DynArray<T, 3>) -> DynArray<T, 3>
 where
     T: Clone + Copy + RlstScalar,
 {
-    let mut flipped = rlst_dynamic_array3!(T, arr.shape());
+    let mut flipped = DynArray::<T>::from_shape(arr.shape());
 
     let [m, n, o] = arr.shape();
 
@@ -397,11 +392,12 @@ mod test {
 
     use super::*;
     use approx::*;
+    use rlst::rlst_dynamic_array;
 
     #[test]
     fn test_flip3() {
         let n = 2;
-        let mut arr = rlst_dynamic_array3!(f64, [n, n, n]);
+        let mut arr = rlst_dynamic_array!(f64, [n, n, n]);
         for i in 0..n {
             for j in 0..n {
                 for k in 0..n {

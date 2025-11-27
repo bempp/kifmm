@@ -5,7 +5,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use num::Zero;
 use rand::{rngs, Rng};
-use rlst::{rlst_dynamic_array2, Array, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array, DynArray, RawAccessMut, RlstScalar};
 
 use crate::traits::general::single_node::{ArgmaxValue, Epsilon};
 
@@ -345,10 +345,7 @@ pub(crate) fn aca_plus<Kernel, Scalar>(
     local_radius_cols: Option<usize>,
     verbose: bool,
     multithreaded: bool,
-) -> (
-    Array<Scalar, rlst::BaseArray<Scalar, rlst::VectorContainer<Scalar>, 2>, 2>,
-    Array<Scalar, rlst::BaseArray<Scalar, rlst::VectorContainer<Scalar>, 2>, 2>,
-)
+) -> (DynArray<Scalar, 2>, DynArray<Scalar, 2>)
 where
     Scalar: ArgmaxValue<Scalar> + Epsilon,
     <Scalar as RlstScalar>::Real: ArgmaxValue<Scalar::Real>,
@@ -376,7 +373,7 @@ where
     };
 
     // Set random number generator
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let mut us = Vec::new();
     let mut vs = Vec::new();
@@ -574,9 +571,9 @@ where
     let n = vs[0].len();
 
     // RLST arrays are column major by default
-    let mut u_aca = rlst_dynamic_array2!(Scalar, [m, k]);
-    let mut v_aca = rlst_dynamic_array2!(Scalar, [n, k]);
-    let mut v_aca_t = rlst_dynamic_array2!(Scalar, [k, n]);
+    let mut u_aca = rlst_dynamic_array!(Scalar, [m, k]);
+    let mut v_aca = rlst_dynamic_array!(Scalar, [n, k]);
+    let mut v_aca_t = rlst_dynamic_array!(Scalar, [k, n]);
 
     for (j, u) in us.iter().enumerate() {
         // copy in us -> column vectors
@@ -600,7 +597,7 @@ mod test {
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 
     use num::One;
-    use rand::thread_rng;
+    use rand::rng;
     use rlst::{c32, empty_array, MultIntoResize, RawAccess, RawAccessMut};
 
     use crate::{fmm::helpers::single_node::l2_error, tree::helpers::points_fixture};
@@ -638,7 +635,7 @@ mod test {
 
     #[test]
     fn test_argsort() {
-        let mut rng = thread_rng();
+        let mut rng = rng();
         let n = 100;
 
         // Test real
@@ -695,8 +692,8 @@ mod test {
             );
 
             // generate a random vector
-            let mut rng = rand::thread_rng();
-            let mut x = rlst_dynamic_array2![f32, [n_sources, 1]];
+            let mut rng = rand::rng();
+            let mut x = rlst_dynamic_array![f32, [n_sources, 1]];
             x.data_mut().iter_mut().for_each(|e| *e = rng.gen());
 
             // Apply matrix to a random vector
@@ -738,7 +735,7 @@ mod test {
             );
 
             // generate a test vector
-            let mut x = rlst_dynamic_array2![c32, [n_sources, 1]];
+            let mut x = rlst_dynamic_array![c32, [n_sources, 1]];
             x.data_mut().iter_mut().for_each(|e| *e = c32::one());
 
             // Apply matrix to test vector
