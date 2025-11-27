@@ -21,32 +21,33 @@ name = "kifmm"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-itertools = "0.13.*"
+itertools = "0.14.*"
 num = "0.4"
-rayon = "1.9"
-rand = "0.8.5"
+rayon = "1.11"
+rand = "0.9.2"
 kifmm-fftw-sys = { path = "../fftw-sys" }
-green-kernels = { git = "https://github.com/skailasa/green-kernels" }
-lazy_static = "1.4.0"
-num-complex = "0.4.5"
-mpi = { version = "0.8.*", optional = true, features = ["complex"]}
-mpi-sys = { version="0.2.2", optional=true }
+green-kernels = { git = "https://github.com/bempp/green-kernels.git" }
+lazy_static = "1.5.0"
+num-complex = "0.4.6"
+mpi = { git = "https://github.com/rsmpi/rsmpi.git", optional = true, features = ["complex"]}
+mpi-sys = { git = "https://github.com/rsmpi/rsmpi.git", optional = true }
 memoffset = {version = "0.9.1", optional = true}
-pulp = "0.18.12"
-bytemuck = "1.16.0"
+pulp = "0.22"
+bytemuck = "1.24.0"
 superslice = {version = "1.0.0", optional = true}
-rand_distr = "0.4.3"
-rlst = { git = "https://github.com/skailasa/rlst.git", branch="tmp", default-features = false }
+rand_distr = "0.5.1"
+rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 
 serde_yaml = "0.9.34"
 coe-rs = "0.1.2"
 
 [dev-dependencies]
 approx = "0.5"
-criterion = { version = "0.5.*", features = ["html_reports"]}
+criterion = { version = "0.7.*", features = ["html_reports"]}
 
 [build-dependencies]
-cbindgen = "0.26.0"
+cbindgen = "0.29"
+cc = "1.2"
 
 [[bench]]
 name = "laplace"

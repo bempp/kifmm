@@ -9,7 +9,7 @@ use mpi::{
     Count, Rank,
 };
 use num::Float;
-use rlst::{rlst_dynamic_array3, Array, BaseArray, RawAccessMut, RlstScalar, VectorContainer};
+use rlst::{rlst_dynamic_array, DynArray, RawAccessMut, RlstScalar};
 
 use crate::{
     fmm::{
@@ -492,12 +492,12 @@ where
         expansion_order: usize,
         convolution_grid: &[Scalar::Real],
         target_pt: [Scalar::Real; 3],
-    ) -> Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 3>, 3> {
+    ) -> DynArray<Scalar, 3> {
         let n = 2 * expansion_order - 1; // size of convolution grid
         let npad = n + 1; // padded size
         let nconv = n.pow(3); // length of buffer storing values on convolution grid
 
-        let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
+        let mut result = rlst_dynamic_array!(Scalar, [npad, npad, npad]);
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
         self.kernel.assemble_st(
@@ -531,10 +531,10 @@ where
         expansion_order: usize,
         expansion_order_index: usize,
         charges: &[Scalar],
-    ) -> Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 3>, 3> {
+    ) -> DynArray<Scalar, 3> {
         let n = 2 * expansion_order - 1;
         let npad = n + 1;
-        let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
+        let mut result = rlst_dynamic_array!(Scalar, [npad, npad, npad]);
         for (i, &j) in self.source_to_target.surf_to_conv_map[expansion_order_index]
             .iter()
             .enumerate()

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use itertools::Itertools;
-use rlst::{MatrixSvd, RlstScalar};
+use rlst::{Lapack, RlstScalar};
 
 use crate::{
     fmm::types::PinvMode,
@@ -26,7 +26,7 @@ use crate::{
 
 impl<Scalar, Kernel, FieldTranslation> SingleNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Epsilon + MatrixSvd,
+    Scalar: RlstScalar + Default + Epsilon + Lapack,
     <Scalar as RlstScalar>::Real: Default + Epsilon,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default,

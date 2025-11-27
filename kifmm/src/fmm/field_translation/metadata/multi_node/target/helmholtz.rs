@@ -4,7 +4,7 @@ use green_kernels::{
 use itertools::Itertools;
 use mpi::traits::{Communicator, Equivalence};
 use rlst::{
-    empty_array, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
+    empty_array, rlst_dynamic_array, DynArray, Lapack, MultIntoResize, RawAccess, RawAccessMut,
     RlstScalar, Shape,
 };
 
@@ -40,9 +40,8 @@ where
     Scalar: RlstScalar<Complex = Scalar>
         + Default
         + Epsilon
-        + MatrixSvd
         + Epsilon
-        + MatrixQr
+        + Lapack
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>
@@ -53,7 +52,7 @@ where
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>
         + Equivalence,
-    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar> + Equivalence,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar> + Equivalence,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real> + Equivalence,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti + MetadataAccess,
@@ -120,7 +119,7 @@ where
             let v;
             match pinv_mode {
                 PinvMode::Svd { atol, rtol } => {
-                    let mut dc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
+                    let mut dc2e = rlst_dynamic_array!(Scalar, [n_rows, n_cols]);
                     self.kernel.assemble_st(
                         GreenKernelEvalType::Value,
                         &downward_check_surface[..],
@@ -151,7 +150,7 @@ where
                 }
             }
 
-            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            let mut mat_s = rlst_dynamic_array!(Scalar, [s.len(), s.len()]);
             for i in 0..s.len() {
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
@@ -236,7 +235,7 @@ where
                     child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
+                    rlst_dynamic_array!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
@@ -250,7 +249,7 @@ where
                         .simple_mult_into_resize(dc2e_inv_2[(level + 1) as usize].r(), pe2cc.r()),
                 );
 
-                let mut tmp_2 = rlst_dynamic_array2!(Scalar, tmp_1.shape());
+                let mut tmp_2 = DynArray::<Scalar>::from_shape(tmp_1.shape());
                 tmp_2.data_mut().copy_from_slice(tmp_1.data());
 
                 l2l.push(tmp_1);
@@ -263,11 +262,11 @@ where
 
         let mut dc2e_inv_1_global = dc2e_inv_1
             .iter()
-            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .map(|x| DynArray::<Scalar>::from_shape(x.shape()))
             .collect_vec();
         let mut dc2e_inv_2_global = dc2e_inv_2
             .iter()
-            .map(|x| rlst_dynamic_array2!(Scalar, x.shape()))
+            .map(|x| DynArray::<Scalar>::from_shape(x.shape()))
             .collect_vec();
 
         dc2e_inv_1_global

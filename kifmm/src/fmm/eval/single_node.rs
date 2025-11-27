@@ -121,10 +121,7 @@ mod test {
     };
     use num::{Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use rlst::{
-        c64, rlst_dynamic_array2, Array, BaseArray, RawAccess, RawAccessMut, RlstScalar, Shape,
-        VectorContainer,
-    };
+    use rlst::{c64, rlst_dynamic_array, DynArray, RawAccess, RawAccessMut, RlstScalar, Shape};
 
     use crate::{
         fmm::{
@@ -149,8 +146,8 @@ mod test {
             >,
         >,
         eval_type: GreenKernelEvalType,
-        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
-        charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
+        sources: &DynArray<T::Real, 2>,
+        charges: &DynArray<T::Real, 2>,
         threshold: T::Real,
     ) where
         T::Real: Default,
@@ -197,8 +194,8 @@ mod test {
             >,
         >,
         eval_type: GreenKernelEvalType,
-        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
-        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        sources: &DynArray<T::Real, 2>,
+        charges: &DynArray<T, 2>,
         threshold: T::Real,
     ) where
         T::Real: Default,
@@ -247,8 +244,8 @@ mod test {
             >,
         >,
         eval_type: GreenKernelEvalType,
-        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
-        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        sources: &DynArray<T::Real, 2>,
+        charges: &DynArray<T, 2>,
         threshold: T::Real,
     ) where
         T::Real: Default,
@@ -290,8 +287,8 @@ mod test {
             >,
         >,
         eval_type: GreenKernelEvalType,
-        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
-        charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
+        sources: &DynArray<T::Real, 2>,
+        charges: &DynArray<T::Real, 2>,
         threshold: T::Real,
     ) where
         T::Real: Default,
@@ -331,8 +328,8 @@ mod test {
                 Tree = SingleNodeFmmTree<T::Real>,
             >,
         >,
-        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
-        charges: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
+        sources: &DynArray<T::Real, 2>,
+        charges: &DynArray<T::Real, 2>,
         threshold: T::Real,
     ) where
         T::Real: Default,
@@ -394,8 +391,8 @@ mod test {
                 Tree = SingleNodeFmmTree<T::Real>,
             >,
         >,
-        sources: &Array<T::Real, BaseArray<T::Real, VectorContainer<T::Real>, 2>, 2>,
-        charges: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
+        sources: &DynArray<T::Real, 2>,
+        charges: &DynArray<T, 2>,
         threshold: T::Real,
     ) where
         T::Real: Default,
@@ -453,7 +450,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
@@ -518,7 +515,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_threshold = Some(1e-5);
@@ -567,7 +564,7 @@ mod test {
         // Set charge data and evaluate an FMM
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let svd_mode = crate::fmm::types::FmmSvdMode::new(false, None, None, None, None);
@@ -625,7 +622,7 @@ mod test {
         // Set charge data and evaluate an FMM
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm = SingleNodeBuilder::new(false)
@@ -677,7 +674,7 @@ mod test {
         // Set charge data and evaluate an FMM
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let mut fmm = SingleNodeBuilder::new(false)
@@ -737,7 +734,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // FFT based field translation
@@ -884,7 +881,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
@@ -975,7 +972,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
@@ -1037,7 +1034,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translations allow variable check/equiv surfaces
@@ -1126,7 +1123,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let wavenumber = 2.5;
@@ -1172,7 +1169,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1301,7 +1298,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1431,7 +1428,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1509,7 +1506,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         // BLAS based field translation
@@ -1564,7 +1561,7 @@ mod test {
         // Charge data
         let nvecs = 5;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(n_sources)
@@ -1656,7 +1653,7 @@ mod test {
         // Charge data
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges
             .data_mut()
             .chunks_exact_mut(n_sources)

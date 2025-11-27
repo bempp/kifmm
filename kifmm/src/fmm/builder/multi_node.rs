@@ -7,7 +7,7 @@ use mpi::{
     traits::Equivalence,
 };
 use num::Float;
-use rlst::{MatrixSvd, RlstScalar};
+use rlst::{Lapack, RlstScalar};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 
@@ -38,7 +38,7 @@ use crate::{
 
 impl<Scalar, Kernel, FieldTranslation> MultiNodeBuilder<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Epsilon + MatrixSvd + Equivalence,
+    Scalar: RlstScalar + Default + Epsilon + Equivalence + Lapack,
     <Scalar as RlstScalar>::Real: Default + Epsilon + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Clone + Default,
     FieldTranslation: FieldTranslationTrait + Default + Clone,

@@ -9,6 +9,24 @@
 #define LEN_BYTES 8
 
 /**
+ * Static FMM type
+ */
+typedef enum FmmCType {
+  FmmCType_Laplace32,
+  FmmCType_Laplace64,
+  FmmCType_Helmholtz32,
+  FmmCType_Helmholtz64,
+} FmmCType;
+
+/**
+ * M2L field translation mode
+ */
+typedef enum FmmTranslationCType {
+  FmmTranslationCType_Blas,
+  FmmTranslationCType_Fft,
+} FmmTranslationCType;
+
+/**
  * Enumeration of communication types for timing
  */
 typedef enum CommunicationType {
@@ -53,24 +71,6 @@ typedef enum CommunicationType {
    */
   CommunicationType_ScatterGlobalFmm,
 } CommunicationType;
-
-/**
- * Static FMM type
- */
-typedef enum FmmCType {
-  FmmCType_Laplace32,
-  FmmCType_Laplace64,
-  FmmCType_Helmholtz32,
-  FmmCType_Helmholtz64,
-} FmmCType;
-
-/**
- * M2L field translation mode
- */
-typedef enum FmmTranslationCType {
-  FmmTranslationCType_Blas,
-  FmmTranslationCType_Fft,
-} FmmTranslationCType;
 
 /**
  * Enumeration of metadata construction for timing

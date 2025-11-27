@@ -12,9 +12,9 @@ edition = "2021"
 
 [dependencies]
 kifmm-fftw-src = { path = "../fftw-src" }
-libc = "0.2.153"
-num-complex = "0.4.5"
+libc = "0.2.177"
+num-complex = "0.4.6"
 
 [build-dependencies]
-bindgen = "0.69.4"
-cc = "1.0.90"
+bindgen = "0.72.1"
+cc = "1.2.47"

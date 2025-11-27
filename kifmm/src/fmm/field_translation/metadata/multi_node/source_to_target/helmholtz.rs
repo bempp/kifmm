@@ -11,8 +11,9 @@ use mpi::traits::{Communicator, Equivalence};
 use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, rlst_dynamic_array3, MultIntoResize,
-    RawAccess, RawAccessMut, RlstScalar, Shape, SvdMode, UnsafeRandomAccessMut,
+    dense::linalg::lapack::singular_value_decomposition::SvdMode, empty_array, rlst_dynamic_array,
+    DynArray, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, SliceArray,
+    UnsafeRandomAccessMut,
 };
 
 use crate::{
@@ -301,7 +302,9 @@ where
 
                         // Compute FFT of padded kernel
                         let mut kernel_hat =
-                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                            DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                                transform_shape,
+                            );
 
                         let plan = Scalar::plan_forward(
                             kernel.data_mut(),
@@ -322,7 +325,9 @@ where
                     } else {
                         // Fill with zeros when interaction doesn't exist
                         let kernel_hat_zeros =
-                            rlst_dynamic_array3!(<Scalar as DftType>::OutputType, transform_shape);
+                            DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                                transform_shape,
+                            );
                         kernel_data_vec_r[i].push(kernel_hat_zeros);
                     }
                 }
@@ -422,12 +427,12 @@ where
                         let k_f = &kernel_f
                             [frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
                             .to_vec();
-                        let k_f_ = rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-                        let mut k_ft = rlst_dynamic_array2!(
+                        let k_f = SliceArray::from_shape(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                        let mut k_ft = rlst_dynamic_array!(
                             <Scalar as DftType>::OutputType,
                             [NSIBLINGS, NSIBLINGS]
                         );
-                        k_ft.fill_from(k_f_.r());
+                        k_ft.fill_from(&k_f);
                         kernel_data_ft.push(k_ft.data().to_vec());
                     }
                 }
@@ -591,10 +596,10 @@ where
                             ));
 
                             // Compute FFT of padded kernel
-                            let mut kernel_hat = rlst_dynamic_array3!(
-                                <Scalar as DftType>::OutputType,
-                                transform_shape
-                            );
+                            let mut kernel_hat =
+                                DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                                    transform_shape,
+                                );
 
                             let plan = Scalar::plan_forward(
                                 kernel.data_mut(),
@@ -614,10 +619,10 @@ where
                             kernel_data_vec_r[i].push(kernel_hat);
                         } else {
                             // Fill with zeros when interaction doesn't exist
-                            let kernel_hat_zeros = rlst_dynamic_array3!(
-                                <Scalar as DftType>::OutputType,
-                                transform_shape
-                            );
+                            let kernel_hat_zeros =
+                                DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                                    transform_shape,
+                                );
                             kernel_data_vec_r[i].push(kernel_hat_zeros);
                         }
                     }
@@ -718,11 +723,11 @@ where
                                 [frequency_offset..(frequency_offset + NSIBLINGS_SQUARED)]
                                 .to_vec();
                             let k_f_ =
-                                rlst_array_from_slice2!(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
-                            let mut k_ft = rlst_dynamic_array2!(
-                                <Scalar as DftType>::OutputType,
-                                [NSIBLINGS, NSIBLINGS]
-                            );
+                                SliceArray::from_shape(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
+                            let mut k_ft =
+                                DynArray::<<Scalar as DftType>::OutputType>::from_shape([
+                                    NSIBLINGS, NSIBLINGS,
+                                ]);
                             k_ft.fill_from(k_f_.r());
                             kernel_data_ft.push(k_ft.data().to_vec());
                         }
@@ -915,7 +920,7 @@ where
                     .surface_grid(check_surface_order, domain, alpha);
             let n_targets = ncoeffs_kifmm(check_surface_order);
 
-            let mut tmp_gram = rlst_dynamic_array2!(Scalar, [n_targets, n_sources]);
+            let mut tmp_gram = rlst_dynamic_array!(Scalar, [n_targets, n_sources]);
 
             self.kernel.assemble_st(
                 GreenKernelEvalType::Value,
@@ -928,9 +933,9 @@ where
             let nvt = tmp_gram.shape()[1];
             let k = std::cmp::min(mu, nvt);
 
-            let mut u = rlst_dynamic_array2!(Scalar, [mu, k]);
+            let mut u = rlst_dynamic_array!(Scalar, [mu, k]);
             let mut sigma = vec![Scalar::zero().re(); k];
-            let mut vt = rlst_dynamic_array2!(Scalar, [k, nvt]);
+            let mut vt = rlst_dynamic_array!(Scalar, [k, nvt]);
 
             let target_rank;
 
@@ -970,7 +975,7 @@ where
                 }
             }
 
-            let mut sigma_mat = rlst_dynamic_array2!(Scalar, [k, k]);
+            let mut sigma_mat = rlst_dynamic_array!(Scalar, [k, k]);
 
             for (j, s) in sigma.iter().enumerate().take(k) {
                 unsafe {
@@ -982,8 +987,8 @@ where
 
             let cutoff_rank = find_cutoff_rank(&sigma, self.source_to_target.threshold, n_sources);
 
-            let mut u_compressed = rlst_dynamic_array2!(Scalar, [mu, cutoff_rank]);
-            let mut vt_compressed = rlst_dynamic_array2!(Scalar, [cutoff_rank, nvt]);
+            let mut u_compressed = rlst_dynamic_array!(Scalar, [mu, cutoff_rank]);
+            let mut vt_compressed = rlst_dynamic_array!(Scalar, [cutoff_rank, nvt]);
 
             u_compressed.fill_from(u.into_subview([0, 0], [mu, cutoff_rank]));
             vt_compressed.fill_from(vt.into_subview([0, 0], [cutoff_rank, nvt]));
