@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    empty_array, rlst_dynamic_array, DynArray, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+    SliceArray,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -94,10 +94,10 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let multipoles =
-                    rlst_array_from_slice2!(multipoles, [n_coeffs_equivalent_surface, n_sources]);
+                    SliceArray::from_shape(multipoles, [n_coeffs_equivalent_surface, n_sources]);
 
                 // Allocate buffer to store compressed check potentials
-                let compressed_check_potentials = rlst_dynamic_array2!(
+                let compressed_check_potentials = rlst_dynamic_array!(
                     Scalar,
                     [
                         self.source_to_target.cutoff_rank[m2l_operator_index],
@@ -151,7 +151,7 @@ where
                             let c_vt_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
-                            let mut compressed_multipoles_subset = rlst_dynamic_array2!(
+                            let mut compressed_multipoles_subset = rlst_dynamic_array!(
                                 Scalar,
                                 [
                                     self.source_to_target.cutoff_rank[m2l_operator_index],
@@ -231,18 +231,15 @@ where
                 return Ok(());
             }
             FmmEvalType::Matrix(n_matvecs) => {
-                let multipoles = rlst_array_from_slice2!(
+                let multipoles = SliceArray::from_shape(
                     multipoles,
-                    [n_coeffs_equivalent_surface, n_sources * n_matvecs]
+                    [n_coeffs_equivalent_surface, n_sources * n_matvecs],
                 );
 
-                let compressed_check_potentials = rlst_dynamic_array2!(
-                    Scalar,
-                    [
-                        self.source_to_target.cutoff_rank[m2l_operator_index],
-                        n_targets * n_matvecs
-                    ]
-                );
+                let compressed_check_potentials = DynArray::<Scalar>::from_shape([
+                    self.source_to_target.cutoff_rank[m2l_operator_index],
+                    n_targets * n_matvecs,
+                ]);
 
                 let mut compressed_check_potentials_ptrs = Vec::new();
 
@@ -300,13 +297,11 @@ where
                             let c_vt_sub =
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
-                            let mut compressed_multipoles_subset = rlst_dynamic_array2!(
-                                Scalar,
-                                [
+                            let mut compressed_multipoles_subset =
+                                DynArray::<Scalar>::from_shape([
                                     self.source_to_target.cutoff_rank[m2l_operator_index],
-                                    multipole_idxs.len() * n_matvecs
-                                ]
-                            );
+                                    multipole_idxs.len() * n_matvecs,
+                                ]);
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
@@ -500,7 +495,7 @@ where
 
                 // Allocate buffer to store check potentials
                 let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets]);
+                    rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, n_targets]);
                 let mut check_potentials_ptrs = Vec::new();
 
                 for i in 0..n_targets {
@@ -527,7 +522,7 @@ where
                             let u = &self.source_to_target.metadata[m2l_operator_index].u[c_idx];
                             let vt = &self.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-                            let mut multipoles_subset = rlst_dynamic_array2!(
+                            let mut multipoles_subset = rlst_dynamic_array!(
                                 Scalar,
                                 [n_coeffs_equivalent_surface, multipole_idxs.len()]
                             );
@@ -603,7 +598,7 @@ where
                 let multipoles = self.multipoles(level).unwrap();
 
                 let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_sources * n_matvecs]);
+                    rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, n_sources * n_matvecs]);
 
                 let mut check_potentials_ptrs = Vec::new();
 
@@ -639,13 +634,10 @@ where
                             let u = &self.source_to_target.metadata[m2l_operator_index].u[c_idx];
                             let vt = &self.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-                            let mut multipoles_subset = rlst_dynamic_array2!(
-                                Scalar,
-                                [
-                                    n_coeffs_equivalent_surface,
-                                    multipole_idxs.len() * n_matvecs
-                                ]
-                            );
+                            let mut multipoles_subset = DynArray::<Scalar>::from_shape([
+                                n_coeffs_equivalent_surface,
+                                multipole_idxs.len() * n_matvecs,
+                            ]);
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()

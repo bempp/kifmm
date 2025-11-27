@@ -10,7 +10,7 @@ use rayon::prelude::{
     ParallelSliceMut,
 };
 use rlst::{
-    empty_array, rlst_dynamic_array2, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
+    empty_array, rlst_dynamic_array, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -418,7 +418,7 @@ where
                             .zip(self.level_locals[level as usize].par_chunks_exact(NSIBLINGS))
                             .for_each(|(check_potential_chunk, local_ptrs)| {
                                 // Map to surface grid
-                                let mut potential_chunk = rlst_dynamic_array2!(
+                                let mut potential_chunk = rlst_dynamic_array!(
                                     Scalar,
                                     [n_coeffs_equivalent_surface, NSIBLINGS]
                                 );

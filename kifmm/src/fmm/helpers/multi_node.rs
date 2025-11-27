@@ -10,10 +10,7 @@ use mpi::{
     Count,
 };
 use num::Float;
-use rlst::{
-    rlst_dynamic_array2, rlst_dynamic_array3, Array, BaseArray, RawAccess, RawAccessMut,
-    RlstScalar, Shape, VectorContainer,
-};
+use rlst::{rlst_dynamic_array, DynArray, RawAccess, RawAccessMut, RlstScalar, Shape};
 
 use crate::{
     fmm::{
@@ -72,9 +69,7 @@ pub(crate) fn deserialise_nested_vec<T: Pod>(input: &[u8]) -> (Vec<Vec<T>>, &[u8
     (buffer, rest)
 }
 
-pub(crate) fn serialise_array_2x2<T: RlstScalar + Pod>(
-    input: &Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>,
-) -> Vec<u8> {
+pub(crate) fn serialise_array_2x2<T: RlstScalar + Pod>(input: &DynArray<T, 2>) -> Vec<u8> {
     let mut buffer = Vec::new();
     let shape = input.shape();
     let rows = &(shape[0] as u64).to_le_bytes();
@@ -89,9 +84,7 @@ pub(crate) fn serialise_array_2x2<T: RlstScalar + Pod>(
     buffer
 }
 
-pub(crate) fn serialise_array_3x3<T: RlstScalar + Pod>(
-    input: &Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>,
-) -> Vec<u8> {
+pub(crate) fn serialise_array_3x3<T: RlstScalar + Pod>(input: &DynArray<T, 3>) -> Vec<u8> {
     let mut buffer = Vec::new();
     let shape = input.shape();
     let rows = &(shape[0] as u64).to_le_bytes();
@@ -110,9 +103,7 @@ pub(crate) fn serialise_array_3x3<T: RlstScalar + Pod>(
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn deserialise_array_2x2<T: RlstScalar + Pod>(
-    input: &[u8],
-) -> (Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>, &[u8]) {
+pub(crate) fn deserialise_array_2x2<T: RlstScalar + Pod>(input: &[u8]) -> (DynArray<T, 2>, &[u8]) {
     let (rows_bytes, rest) = input.split_at(LEN_BYTES);
     let rows = u64::from_le_bytes(rows_bytes.try_into().unwrap()) as usize;
     let (cols_bytes, rest) = rest.split_at(LEN_BYTES);
@@ -124,16 +115,14 @@ pub(crate) fn deserialise_array_2x2<T: RlstScalar + Pod>(
     let (data_bytes, remaining) = rest.split_at(total_bytes);
     let data = cast_slice::<u8, T>(data_bytes);
 
-    let mut array = rlst_dynamic_array2!(T, [rows, cols]);
+    let mut array = rlst_dynamic_array!(T, [rows, cols]);
     array.data_mut().copy_from_slice(data);
 
     (array, remaining)
 }
 
 #[allow(clippy::type_complexity)]
-pub(crate) fn deserialise_array_3x3<T: RlstScalar + Pod>(
-    input: &[u8],
-) -> (Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>, &[u8]) {
+pub(crate) fn deserialise_array_3x3<T: RlstScalar + Pod>(input: &[u8]) -> (DynArray<T, 3>, &[u8]) {
     let (rows_bytes, rest) = input.split_at(LEN_BYTES);
     let rows = u64::from_le_bytes(rows_bytes.try_into().unwrap()) as usize;
     let (cols_bytes, rest) = rest.split_at(LEN_BYTES);
@@ -147,15 +136,13 @@ pub(crate) fn deserialise_array_3x3<T: RlstScalar + Pod>(
     let (data_bytes, remaining) = rest.split_at(total_bytes);
     let data = cast_slice::<u8, T>(data_bytes);
 
-    let mut array = rlst_dynamic_array3!(T, [rows, cols, depth]);
+    let mut array = rlst_dynamic_array!(T, [rows, cols, depth]);
     array.data_mut().copy_from_slice(data);
 
     (array, remaining)
 }
 
-pub(crate) fn serialise_nested_array_2x2<T: RlstScalar + Pod>(
-    input: &[Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>],
-) -> Vec<u8> {
+pub(crate) fn serialise_nested_array_2x2<T: RlstScalar + Pod>(input: &[DynArray<T, 2>]) -> Vec<u8> {
     let mut buffer = Vec::new();
     buffer.extend_from_slice(&(input.len() as u64).to_le_bytes());
 
@@ -167,9 +154,7 @@ pub(crate) fn serialise_nested_array_2x2<T: RlstScalar + Pod>(
     buffer
 }
 
-pub(crate) fn serialise_nested_array_3x3<T: RlstScalar + Pod>(
-    input: &[Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>],
-) -> Vec<u8> {
+pub(crate) fn serialise_nested_array_3x3<T: RlstScalar + Pod>(input: &[DynArray<T, 3>]) -> Vec<u8> {
     let mut buffer = Vec::new();
     buffer.extend_from_slice(&(input.len() as u64).to_le_bytes());
 
@@ -184,7 +169,7 @@ pub(crate) fn serialise_nested_array_3x3<T: RlstScalar + Pod>(
 #[allow(clippy::type_complexity)]
 pub(crate) fn deserialise_nested_array_2x2<T: RlstScalar + Pod>(
     input: &[u8],
-) -> (Vec<Array<T, BaseArray<T, VectorContainer<T>, 2>, 2>>, &[u8]) {
+) -> (Vec<DynArray<T, 2>>, &[u8]) {
     let (len_bytes, mut rest) = input.split_at(LEN_BYTES);
     let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
     let mut buffer = Vec::new();
@@ -202,7 +187,7 @@ pub(crate) fn deserialise_nested_array_2x2<T: RlstScalar + Pod>(
 #[allow(clippy::type_complexity)]
 pub(crate) fn deserialise_nested_array_3x3<T: RlstScalar + Pod>(
     input: &[u8],
-) -> (Vec<Array<T, BaseArray<T, VectorContainer<T>, 3>, 3>>, &[u8]) {
+) -> (Vec<DynArray<T, 3>>, &[u8]) {
     let (len_bytes, mut rest) = input.split_at(LEN_BYTES);
     let len = u64::from_le_bytes(len_bytes.try_into().unwrap()) as usize;
     let mut buffer = Vec::new();
@@ -580,17 +565,17 @@ pub(crate) fn calculate_precomputation_load(
 mod test {
     use super::*;
     use num::Complex;
-    use rand::distributions::{Distribution, Uniform};
-    use rlst::{dense::tools::RandScalar, DefaultIteratorMut};
+    use rand::distr::{Distribution, Uniform};
+    use rlst::{traits::rlst_num::RandScalar, ArrayIteratorMut};
 
     fn test_array_real<T>()
     where
-        T: rand::distributions::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
+        T: rand::distr::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
     {
         let m = 5;
         let n = 4;
-        let mut expected = rlst_dynamic_array2!(T, [m, n]);
-        let mut rng = rand::thread_rng();
+        let mut expected = rlst_dynamic_array!(T, [m, n]);
+        let mut rng = rand::rng();
         let between = Uniform::from(T::from(0.).unwrap()..T::from(1.0).unwrap());
         expected
             .iter_mut()
@@ -608,17 +593,14 @@ mod test {
 
     fn test_array_complex<T>()
     where
-        T: rand::distributions::uniform::SampleUniform
-            + RlstScalar<Real = T>
-            + RandScalar
-            + PartialOrd,
+        T: rand::distr::uniform::SampleUniform + RlstScalar<Real = T> + RandScalar + PartialOrd,
         Complex<T>: RlstScalar,
     {
         let m = 5;
         let n = 4;
-        let mut expected = rlst_dynamic_array2!(Complex<T>, [m, n]);
+        let mut expected = rlst_dynamic_array!(Complex<T>, [m, n]);
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let between = Uniform::from(T::from(0.).unwrap()..T::from(1.0).unwrap());
 
         expected.iter_mut().for_each(|e| {
@@ -648,9 +630,9 @@ mod test {
 
     fn test_array_real_empty<T>()
     where
-        T: rand::distributions::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
+        T: rand::distr::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
     {
-        let expected = rlst_dynamic_array2!(T, [0, 0]);
+        let expected = rlst_dynamic_array!(T, [0, 0]);
         let serialised = serialise_array_2x2(&expected);
         let found = deserialise_array_2x2::<T>(&serialised).0;
         assert!(found.shape()[0] == 0);
@@ -660,10 +642,10 @@ mod test {
 
     fn test_array_complex_empty<T>()
     where
-        T: rand::distributions::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
+        T: rand::distr::uniform::SampleUniform + RlstScalar + PartialOrd + RandScalar,
         Complex<T>: RlstScalar,
     {
-        let expected = rlst_dynamic_array2!(Complex<T>, [0, 0]);
+        let expected = rlst_dynamic_array!(Complex<T>, [0, 0]);
         let serialised = serialise_array_2x2(&expected);
         let found = deserialise_array_2x2::<Complex<T>>(&serialised).0;
         assert!(found.shape()[0] == 0);
@@ -834,10 +816,10 @@ mod test {
         // test case where all elements are full
         let m = 5;
         let n = 4;
-        let mut u = rlst_dynamic_array2!(T, [m, n]);
+        let mut u = rlst_dynamic_array!(T, [m, n]);
         u.data_mut().iter_mut().for_each(|e| *e += T::one());
 
-        let mut st = rlst_dynamic_array2!(T, [n, m]);
+        let mut st = rlst_dynamic_array!(T, [n, m]);
         st.data_mut()
             .iter_mut()
             .for_each(|e| *e += T::from(2.0).unwrap());
@@ -846,13 +828,13 @@ mod test {
         let mut c_vt = Vec::new();
 
         for _ in 0..316 {
-            let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+            let mut tmp = rlst_dynamic_array!(T, [m, n]);
             tmp.data_mut()
                 .iter_mut()
                 .for_each(|e| *e += T::from(3.0).unwrap());
             c_u.push(tmp);
 
-            let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+            let mut tmp = rlst_dynamic_array!(T, [m, n]);
             tmp.data_mut()
                 .iter_mut()
                 .for_each(|e| *e += T::from(4.0).unwrap());
@@ -937,9 +919,9 @@ mod test {
         // test case where some elements are empty
         let m = 0;
         let n = 0;
-        let u = rlst_dynamic_array2!(T, [m, n]);
+        let u = rlst_dynamic_array!(T, [m, n]);
 
-        let mut st = rlst_dynamic_array2!(T, [n, m]);
+        let mut st = rlst_dynamic_array!(T, [n, m]);
         st.data_mut()
             .iter_mut()
             .for_each(|e| *e += T::from(2.0).unwrap());
@@ -949,20 +931,20 @@ mod test {
 
         for i in 0..316 {
             if i % 2 == 0 {
-                let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                let mut tmp = rlst_dynamic_array!(T, [m, n]);
                 tmp.data_mut()
                     .iter_mut()
                     .for_each(|e| *e += T::from(3.0).unwrap());
                 c_u.push(tmp);
 
-                let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                let mut tmp = rlst_dynamic_array!(T, [m, n]);
                 tmp.data_mut()
                     .iter_mut()
                     .for_each(|e| *e += T::from(4.0).unwrap());
                 c_vt.push(tmp);
             } else {
-                c_u.push(rlst_dynamic_array2!(T, [0, 0]));
-                c_vt.push(rlst_dynamic_array2!(T, [0, 0]));
+                c_u.push(rlst_dynamic_array!(T, [0, 0]));
+                c_vt.push(rlst_dynamic_array!(T, [0, 0]));
             }
         }
 
@@ -1051,9 +1033,9 @@ mod test {
             // test case where some elements are empty
             let m = 0;
             let n = 0;
-            let u = rlst_dynamic_array2!(T, [m, n]);
+            let u = rlst_dynamic_array!(T, [m, n]);
 
-            let mut st = rlst_dynamic_array2!(T, [n, m]);
+            let mut st = rlst_dynamic_array!(T, [n, m]);
             st.data_mut()
                 .iter_mut()
                 .for_each(|e| *e += T::from(2.0).unwrap());
@@ -1063,20 +1045,20 @@ mod test {
 
             for i in 0..316 {
                 if i % 2 == 0 {
-                    let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                    let mut tmp = rlst_dynamic_array!(T, [m, n]);
                     tmp.data_mut()
                         .iter_mut()
                         .for_each(|e| *e += T::from(3.0).unwrap());
                     c_u.push(tmp);
 
-                    let mut tmp = rlst_dynamic_array2!(T, [m, n]);
+                    let mut tmp = rlst_dynamic_array!(T, [m, n]);
                     tmp.data_mut()
                         .iter_mut()
                         .for_each(|e| *e += T::from(4.0).unwrap());
                     c_vt.push(tmp);
                 } else {
-                    c_u.push(rlst_dynamic_array2!(T, [0, 0]));
-                    c_vt.push(rlst_dynamic_array2!(T, [0, 0]));
+                    c_u.push(rlst_dynamic_array!(T, [0, 0]));
+                    c_vt.push(rlst_dynamic_array!(T, [0, 0]));
                 }
             }
 

@@ -21,7 +21,7 @@ use crate::{
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
-use rlst::{empty_array, rlst_dynamic_array2, MultIntoResize, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar};
 
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
@@ -80,7 +80,7 @@ where
                         .par_chunks_exact(chunk_size)
                         .zip(child_locals.par_chunks_exact(NSIBLINGS * chunk_size))
                         .for_each(|(parent_local_pointer_chunk, child_local_pointers_chunk)| {
-                            let mut parent_locals = rlst_dynamic_array2!(
+                            let mut parent_locals = rlst_dynamic_array!(
                                 Scalar,
                                 [n_coeffs_equivalent_surface_parent, chunk_size]
                             );

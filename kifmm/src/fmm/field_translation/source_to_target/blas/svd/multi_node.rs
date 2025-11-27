@@ -7,8 +7,8 @@ use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+    SliceArray,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -97,7 +97,7 @@ where
                     }
 
                     // Allocate buffer to store compressed check potentials
-                    let compressed_check_potentials = rlst_dynamic_array2!(
+                    let compressed_check_potentials = rlst_dynamic_array!(
                         Scalar,
                         [
                             self.source_to_target.cutoff_rank[m2l_operator_index],
@@ -158,9 +158,9 @@ where
                         let n_sources = all_n_sources[i];
                         let multipoles = &all_multipoles[i];
 
-                        let multipoles = rlst_array_from_slice2!(
+                        let multipoles = SliceArray::from_shape(
                             multipoles,
-                            [n_coeffs_equivalent_surface, n_sources]
+                            [n_coeffs_equivalent_surface, n_sources],
                         );
 
                         // 1. Compute the SVD compressed multipole expansions at this level
@@ -197,7 +197,7 @@ where
                                     let c_u_sub = &all_c_u_sub[c_idx];
                                     let c_vt_sub = &all_c_vt_sub[c_idx];
 
-                                    let mut compressed_multipoles_subset = rlst_dynamic_array2!(
+                                    let mut compressed_multipoles_subset = rlst_dynamic_array!(
                                         Scalar,
                                         [cutoff_rank, multipole_idxs.len()]
                                     );
@@ -357,7 +357,7 @@ where
 
                     // Allocate buffer to store check potentials
                     let all_check_potentials =
-                        rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets]);
+                        rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, n_targets]);
 
                     let mut all_check_potentials_ptrs = Vec::new();
 
@@ -413,9 +413,9 @@ where
                         let n_sources = all_n_sources[i];
                         let multipoles = &all_multipoles[i];
 
-                        let multipoles = rlst_array_from_slice2!(
+                        let multipoles = SliceArray::from_shape(
                             multipoles,
-                            [n_coeffs_equivalent_surface, n_sources]
+                            [n_coeffs_equivalent_surface, n_sources],
                         );
 
                         // 1. Apply BLAS operation
@@ -431,7 +431,7 @@ where
                                     let u = &all_u_sub[c_idx];
                                     let vt = &all_vt_sub[c_idx];
 
-                                    let mut multipoles_subset = rlst_dynamic_array2!(
+                                    let mut multipoles_subset = rlst_dynamic_array!(
                                         Scalar,
                                         [n_coeffs_equivalent_surface, multipole_idxs.len()]
                                     );

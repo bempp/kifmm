@@ -4,9 +4,7 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use itertools::Itertools;
-use rlst::{
-    empty_array, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultIntoResize, RawAccessMut, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccessMut, RlstScalar};
 
 use crate::{
     fmm::helpers::single_node::ncoeffs_kifmm,
@@ -32,9 +30,8 @@ where
     Scalar: RlstScalar<Complex = Scalar>
         + Default
         + Epsilon
-        + MatrixSvd
         + Epsilon
-        + MatrixQr
+        + Lapack
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -43,7 +40,7 @@ where
         + Upcast
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>,
-    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar>,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: Evaluate,
@@ -95,7 +92,7 @@ where
             let v;
             match pinv_mode {
                 PinvMode::Svd { atol, rtol } => {
-                    let mut dc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
+                    let mut dc2e = rlst_dynamic_array!(Scalar, [n_rows, n_cols]);
                     self.kernel.assemble_st(
                         GreenKernelEvalType::Value,
                         &downward_check_surface[..],
@@ -126,7 +123,7 @@ where
                 }
             }
 
-            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            let mut mat_s = rlst_dynamic_array!(Scalar, [s.len(), s.len()]);
             for i in 0..s.len() {
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
@@ -185,7 +182,7 @@ where
                     child.surface_grid(check_surface_order_child, domain, alpha_inner);
 
                 let mut pe2cc =
-                    rlst_dynamic_array2!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
+                    rlst_dynamic_array!(Scalar, [ncheck_surface_child, n_equiv_surface_parent]);
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,

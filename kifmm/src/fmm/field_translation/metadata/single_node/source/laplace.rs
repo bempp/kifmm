@@ -4,8 +4,7 @@ use green_kernels::{
     laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use rlst::{
-    empty_array, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
-    RlstScalar,
+    empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
 };
 
 use crate::{
@@ -30,9 +29,8 @@ where
     Scalar: RlstScalar
         + Default
         + Epsilon
-        + MatrixSvd
+        + Lapack
         + Epsilon
-        + MatrixQr
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -41,7 +39,7 @@ where
         + Upcast
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>,
-    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar>,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: DataAccess,
@@ -79,7 +77,7 @@ where
             let v;
             match pinv_mode {
                 PinvMode::Svd { atol, rtol } => {
-                    let mut uc2e = rlst_dynamic_array2!(Scalar, [n_check_surface, n_equiv_surface]);
+                    let mut uc2e = rlst_dynamic_array!(Scalar, [n_check_surface, n_equiv_surface]);
                     self.kernel.assemble_st(
                         GreenKernelEvalType::Value,
                         &upward_check_surface[..],
@@ -110,7 +108,7 @@ where
                 }
             }
 
-            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            let mut mat_s = rlst_dynamic_array!(Scalar, [s.len(), s.len()]);
             for i in 0..s.len() {
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
@@ -140,7 +138,7 @@ where
             let n_equiv_surface_parent = ncoeffs_kifmm(equivalent_surface_order_parent);
 
             let mut m2m_level =
-                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
+                rlst_dynamic_array!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
             let mut m2m_vec_level = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -148,7 +146,7 @@ where
                     child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
-                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
+                    rlst_dynamic_array!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
 
                 // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
                 self.kernel.assemble_st(
@@ -186,7 +184,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use rand::{thread_rng, Rng};
+    use rand::{rng, Rng};
     use rlst::Shape;
 
     use super::*;
@@ -223,7 +221,7 @@ mod test {
 
         match pinv_mode {
             PinvMode::Svd { atol, rtol } => {
-                let mut uc2e = rlst_dynamic_array2!(f64, [n_check_surface, n_equiv_surface]);
+                let mut uc2e = rlst_dynamic_array!(f64, [n_check_surface, n_equiv_surface]);
                 kernel.assemble_st(
                     GreenKernelEvalType::Value,
                     &upward_check_surface[..],
@@ -254,7 +252,7 @@ mod test {
             }
         }
 
-        let mut mat_s = rlst_dynamic_array2!(f64, [s.len(), s.len()]);
+        let mut mat_s = rlst_dynamic_array!(f64, [s.len(), s.len()]);
         for i in 0..s.len() {
             mat_s[[i, i]] = s[i];
         }
@@ -286,7 +284,7 @@ mod test {
             child_equivalent_surfaces.push(child_upward_equivalent_surface.clone());
 
             let mut ce2pc =
-                rlst_dynamic_array2!(f64, [n_check_surface_parent, n_equiv_surface_child]);
+                rlst_dynamic_array!(f64, [n_check_surface_parent, n_equiv_surface_child]);
 
             // Note, this way around due to calling convention of kernel, source/targets are 'swapped'
             kernel.assemble_st(
@@ -306,8 +304,8 @@ mod test {
         }
 
         // Calculate truth at far field point
-        let mut rng = thread_rng();
-        let mut x = rlst_dynamic_array2![f64, [n_equiv_surface, 1]]; // random column vector, i.e. multipoles on child check surface
+        let mut rng = rng();
+        let mut x = rlst_dynamic_array![f64, [n_equiv_surface, 1]]; // random column vector, i.e. multipoles on child check surface
         x.data_mut().iter_mut().for_each(|x| *x = rng.gen());
 
         let far_field = vec![100., 0., 0.];

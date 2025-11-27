@@ -21,8 +21,8 @@ use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    rlst_array_from_slice2, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultInto, RawAccess,
-    RawAccessMut, RlstScalar, Shape,
+    rlst_dynamic_array, DynArray, Lapack, MultInto, RawAccess, RawAccessMut, RlstScalar, Shape,
+    SliceArray,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -31,9 +31,8 @@ where
     Scalar: RlstScalar
         + Default
         + Epsilon
-        + MatrixSvd
         + Epsilon
-        + MatrixQr
+        + Lapack
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -42,7 +41,7 @@ where
         + Upcast
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>,
-    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar>,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
@@ -108,11 +107,11 @@ where
         match self.fmm_eval_type {
             FmmEvalType::Vector => {
                 let multipoles =
-                    rlst_array_from_slice2!(multipoles, [n_coeffs_equivalent_surface, n_sources]);
+                    SliceArray::from_shape(multipoles, [n_coeffs_equivalent_surface, n_sources]);
 
                 // Allocate buffer to store check potentials
                 let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets]);
+                    rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, n_targets]);
 
                 let mut check_potential_ptrs = Vec::new();
 
@@ -146,7 +145,7 @@ where
                             let vt_i =
                                 &self.source_to_target.metadata[m2l_operator_index].vt[t_idx];
 
-                            let mut multipoles_subset = rlst_dynamic_array2!(
+                            let mut multipoles_subset = rlst_dynamic_array!(
                                 Scalar,
                                 [n_coeffs_equivalent_surface, multipole_idxs.len()]
                             );
@@ -171,14 +170,14 @@ where
                             let [m, _k] = vt_i.shape();
                             let [_k, n] = multipoles_subset.shape();
 
-                            let mut tmp1 = rlst_dynamic_array2!(Scalar, [m, n]);
+                            let mut tmp1 = rlst_dynamic_array!(Scalar, [m, n]);
                             tmp1.r_mut()
                                 .simple_mult_into(vt_i.r(), multipoles_subset.r());
 
                             // Apply left decomposition
                             let [m, _k] = u_i.shape();
                             let [_k, n] = tmp1.shape();
-                            let mut check_potential = rlst_dynamic_array2!(Scalar, [m, n]);
+                            let mut check_potential = rlst_dynamic_array!(Scalar, [m, n]);
                             check_potential.r_mut().simple_mult_into(u_i.r(), tmp1.r());
 
                             // Save results to global vector
@@ -209,14 +208,14 @@ where
                 {
                     let [m, _k] = self.dc2e_inv_2[c2e_operator_index].shape();
                     let [_k, n] = check_potentials.shape();
-                    let mut tmp = rlst_dynamic_array2!(Scalar, [m, n]);
+                    let mut tmp = rlst_dynamic_array!(Scalar, [m, n]);
                     tmp.r_mut().simple_mult_into(
                         self.dc2e_inv_2[c2e_operator_index].r(),
                         check_potentials.r(),
                     );
 
                     let mut locals =
-                        rlst_dynamic_array2!(Scalar, [n_coeffs_equivalent_surface, n_targets]);
+                        rlst_dynamic_array!(Scalar, [n_coeffs_equivalent_surface, n_targets]);
                     locals
                         .r_mut()
                         .simple_mult_into(self.dc2e_inv_1[c2e_operator_index].r(), tmp.r());
@@ -235,13 +234,13 @@ where
             }
 
             FmmEvalType::Matrix(n_matvecs) => {
-                let multipoles = rlst_array_from_slice2!(
+                let multipoles = SliceArray::from_shape(
                     multipoles,
-                    [n_coeffs_equivalent_surface, n_sources * n_matvecs]
+                    [n_coeffs_equivalent_surface, n_sources * n_matvecs],
                 );
 
                 let check_potentials =
-                    rlst_dynamic_array2!(Scalar, [n_coeffs_check_surface, n_targets * n_matvecs]);
+                    rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, n_targets * n_matvecs]);
 
                 let mut check_potentials_ptrs = Vec::new();
 
@@ -283,13 +282,10 @@ where
                             let vt_i =
                                 &self.source_to_target.metadata[m2l_operator_index].vt[t_idx];
 
-                            let mut multipoles_subset = rlst_dynamic_array2!(
-                                Scalar,
-                                [
-                                    n_coeffs_equivalent_surface,
-                                    multipole_idxs.len() * n_matvecs
-                                ]
-                            );
+                            let mut multipoles_subset = DynArray::<Scalar>::from_shape([
+                                n_coeffs_equivalent_surface,
+                                multipole_idxs.len() * n_matvecs,
+                            ]);
 
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
@@ -329,14 +325,14 @@ where
                             let [_k, n] = multipoles_subset.shape();
 
                             // Apply right decomposition
-                            let mut tmp1 = rlst_dynamic_array2!(Scalar, [m, n]);
+                            let mut tmp1 = rlst_dynamic_array!(Scalar, [m, n]);
                             tmp1.r_mut()
                                 .simple_mult_into(vt_i.r(), multipoles_subset.r());
 
                             // Apply left decomposition
                             let [m, _k] = u_i.shape();
                             let [_k, n] = tmp1.shape();
-                            let mut check_potential = rlst_dynamic_array2!(Scalar, [m, n]);
+                            let mut check_potential = DynArray::<Scalar>::from_shape([m, n]);
                             check_potential.r_mut().simple_mult_into(u_i.r(), tmp1.r());
 
                             // Save results to global vector

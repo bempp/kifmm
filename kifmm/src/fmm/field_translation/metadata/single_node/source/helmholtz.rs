@@ -5,8 +5,7 @@ use green_kernels::{
 };
 use itertools::Itertools;
 use rlst::{
-    empty_array, rlst_dynamic_array2, MatrixQr, MatrixSvd, MultIntoResize, RawAccess, RawAccessMut,
-    RlstScalar,
+    empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
 };
 
 use crate::{
@@ -31,9 +30,8 @@ where
     Scalar: RlstScalar<Complex = Scalar>
         + Default
         + Epsilon
-        + MatrixSvd
         + Epsilon
-        + MatrixQr
+        + Lapack
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -42,7 +40,7 @@ where
         + Upcast
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>,
-    <Scalar as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<Scalar>,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar>,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: DataAccess,
@@ -93,7 +91,7 @@ where
             let v;
             match pinv_mode {
                 PinvMode::Svd { atol, rtol } => {
-                    let mut uc2e = rlst_dynamic_array2!(Scalar, [n_rows, n_cols]);
+                    let mut uc2e = rlst_dynamic_array!(Scalar, [n_rows, n_cols]);
                     self.kernel.assemble_st(
                         GreenKernelEvalType::Value,
                         &upward_check_surface[..],
@@ -124,7 +122,7 @@ where
                 }
             }
 
-            let mut mat_s = rlst_dynamic_array2!(Scalar, [s.len(), s.len()]);
+            let mut mat_s = rlst_dynamic_array!(Scalar, [s.len(), s.len()]);
             for i in 0..s.len() {
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
@@ -182,7 +180,7 @@ where
 
             let children = curr.children();
             let mut m2m =
-                rlst_dynamic_array2!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
+                rlst_dynamic_array!(Scalar, [n_equiv_surface_parent, 8 * n_equiv_surface_child]);
             let mut m2m_vec = Vec::new();
 
             for (i, child) in children.iter().enumerate() {
@@ -190,7 +188,7 @@ where
                     child.surface_grid(equivalent_surface_order_child, domain, alpha_inner);
 
                 let mut ce2pc =
-                    rlst_dynamic_array2!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
+                    rlst_dynamic_array!(Scalar, [n_check_surface_parent, n_equiv_surface_child]);
 
                 self.kernel.assemble_st(
                     GreenKernelEvalType::Value,

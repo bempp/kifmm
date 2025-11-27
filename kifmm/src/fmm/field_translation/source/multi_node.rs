@@ -7,8 +7,8 @@ use mpi::traits::Equivalence;
 use num::Float;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_array_from_slice2, rlst_dynamic_array2, MultIntoResize, RawAccess,
-    RawAccessMut, RlstScalar,
+    empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+    SliceArray,
 };
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
@@ -54,7 +54,7 @@ where
             match self.fmm_eval_type {
                 FmmEvalType::Vector => {
                     let mut check_potentials =
-                        rlst_dynamic_array2!(Scalar, [n_leaves * n_coeffs_check_surface, 1]);
+                        rlst_dynamic_array!(Scalar, [n_leaves * n_coeffs_check_surface, 1]);
 
                     // Compute check potential for each box
                     check_potentials
@@ -102,13 +102,13 @@ where
                         .par_chunks_exact(n_coeffs_check_surface * chunk_size)
                         .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
                         .for_each(|(check_potential, multipole_ptrs)| {
-                            let check_potential = rlst_array_from_slice2!(
+                            let check_potential = SliceArray::from_shape(
                                 check_potential,
-                                [n_coeffs_check_surface, chunk_size]
+                                [n_coeffs_check_surface, chunk_size],
                             );
 
                             let tmp = if kernel.is_homogenous() {
-                                let mut scaled_check_potential = rlst_dynamic_array2!(
+                                let mut scaled_check_potential = rlst_dynamic_array!(
                                     Scalar,
                                     [n_coeffs_check_surface, chunk_size]
                                 );
@@ -205,9 +205,9 @@ where
                         .zip(parent_multipoles.par_chunks_exact(chunk_size))
                         .for_each(
                             |(child_multipoles_chunk, parent_multipole_pointers_chunk)| {
-                                let child_multipoles_chunk_mat = rlst_array_from_slice2!(
+                                let child_multipoles_chunk_mat = SliceArray::from_shape(
                                     child_multipoles_chunk,
-                                    [n_coeffs_equivalent_surface * NSIBLINGS, chunk_size]
+                                    [n_coeffs_equivalent_surface * NSIBLINGS, chunk_size],
                                 );
 
                                 let parent_multipoles_chunk = empty_array::<Scalar, 2>()

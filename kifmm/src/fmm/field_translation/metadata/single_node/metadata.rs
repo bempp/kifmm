@@ -3,7 +3,7 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
     types::GreenKernelEvalType,
 };
-use rlst::{rlst_dynamic_array3, Array, BaseArray, RawAccessMut, RlstScalar, VectorContainer};
+use rlst::{rlst_dynamic_array, DynArray, RawAccessMut, RlstScalar};
 
 use crate::{
     fmm::{
@@ -48,12 +48,12 @@ where
         expansion_order: usize,
         convolution_grid: &[Scalar::Real],
         target_pt: [Scalar::Real; 3],
-    ) -> Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 3>, 3> {
+    ) -> DynArray<Scalar, 3> {
         let n = 2 * expansion_order - 1; // size of convolution grid
         let npad = n + 1; // padded size
         let nconv = n.pow(3); // length of buffer storing values on convolution grid
 
-        let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
+        let mut result = rlst_dynamic_array!(Scalar, [npad, npad, npad]);
 
         let mut kernel_evals = vec![Scalar::zero(); nconv];
         self.kernel.assemble_st(
@@ -87,10 +87,10 @@ where
         expansion_order: usize,
         expansion_order_index: usize,
         charges: &[Scalar],
-    ) -> Array<Scalar, BaseArray<Scalar, VectorContainer<Scalar>, 3>, 3> {
+    ) -> DynArray<Scalar, 3> {
         let n = 2 * expansion_order - 1;
         let npad = n + 1;
-        let mut result = rlst_dynamic_array3!(Scalar, [npad, npad, npad]);
+        let mut result = rlst_dynamic_array!(Scalar, [npad, npad, npad]);
         for (i, &j) in self.source_to_target.surf_to_conv_map[expansion_order_index]
             .iter()
             .enumerate()
@@ -562,8 +562,8 @@ mod test {
     use num::{Complex, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
     use rlst::{
-        c64, empty_array, rlst_dynamic_array2, rlst_dynamic_array3, MultIntoResize,
-        RandomAccessByRef, RandomAccessMut, RawAccess, RawAccessMut, RlstScalar, Shape,
+        c64, empty_array, rlst_dynamic_array, MultIntoResize, RandomAccessByRef, RandomAccessMut,
+        RawAccess, RawAccessMut, RlstScalar, Shape,
     };
 
     use green_kernels::{
@@ -607,7 +607,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new(false)
@@ -641,7 +641,7 @@ mod test {
         let c_u = &fmm.source_to_target.metadata[0].c_u[c_idx];
         let c_vt = &fmm.source_to_target.metadata[0].c_vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        let mut multipole = rlst_dynamic_array!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
         }
@@ -713,7 +713,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new(false)
@@ -762,7 +762,7 @@ mod test {
         let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
         let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        let mut multipole = rlst_dynamic_array!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
         }
@@ -878,7 +878,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new(false)
@@ -899,7 +899,7 @@ mod test {
         let level = 3;
         let coeff_idx = fmm.expansion_index(level);
 
-        let mut multipole = rlst_dynamic_array2!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        let mut multipole = rlst_dynamic_array!(f64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = i as f64;
@@ -919,7 +919,7 @@ mod test {
             multipole.data(),
         );
         let [m, n, o] = signal.shape();
-        let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
+        let mut signal_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o / 2 + 1]);
 
         let plan =
             f64::plan_forward(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
@@ -972,12 +972,12 @@ mod test {
         let mut kernel = flip3(&kernel);
 
         // Compute FFT of padded kernel
-        let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
+        let mut kernel_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o / 2 + 1]);
         let plan =
             f64::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
         let _ = f64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
 
-        let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o / 2 + 1]);
+        let mut hadamard_product = rlst_dynamic_array!(Complex<f64>, [m, n, o / 2 + 1]);
         for k in 0..o / 2 + 1 {
             for j in 0..n {
                 for i in 0..m {
@@ -986,7 +986,7 @@ mod test {
                 }
             }
         }
-        let mut potentials = rlst_dynamic_array3!(f64, [m, n, o]);
+        let mut potentials = rlst_dynamic_array!(f64, [m, n, o]);
 
         let plan = f64::plan_backward(
             hadamard_product.data_mut(),
@@ -1048,7 +1048,7 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array2!(c64, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
 
         let fmm = SingleNodeBuilder::new(false)
@@ -1068,7 +1068,7 @@ mod test {
 
         let level = 2;
         let coeff_idx = fmm.expansion_index(level);
-        let mut multipole = rlst_dynamic_array2!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        let mut multipole = rlst_dynamic_array!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
             *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
@@ -1096,7 +1096,7 @@ mod test {
             multipole.data(),
         );
         let [m, n, o] = signal.shape();
-        let mut signal_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+        let mut signal_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o]);
 
         let plan =
             c64::plan_forward(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
@@ -1149,12 +1149,12 @@ mod test {
         let mut kernel = flip3(&kernel);
 
         // Compute FFT of padded kernel
-        let mut kernel_hat = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+        let mut kernel_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o]);
         let plan =
             c64::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
         let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
 
-        let mut hadamard_product = rlst_dynamic_array3!(Complex<f64>, [m, n, o]);
+        let mut hadamard_product = rlst_dynamic_array!(Complex<f64>, [m, n, o]);
         for k in 0..o {
             for j in 0..n {
                 for i in 0..m {
@@ -1163,7 +1163,7 @@ mod test {
                 }
             }
         }
-        let mut potentials = rlst_dynamic_array3!(c64, [m, n, o]);
+        let mut potentials = rlst_dynamic_array!(c64, [m, n, o]);
 
         let plan = c64::plan_backward(
             hadamard_product.data_mut(),
