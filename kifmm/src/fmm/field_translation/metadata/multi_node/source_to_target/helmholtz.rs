@@ -10,10 +10,10 @@ use itertools::{izip, Itertools};
 use mpi::traits::{Communicator, Equivalence};
 use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rlst::DynArray;
 use rlst::{
     dense::linalg::lapack::singular_value_decomposition::SvdMode, empty_array, rlst_dynamic_array,
-    DynArray, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, SliceArray,
-    UnsafeRandomAccessMut,
+    Gemm, MultIntoResize, RlstScalar, SliceArray,
 };
 use rlst::{Lapack, SingularValueDecomposition};
 
@@ -934,9 +934,13 @@ where
             let nvt = tmp_gram.shape()[1];
             let k = std::cmp::min(mu, nvt);
 
-            let mut u = rlst_dynamic_array!(Scalar, [mu, k]);
-            let mut sigma = vec![Scalar::zero().re(); k];
-            let mut vt = rlst_dynamic_array!(Scalar, [k, nvt]);
+            // let mut u = rlst_dynamic_array!(Scalar, [mu, k]);
+            // let mut sigma = vec![Scalar::zero().re(); k];
+            // let mut vt = rlst_dynamic_array!(Scalar, [k, nvt]);
+
+            let u;
+            let sigma;
+            let vt;
 
             let target_rank;
 
@@ -970,10 +974,10 @@ where
                 }
 
                 FmmSvdMode::Deterministic => {
-                    (sigma_arr, u, vt) = tmp_gram.svd(SvdMode::Compact).unwrap();
-                    // tmp_gram
-                    //     .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut sigma[..], SvdMode::Compact)
-                    //     .unwrap();
+                    (sigma, u, vt) = {
+                        let (sigma_arr, u, vt) = tmp_gram.svd(SvdMode::Compact).unwrap();
+                        (sigma_arr.data().unwrap().to_vec(), u, vt)
+                    }
                 }
             }
 
@@ -992,8 +996,8 @@ where
             let mut u_compressed = rlst_dynamic_array!(Scalar, [mu, cutoff_rank]);
             let mut vt_compressed = rlst_dynamic_array!(Scalar, [cutoff_rank, nvt]);
 
-            u_compressed.fill_from(u.into_subview([0, 0], [mu, cutoff_rank]));
-            vt_compressed.fill_from(vt.into_subview([0, 0], [cutoff_rank, nvt]));
+            u_compressed.fill_from(&u.into_subview([0, 0], [mu, cutoff_rank]));
+            vt_compressed.fill_from(&vt.into_subview([0, 0], [cutoff_rank, nvt]));
             u_r.push(u_compressed);
             vt_r.push(vt_compressed);
             cutoff_ranks_r.push(cutoff_rank as i32);
