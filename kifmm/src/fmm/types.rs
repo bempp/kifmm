@@ -973,10 +973,10 @@ where
     pub st: DynArray<T, 2>,
 
     /// Left singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_u: DynArray<T, 2>,
+    pub c_u: Vec<DynArray<T, 2>>,
 
     /// Right singular vectors of re-compressed M2L matrix, one entry for each transfer vector.
-    pub c_vt: DynArray<T, 2>,
+    pub c_vt: Vec<DynArray<T, 2>>,
 }
 
 impl<Scalar> Clone for BlasMetadataSaRcmp<Scalar>

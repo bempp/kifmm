@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rayon::prelude::*;
 
 use rlst::{
-    empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
     SliceArray,
 };
 
@@ -27,7 +27,7 @@ use crate::{
 
 impl<Scalar, Kernel, FieldTranslation> SourceTranslation for KiFmm<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar,
+    Scalar: RlstScalar + Gemm,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
@@ -58,6 +58,7 @@ where
                 // Compute check potential for each box
                 check_potentials
                     .data_mut()
+                    .unwrap()
                     .par_chunks_exact_mut(n_coeffs_check_surface)
                     .zip(
                         self.leaf_upward_check_surfaces_sources
@@ -98,6 +99,7 @@ where
                 // Use check potentials to compute the multipole expansion
                 check_potentials
                     .data()
+                    .unwrap()
                     .par_chunks_exact(n_coeffs_check_surface * chunk_size)
                     .zip(self.leaf_multipoles.par_chunks_exact(chunk_size))
                     .for_each(|(check_potential, multipole_ptrs)| {
@@ -109,8 +111,9 @@ where
                         let tmp = if self.kernel.is_homogenous() {
                             let mut scaled_check_potential =
                                 rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, chunk_size]);
-                            scaled_check_potential.fill_from(check_potential);
-                            scaled_check_potential.scale_inplace(scale);
+                            scaled_check_potential.fill_from(&check_potential);
+                            scaled_check_potential *= scale;
+                            // scaled_check_potential.scale_inplace(scale);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].r(),
@@ -140,7 +143,7 @@ where
                             multipole
                                 .iter_mut()
                                 .zip(
-                                    &tmp.data()[i * n_coeffs_equivalent_surface
+                                    &tmp.data().unwrap()[i * n_coeffs_equivalent_surface
                                         ..(i + 1) * n_coeffs_equivalent_surface],
                                 )
                                 .for_each(|(m, t)| *m += *t);
@@ -156,6 +159,7 @@ where
                 // Compute the check potential for each box for each charge vector
                 check_potentials
                     .data_mut()
+                    .unwrap()
                     .par_chunks_exact_mut(n_coeffs_check_surface * n_matvecs)
                     .zip(
                         self.leaf_upward_check_surfaces_sources
@@ -202,6 +206,7 @@ where
                 // Compute multipole expansions
                 check_potentials
                     .data()
+                    .unwrap()
                     .par_chunks_exact(n_coeffs_check_surface * n_matvecs)
                     .zip(self.leaf_multipoles.par_iter())
                     .for_each(|(check_potential, multipole_ptrs)| {
@@ -214,8 +219,9 @@ where
                             let mut scaled_check_potential =
                                 rlst_dynamic_array!(Scalar, [n_coeffs_check_surface, n_matvecs]);
 
-                            scaled_check_potential.fill_from(check_potential);
-                            scaled_check_potential.scale_inplace(scale);
+                            scaled_check_potential.fill_from(&check_potential);
+                            scaled_check_potential *= scale;
+                            // scaled_check_potential.scale_inplace(scale);
 
                             empty_array::<Scalar, 2>().simple_mult_into_resize(
                                 self.uc2e_inv_1[operator_index].r(),
@@ -244,7 +250,7 @@ where
                             multipole
                                 .iter_mut()
                                 .zip(
-                                    &tmp.data()[i * n_coeffs_equivalent_surface
+                                    &tmp.data().unwrap()[i * n_coeffs_equivalent_surface
                                         ..(i + 1) * n_coeffs_equivalent_surface],
                                 )
                                 .for_each(|(m, t)| *m += *t);
@@ -329,7 +335,7 @@ where
                                 parent_multipole
                                     .iter_mut()
                                     .zip(
-                                        &parent_multipoles_chunk.data()[chunk_idx
+                                        &parent_multipoles_chunk.data().unwrap()[chunk_idx
                                             * n_coeffs_equivalent_surface_parent
                                             ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent],
                                     )
@@ -385,7 +391,7 @@ where
                                         n_coeffs_equivalent_surface_parent,
                                     )
                                 };
-                                let result_ij = &result_i.data()[j
+                                let result_ij = &result_i.data().unwrap()[j
                                     * n_coeffs_equivalent_surface_parent
                                     ..(j + 1) * n_coeffs_equivalent_surface_parent];
                                 parent_multipole_j

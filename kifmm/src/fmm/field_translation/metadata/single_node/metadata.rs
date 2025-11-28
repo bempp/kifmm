@@ -3,7 +3,7 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait,
     types::GreenKernelEvalType,
 };
-use rlst::{rlst_dynamic_array, DynArray, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
 use crate::{
     fmm::{
@@ -68,7 +68,7 @@ where
                 for i in 0..n {
                     let conv_idx = i + j * n + k * n * n;
                     let save_idx = i + j * npad + k * npad * npad;
-                    result.data_mut()[save_idx..(save_idx + 1)]
+                    result.data_mut().unwrap()[save_idx..(save_idx + 1)]
                         .copy_from_slice(&kernel_evals[(conv_idx)..(conv_idx + 1)]);
                 }
             }
@@ -95,7 +95,7 @@ where
             .iter()
             .enumerate()
         {
-            result.data_mut()[j] = charges[i];
+            result.data_mut().unwrap()[j] = charges[i];
         }
 
         result
@@ -561,10 +561,7 @@ mod test {
     use itertools::*;
     use num::{Complex, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use rlst::{
-        c64, empty_array, rlst_dynamic_array, MultIntoResize, RandomAccessByRef, RandomAccessMut,
-        RawAccess, RawAccessMut, RlstScalar, Shape,
-    };
+    use rlst::{empty_array, rlst_dynamic_array, MultIntoResize, RlstScalar};
 
     use green_kernels::{
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel,
@@ -608,13 +605,23 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         let fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -680,12 +687,13 @@ mod test {
             GreenKernelEvalType::Value,
             &sources[..],
             &targets[..],
-            multipole.data(),
+            multipole.data().unwrap(),
             &mut direct[..],
         );
 
         let abs_error: f64 = check_potential
             .data()
+            .unwrap()
             .iter()
             .zip(direct.iter())
             .map(|(a, b)| (a - b).abs())
@@ -713,14 +721,24 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        let mut charges = rlst_dynamic_array!(rlst::c64, [n_sources, nvecs]);
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         let fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
@@ -762,14 +780,15 @@ mod test {
         let u = &fmm.source_to_target.metadata[m2l_operator_index].u[c_idx];
         let vt = &fmm.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-        let mut multipole = rlst_dynamic_array!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        let mut multipole =
+            rlst_dynamic_array!(rlst::c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
-            *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
+            *multipole.get_mut([i, 0]).unwrap() = rlst::c64::from(i as f64);
         }
 
-        let check_potential = empty_array::<c64, 2>().simple_mult_into_resize(
+        let check_potential = empty_array::<rlst::c64, 2>().simple_mult_into_resize(
             u.r(),
-            empty_array::<c64, 2>().simple_mult_into_resize(vt.r(), multipole.r()),
+            empty_array::<rlst::c64, 2>().simple_mult_into_resize(vt.r(), multipole.r()),
         );
 
         let alpha = ALPHA_INNER;
@@ -778,23 +797,24 @@ mod test {
             source.surface_grid(fmm.equivalent_surface_order(level), &fmm.tree.domain, alpha);
         let targets = target.surface_grid(fmm.check_surface_order(level), &fmm.tree.domain, alpha);
 
-        let mut direct = vec![c64::zero(); fmm.n_coeffs_check_surface(level)];
+        let mut direct = vec![rlst::c64::zero(); fmm.n_coeffs_check_surface(level)];
 
         fmm.kernel.evaluate_st(
             GreenKernelEvalType::Value,
             &sources[..],
             &targets[..],
-            multipole.data(),
+            multipole.data().unwrap(),
             &mut direct[..],
         );
 
         let abs_error: f64 = check_potential
             .data()
+            .unwrap()
             .iter()
             .zip(direct.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
+        let rel_error: f64 = abs_error / (direct.iter().sum::<rlst::c64>().abs());
 
         println!("abs {abs_error:?} rel {rel_error:?}");
         assert!(rel_error < 1e-5);
@@ -879,13 +899,23 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         let fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -916,14 +946,24 @@ mod test {
         let mut signal = fmm.evaluate_charges_convolution_grid(
             expansion_order[coeff_idx],
             coeff_idx,
-            multipole.data(),
+            multipole.data().unwrap(),
         );
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o / 2 + 1]);
 
-        let plan =
-            f64::plan_forward(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
-        let _ = f64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
+        let plan = f64::plan_forward(
+            signal.data_mut().unwrap(),
+            signal_hat.data_mut().unwrap(),
+            &[m, n, o],
+            None,
+        )
+        .unwrap();
+        let _ = f64::forward_dft(
+            signal.data_mut().unwrap(),
+            signal_hat.data_mut().unwrap(),
+            &[m, n, o],
+            &plan,
+        );
 
         let source_equivalent_surface = transfer_vector.source.surface_grid(
             expansion_order[coeff_idx],
@@ -973,9 +1013,19 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o / 2 + 1]);
-        let plan =
-            f64::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
-        let _ = f64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
+        let plan = f64::plan_forward(
+            kernel.data_mut().unwrap(),
+            kernel_hat.data_mut().unwrap(),
+            &[m, n, o],
+            None,
+        )
+        .unwrap();
+        let _ = f64::forward_dft(
+            kernel.data_mut().unwrap(),
+            kernel_hat.data_mut().unwrap(),
+            &[m, n, o],
+            &plan,
+        );
 
         let mut hadamard_product = rlst_dynamic_array!(Complex<f64>, [m, n, o / 2 + 1]);
         for k in 0..o / 2 + 1 {
@@ -989,15 +1039,15 @@ mod test {
         let mut potentials = rlst_dynamic_array!(f64, [m, n, o]);
 
         let plan = f64::plan_backward(
-            hadamard_product.data_mut(),
-            potentials.data_mut(),
+            hadamard_product.data_mut().unwrap(),
+            potentials.data_mut().unwrap(),
             &[m, n, o],
             None,
         )
         .unwrap();
         let _ = f64::backward_dft(
-            hadamard_product.data_mut(),
-            potentials.data_mut(),
+            hadamard_product.data_mut().unwrap(),
+            potentials.data_mut().unwrap(),
             &[m, n, o],
             &plan,
         );
@@ -1007,7 +1057,7 @@ mod test {
             .iter()
             .enumerate()
         {
-            result[i] = potentials.data()[idx];
+            result[i] = potentials.data().unwrap()[idx];
         }
 
         // Get direct evaluations for testing
@@ -1016,7 +1066,7 @@ mod test {
             GreenKernelEvalType::Value,
             &source_equivalent_surface[..],
             &target_check_surface[..],
-            multipole.data(),
+            multipole.data().unwrap(),
             &mut direct[..],
         );
 
@@ -1048,14 +1098,24 @@ mod test {
         // Charge data
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
-        let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        let mut charges = rlst_dynamic_array!(rlst::c64, [n_sources, nvecs]);
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::new(rng.random(), rng.random()));
 
         let fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
@@ -1068,10 +1128,11 @@ mod test {
 
         let level = 2;
         let coeff_idx = fmm.expansion_index(level);
-        let mut multipole = rlst_dynamic_array!(c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
+        let mut multipole =
+            rlst_dynamic_array!(rlst::c64, [fmm.n_coeffs_equivalent_surface(level), 1]);
 
         for i in 0..fmm.n_coeffs_equivalent_surface(level) {
-            *multipole.get_mut([i, 0]).unwrap() = c64::from(i as f64);
+            *multipole.get_mut([i, 0]).unwrap() = rlst::c64::from(i as f64);
         }
 
         let source = fmm.tree().source_tree().keys(level).unwrap()[0];
@@ -1093,14 +1154,24 @@ mod test {
         let mut signal = fmm.evaluate_charges_convolution_grid(
             expansion_order[coeff_idx],
             coeff_idx,
-            multipole.data(),
+            multipole.data().unwrap(),
         );
         let [m, n, o] = signal.shape();
         let mut signal_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o]);
 
-        let plan =
-            c64::plan_forward(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], None).unwrap();
-        let _ = c64::forward_dft(signal.data_mut(), signal_hat.data_mut(), &[m, n, o], &plan);
+        let plan = rlst::c64::plan_forward(
+            signal.data_mut().unwrap(),
+            signal_hat.data_mut().unwrap(),
+            &[m, n, o],
+            None,
+        )
+        .unwrap();
+        let _ = rlst::c64::forward_dft(
+            signal.data_mut().unwrap(),
+            signal_hat.data_mut().unwrap(),
+            &[m, n, o],
+            &plan,
+        );
 
         let source_equivalent_surface = source.surface_grid(
             expansion_order[coeff_idx],
@@ -1150,9 +1221,19 @@ mod test {
 
         // Compute FFT of padded kernel
         let mut kernel_hat = rlst_dynamic_array!(Complex<f64>, [m, n, o]);
-        let plan =
-            c64::plan_forward(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], None).unwrap();
-        let _ = c64::forward_dft(kernel.data_mut(), kernel_hat.data_mut(), &[m, n, o], &plan);
+        let plan = rlst::c64::plan_forward(
+            kernel.data_mut().unwrap(),
+            kernel_hat.data_mut().unwrap(),
+            &[m, n, o],
+            None,
+        )
+        .unwrap();
+        let _ = rlst::c64::forward_dft(
+            kernel.data_mut().unwrap(),
+            kernel_hat.data_mut().unwrap(),
+            &[m, n, o],
+            &plan,
+        );
 
         let mut hadamard_product = rlst_dynamic_array!(Complex<f64>, [m, n, o]);
         for k in 0..o {
@@ -1163,37 +1244,37 @@ mod test {
                 }
             }
         }
-        let mut potentials = rlst_dynamic_array!(c64, [m, n, o]);
+        let mut potentials = rlst_dynamic_array!(rlst::c64, [m, n, o]);
 
-        let plan = c64::plan_backward(
-            hadamard_product.data_mut(),
-            potentials.data_mut(),
+        let plan = rlst::c64::plan_backward(
+            hadamard_product.data_mut().unwrap(),
+            potentials.data_mut().unwrap(),
             &[m, n, o],
             None,
         )
         .unwrap();
-        let _ = c64::backward_dft(
-            hadamard_product.data_mut(),
-            potentials.data_mut(),
+        let _ = rlst::c64::backward_dft(
+            hadamard_product.data_mut().unwrap(),
+            potentials.data_mut().unwrap(),
             &[m, n, o],
             &plan,
         );
 
-        let mut result = vec![c64::zero(); n_targets];
+        let mut result = vec![rlst::c64::zero(); n_targets];
         for (i, &idx) in fmm.source_to_target.conv_to_surf_map[coeff_idx]
             .iter()
             .enumerate()
         {
-            result[i] = potentials.data()[idx];
+            result[i] = potentials.data().unwrap()[idx];
         }
 
         // Get direct evaluations for testing
-        let mut direct = vec![c64::zero(); fmm.n_coeffs_check_surface(level)];
+        let mut direct = vec![rlst::c64::zero(); fmm.n_coeffs_check_surface(level)];
         fmm.kernel.evaluate_st(
             GreenKernelEvalType::Value,
             &source_equivalent_surface[..],
             &target_check_surface[..],
-            multipole.data(),
+            multipole.data().unwrap(),
             &mut direct[..],
         );
 
@@ -1202,7 +1283,7 @@ mod test {
             .zip(direct.iter())
             .map(|(a, b)| (a - b).abs())
             .sum();
-        let rel_error: f64 = abs_error / (direct.iter().sum::<c64>().abs());
+        let rel_error: f64 = abs_error / (direct.iter().sum::<rlst::c64>().abs());
 
         assert!(rel_error < 1e-15);
     }

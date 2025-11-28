@@ -12,8 +12,7 @@ use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
     dense::linalg::lapack::singular_value_decomposition::SvdMode, empty_array, rlst_dynamic_array,
-    DynArray, EvaluateObject, Lapack, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape,
-    SliceArray, UnsafeRandomAccessByRef, UnsafeRandomAccessMut,
+    DynArray, EvaluateObject, Lapack, MultIntoResize, RlstScalar, SliceArray,
 };
 use rlst::{Gemm, SingularValueDecomposition};
 

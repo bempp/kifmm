@@ -4,7 +4,8 @@ use green_kernels::{
     laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use rlst::{
-    empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+    empty_array, rlst_dynamic_array, Gemm, Lapack, MultIntoResize, RawAccess, RawAccessMut,
+    RlstScalar,
 };
 
 use crate::{
@@ -30,6 +31,7 @@ where
         + Default
         + Epsilon
         + Lapack
+        + Gemm
         + Epsilon
         + Upcast
         + ArgmaxValue<Scalar>
@@ -82,7 +84,7 @@ where
                         GreenKernelEvalType::Value,
                         &upward_check_surface[..],
                         &upward_equivalent_surface[..],
-                        uc2e.data_mut(),
+                        uc2e.data_mut().unwrap(),
                     );
                     (s, ut, v) = pinv(&uc2e, atol, rtol).unwrap();
                 }
@@ -153,7 +155,7 @@ where
                     GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
-                    ce2pc.data_mut(),
+                    ce2pc.data_mut().unwrap(),
                 );
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -167,7 +169,7 @@ where
                 let l = i * n_equiv_surface_child * n_equiv_surface_parent;
                 let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
-                m2m_level.data_mut()[l..r].copy_from_slice(tmp.data());
+                m2m_level.data_mut().unwrap()[l..r].copy_from_slice(tmp.data().unwrap());
                 m2m_vec_level.push(tmp);
             }
 
@@ -226,7 +228,7 @@ mod test {
                     GreenKernelEvalType::Value,
                     &upward_check_surface[..],
                     &upward_equivalent_surface[..],
-                    uc2e.data_mut(),
+                    uc2e.data_mut().unwrap(),
                 );
                 (s, ut, v) = pinv(&uc2e, atol, rtol).unwrap();
             }
@@ -291,7 +293,7 @@ mod test {
                 GreenKernelEvalType::Value,
                 &parent_upward_check_surface,
                 &child_upward_equivalent_surface,
-                ce2pc.data_mut(),
+                ce2pc.data_mut().unwrap(),
             );
 
             let tmp = empty_array::<f64, 2>().simple_mult_into_resize(
@@ -306,7 +308,10 @@ mod test {
         // Calculate truth at far field point
         let mut rng = rng();
         let mut x = rlst_dynamic_array![f64, [n_equiv_surface, 1]]; // random column vector, i.e. multipoles on child check surface
-        x.data_mut().iter_mut().for_each(|x| *x = rng.gen());
+        x.data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|x| *x = rng.random());
 
         let far_field = vec![100., 0., 0.];
         let mut truth = vec![0.];
@@ -314,7 +319,7 @@ mod test {
             GreenKernelEvalType::Value,
             &child_equivalent_surfaces[0],
             &far_field,
-            x.data(),
+            x.data().unwrap(),
             &mut truth,
         );
 
@@ -332,7 +337,7 @@ mod test {
             GreenKernelEvalType::Value,
             &parent_upward_equivalent_surface,
             &far_field,
-            b.data(),
+            b.data().unwrap(),
             &mut found,
         );
 

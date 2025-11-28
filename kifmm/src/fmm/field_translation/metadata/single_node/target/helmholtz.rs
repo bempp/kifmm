@@ -4,7 +4,9 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use itertools::Itertools;
-use rlst::{empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccessMut, RlstScalar};
+use rlst::{
+    empty_array, rlst_dynamic_array, Gemm, Lapack, MultIntoResize, RawAccessMut, RlstScalar,
+};
 
 use crate::{
     fmm::helpers::single_node::ncoeffs_kifmm,
@@ -30,8 +32,8 @@ where
     Scalar: RlstScalar<Complex = Scalar>
         + Default
         + Epsilon
-        + Epsilon
         + Lapack
+        + Gemm
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -97,7 +99,7 @@ where
                         GreenKernelEvalType::Value,
                         &downward_check_surface[..],
                         &downward_equivalent_surface[..],
-                        dc2e.data_mut(),
+                        dc2e.data_mut().unwrap(),
                     );
                     (s, ut, v) = pinv(&dc2e, atol, rtol).unwrap();
                 }
@@ -187,7 +189,7 @@ where
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
-                    pe2cc.data_mut(),
+                    pe2cc.data_mut().unwrap(),
                 );
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(

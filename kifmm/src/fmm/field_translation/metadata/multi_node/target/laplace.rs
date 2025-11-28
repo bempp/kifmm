@@ -3,10 +3,7 @@ use green_kernels::{
 };
 use itertools::Itertools;
 use mpi::traits::{Communicator, Equivalence};
-use rlst::{
-    empty_array, rlst_dynamic_array, DynArray, Lapack, MultIntoResize, RawAccess, RawAccessMut,
-    RlstScalar, Shape,
-};
+use rlst::{empty_array, rlst_dynamic_array, DynArray, Gemm, Lapack, MultIntoResize, RlstScalar};
 
 use crate::{
     fmm::{
@@ -40,6 +37,7 @@ where
         + Epsilon
         + Epsilon
         + Lapack
+        + Gemm
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>
@@ -128,7 +126,7 @@ where
                         GreenKernelEvalType::Value,
                         &downward_check_surface[..],
                         &downward_equivalent_surface[..],
-                        dc2e.data_mut(),
+                        dc2e.data_mut().unwrap(),
                     );
                     (s, ut, v) = pinv(&dc2e, atol, rtol).unwrap();
                 }
@@ -228,7 +226,7 @@ where
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
-                    pe2cc.data_mut(),
+                    pe2cc.data_mut().unwrap(),
                 );
 
                 let mut tmp_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -241,11 +239,15 @@ where
 
                 tmp_1
                     .data_mut()
+                    .unwrap()
                     .iter_mut()
                     .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
 
-                let mut tmp_2 = DynArray::<Scalar>::from_shape(tmp_1.shape());
-                tmp_2.data_mut().copy_from_slice(tmp_1.data());
+                let mut tmp_2 = DynArray::<Scalar, _>::from_shape(tmp_1.shape());
+                tmp_2
+                    .data_mut()
+                    .unwrap()
+                    .copy_from_slice(tmp_1.data().unwrap());
 
                 l2l_level_1.push(tmp_1);
                 l2l_level_2.push(tmp_2);
@@ -257,21 +259,23 @@ where
 
         let mut dc2e_inv_1_global = dc2e_inv_1
             .iter()
-            .map(|x| DynArray::<Scalar>::from_shape(x.shape()))
+            .map(|x| DynArray::<Scalar, _>::from_shape(x.shape()))
             .collect_vec();
         let mut dc2e_inv_2_global = dc2e_inv_2
             .iter()
-            .map(|x| DynArray::<Scalar>::from_shape(x.shape()))
+            .map(|x| DynArray::<Scalar, _>::from_shape(x.shape()))
             .collect_vec();
 
-        dc2e_inv_1_global
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_1[i].data()));
-        dc2e_inv_2_global
-            .iter_mut()
-            .enumerate()
-            .for_each(|(i, x)| x.data_mut().copy_from_slice(dc2e_inv_2[i].data()));
+        dc2e_inv_1_global.iter_mut().enumerate().for_each(|(i, x)| {
+            x.data_mut()
+                .unwrap()
+                .copy_from_slice(dc2e_inv_1[i].data().unwrap())
+        });
+        dc2e_inv_2_global.iter_mut().enumerate().for_each(|(i, x)| {
+            x.data_mut()
+                .unwrap()
+                .copy_from_slice(dc2e_inv_2[i].data().unwrap())
+        });
 
         self.global_fmm.target_vec = target_vec_global;
         self.global_fmm.dc2e_inv_1 = dc2e_inv_1_global;

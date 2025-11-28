@@ -119,6 +119,7 @@ where
                     let raw = unsafe {
                         check_potentials
                             .data()
+                            .unwrap()
                             .as_ptr()
                             .add(i * n_coeffs_check_surface) as *mut Scalar
                     };
@@ -151,10 +152,11 @@ where
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                                multipoles_subset.data_mut()[i * n_coeffs_equivalent_surface
+                                multipoles_subset.data_mut().unwrap()[i
+                                    * n_coeffs_equivalent_surface
                                     ..(i + 1) * n_coeffs_equivalent_surface]
                                     .copy_from_slice(
-                                        &multipoles.data()[multipole_idx
+                                        &multipoles.data().unwrap()[multipole_idx
                                             * n_coeffs_equivalent_surface
                                             ..(multipole_idx + 1) * n_coeffs_equivalent_surface],
                                     );
@@ -163,6 +165,7 @@ where
                             // Apply scale
                             multipoles_subset
                                 .data_mut()
+                                .unwrap()
                                 .iter_mut()
                                 .for_each(|x| *x *= scale);
 

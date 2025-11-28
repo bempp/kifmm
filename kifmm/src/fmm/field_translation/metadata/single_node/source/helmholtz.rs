@@ -4,9 +4,7 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use itertools::Itertools;
-use rlst::{
-    empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, Gemm, Lapack, MultIntoResize, RlstScalar};
 
 use crate::{
     fmm::{helpers::single_node::ncoeffs_kifmm, types::PinvMode},
@@ -32,6 +30,7 @@ where
         + Epsilon
         + Epsilon
         + Lapack
+        + Gemm
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -96,7 +95,7 @@ where
                         GreenKernelEvalType::Value,
                         &upward_check_surface[..],
                         &upward_equivalent_surface[..],
-                        uc2e.data_mut(),
+                        uc2e.data_mut().unwrap(),
                     );
                     (s, ut, v) = pinv(&uc2e, atol, rtol).unwrap();
                 }
@@ -194,7 +193,7 @@ where
                     GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
-                    ce2pc.data_mut(),
+                    ce2pc.data_mut().unwrap(),
                 );
 
                 let tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -205,7 +204,7 @@ where
                 let l = i * n_equiv_surface_child * n_equiv_surface_parent;
                 let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
-                m2m.data_mut()[l..r].copy_from_slice(tmp.data());
+                m2m.data_mut().unwrap()[l..r].copy_from_slice(tmp.data().unwrap());
                 m2m_vec.push(tmp);
             }
 

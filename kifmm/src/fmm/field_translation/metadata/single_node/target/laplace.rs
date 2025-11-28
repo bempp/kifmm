@@ -3,7 +3,9 @@
 use green_kernels::{
     laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
-use rlst::{empty_array, rlst_dynamic_array, Lapack, MultIntoResize, RawAccessMut, RlstScalar};
+use rlst::{
+    empty_array, rlst_dynamic_array, Gemm, Lapack, MultIntoResize, RawAccessMut, RlstScalar,
+};
 
 use crate::{
     fmm::{
@@ -32,6 +34,7 @@ where
         + Epsilon
         + Epsilon
         + Lapack
+        + Gemm
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -83,7 +86,7 @@ where
                         GreenKernelEvalType::Value,
                         &downward_check_surface[..],
                         &downward_equivalent_surface[..],
-                        dc2e.data_mut(),
+                        dc2e.data_mut().unwrap(),
                     );
                     (s, ut, v) = pinv(&dc2e, atol, rtol).unwrap();
                 }
@@ -154,7 +157,7 @@ where
                     GreenKernelEvalType::Value,
                     &child_downward_check_surface,
                     &parent_downward_equivalent_surface,
-                    pe2cc.data_mut(),
+                    pe2cc.data_mut().unwrap(),
                 );
 
                 let mut tmp = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -166,6 +169,7 @@ where
                 );
 
                 tmp.data_mut()
+                    .unwrap()
                     .iter_mut()
                     .for_each(|d| *d *= homogenous_kernel_scale(child.level()));
 
