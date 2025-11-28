@@ -119,9 +119,9 @@ mod test {
         helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel, traits::Kernel,
         types::GreenKernelEvalType,
     };
-    use num::{Float, Zero};
+    use num::{Complex, Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use rlst::{c64, rlst_dynamic_array, DynArray, RawAccess, RawAccessMut, RlstScalar, Shape};
+    use rlst::{c64, rlst_dynamic_array, DynArray, RlstScalar, Shape};
 
     use crate::{
         fmm::{
@@ -536,7 +536,7 @@ mod test {
             .data_mut()
             .unwrap()
             .iter_mut()
-            .for_each(|c| *c = rng.gen());
+            .for_each(|c| *c = rng.random());
 
         let svd_threshold = Some(1e-5);
         let mut fmm_svd = SingleNodeBuilder::new(false)
@@ -729,13 +729,19 @@ mod test {
             .data_mut()
             .unwrap()
             .iter_mut()
-            .for_each(|c| *c = Complex<f64>::new(rng.random(), rng.random()));
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         let mut fmm = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
@@ -789,16 +795,26 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         // FFT based field translation
         {
             // Evaluate potentials
             let mut fmm_fft = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::Value,
@@ -821,10 +837,16 @@ mod test {
 
             // Evaluate potentials + derivatives
             let mut fmm_fft = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     GreenKernelEvalType::ValueDeriv,
@@ -852,10 +874,16 @@ mod test {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -882,10 +910,16 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -936,17 +970,27 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -974,10 +1018,16 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1027,17 +1077,27 @@ mod test {
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1089,17 +1149,27 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         // BLAS based field translations allow variable check/equiv surfaces
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1127,10 +1197,16 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1178,15 +1254,25 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         let wavenumber = 2.5;
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
@@ -1224,16 +1310,26 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         // BLAS based field translation
         {
             // Evaluate potentials
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
@@ -1253,10 +1349,16 @@ mod test {
 
             // Evaluate potentials + derivatives
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
@@ -1282,10 +1384,16 @@ mod test {
         {
             // Evaluate potentials
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
@@ -1305,10 +1413,16 @@ mod test {
 
             // Evaluate potentials + derivatives
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
@@ -1353,16 +1467,26 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         // BLAS based field translation
         {
             // Evaluate potentials
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
@@ -1382,10 +1506,16 @@ mod test {
 
             // Evaluate potentials + derivatives
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
@@ -1411,10 +1541,16 @@ mod test {
         {
             // Evaluate potentials
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
@@ -1434,10 +1570,16 @@ mod test {
 
             // Evaluate potentials + derivatives
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
@@ -1483,16 +1625,26 @@ mod test {
         let nvecs = 1;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         // BLAS based field translation
         {
             // Evaluate potentials
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
@@ -1513,10 +1665,16 @@ mod test {
 
             // Evaluate potentials + derivatives
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::ValueDeriv,
@@ -1561,16 +1719,26 @@ mod test {
         let nvecs = 2;
         let mut rng = StdRng::seed_from_u64(0);
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = Complex::<f64>::new(rng.random(), rng.random()));
 
         // BLAS based field translation
         {
             // Evaluate potentials
             let mut fmm = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     GreenKernelEvalType::Value,
@@ -1618,18 +1786,29 @@ mod test {
         let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
         charges
             .data_mut()
+            .unwrap()
             .chunks_exact_mut(n_sources)
-            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<f64>()));
+            .for_each(|chunk| {
+                chunk
+                    .iter_mut()
+                    .for_each(|elem| *elem += rng.random::<f64>())
+            });
 
         // fmm with blas based field translation
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1653,10 +1832,16 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Laplace3dKernel::new(),
                     eval_type,
@@ -1710,18 +1895,29 @@ mod test {
         let mut charges = rlst_dynamic_array!(c64, [n_sources, nvecs]);
         charges
             .data_mut()
+            .unwrap()
             .chunks_exact_mut(n_sources)
-            .for_each(|chunk| chunk.iter_mut().for_each(|elem| *elem += rng.gen::<c64>()));
+            .for_each(|chunk| {
+                chunk
+                    .iter_mut()
+                    .for_each(|elem| *elem += Complex::new(rng.random(), rng.random()))
+            });
 
         // fmm with blas based field translation
         {
             // Evaluate potentials
             let eval_type = GreenKernelEvalType::Value;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,
@@ -1745,10 +1941,16 @@ mod test {
             // Evaluate potentials + derivatives
             let eval_type = GreenKernelEvalType::ValueDeriv;
             let mut fmm_blas = SingleNodeBuilder::new(false)
-                .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+                .tree(
+                    sources.data().unwrap(),
+                    targets.data().unwrap(),
+                    n_crit,
+                    depth,
+                    prune_empty,
+                )
                 .unwrap()
                 .parameters(
-                    charges.data(),
+                    charges.data().unwrap(),
                     &expansion_order,
                     Helmholtz3dKernel::new(wavenumber),
                     eval_type,

@@ -512,7 +512,7 @@ where
                 for i in 0..n {
                     let conv_idx = i + j * n + k * n * n;
                     let save_idx = i + j * npad + k * npad * npad;
-                    result.data_mut()[save_idx..(save_idx + 1)]
+                    result.data_mut().unwrap()[save_idx..(save_idx + 1)]
                         .copy_from_slice(&kernel_evals[(conv_idx)..(conv_idx + 1)]);
                 }
             }
@@ -539,7 +539,7 @@ where
             .iter()
             .enumerate()
         {
-            result.data_mut()[j] = charges[i];
+            result.data_mut().unwrap()[j] = charges[i];
         }
 
         result

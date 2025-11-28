@@ -4,8 +4,8 @@ use green_kernels::{
 use itertools::Itertools;
 use mpi::traits::{Communicator, Equivalence};
 use rlst::{
-    empty_array, rlst_dynamic_array, DynArray, Lapack, MultIntoResize, RawAccess, RawAccessMut,
-    RlstScalar, Shape,
+    empty_array, rlst_dynamic_array, DynArray, Gemm, Lapack, MultIntoResize, RawAccess,
+    RawAccessMut, RlstScalar, Shape,
 };
 
 use crate::{
@@ -40,6 +40,7 @@ where
         + Epsilon
         + Epsilon
         + Lapack
+        + Gemm
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>
@@ -127,7 +128,7 @@ where
                         GreenKernelEvalType::Value,
                         &upward_check_surface[..],
                         &upward_equivalent_surface[..],
-                        uc2e.data_mut(),
+                        uc2e.data_mut().unwrap(),
                     );
                     (s, ut, v) = pinv(&uc2e, atol, rtol).unwrap();
                 }
@@ -158,7 +159,7 @@ where
                 mat_s[[i, i]] = Scalar::from_real(s[i]);
             }
 
-            uc2e_inv_1_r.push(empty_array::<Scalar, 2>().simple_mult_into_resize(v.r(), mat_s.r()));
+            uc2e_inv_1_r.push(rlst::dot!(v.r(), mat_s.r()));
             uc2e_inv_2_r.push(ut);
         }
 
@@ -233,7 +234,7 @@ where
                     GreenKernelEvalType::Value,
                     &parent_upward_check_surface,
                     &child_upward_equivalent_surface,
-                    ce2pc.data_mut(),
+                    ce2pc.data_mut().unwrap(),
                 );
 
                 let tmp_1 = empty_array::<Scalar, 2>().simple_mult_into_resize(
@@ -245,15 +246,18 @@ where
                 );
 
                 let mut tmp_2 = DynArray::<Scalar, _>::from_shape(tmp_1.shape());
-                tmp_2.data_mut().copy_from_slice(tmp_1.data());
+                tmp_2
+                    .data_mut()
+                    .unwrap()
+                    .copy_from_slice(tmp_1.data().unwrap());
 
                 let l = i * n_equiv_surface_child * n_equiv_surface_parent;
                 let r = l + n_equiv_surface_child * n_equiv_surface_parent;
 
-                m2m_level_1.data_mut()[l..r].copy_from_slice(tmp_1.data());
+                m2m_level_1.data_mut().unwrap()[l..r].copy_from_slice(tmp_1.data().unwrap());
                 m2m_vec_level_1.push(tmp_1);
 
-                m2m_level_2.data_mut()[l..r].copy_from_slice(tmp_2.data());
+                m2m_level_2.data_mut().unwrap()[l..r].copy_from_slice(tmp_2.data().unwrap());
                 m2m_vec_level_2.push(tmp_2);
             }
 

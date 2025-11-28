@@ -12,9 +12,10 @@ use num::{Float, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
     dense::linalg::lapack::singular_value_decomposition::SvdMode, empty_array, rlst_dynamic_array,
-    DynArray, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, SliceArray,
+    DynArray, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar, Shape, SliceArray,
     UnsafeRandomAccessMut,
 };
+use rlst::{Lapack, SingularValueDecomposition};
 
 use crate::{
     fmm::{
@@ -302,21 +303,21 @@ where
 
                         // Compute FFT of padded kernel
                         let mut kernel_hat =
-                            DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                            DynArray::<<Scalar as DftType>::OutputType, _>::from_shape(
                                 transform_shape,
                             );
 
                         let plan = Scalar::plan_forward(
-                            kernel.data_mut(),
-                            kernel_hat.data_mut(),
+                            kernel.data_mut().unwrap(),
+                            kernel_hat.data_mut().unwrap(),
                             &shape,
                             None,
                         )
                         .unwrap();
 
                         let _ = Scalar::forward_dft(
-                            kernel.data_mut(),
-                            kernel_hat.data_mut(),
+                            kernel.data_mut().unwrap(),
+                            kernel_hat.data_mut().unwrap(),
                             &shape,
                             &plan,
                         );
@@ -325,7 +326,7 @@ where
                     } else {
                         // Fill with zeros when interaction doesn't exist
                         let kernel_hat_zeros =
-                            DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                            DynArray::<<Scalar as DftType>::OutputType, _>::from_shape(
                                 transform_shape,
                             );
                         kernel_data_vec_r[i].push(kernel_hat_zeros);
@@ -394,7 +395,7 @@ where
                     {
                         let offset = j * transform_size;
                         kernel_data[i][offset..offset + transform_size]
-                            .copy_from_slice(kernel_data_ij.data())
+                            .copy_from_slice(kernel_data_ij.data().unwrap())
                     }
                 }
 
@@ -433,7 +434,7 @@ where
                             [NSIBLINGS, NSIBLINGS]
                         );
                         k_ft.fill_from(&k_f);
-                        kernel_data_ft.push(k_ft.data().to_vec());
+                        kernel_data_ft.push(k_ft.data().unwrap().to_vec());
                     }
                 }
 
@@ -597,21 +598,21 @@ where
 
                             // Compute FFT of padded kernel
                             let mut kernel_hat =
-                                DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                                DynArray::<<Scalar as DftType>::OutputType, _>::from_shape(
                                     transform_shape,
                                 );
 
                             let plan = Scalar::plan_forward(
-                                kernel.data_mut(),
-                                kernel_hat.data_mut(),
+                                kernel.data_mut().unwrap(),
+                                kernel_hat.data_mut().unwrap(),
                                 &shape,
                                 None,
                             )
                             .unwrap();
 
                             let _ = Scalar::forward_dft(
-                                kernel.data_mut(),
-                                kernel_hat.data_mut(),
+                                kernel.data_mut().unwrap(),
+                                kernel_hat.data_mut().unwrap(),
                                 &shape,
                                 &plan,
                             );
@@ -620,7 +621,7 @@ where
                         } else {
                             // Fill with zeros when interaction doesn't exist
                             let kernel_hat_zeros =
-                                DynArray::<<Scalar as DftType>::OutputType>::from_shape(
+                                DynArray::<<Scalar as DftType>::OutputType, _>::from_shape(
                                     transform_shape,
                                 );
                             kernel_data_vec_r[i].push(kernel_hat_zeros);
@@ -689,7 +690,7 @@ where
                         {
                             let offset = j * transform_size;
                             kernel_data[i][offset..offset + transform_size]
-                                .copy_from_slice(kernel_data_ij.data())
+                                .copy_from_slice(kernel_data_ij.data().unwrap())
                         }
                     }
 
@@ -725,11 +726,11 @@ where
                             let k_f_ =
                                 SliceArray::from_shape(k_f.as_slice(), [NSIBLINGS, NSIBLINGS]);
                             let mut k_ft =
-                                DynArray::<<Scalar as DftType>::OutputType>::from_shape([
+                                DynArray::<<Scalar as DftType>::OutputType, _>::from_shape([
                                     NSIBLINGS, NSIBLINGS,
                                 ]);
-                            k_ft.fill_from(k_f_.r());
-                            kernel_data_ft.push(k_ft.data().to_vec());
+                            k_ft.fill_from(&k_f_);
+                            kernel_data_ft.push(k_ft.data().unwrap().to_vec());
                         }
                     }
 
@@ -778,7 +779,7 @@ where
 impl<Scalar> SourceToTargetTranslationMetadata
     for KiFmmMulti<Scalar, Helmholtz3dKernel<Scalar>, BlasFieldTranslationIa<Scalar>>
 where
-    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixRsvd + Equivalence,
+    Scalar: RlstScalar<Complex = Scalar> + Default + MatrixRsvd + Lapack + Gemm + Equivalence,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Self: MetadataAccess,
 {
@@ -926,7 +927,7 @@ where
                 GreenKernelEvalType::Value,
                 &target_check_surface[..],
                 &source_equivalent_surface[..],
-                tmp_gram.data_mut(),
+                tmp_gram.data_mut().unwrap(),
             );
 
             let mu = tmp_gram.shape()[0];
@@ -969,9 +970,10 @@ where
                 }
 
                 FmmSvdMode::Deterministic => {
-                    tmp_gram
-                        .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut sigma[..], SvdMode::Reduced)
-                        .unwrap();
+                    (sigma_arr, u, vt) = tmp_gram.svd(SvdMode::Compact).unwrap();
+                    // tmp_gram
+                    //     .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut sigma[..], SvdMode::Compact)
+                    //     .unwrap();
                 }
             }
 
