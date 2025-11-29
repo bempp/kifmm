@@ -353,7 +353,7 @@ pub(crate) fn flip3<T>(arr: &DynArray<T, 3>) -> DynArray<T, 3>
 where
     T: Clone + Copy + RlstScalar,
 {
-    let mut flipped = DynArray::<T>::from_shape(arr.shape());
+    let mut flipped = DynArray::<T, _>::from_shape(arr.shape());
 
     let [m, n, o] = arr.shape();
 

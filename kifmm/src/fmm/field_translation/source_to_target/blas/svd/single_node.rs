@@ -5,8 +5,8 @@ use std::sync::Mutex;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array, DynArray, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
-    SliceArray,
+    empty_array, rlst_dynamic_array, DynArray, Gemm, MultIntoResize, RawAccess, RawAccessMut,
+    RlstScalar, SliceArray,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -29,7 +29,7 @@ use crate::{
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
-    Scalar: RlstScalar + Default,
+    Scalar: RlstScalar + Default + Gemm,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: MetadataAccess + DataAccess<Scalar = Scalar, Kernel = Kernel>,
@@ -110,6 +110,7 @@ where
                     let raw = unsafe {
                         compressed_check_potentials
                             .data()
+                            .unwrap()
                             .as_ptr()
                             .add(i * self.source_to_target.cutoff_rank[m2l_operator_index])
                             as *mut Scalar
@@ -132,10 +133,14 @@ where
                     );
 
                     if self.kernel.is_homogenous() {
-                        compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                            *d *= homogenous_kernel_scale::<Scalar>(level)
-                                * m2l_scale::<Scalar>(level).unwrap()
-                        });
+                        compressed_multipoles
+                            .data_mut()
+                            .unwrap()
+                            .iter_mut()
+                            .for_each(|d| {
+                                *d *= homogenous_kernel_scale::<Scalar>(level)
+                                    * m2l_scale::<Scalar>(level).unwrap()
+                            });
                     }
                 }
 
@@ -160,13 +165,13 @@ where
                             );
 
                             for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                                compressed_multipoles_subset.data_mut()[i * self
+                                compressed_multipoles_subset.data_mut().unwrap()[i * self
                                     .source_to_target
                                     .cutoff_rank[m2l_operator_index]
                                     ..(i + 1)
                                         * self.source_to_target.cutoff_rank[m2l_operator_index]]
                                     .copy_from_slice(
-                                        &compressed_multipoles.data()[multipole_idx
+                                        &compressed_multipoles.data().unwrap()[multipole_idx
                                             * self.source_to_target.cutoff_rank[m2l_operator_index]
                                             ..(multipole_idx + 1)
                                                 * self.source_to_target.cutoff_rank
@@ -193,7 +198,7 @@ where
                                         self.source_to_target.cutoff_rank[m2l_operator_index],
                                     )
                                 };
-                                let tmp = &compressed_check_potential.data()[multipole_idx
+                                let tmp = &compressed_check_potential.data().unwrap()[multipole_idx
                                     * self.source_to_target.cutoff_rank[m2l_operator_index]
                                     ..(multipole_idx + 1)
                                         * self.source_to_target.cutoff_rank[m2l_operator_index]];
@@ -224,7 +229,7 @@ where
                     };
                     all_locals
                         .iter_mut()
-                        .zip(locals.data().iter())
+                        .zip(locals.data().unwrap().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
 
@@ -236,7 +241,7 @@ where
                     [n_coeffs_equivalent_surface, n_sources * n_matvecs],
                 );
 
-                let compressed_check_potentials = DynArray::<Scalar>::from_shape([
+                let compressed_check_potentials = DynArray::<Scalar, _>::from_shape([
                     self.source_to_target.cutoff_rank[m2l_operator_index],
                     n_targets * n_matvecs,
                 ]);
@@ -254,6 +259,7 @@ where
                         let raw = unsafe {
                             compressed_check_potentials
                                 .data()
+                                .unwrap()
                                 .as_ptr()
                                 .add(key_displacement + charge_vec_displacement)
                                 as *mut Scalar
@@ -278,10 +284,14 @@ where
                     );
 
                     if self.kernel.is_homogenous() {
-                        compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                            *d *= homogenous_kernel_scale::<Scalar>(level)
-                                * m2l_scale::<Scalar>(level).unwrap()
-                        });
+                        compressed_multipoles
+                            .data_mut()
+                            .unwrap()
+                            .iter_mut()
+                            .for_each(|d| {
+                                *d *= homogenous_kernel_scale::<Scalar>(level)
+                                    * m2l_scale::<Scalar>(level).unwrap()
+                            });
                     }
                 }
 
@@ -298,7 +308,7 @@ where
                                 &self.source_to_target.metadata[m2l_operator_index].c_vt[c_idx];
 
                             let mut compressed_multipoles_subset =
-                                DynArray::<Scalar>::from_shape([
+                                DynArray::<Scalar, _>::from_shape([
                                     self.source_to_target.cutoff_rank[m2l_operator_index],
                                     multipole_idxs.len() * n_matvecs,
                                 ]);
@@ -318,19 +328,19 @@ where
                                     let charge_vec_displacement = charge_vec_idx
                                         * self.source_to_target.cutoff_rank[m2l_operator_index];
 
-                                    compressed_multipoles_subset.data_mut()[key_displacement_local
-                                        + charge_vec_displacement
-                                        ..key_displacement_local
-                                            + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank
-                                                [m2l_operator_index]]
-                                        .copy_from_slice(
-                                            &compressed_multipoles.data()[key_displacement_global
+                                    compressed_multipoles_subset.data_mut().unwrap()
+                                        [key_displacement_local + charge_vec_displacement
+                                            ..key_displacement_local
                                                 + charge_vec_displacement
-                                                ..key_displacement_global
-                                                    + charge_vec_displacement
-                                                    + self.source_to_target.cutoff_rank
-                                                        [m2l_operator_index]],
+                                                + self.source_to_target.cutoff_rank
+                                                    [m2l_operator_index]]
+                                        .copy_from_slice(
+                                            &compressed_multipoles.data().unwrap()
+                                                [key_displacement_global + charge_vec_displacement
+                                                    ..key_displacement_global
+                                                        + charge_vec_displacement
+                                                        + self.source_to_target.cutoff_rank
+                                                            [m2l_operator_index]],
                                         );
                                 }
                             }
@@ -368,12 +378,12 @@ where
                                     let charge_vec_displacement = charge_vec_idx
                                         * self.source_to_target.cutoff_rank[m2l_operator_index];
 
-                                    let tmp = &compressed_check_potential.data()[key_displacement
-                                        + charge_vec_displacement
-                                        ..key_displacement
-                                            + charge_vec_displacement
-                                            + self.source_to_target.cutoff_rank
-                                                [m2l_operator_index]];
+                                    let tmp = &compressed_check_potential.data().unwrap()
+                                        [key_displacement + charge_vec_displacement
+                                            ..key_displacement
+                                                + charge_vec_displacement
+                                                + self.source_to_target.cutoff_rank
+                                                    [m2l_operator_index]];
                                     check_potential
                                         .iter_mut()
                                         .zip(tmp)
@@ -404,7 +414,7 @@ where
                     };
                     all_locals
                         .iter_mut()
-                        .zip(locals.data().iter())
+                        .zip(locals.data().unwrap().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
             }
@@ -421,7 +431,7 @@ where
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
 where
-    Scalar: RlstScalar + Default,
+    Scalar: RlstScalar + Default + Gemm,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
     Self: MetadataAccess,
@@ -502,6 +512,7 @@ where
                     let raw = unsafe {
                         check_potentials
                             .data()
+                            .unwrap()
                             .as_ptr()
                             .add(i * n_coeffs_check_surface) as *mut Scalar
                     };
@@ -530,7 +541,7 @@ where
                             for (local_multipole_idx, &global_multipole_idx) in
                                 multipole_idxs.iter().enumerate()
                             {
-                                multipoles_subset.data_mut()[local_multipole_idx
+                                multipoles_subset.data_mut().unwrap()[local_multipole_idx
                                     * n_coeffs_equivalent_surface
                                     ..(local_multipole_idx + 1) * n_coeffs_equivalent_surface]
                                     .copy_from_slice(
@@ -549,7 +560,7 @@ where
                                 );
 
                             for (multipole_idx, &local_idx) in local_idxs.iter().enumerate() {
-                                let tmp = &check_potential.data()[multipole_idx
+                                let tmp = &check_potential.data().unwrap()[multipole_idx
                                     * n_coeffs_check_surface
                                     ..(multipole_idx + 1) * n_coeffs_check_surface];
 
@@ -587,7 +598,7 @@ where
                     };
                     all_locals
                         .iter_mut()
-                        .zip(locals.data().iter())
+                        .zip(locals.data().unwrap().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
 
@@ -611,6 +622,7 @@ where
                         let raw = unsafe {
                             check_potentials
                                 .data()
+                                .unwrap()
                                 .as_ptr()
                                 .add(key_displacement + charge_vec_displacement)
                                 as *mut Scalar
@@ -634,7 +646,7 @@ where
                             let u = &self.source_to_target.metadata[m2l_operator_index].u[c_idx];
                             let vt = &self.source_to_target.metadata[m2l_operator_index].vt[c_idx];
 
-                            let mut multipoles_subset = DynArray::<Scalar>::from_shape([
+                            let mut multipoles_subset = DynArray::<Scalar, _>::from_shape([
                                 n_coeffs_equivalent_surface,
                                 multipole_idxs.len() * n_matvecs,
                             ]);
@@ -652,7 +664,7 @@ where
                                     let charge_vec_displacement =
                                         charge_vec_idx * n_coeffs_equivalent_surface;
 
-                                    multipoles_subset.data_mut()[key_displacement_local
+                                    multipoles_subset.data_mut().unwrap()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
@@ -686,7 +698,7 @@ where
                                     let charge_vec_displacement =
                                         charge_vec_idx * n_coeffs_check_surface;
 
-                                    let tmp = &check_potential.data()[key_displacement
+                                    let tmp = &check_potential.data().unwrap()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement
@@ -729,7 +741,7 @@ where
                     };
                     all_locals
                         .iter_mut()
-                        .zip(locals.data().iter())
+                        .zip(locals.data().unwrap().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
             }

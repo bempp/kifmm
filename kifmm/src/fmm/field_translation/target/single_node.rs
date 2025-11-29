@@ -4,7 +4,9 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use rayon::prelude::*;
-use rlst::{empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{
+    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+};
 
 use green_kernels::traits::Kernel as KernelTrait;
 
@@ -22,7 +24,7 @@ use crate::{
 
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation for KiFmm<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar,
+    Scalar: RlstScalar + Gemm,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Send + Sync,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     <Scalar as RlstScalar>::Real: Default,
@@ -78,7 +80,8 @@ where
                             .enumerate()
                             .take(chunk_size)
                         {
-                            parent_locals.data_mut()[chunk_idx * n_coeffs_equivalent_surface_parent
+                            parent_locals.data_mut().unwrap()[chunk_idx
+                                * n_coeffs_equivalent_surface_parent
                                 ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent]
                                 .copy_from_slice(unsafe {
                                     std::slice::from_raw_parts_mut(
@@ -106,7 +109,7 @@ where
                                 child_local
                                     .iter_mut()
                                     .zip(
-                                        &tmp.data()[j * n_coeffs_equivalent_surface
+                                        &tmp.data().unwrap()[j * n_coeffs_equivalent_surface
                                             ..(j + 1) * n_coeffs_equivalent_surface],
                                     )
                                     .for_each(|(l, t)| *l += *t);
@@ -149,7 +152,7 @@ where
                                     n_coeffs_equivalent_surface_parent,
                                 )
                             };
-                            parent_locals.data_mut()[charge_vec_idx
+                            parent_locals.data_mut().unwrap()[charge_vec_idx
                                 * n_coeffs_equivalent_surface_parent
                                 ..(charge_vec_idx + 1) * n_coeffs_equivalent_surface_parent]
                                 .copy_from_slice(tmp);
@@ -172,7 +175,8 @@ where
                                         n_coeffs_equivalent_surface,
                                     )
                                 };
-                                let result_ij = &result_i.data()[j * n_coeffs_equivalent_surface
+                                let result_ij = &result_i.data().unwrap()[j
+                                    * n_coeffs_equivalent_surface
                                     ..(j + 1) * n_coeffs_equivalent_surface];
                                 child_locals_ij
                                     .iter_mut()

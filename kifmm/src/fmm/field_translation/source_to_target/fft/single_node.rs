@@ -6,7 +6,7 @@ use num::{One, Zero};
 
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
+    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;
@@ -39,6 +39,7 @@ where
         + AsComplex
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default
+        + Gemm
         + AlignedAllocable,
     <Scalar as AsComplex>::ComplexType:
         Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
@@ -353,6 +354,7 @@ where
 
                             local_chunk
                                 .data()
+                                .unwrap()
                                 .chunks_exact(n_coeffs_equivalent_surface)
                                 .zip(local_ptrs)
                                 .for_each(|(result, local)| {

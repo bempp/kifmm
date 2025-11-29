@@ -4,8 +4,8 @@ use green_kernels::{
 use itertools::Itertools;
 use mpi::traits::{Communicator, Equivalence};
 use rlst::{
-    empty_array, rlst_dynamic_array, DynArray, Gemm, Lapack, MultIntoResize, RawAccess, RlstScalar,
-    Shape,
+    empty_array, rlst_dynamic_array, AbsSquare, DynArray, Gemm, Lapack, MultIntoResize, RawAccess,
+    RlstScalar, Shape,
 };
 
 use crate::{
@@ -44,6 +44,7 @@ where
         + Lapack
         + Gemm
         + Upcast
+        + AbsSquare<Output = Scalar::Real>
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>
         + Equivalence,
@@ -53,7 +54,7 @@ where
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>
         + Equivalence,
-    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar> + Equivalence,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar> + Equivalence + Gemm,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real> + Equivalence,
     FieldTranslation: FieldTranslationTrait + Send + Sync + Default,
     Self: DataAccessMulti + MetadataAccess,

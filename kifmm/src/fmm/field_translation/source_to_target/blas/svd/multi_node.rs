@@ -7,7 +7,7 @@ use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use rlst::{
-    empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
     SliceArray,
 };
 
@@ -31,7 +31,7 @@ use crate::{
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmmMulti<Scalar, Kernel, BlasFieldTranslationSaRcmp<Scalar>>
 where
-    Scalar: RlstScalar + Default + Equivalence,
+    Scalar: RlstScalar + Default + Equivalence + Gemm,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     Self: MetadataAccess
@@ -110,6 +110,7 @@ where
                         let raw = unsafe {
                             compressed_check_potentials
                                 .data()
+                                .unwrap()
                                 .as_ptr()
                                 .add(i * self.source_to_target.cutoff_rank[m2l_operator_index])
                                 as *mut Scalar
@@ -173,10 +174,14 @@ where
                                 );
 
                             if self.kernel.is_homogenous() {
-                                compressed_multipoles.data_mut().iter_mut().for_each(|d| {
-                                    *d *= homogenous_kernel_scale::<Scalar>(level)
-                                        * m2l_scale::<Scalar>(level).unwrap()
-                                });
+                                compressed_multipoles
+                                    .data_mut()
+                                    .unwrap()
+                                    .iter_mut()
+                                    .for_each(|d| {
+                                        *d *= homogenous_kernel_scale::<Scalar>(level)
+                                            * m2l_scale::<Scalar>(level).unwrap()
+                                    });
                             }
                         }
 
@@ -203,10 +208,10 @@ where
                                     );
 
                                     for (i, &multipole_idx) in multipole_idxs.iter().enumerate() {
-                                        compressed_multipoles_subset.data_mut()
+                                        compressed_multipoles_subset.data_mut().unwrap()
                                             [i * cutoff_rank..(i + 1) * cutoff_rank]
                                             .copy_from_slice(
-                                                &compressed_multipoles.data()[multipole_idx
+                                                &compressed_multipoles.data().unwrap()[multipole_idx
                                                     * cutoff_rank
                                                     ..(multipole_idx + 1) * cutoff_rank],
                                             );
@@ -234,9 +239,9 @@ where
                                                 cutoff_rank,
                                             )
                                         };
-                                        let tmp = &compressed_check_potential.data()[multipole_idx
-                                            * cutoff_rank
-                                            ..(multipole_idx + 1) * cutoff_rank];
+                                        let tmp = &compressed_check_potential.data().unwrap()
+                                            [multipole_idx * cutoff_rank
+                                                ..(multipole_idx + 1) * cutoff_rank];
                                         check_potential
                                             .iter_mut()
                                             .zip(tmp)
@@ -268,7 +273,7 @@ where
                         };
                         all_locals
                             .iter_mut()
-                            .zip(locals.data().iter())
+                            .zip(locals.data().unwrap().iter())
                             .for_each(|(l, r)| *l += *r);
                     }
                 }
@@ -289,7 +294,7 @@ where
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmmMulti<Scalar, Kernel, BlasFieldTranslationIa<Scalar>>
 where
-    Scalar: RlstScalar + Default + Equivalence,
+    Scalar: RlstScalar + Default + Equivalence + Gemm,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
     Self: MetadataAccess
@@ -365,6 +370,7 @@ where
                         let raw = unsafe {
                             all_check_potentials
                                 .data()
+                                .unwrap()
                                 .as_ptr()
                                 .add(i * n_coeffs_check_surface)
                                 as *mut Scalar
@@ -439,12 +445,12 @@ where
                                     for (local_multipole_idx, &global_multipole_idx) in
                                         multipole_idxs.iter().enumerate()
                                     {
-                                        multipoles_subset.data_mut()[local_multipole_idx
+                                        multipoles_subset.data_mut().unwrap()[local_multipole_idx
                                             * n_coeffs_equivalent_surface
                                             ..(local_multipole_idx + 1)
                                                 * n_coeffs_equivalent_surface]
                                             .copy_from_slice(
-                                                &multipoles.data()[global_multipole_idx
+                                                &multipoles.data().unwrap()[global_multipole_idx
                                                     * n_coeffs_equivalent_surface
                                                     ..(global_multipole_idx + 1)
                                                         * n_coeffs_equivalent_surface],
@@ -462,7 +468,7 @@ where
 
                                     for (multipole_idx, &local_idx) in local_idxs.iter().enumerate()
                                     {
-                                        let tmp = &check_potential.data()[multipole_idx
+                                        let tmp = &check_potential.data().unwrap()[multipole_idx
                                             * n_coeffs_check_surface
                                             ..(multipole_idx + 1) * n_coeffs_check_surface];
 
@@ -505,7 +511,7 @@ where
 
                         all_locals
                             .iter_mut()
-                            .zip(locals.data().iter())
+                            .zip(locals.data().unwrap().iter())
                             .for_each(|(l, r)| *l += *r);
                     }
                 }

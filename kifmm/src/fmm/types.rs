@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::RwLock};
 
 use green_kernels::{traits::Kernel as KernelTrait, types::GreenKernelEvalType};
 use num::traits::Float;
-use rlst::{rlst_dynamic_array, DynArray, RawAccess, RawAccessMut, RlstScalar, Shape, SliceArray};
+use rlst::{rlst_dynamic_array, DynArray, RlstScalar, SliceArray};
 
 use crate::{
     linalg::rsvd::Normaliser,
@@ -984,24 +984,32 @@ where
     Scalar: RlstScalar + Clone,
 {
     fn clone(&self) -> Self {
-        let mut u = DynArray::<Scalar>::from_shape(self.u.shape());
-        u.data_mut().copy_from_slice(self.u.data());
+        let mut u = DynArray::<Scalar, _>::from_shape(self.u.shape());
+        u.data_mut()
+            .unwrap()
+            .copy_from_slice(self.u.data().unwrap());
 
-        let mut st = DynArray::<Scalar>::from_shape(self.st.shape());
-        st.data_mut().copy_from_slice(self.st.data());
+        let mut st = DynArray::<Scalar, _>::from_shape(self.st.shape());
+        st.data_mut()
+            .unwrap()
+            .copy_from_slice(self.st.data().unwrap());
 
         let mut c_u = Vec::new();
         let mut c_vt = Vec::new();
 
         for item in self.c_u.iter() {
-            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
-            tmp.data_mut().copy_from_slice(item.data());
+            let mut tmp = DynArray::<Scalar, _>::from_shape(item.shape());
+            tmp.data_mut()
+                .unwrap()
+                .copy_from_slice(item.data().unwrap());
             c_u.push(tmp);
         }
 
         for item in self.c_vt.iter() {
-            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
-            tmp.data_mut().copy_from_slice(item.data());
+            let mut tmp = DynArray::<Scalar, _>::from_shape(item.shape());
+            tmp.data_mut()
+                .unwrap()
+                .copy_from_slice(item.data().unwrap());
             c_vt.push(tmp);
         }
 
@@ -1052,14 +1060,18 @@ where
         let mut vt = Vec::new();
 
         for item in self.u.iter() {
-            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
-            tmp.data_mut().copy_from_slice(item.data());
+            let mut tmp = DynArray::<Scalar, _>::from_shape(item.shape());
+            tmp.data_mut()
+                .unwrap()
+                .copy_from_slice(item.data().unwrap());
             u.push(tmp);
         }
 
         for item in self.vt.iter() {
-            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
-            tmp.data_mut().copy_from_slice(item.data());
+            let mut tmp = DynArray::<Scalar, _>::from_shape(item.shape());
+            tmp.data_mut()
+                .unwrap()
+                .copy_from_slice(item.data().unwrap());
             vt.push(tmp);
         }
 
@@ -1089,14 +1101,18 @@ where
         let mut vt = Vec::new();
 
         for item in self.u.iter() {
-            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
-            tmp.data_mut().copy_from_slice(item.data());
+            let mut tmp = DynArray::<Scalar, _>::from_shape(item.shape());
+            tmp.data_mut()
+                .unwrap()
+                .copy_from_slice(item.data().unwrap());
             u.push(tmp);
         }
 
         for item in self.vt.iter() {
-            let mut tmp = DynArray::<Scalar>::from_shape(item.shape());
-            tmp.data_mut().copy_from_slice(item.data());
+            let mut tmp = DynArray::<Scalar, _>::from_shape(item.shape());
+            tmp.data_mut()
+                .unwrap()
+                .copy_from_slice(item.data().unwrap());
             vt.push(tmp);
         }
 

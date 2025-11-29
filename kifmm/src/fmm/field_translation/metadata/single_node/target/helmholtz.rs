@@ -4,9 +4,7 @@ use green_kernels::{
     helmholtz_3d::Helmholtz3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
 use itertools::Itertools;
-use rlst::{
-    empty_array, rlst_dynamic_array, Gemm, Lapack, MultIntoResize, RawAccessMut, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, AbsSquare, Gemm, Lapack, MultIntoResize, RlstScalar};
 
 use crate::{
     fmm::helpers::single_node::ncoeffs_kifmm,
@@ -35,6 +33,7 @@ where
         + Lapack
         + Gemm
         + Upcast
+        + AbsSquare<Output = Scalar::Real>
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
     <Scalar as RlstScalar>::Real: Default
@@ -42,7 +41,7 @@ where
         + Upcast
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>,
-    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar>,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar> + Gemm,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: Evaluate,

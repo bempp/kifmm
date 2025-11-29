@@ -9,9 +9,7 @@ use rayon::prelude::{
     IndexedParallelIterator, IntoParallelIterator, ParallelIterator, ParallelSlice,
     ParallelSliceMut,
 };
-use rlst::{
-    empty_array, rlst_dynamic_array, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RlstScalar};
 
 use green_kernels::traits::Kernel as KernelTrait;
 
@@ -44,6 +42,7 @@ where
         + Dft<InputType = Scalar, OutputType = <Scalar as AsComplex>::ComplexType>
         + Default
         + AlignedAllocable
+        + Gemm
         + Equivalence,
     <Scalar as AsComplex>::ComplexType:
         Hadamard8x8<Scalar = <Scalar as AsComplex>::ComplexType> + AlignedAllocable,
@@ -443,6 +442,7 @@ where
 
                                 local_chunk
                                     .data()
+                                    .unwrap()
                                     .chunks_exact(n_coeffs_equivalent_surface)
                                     .zip(local_ptrs)
                                     .for_each(|(result, local)| {

@@ -154,7 +154,7 @@ impl Hadamard8x8 for c64 {
 #[cfg(all(target_arch = "aarch64", target_feature = "neon"))]
 pub mod aarch64 {
     use super::{c32, c64, Hadamard8x8Data};
-    use pulp::{f32x4, f64x2};
+    use pulp::{f32x4, f64x2, Simd};
     use std::arch::aarch64::{float32x4_t, float64x2_t};
 
     impl pulp::NullaryFnOnce for Hadamard8x8Data<'_, c64> {
@@ -182,91 +182,91 @@ pub mod aarch64 {
             let mut a8 = f64x2(0., 0.);
 
             let [r1, r2, r3, r4, r5, r6, r7, r8]: [f64x2; 8] = pulp::cast(*result);
-            let scale = simd.f64s_splat(scale);
+            let scale = simd.splat_f64s(scale);
 
             let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
             let [v1, v2, v3, v4, v5, v6, v7, v8]: [f64x2; 8] = pulp::cast(*vector);
 
             // Unroll loop
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[0]);
-            a1 = simd.c64s_mul_add_e(m1, v1, a1);
-            a2 = simd.c64s_mul_add_e(m2, v1, a2);
-            a3 = simd.c64s_mul_add_e(m3, v1, a3);
-            a4 = simd.c64s_mul_add_e(m4, v1, a4);
-            a5 = simd.c64s_mul_add_e(m5, v1, a5);
-            a6 = simd.c64s_mul_add_e(m6, v1, a6);
-            a7 = simd.c64s_mul_add_e(m7, v1, a7);
-            a8 = simd.c64s_mul_add_e(m8, v1, a8);
+            a1 = simd.mul_add_e_c64s(m1, v1, a1);
+            a2 = simd.mul_add_e_c64s(m2, v1, a2);
+            a3 = simd.mul_add_e_c64s(m3, v1, a3);
+            a4 = simd.mul_add_e_c64s(m4, v1, a4);
+            a5 = simd.mul_add_e_c64s(m5, v1, a5);
+            a6 = simd.mul_add_e_c64s(m6, v1, a6);
+            a7 = simd.mul_add_e_c64s(m7, v1, a7);
+            a8 = simd.mul_add_e_c64s(m8, v1, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[1]);
-            a1 = simd.c64s_mul_add_e(m1, v2, a1);
-            a2 = simd.c64s_mul_add_e(m2, v2, a2);
-            a3 = simd.c64s_mul_add_e(m3, v2, a3);
-            a4 = simd.c64s_mul_add_e(m4, v2, a4);
-            a5 = simd.c64s_mul_add_e(m5, v2, a5);
-            a6 = simd.c64s_mul_add_e(m6, v2, a6);
-            a7 = simd.c64s_mul_add_e(m7, v2, a7);
-            a8 = simd.c64s_mul_add_e(m8, v2, a8);
+            a1 = simd.mul_add_e_c64s(m1, v2, a1);
+            a2 = simd.mul_add_e_c64s(m2, v2, a2);
+            a3 = simd.mul_add_e_c64s(m3, v2, a3);
+            a4 = simd.mul_add_e_c64s(m4, v2, a4);
+            a5 = simd.mul_add_e_c64s(m5, v2, a5);
+            a6 = simd.mul_add_e_c64s(m6, v2, a6);
+            a7 = simd.mul_add_e_c64s(m7, v2, a7);
+            a8 = simd.mul_add_e_c64s(m8, v2, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[2]);
-            a1 = simd.c64s_mul_add_e(m1, v3, a1);
-            a2 = simd.c64s_mul_add_e(m2, v3, a2);
-            a3 = simd.c64s_mul_add_e(m3, v3, a3);
-            a4 = simd.c64s_mul_add_e(m4, v3, a4);
-            a5 = simd.c64s_mul_add_e(m5, v3, a5);
-            a6 = simd.c64s_mul_add_e(m6, v3, a6);
-            a7 = simd.c64s_mul_add_e(m7, v3, a7);
-            a8 = simd.c64s_mul_add_e(m8, v3, a8);
+            a1 = simd.mul_add_e_c64s(m1, v3, a1);
+            a2 = simd.mul_add_e_c64s(m2, v3, a2);
+            a3 = simd.mul_add_e_c64s(m3, v3, a3);
+            a4 = simd.mul_add_e_c64s(m4, v3, a4);
+            a5 = simd.mul_add_e_c64s(m5, v3, a5);
+            a6 = simd.mul_add_e_c64s(m6, v3, a6);
+            a7 = simd.mul_add_e_c64s(m7, v3, a7);
+            a8 = simd.mul_add_e_c64s(m8, v3, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[3]);
-            a1 = simd.c64s_mul_add_e(m1, v4, a1);
-            a2 = simd.c64s_mul_add_e(m2, v4, a2);
-            a3 = simd.c64s_mul_add_e(m3, v4, a3);
-            a4 = simd.c64s_mul_add_e(m4, v4, a4);
-            a5 = simd.c64s_mul_add_e(m5, v4, a5);
-            a6 = simd.c64s_mul_add_e(m6, v4, a6);
-            a7 = simd.c64s_mul_add_e(m7, v4, a7);
-            a8 = simd.c64s_mul_add_e(m8, v4, a8);
+            a1 = simd.mul_add_e_c64s(m1, v4, a1);
+            a2 = simd.mul_add_e_c64s(m2, v4, a2);
+            a3 = simd.mul_add_e_c64s(m3, v4, a3);
+            a4 = simd.mul_add_e_c64s(m4, v4, a4);
+            a5 = simd.mul_add_e_c64s(m5, v4, a5);
+            a6 = simd.mul_add_e_c64s(m6, v4, a6);
+            a7 = simd.mul_add_e_c64s(m7, v4, a7);
+            a8 = simd.mul_add_e_c64s(m8, v4, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[4]);
-            a1 = simd.c64s_mul_add_e(m1, v5, a1);
-            a2 = simd.c64s_mul_add_e(m2, v5, a2);
-            a3 = simd.c64s_mul_add_e(m3, v5, a3);
-            a4 = simd.c64s_mul_add_e(m4, v5, a4);
-            a5 = simd.c64s_mul_add_e(m5, v5, a5);
-            a6 = simd.c64s_mul_add_e(m6, v5, a6);
-            a7 = simd.c64s_mul_add_e(m7, v5, a7);
-            a8 = simd.c64s_mul_add_e(m8, v5, a8);
+            a1 = simd.mul_add_e_c64s(m1, v5, a1);
+            a2 = simd.mul_add_e_c64s(m2, v5, a2);
+            a3 = simd.mul_add_e_c64s(m3, v5, a3);
+            a4 = simd.mul_add_e_c64s(m4, v5, a4);
+            a5 = simd.mul_add_e_c64s(m5, v5, a5);
+            a6 = simd.mul_add_e_c64s(m6, v5, a6);
+            a7 = simd.mul_add_e_c64s(m7, v5, a7);
+            a8 = simd.mul_add_e_c64s(m8, v5, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[5]);
-            a1 = simd.c64s_mul_add_e(m1, v6, a1);
-            a2 = simd.c64s_mul_add_e(m2, v6, a2);
-            a3 = simd.c64s_mul_add_e(m3, v6, a3);
-            a4 = simd.c64s_mul_add_e(m4, v6, a4);
-            a5 = simd.c64s_mul_add_e(m5, v6, a5);
-            a6 = simd.c64s_mul_add_e(m6, v6, a6);
-            a7 = simd.c64s_mul_add_e(m7, v6, a7);
-            a8 = simd.c64s_mul_add_e(m8, v6, a8);
+            a1 = simd.mul_add_e_c64s(m1, v6, a1);
+            a2 = simd.mul_add_e_c64s(m2, v6, a2);
+            a3 = simd.mul_add_e_c64s(m3, v6, a3);
+            a4 = simd.mul_add_e_c64s(m4, v6, a4);
+            a5 = simd.mul_add_e_c64s(m5, v6, a5);
+            a6 = simd.mul_add_e_c64s(m6, v6, a6);
+            a7 = simd.mul_add_e_c64s(m7, v6, a7);
+            a8 = simd.mul_add_e_c64s(m8, v6, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[6]);
-            a1 = simd.c64s_mul_add_e(m1, v7, a1);
-            a2 = simd.c64s_mul_add_e(m2, v7, a2);
-            a3 = simd.c64s_mul_add_e(m3, v7, a3);
-            a4 = simd.c64s_mul_add_e(m4, v7, a4);
-            a5 = simd.c64s_mul_add_e(m5, v7, a5);
-            a6 = simd.c64s_mul_add_e(m6, v7, a6);
-            a7 = simd.c64s_mul_add_e(m7, v7, a7);
-            a8 = simd.c64s_mul_add_e(m8, v7, a8);
+            a1 = simd.mul_add_e_c64s(m1, v7, a1);
+            a2 = simd.mul_add_e_c64s(m2, v7, a2);
+            a3 = simd.mul_add_e_c64s(m3, v7, a3);
+            a4 = simd.mul_add_e_c64s(m4, v7, a4);
+            a5 = simd.mul_add_e_c64s(m5, v7, a5);
+            a6 = simd.mul_add_e_c64s(m6, v7, a6);
+            a7 = simd.mul_add_e_c64s(m7, v7, a7);
+            a8 = simd.mul_add_e_c64s(m8, v7, a8);
 
             let [m1, m2, m3, m4, m5, m6, m7, m8]: [f64x2; 8] = pulp::cast(matrix[7]);
-            a1 = simd.c64s_mul_add_e(m1, v8, a1);
-            a2 = simd.c64s_mul_add_e(m2, v8, a2);
-            a3 = simd.c64s_mul_add_e(m3, v8, a3);
-            a4 = simd.c64s_mul_add_e(m4, v8, a4);
-            a5 = simd.c64s_mul_add_e(m5, v8, a5);
-            a6 = simd.c64s_mul_add_e(m6, v8, a6);
-            a7 = simd.c64s_mul_add_e(m7, v8, a7);
-            a8 = simd.c64s_mul_add_e(m8, v8, a8);
+            a1 = simd.mul_add_e_c64s(m1, v8, a1);
+            a2 = simd.mul_add_e_c64s(m2, v8, a2);
+            a3 = simd.mul_add_e_c64s(m3, v8, a3);
+            a4 = simd.mul_add_e_c64s(m4, v8, a4);
+            a5 = simd.mul_add_e_c64s(m5, v8, a5);
+            a6 = simd.mul_add_e_c64s(m6, v8, a6);
+            a7 = simd.mul_add_e_c64s(m7, v8, a7);
+            a8 = simd.mul_add_e_c64s(m8, v8, a8);
 
             a1 = simd.mul_add_f64x2(a1, scale, r1);
             a2 = simd.mul_add_f64x2(a2, scale, r2);
@@ -318,7 +318,7 @@ pub mod aarch64 {
             let mut a3 = f32x4(0., 0., 0., 0.);
             let mut a4 = f32x4(0., 0., 0., 0.);
             let [r1, r2, r3, r4]: [f32x4; 4] = pulp::cast(*result);
-            let scale = simd.f32s_splat(scale);
+            let scale = simd.splat_f32s(scale);
 
             let (matrix, _) = pulp::as_arrays::<8, _>(matrix);
             let [v1, v2, v3, v4]: [f32x4; 4] = pulp::cast(*vector);
@@ -334,52 +334,52 @@ pub mod aarch64 {
 
             // Unroll loop
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[0]);
-            a1 = simd.c32s_mul_add_e(m1, v01, a1);
-            a2 = simd.c32s_mul_add_e(m2, v01, a2);
-            a3 = simd.c32s_mul_add_e(m3, v01, a3);
-            a4 = simd.c32s_mul_add_e(m4, v01, a4);
+            a1 = simd.mul_add_e_c32s(m1, v01, a1);
+            a2 = simd.mul_add_e_c32s(m2, v01, a2);
+            a3 = simd.mul_add_e_c32s(m3, v01, a3);
+            a4 = simd.mul_add_e_c32s(m4, v01, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[1]);
-            a1 = simd.c32s_mul_add_e(m1, v02, a1);
-            a2 = simd.c32s_mul_add_e(m2, v02, a2);
-            a3 = simd.c32s_mul_add_e(m3, v02, a3);
-            a4 = simd.c32s_mul_add_e(m4, v02, a4);
+            a1 = simd.mul_add_e_c32s(m1, v02, a1);
+            a2 = simd.mul_add_e_c32s(m2, v02, a2);
+            a3 = simd.mul_add_e_c32s(m3, v02, a3);
+            a4 = simd.mul_add_e_c32s(m4, v02, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[2]);
-            a1 = simd.c32s_mul_add_e(m1, v03, a1);
-            a2 = simd.c32s_mul_add_e(m2, v03, a2);
-            a3 = simd.c32s_mul_add_e(m3, v03, a3);
-            a4 = simd.c32s_mul_add_e(m4, v03, a4);
+            a1 = simd.mul_add_e_c32s(m1, v03, a1);
+            a2 = simd.mul_add_e_c32s(m2, v03, a2);
+            a3 = simd.mul_add_e_c32s(m3, v03, a3);
+            a4 = simd.mul_add_e_c32s(m4, v03, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[3]);
-            a1 = simd.c32s_mul_add_e(m1, v04, a1);
-            a2 = simd.c32s_mul_add_e(m2, v04, a2);
-            a3 = simd.c32s_mul_add_e(m3, v04, a3);
-            a4 = simd.c32s_mul_add_e(m4, v04, a4);
+            a1 = simd.mul_add_e_c32s(m1, v04, a1);
+            a2 = simd.mul_add_e_c32s(m2, v04, a2);
+            a3 = simd.mul_add_e_c32s(m3, v04, a3);
+            a4 = simd.mul_add_e_c32s(m4, v04, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[4]);
-            a1 = simd.c32s_mul_add_e(m1, v05, a1);
-            a2 = simd.c32s_mul_add_e(m2, v05, a2);
-            a3 = simd.c32s_mul_add_e(m3, v05, a3);
-            a4 = simd.c32s_mul_add_e(m4, v05, a4);
+            a1 = simd.mul_add_e_c32s(m1, v05, a1);
+            a2 = simd.mul_add_e_c32s(m2, v05, a2);
+            a3 = simd.mul_add_e_c32s(m3, v05, a3);
+            a4 = simd.mul_add_e_c32s(m4, v05, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[5]);
-            a1 = simd.c32s_mul_add_e(m1, v06, a1);
-            a2 = simd.c32s_mul_add_e(m2, v06, a2);
-            a3 = simd.c32s_mul_add_e(m3, v06, a3);
-            a4 = simd.c32s_mul_add_e(m4, v06, a4);
+            a1 = simd.mul_add_e_c32s(m1, v06, a1);
+            a2 = simd.mul_add_e_c32s(m2, v06, a2);
+            a3 = simd.mul_add_e_c32s(m3, v06, a3);
+            a4 = simd.mul_add_e_c32s(m4, v06, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[6]);
-            a1 = simd.c32s_mul_add_e(m1, v07, a1);
-            a2 = simd.c32s_mul_add_e(m2, v07, a2);
-            a3 = simd.c32s_mul_add_e(m3, v07, a3);
-            a4 = simd.c32s_mul_add_e(m4, v07, a4);
+            a1 = simd.mul_add_e_c32s(m1, v07, a1);
+            a2 = simd.mul_add_e_c32s(m2, v07, a2);
+            a3 = simd.mul_add_e_c32s(m3, v07, a3);
+            a4 = simd.mul_add_e_c32s(m4, v07, a4);
 
             let [m1, m2, m3, m4]: [f32x4; 4] = pulp::cast(matrix[7]);
-            a1 = simd.c32s_mul_add_e(m1, v08, a1);
-            a2 = simd.c32s_mul_add_e(m2, v08, a2);
-            a3 = simd.c32s_mul_add_e(m3, v08, a3);
-            a4 = simd.c32s_mul_add_e(m4, v08, a4);
+            a1 = simd.mul_add_e_c32s(m1, v08, a1);
+            a2 = simd.mul_add_e_c32s(m2, v08, a2);
+            a3 = simd.mul_add_e_c32s(m3, v08, a3);
+            a4 = simd.mul_add_e_c32s(m4, v08, a4);
 
             a1 = simd.mul_add_f32x4(a1, scale, r1);
             a2 = simd.mul_add_f32x4(a2, scale, r2);

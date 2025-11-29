@@ -5,7 +5,7 @@ use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use num::Zero;
 use rand::{rngs, Rng};
-use rlst::{rlst_dynamic_array, DynArray, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
 use crate::traits::general::single_node::{ArgmaxValue, Epsilon};
 
@@ -104,7 +104,7 @@ where
         let mut cand;
         for _ in 0..20 {
             let offset: isize =
-                rng.gen_range(-(local_radius_rows as isize)..(local_radius_rows as isize));
+                rng.random_range(-(local_radius_rows as i64)..(local_radius_rows as i64)) as isize;
             cand = (base as isize + offset).rem_euclid(n_targets as isize) as usize;
             if !prev_i_star.contains(&cand) {
                 *i_ref = cand;
@@ -114,7 +114,7 @@ where
     } else {
         let mut cand;
         for _ in 0..20 {
-            cand = rng.gen_range(0..n_targets);
+            cand = rng.random_range(0..n_targets);
             if !prev_i_star.contains(&cand) {
                 *i_ref = cand;
                 break;
@@ -165,7 +165,7 @@ where
         let mut cand;
         for _ in 0..20 {
             let offset: isize =
-                rng.gen_range(-(local_radius_cols as isize)..(local_radius_cols as isize));
+                rng.random_range(-(local_radius_cols as i64)..(local_radius_cols as i64)) as isize;
             cand = (base as isize + offset).rem_euclid(n_sources as isize) as usize;
             if !prev_j_star.contains(&cand) {
                 *j_ref = cand;
@@ -175,7 +175,7 @@ where
     } else {
         let mut cand;
         for _ in 0..20 {
-            cand = rng.gen_range(0..n_sources);
+            cand = rng.random_range(0..n_sources);
             if !prev_j_star.contains(&cand) {
                 *j_ref = cand;
                 break;
@@ -382,8 +382,8 @@ where
     let mut prev_j_star = HashSet::new();
 
     // Initial references for rows and columns, pick randomly
-    let mut i_ref = rng.gen_range(0..n_targets);
-    let mut j_ref = rng.gen_range(0..n_sources);
+    let mut i_ref = rng.random_range(0..n_targets);
+    let mut j_ref = rng.random_range(0..n_sources);
     // Calculate initial residual values, mutates i_ref
     let mut r_iref = reset_reference_row(
         sources,
@@ -577,16 +577,16 @@ where
 
     for (j, u) in us.iter().enumerate() {
         // copy in us -> column vectors
-        u_aca.data_mut()[j * m..(j + 1) * m].copy_from_slice(u);
+        u_aca.data_mut().unwrap()[j * m..(j + 1) * m].copy_from_slice(u);
     }
 
     for (i, v) in vs.iter().enumerate() {
         // copy in vs -> row vectors
-        v_aca.data_mut()[i * n..(i + 1) * n].copy_from_slice(v);
+        v_aca.data_mut().unwrap()[i * n..(i + 1) * n].copy_from_slice(v);
     }
 
     // Have to account for RLST memory ordering
-    v_aca_t.fill_from(v_aca.transpose());
+    v_aca_t.fill_from(&v_aca.transpose());
 
     (u_aca, v_aca_t)
 }
@@ -596,9 +596,9 @@ mod test {
 
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
 
-    use num::One;
+    use num::{Complex, One};
     use rand::rng;
-    use rlst::{c32, empty_array, MultIntoResize, RawAccess, RawAccessMut};
+    use rlst::{c32, empty_array, MultIntoResize};
 
     use crate::{fmm::helpers::single_node::l2_error, tree::helpers::points_fixture};
 
@@ -640,7 +640,7 @@ mod test {
 
         // Test real
         let mut arr: Vec<f32> = vec![0f32; n];
-        arr.iter_mut().for_each(|e| *e = rng.gen());
+        arr.iter_mut().for_each(|e| *e = rng.random());
         let found = argsort(&arr);
         let sorted = found.iter().map(|&i| arr[i]).collect_vec();
         let mut curr = sorted[0];
@@ -651,7 +651,8 @@ mod test {
 
         // Test complex
         let mut arr: Vec<c32> = vec![c32::zero(); n];
-        arr.iter_mut().for_each(|e| *e = rng.gen());
+        arr.iter_mut()
+            .for_each(|e| *e = Complex::new(rng.random(), rng.random()));
         let found = argsort(&arr);
         let sorted = found.iter().map(|&i| arr[i]).collect_vec();
         let mut curr = sorted[0];
@@ -680,8 +681,8 @@ mod test {
             let kernel = Laplace3dKernel::<f32>::new();
 
             let (u, v) = aca_plus(
-                sources.data(),
-                targets.data(),
+                sources.data().unwrap(),
+                targets.data().unwrap(),
                 kernel.clone(),
                 Some(eps),
                 None,
@@ -694,16 +695,19 @@ mod test {
             // generate a random vector
             let mut rng = rand::rng();
             let mut x = rlst_dynamic_array![f32, [n_sources, 1]];
-            x.data_mut().iter_mut().for_each(|e| *e = rng.gen());
+            x.data_mut()
+                .unwrap()
+                .iter_mut()
+                .for_each(|e| *e = rng.random());
 
             // Apply matrix to a random vector
             let mut b_true = vec![0f32; n_targets];
 
             kernel.evaluate_st(
                 green_kernels::types::GreenKernelEvalType::Value,
-                sources.data(),
-                targets.data(),
-                x.data(),
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                x.data().unwrap(),
                 &mut b_true,
             );
 
@@ -712,7 +716,7 @@ mod test {
                 empty_array::<f32, 2>().simple_mult_into_resize(v.r(), x),
             );
 
-            let l2_error = l2_error(b_aca.data(), &b_true);
+            let l2_error = l2_error(b_aca.data().unwrap(), &b_true);
 
             assert!(l2_error < eps * 10.);
         }
@@ -723,8 +727,8 @@ mod test {
             let kernel = Helmholtz3dKernel::<c32>::new(wavenumber);
 
             let (u, v) = aca_plus(
-                sources.data(),
-                targets.data(),
+                sources.data().unwrap(),
+                targets.data().unwrap(),
                 kernel.clone(),
                 Some(eps),
                 None,
@@ -736,16 +740,19 @@ mod test {
 
             // generate a test vector
             let mut x = rlst_dynamic_array![c32, [n_sources, 1]];
-            x.data_mut().iter_mut().for_each(|e| *e = c32::one());
+            x.data_mut()
+                .unwrap()
+                .iter_mut()
+                .for_each(|e| *e = c32::one());
 
             // Apply matrix to test vector
             let mut b_true = vec![c32::zero(); n_targets];
 
             kernel.evaluate_st(
                 green_kernels::types::GreenKernelEvalType::Value,
-                sources.data(),
-                targets.data(),
-                x.data(),
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                x.data().unwrap(),
                 &mut b_true,
             );
 
@@ -754,7 +761,7 @@ mod test {
                 empty_array::<c32, 2>().simple_mult_into_resize(v.r(), x),
             );
 
-            let l2_error = l2_error(b_aca.data(), &b_true);
+            let l2_error = l2_error(b_aca.data().unwrap(), &b_true);
 
             assert!(l2_error < eps * 10.);
         }

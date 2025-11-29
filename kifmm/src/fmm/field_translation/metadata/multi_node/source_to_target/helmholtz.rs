@@ -956,9 +956,11 @@ where
                         target_rank = n_components
                     } else {
                         let max_equivalent_surface_ncoeffs =
-                            self.n_coeffs_equivalent_surface.iter().max().unwrap();
+                            Iterator::max(self.n_coeffs_equivalent_surface.iter()).unwrap();
+                        // self.n_coeffs_equivalent_surface.iter().max().unwrap();
                         let max_check_surface_ncoeffs =
-                            self.n_coeffs_check_surface.iter().max().unwrap();
+                            Iterator::max(self.n_coeffs_check_surface.iter()).unwrap();
+                        // self.n_coeffs_check_surface.iter().max().unwrap();
                         target_rank =
                             *max_equivalent_surface_ncoeffs.max(max_check_surface_ncoeffs);
                     }

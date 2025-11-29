@@ -3,10 +3,7 @@
 use green_kernels::{
     laplace_3d::Laplace3dKernel, traits::Kernel as KernelTrait, types::GreenKernelEvalType,
 };
-use rlst::{
-    empty_array, rlst_dynamic_array, Gemm, Lapack, MultIntoResize, RawAccess, RawAccessMut,
-    RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, AbsSquare, Gemm, Lapack, MultIntoResize, RlstScalar};
 
 use crate::{
     fmm::{helpers::single_node::ncoeffs_kifmm, types::PinvMode},
@@ -34,6 +31,7 @@ where
         + Gemm
         + Epsilon
         + Upcast
+        + AbsSquare<Output = Scalar::Real>
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
     <Scalar as RlstScalar>::Real: Default
@@ -41,7 +39,7 @@ where
         + Upcast
         + Cast<<<Scalar as Upcast>::Higher as RlstScalar>::Real>
         + ArgmaxValue<<Scalar as RlstScalar>::Real>,
-    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar>,
+    <Scalar as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<Scalar> + Gemm,
     <<Scalar as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<Scalar::Real>,
     FieldTranslation: FieldTranslationTrait + Send + Sync,
     Self: DataAccess,
@@ -187,7 +185,6 @@ where
 #[cfg(test)]
 mod test {
     use rand::{rng, Rng};
-    use rlst::Shape;
 
     use super::*;
     use crate::tree::Domain;

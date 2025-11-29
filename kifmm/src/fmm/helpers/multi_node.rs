@@ -10,7 +10,7 @@ use mpi::{
     Count,
 };
 use num::Float;
-use rlst::{rlst_dynamic_array, DynArray, RawAccess, RawAccessMut, RlstScalar, Shape};
+use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
 use crate::{
     fmm::{
@@ -78,7 +78,7 @@ pub(crate) fn serialise_array_2x2<T: RlstScalar + Pod>(input: &DynArray<T, 2>) -
     buffer.extend_from_slice(cols);
 
     if !input.is_empty() {
-        buffer.extend_from_slice(cast_slice(input.data()));
+        buffer.extend_from_slice(cast_slice(input.data().unwrap()));
     }
 
     buffer
@@ -96,7 +96,7 @@ pub(crate) fn serialise_array_3x3<T: RlstScalar + Pod>(input: &DynArray<T, 3>) -
     buffer.extend_from_slice(depth);
 
     if !input.is_empty() {
-        buffer.extend_from_slice(cast_slice(input.data()));
+        buffer.extend_from_slice(cast_slice(input.data().unwrap()));
     }
 
     buffer
@@ -116,7 +116,7 @@ pub(crate) fn deserialise_array_2x2<T: RlstScalar + Pod>(input: &[u8]) -> (DynAr
     let data = cast_slice::<u8, T>(data_bytes);
 
     let mut array = rlst_dynamic_array!(T, [rows, cols]);
-    array.data_mut().copy_from_slice(data);
+    array.data_mut().unwrap().copy_from_slice(data);
 
     (array, remaining)
 }
@@ -137,7 +137,7 @@ pub(crate) fn deserialise_array_3x3<T: RlstScalar + Pod>(input: &[u8]) -> (DynAr
     let data = cast_slice::<u8, T>(data_bytes);
 
     let mut array = rlst_dynamic_array!(T, [rows, cols, depth]);
-    array.data_mut().copy_from_slice(data);
+    array.data_mut().unwrap().copy_from_slice(data);
 
     (array, remaining)
 }
@@ -566,7 +566,7 @@ mod test {
     use super::*;
     use num::Complex;
     use rand::distr::{Distribution, Uniform};
-    use rlst::{traits::rlst_num::RandScalar, ArrayIteratorMut};
+    use rlst::traits::rlst_num::RandScalar;
 
     fn test_array_real<T>()
     where
@@ -576,7 +576,7 @@ mod test {
         let n = 4;
         let mut expected = rlst_dynamic_array!(T, [m, n]);
         let mut rng = rand::rng();
-        let between = Uniform::from(T::from(0.).unwrap()..T::from(1.0).unwrap());
+        let between = Uniform::try_from(T::from(0.).unwrap()..T::from(1.0).unwrap()).unwrap();
         expected
             .iter_mut()
             .for_each(|e| *e = between.sample(&mut rng));
@@ -584,8 +584,8 @@ mod test {
         let serialised = serialise_array_2x2(&expected);
         let found = deserialise_array_2x2::<T>(&serialised).0;
 
-        (found.data().iter())
-            .zip(expected.data().iter())
+        (found.data().unwrap().iter())
+            .zip(expected.data().unwrap().iter())
             .for_each(|(&e, &f)| {
                 assert!(RlstScalar::abs(e - f) <= T::from(1e-6).unwrap().re());
             });
@@ -601,7 +601,7 @@ mod test {
         let mut expected = rlst_dynamic_array!(Complex<T>, [m, n]);
 
         let mut rng = rand::rng();
-        let between = Uniform::from(T::from(0.).unwrap()..T::from(1.0).unwrap());
+        let between = Uniform::try_from(T::from(0.).unwrap()..T::from(1.0).unwrap()).unwrap();
 
         expected.iter_mut().for_each(|e| {
             *e = Complex {
@@ -613,8 +613,8 @@ mod test {
         let serialised = serialise_array_2x2(&expected);
         let found = deserialise_array_2x2::<Complex<T>>(&serialised).0;
 
-        (found.data().iter())
-            .zip(expected.data().iter())
+        (found.data().unwrap().iter())
+            .zip(expected.data().unwrap().iter())
             .for_each(|(&e, &f)| {
                 let diff = RlstScalar::powf(
                     T::from(e.re()).unwrap() - T::from(f.re()).unwrap(),
@@ -637,7 +637,7 @@ mod test {
         let found = deserialise_array_2x2::<T>(&serialised).0;
         assert!(found.shape()[0] == 0);
         assert!(found.shape()[1] == 0);
-        assert!(found.data().is_empty());
+        assert!(found.data().unwrap().is_empty());
     }
 
     fn test_array_complex_empty<T>()
@@ -650,7 +650,7 @@ mod test {
         let found = deserialise_array_2x2::<Complex<T>>(&serialised).0;
         assert!(found.shape()[0] == 0);
         assert!(found.shape()[1] == 0);
-        assert!(found.data().is_empty());
+        assert!(found.data().unwrap().is_empty());
     }
 
     fn test_vector_real<T: RlstScalar + PartialOrd>() {
@@ -817,10 +817,14 @@ mod test {
         let m = 5;
         let n = 4;
         let mut u = rlst_dynamic_array!(T, [m, n]);
-        u.data_mut().iter_mut().for_each(|e| *e += T::one());
+        u.data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|e| *e += T::one());
 
         let mut st = rlst_dynamic_array!(T, [n, m]);
         st.data_mut()
+            .unwrap()
             .iter_mut()
             .for_each(|e| *e += T::from(2.0).unwrap());
 
@@ -830,12 +834,14 @@ mod test {
         for _ in 0..316 {
             let mut tmp = rlst_dynamic_array!(T, [m, n]);
             tmp.data_mut()
+                .unwrap()
                 .iter_mut()
                 .for_each(|e| *e += T::from(3.0).unwrap());
             c_u.push(tmp);
 
             let mut tmp = rlst_dynamic_array!(T, [m, n]);
             tmp.data_mut()
+                .unwrap()
                 .iter_mut()
                 .for_each(|e| *e += T::from(4.0).unwrap());
             c_vt.push(tmp);
@@ -856,8 +862,9 @@ mod test {
             found
                 .u
                 .data()
+                .unwrap()
                 .iter()
-                .zip(expected.u.data().iter())
+                .zip(expected.u.data().unwrap().iter())
                 .for_each(|(&f, &e)| {
                     assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
                 });
@@ -873,8 +880,9 @@ mod test {
             found
                 .st
                 .data()
+                .unwrap()
                 .iter()
-                .zip(expected.st.data().iter())
+                .zip(expected.st.data().unwrap().iter())
                 .for_each(|(&f, &e)| {
                     assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
                 });
@@ -891,9 +899,13 @@ mod test {
                 .iter()
                 .zip(expected.c_u.iter())
                 .for_each(|(f, e)| {
-                    f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
-                        assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
-                    });
+                    f.data()
+                        .unwrap()
+                        .iter()
+                        .zip(e.data().unwrap().iter())
+                        .for_each(|(&f, &e)| {
+                            assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                        });
                 });
         }
 
@@ -908,9 +920,13 @@ mod test {
                 .iter()
                 .zip(expected.c_vt.iter())
                 .for_each(|(f, e)| {
-                    f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
-                        assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
-                    });
+                    f.data()
+                        .unwrap()
+                        .iter()
+                        .zip(e.data().unwrap().iter())
+                        .for_each(|(&f, &e)| {
+                            assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                        });
                 });
         }
     }
@@ -923,6 +939,7 @@ mod test {
 
         let mut st = rlst_dynamic_array!(T, [n, m]);
         st.data_mut()
+            .unwrap()
             .iter_mut()
             .for_each(|e| *e += T::from(2.0).unwrap());
 
@@ -933,12 +950,14 @@ mod test {
             if i % 2 == 0 {
                 let mut tmp = rlst_dynamic_array!(T, [m, n]);
                 tmp.data_mut()
+                    .unwrap()
                     .iter_mut()
                     .for_each(|e| *e += T::from(3.0).unwrap());
                 c_u.push(tmp);
 
                 let mut tmp = rlst_dynamic_array!(T, [m, n]);
                 tmp.data_mut()
+                    .unwrap()
                     .iter_mut()
                     .for_each(|e| *e += T::from(4.0).unwrap());
                 c_vt.push(tmp);
@@ -973,8 +992,9 @@ mod test {
             found
                 .st
                 .data()
+                .unwrap()
                 .iter()
-                .zip(expected.st.data().iter())
+                .zip(expected.st.data().unwrap().iter())
                 .for_each(|(&f, &e)| {
                     assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
                 });
@@ -993,9 +1013,13 @@ mod test {
                 .enumerate()
                 .for_each(|(i, (f, e))| {
                     if i % 2 == 0 {
-                        f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
-                            assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
-                        });
+                        f.data()
+                            .unwrap()
+                            .iter()
+                            .zip(e.data().unwrap().iter())
+                            .for_each(|(&f, &e)| {
+                                assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                            });
                     } else {
                         assert!(f.is_empty() && e.is_empty());
                     }
@@ -1015,9 +1039,13 @@ mod test {
                 .enumerate()
                 .for_each(|(i, (f, e))| {
                     if i % 2 == 0 {
-                        f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
-                            assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
-                        });
+                        f.data()
+                            .unwrap()
+                            .iter()
+                            .zip(e.data().unwrap().iter())
+                            .for_each(|(&f, &e)| {
+                                assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                            });
                     } else {
                         assert!(f.is_empty() && e.is_empty());
                     }
@@ -1037,6 +1065,7 @@ mod test {
 
             let mut st = rlst_dynamic_array!(T, [n, m]);
             st.data_mut()
+                .unwrap()
                 .iter_mut()
                 .for_each(|e| *e += T::from(2.0).unwrap());
 
@@ -1047,12 +1076,14 @@ mod test {
                 if i % 2 == 0 {
                     let mut tmp = rlst_dynamic_array!(T, [m, n]);
                     tmp.data_mut()
+                        .unwrap()
                         .iter_mut()
                         .for_each(|e| *e += T::from(3.0).unwrap());
                     c_u.push(tmp);
 
                     let mut tmp = rlst_dynamic_array!(T, [m, n]);
                     tmp.data_mut()
+                        .unwrap()
                         .iter_mut()
                         .for_each(|e| *e += T::from(4.0).unwrap());
                     c_vt.push(tmp);
@@ -1087,8 +1118,9 @@ mod test {
 
                 // test data
                 f.st.data()
+                    .unwrap()
                     .iter()
-                    .zip(e.st.data().iter())
+                    .zip(e.st.data().unwrap().iter())
                     .for_each(|(&f, &e)| {
                         assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
                     });
@@ -1106,9 +1138,13 @@ mod test {
                     .enumerate()
                     .for_each(|(i, (f, e))| {
                         if i % 2 == 0 {
-                            f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
-                                assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
-                            });
+                            f.data()
+                                .unwrap()
+                                .iter()
+                                .zip(e.data().unwrap().iter())
+                                .for_each(|(&f, &e)| {
+                                    assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                                });
                         } else {
                             assert!(f.is_empty() && e.is_empty());
                         }
@@ -1127,9 +1163,13 @@ mod test {
                     .enumerate()
                     .for_each(|(i, (f, e))| {
                         if i % 2 == 0 {
-                            f.data().iter().zip(e.data().iter()).for_each(|(&f, &e)| {
-                                assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
-                            });
+                            f.data()
+                                .unwrap()
+                                .iter()
+                                .zip(e.data().unwrap().iter())
+                                .for_each(|(&f, &e)| {
+                                    assert!(RlstScalar::abs(f - e) < T::from(1e-6).unwrap().re());
+                                });
                         } else {
                             assert!(f.is_empty() && e.is_empty());
                         }

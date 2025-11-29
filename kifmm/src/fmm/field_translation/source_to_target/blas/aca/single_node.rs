@@ -21,8 +21,8 @@ use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    rlst_dynamic_array, DynArray, Lapack, MultInto, RawAccess, RawAccessMut, RlstScalar, Shape,
-    SliceArray,
+    rlst_dynamic_array, DynArray, Gemm, Lapack, MultInto, RawAccess, RawAccessMut, RlstScalar,
+    Shape, SliceArray,
 };
 
 impl<Scalar, Kernel> SourceToTargetTranslation
@@ -33,6 +33,7 @@ where
         + Epsilon
         + Epsilon
         + Lapack
+        + Gemm
         + Upcast
         + ArgmaxValue<Scalar>
         + Cast<<Scalar as Upcast>::Higher>,
@@ -195,7 +196,7 @@ where
                                     )
                                 };
 
-                                let tmp = &check_potential.data()[multipole_idx
+                                let tmp = &check_potential.data().unwrap()[multipole_idx
                                     * n_coeffs_check_surface
                                     ..(multipole_idx + 1) * n_coeffs_check_surface];
 
@@ -229,7 +230,7 @@ where
                     };
                     all_locals
                         .iter_mut()
-                        .zip(locals.data().iter())
+                        .zip(locals.data().unwrap().iter())
                         .for_each(|(l, r)| *l += *r);
                 }
 
@@ -256,6 +257,7 @@ where
                         let raw = unsafe {
                             check_potentials
                                 .data()
+                                .unwrap()
                                 .as_ptr()
                                 .add(key_displacement + charge_vec_displacement)
                                 as *mut Scalar
@@ -285,7 +287,7 @@ where
                             let vt_i =
                                 &self.source_to_target.metadata[m2l_operator_index].vt[t_idx];
 
-                            let mut multipoles_subset = DynArray::<Scalar>::from_shape([
+                            let mut multipoles_subset = DynArray::<Scalar, _>::from_shape([
                                 n_coeffs_equivalent_surface,
                                 multipole_idxs.len() * n_matvecs,
                             ]);
@@ -303,13 +305,13 @@ where
                                     let charge_vec_displacement =
                                         charge_vec_idx * n_coeffs_equivalent_surface;
 
-                                    multipoles_subset.data_mut()[key_displacement_local
+                                    multipoles_subset.data_mut().unwrap()[key_displacement_local
                                         + charge_vec_displacement
                                         ..key_displacement_local
                                             + charge_vec_displacement
                                             + n_coeffs_equivalent_surface]
                                         .copy_from_slice(
-                                            &multipoles.data()[key_displacement_global
+                                            &multipoles.data().unwrap()[key_displacement_global
                                                 + charge_vec_displacement
                                                 ..key_displacement_global
                                                     + charge_vec_displacement
@@ -321,6 +323,7 @@ where
                             // Apply scale
                             multipoles_subset
                                 .data_mut()
+                                .unwrap()
                                 .iter_mut()
                                 .for_each(|x| *x *= scale);
 
@@ -335,7 +338,7 @@ where
                             // Apply left decomposition
                             let [m, _k] = u_i.shape();
                             let [_k, n] = tmp1.shape();
-                            let mut check_potential = DynArray::<Scalar>::from_shape([m, n]);
+                            let mut check_potential = DynArray::<Scalar, _>::from_shape([m, n]);
                             check_potential.r_mut().simple_mult_into(u_i.r(), tmp1.r());
 
                             // Save results to global vector
@@ -361,7 +364,7 @@ where
                                         * n_coeffs_check_surface
                                         * n_coeffs_check_surface;
 
-                                    let tmp = &check_potentials.data()[key_displacement
+                                    let tmp = &check_potentials.data().unwrap()[key_displacement
                                         + charge_vec_displacement
                                         ..key_displacement
                                             + charge_vec_displacement

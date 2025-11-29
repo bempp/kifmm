@@ -21,12 +21,14 @@ use crate::{
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
-use rlst::{empty_array, rlst_dynamic_array, MultIntoResize, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{
+    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
+};
 
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>
 where
-    Scalar: RlstScalar + Default + Equivalence,
+    Scalar: RlstScalar + Default + Equivalence + Gemm,
     <Scalar as RlstScalar>::Real: Default + Equivalence + Float,
     FieldTranslation: FieldTranslationTrait + Sync + Send,
     Kernel: KernelTrait<T = Scalar> + HomogenousKernel + Default + Send + Sync,
@@ -89,7 +91,7 @@ where
                                 .enumerate()
                                 .take(chunk_size)
                             {
-                                parent_locals.data_mut()[chunk_idx
+                                parent_locals.data_mut().unwrap()[chunk_idx
                                     * n_coeffs_equivalent_surface_parent
                                     ..(chunk_idx + 1) * n_coeffs_equivalent_surface_parent]
                                     .copy_from_slice(unsafe {
@@ -116,7 +118,7 @@ where
                                     child_local
                                         .iter_mut()
                                         .zip(
-                                            &tmp.data()[j * n_coeffs_equivalent_surface
+                                            &tmp.data().unwrap()[j * n_coeffs_equivalent_surface
                                                 ..(j + 1) * n_coeffs_equivalent_surface],
                                         )
                                         .for_each(|(l, t)| *l += *t);

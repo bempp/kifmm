@@ -8,10 +8,14 @@ use green_kernels::traits::Kernel;
 use num::{One, Zero};
 use rlst::{
     c32, c64,
-    dense::linalg::lapack::{qr::QrDecomposition, singular_value_decomposition::SvdMode},
-    empty_array, rlst_dynamic_array, DynArray, Lapack, MultInto, MultIntoResize, RawAccess,
-    RawAccessMut, RlstError, RlstResult, RlstScalar, Shape,
+    dense::linalg::lapack::{
+        qr::{QMode, QrDecomposition},
+        singular_value_decomposition::SvdMode,
+    },
+    empty_array, rlst_dynamic_array, AbsSquare, DynArray, Lapack, MultInto, MultIntoResize,
+    RlstError, RlstResult, RlstScalar,
 };
+use rlst::{Gemm, Qr, SingularValueDecomposition};
 
 /// Matrix type
 pub type PinvMatrix<T> = DynArray<T, 2>;
@@ -34,7 +38,7 @@ pub(crate) fn pinv<T>(
     rtol: Option<T::Real>,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon + Lapack,
+    T: RlstScalar + Epsilon + Lapack + Gemm,
     <T as RlstScalar>::Real: Epsilon,
 {
     let shape = mat.shape();
@@ -54,6 +58,7 @@ where
             // Row vector
             let l2_norm = mat
                 .data()
+                .unwrap()
                 .iter()
                 .map(|&x| (x * x.conj()).re())
                 .sum::<T::Real>()
@@ -73,7 +78,7 @@ where
             // Compute SVD of row vector
             let s = vec![T::Real::one() / l2_norm];
             let mut v = rlst_dynamic_array!(T, [shape[1], 1]);
-            for (i, &x) in mat.data().iter().enumerate() {
+            for (i, &x) in mat.data().unwrap().iter().enumerate() {
                 v[[i, 0]] = x.conj() / T::from_real(l2_norm);
             }
 
@@ -85,6 +90,7 @@ where
             // Column vector (only one singular value)
             let l2_norm = mat
                 .data()
+                .unwrap()
                 .iter()
                 .map(|&x| (x * x.conj()).re())
                 .sum::<T::Real>()
@@ -104,7 +110,7 @@ where
             // Compute SVD of column vector
             let s = vec![T::Real::one() / l2_norm];
             let mut ut = rlst_dynamic_array!(T, [1, shape[0]]);
-            for (j, &x) in mat.data().iter().enumerate() {
+            for (j, &x) in mat.data().unwrap().iter().enumerate() {
                 ut[[0, j]] = x.conj() / T::from_real(l2_norm);
             }
 
@@ -120,17 +126,20 @@ where
         }
     } else {
         // For matrices compute the full SVD
-        let k = std::cmp::min(shape[0], shape[1]);
-        let mut u = rlst_dynamic_array!(T, [shape[0], k]);
-        let mut s = vec![T::zero().re(); k];
-        let mut vt = rlst_dynamic_array!(T, [k, shape[1]]);
+        // let k = std::cmp::min(shape[0], shape[1]);
+        // let mut u = rlst_dynamic_array!(T, [shape[0], k]);
+        // let mut s = vec![T::zero().re(); k];
+        // let mut vt = rlst_dynamic_array!(T, [k, shape[1]]);
 
-        let mut mat_copy = DynArray::<T>::from_shape(shape);
-        mat_copy.fill_from(mat.r());
+        let mut mat_copy = DynArray::<T, _>::from_shape(shape);
+        mat_copy.fill_from(&mat.r());
 
-        mat_copy
-            .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
-            .unwrap();
+        let (s, u, vt) = mat_copy.svd(SvdMode::Compact).unwrap();
+        let mut s = s.data().unwrap().to_vec();
+
+        // mat_copy
+        //     .into_svd_alloc(u.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
+        //     .unwrap();
 
         let max_s = s
             .iter()
@@ -150,8 +159,8 @@ where
         // Return pseudo-inverse in component form
         let mut v = rlst_dynamic_array!(T, [vt.shape()[1], vt.shape()[0]]);
         let mut ut = rlst_dynamic_array!(T, [u.shape()[1], u.shape()[0]]);
-        v.fill_from(vt.conj().transpose());
-        ut.fill_from(u.conj().transpose());
+        v.fill_from(&vt.conj().transpose());
+        ut.fill_from(&u.conj().transpose());
 
         Ok((s, ut, v))
     }
@@ -163,17 +172,32 @@ macro_rules! extract_qrp_typed {
         let qu: &mut DynArray<$ty, 2> = (&mut $qu).coerce();
         let ru: &mut DynArray<$ty, 2> = (&mut $ru).coerce();
 
-        qr_u.get_r(ru.r_mut());
-        qr_u.get_q_alloc(qu.r_mut())?;
-        *$pu_vec = qr_u.get_perm();
+        let ru_t = qr_u.r_mat()?;
+        let qu_t = qr_u.q_mat(QMode::Compact)?;
+
+        ru.fill_from(&ru_t);
+        qu.fill_from(&qu_t);
+        *$pu_vec = qr_u.perm();
+
+        // qr_u.get_r(ru.r_mut());
+        // qr_u.get_q_alloc(qu.r_mut())?;
+        // *$pu_vec = qr_u.get_perm();
 
         let qr_v: &QrDecomposition<$ty> = $qr_v.coerce();
+
         let qv: &mut DynArray<$ty, 2> = (&mut $qv).coerce();
         let rv: &mut DynArray<$ty, 2> = (&mut $rv).coerce();
 
-        qr_v.get_r(rv.r_mut());
-        qr_v.get_q_alloc(qv.r_mut())?;
-        *$pv_vec = qr_v.get_perm();
+        let rv_t = qr_v.r_mat()?;
+        let qv_t = qr_v.q_mat(QMode::Compact)?;
+
+        rv.fill_from(&rv_t);
+        qv.fill_from(&qv_t);
+        *$pv_vec = qr_v.perm();
+
+        // qr_v.get_r(rv.r_mut());
+        // qr_v.get_q_alloc(qv.r_mut())?;
+        // *$pv_vec = qr_v.get_perm();
     }};
 }
 
@@ -199,12 +223,24 @@ pub(crate) fn pinv_aca_plus<T, K>(
     test: bool,
 ) -> PinvReturnType<T>
 where
-    T: RlstScalar + Epsilon + Lapack + ArgmaxValue<T> + Upcast + Cast<<T as Upcast>::Higher>,
+    T: RlstScalar
+        + Epsilon
+        + Lapack
+        + ArgmaxValue<T>
+        + Upcast
+        + Cast<<T as Upcast>::Higher>
+        + Gemm
+        + AbsSquare<Output = <T as RlstScalar>::Real>,
+    <T as AbsSquare>::Output: RlstScalar,
+    // <T as AbsSquare>::Output: rlst::Sqrt<Output = <T as AbsSquare>::Output>
+    //     + std::ops::Add<Output = <T as AbsSquare>::Output>
+    //     + Copy
+    //     + Default,
     <T as RlstScalar>::Real: ArgmaxValue<<T as RlstScalar>::Real>
         + Epsilon
         + Upcast
         + Cast<<<T as Upcast>::Higher as RlstScalar>::Real>,
-    <T as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<T>,
+    <T as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<T> + Gemm,
     <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + Cast<T::Real>,
     K: Kernel<T = T>,
 {
@@ -244,7 +280,7 @@ where
         let [m1, n1] = u_aca.shape();
         let [m2, n2] = v_aca_t.shape();
         let mut v_aca = rlst_dynamic_array!(T, [n2, m2]);
-        v_aca.fill_from(v_aca_t.r().conj().transpose());
+        v_aca.fill_from(&v_aca_t.r().conj().transpose());
         let [m3, n3] = v_aca.shape();
 
         // Compute QR decomposition of result
@@ -260,8 +296,11 @@ where
         let mut rv = rlst_dynamic_array!(T, [k, n3]);
         let mut pv_vec = Vec::new();
 
-        let qr_u_aca = u_aca.into_qr_alloc()?;
-        let qr_v_aca = v_aca.into_qr_alloc()?;
+        let qr_u_aca = u_aca.qr(rlst::dense::linalg::lapack::qr::EnablePivoting::Yes)?;
+        let qr_v_aca = v_aca.qr(rlst::dense::linalg::lapack::qr::EnablePivoting::Yes)?;
+
+        // let qr_u_aca = u_aca.into_qr_alloc()?;
+        // let qr_v_aca = v_aca.into_qr_alloc()?;
 
         if is_same::<f64, T>() {
             extract_qrp_typed!(
@@ -318,7 +357,7 @@ where
         // Compute SVD based pseudo-inverse on tiny core matrix formed from R factors
         // First form core matrix from P and R factors of QR decomposition
         // ru_pu_t = ru * pu^T
-        let mut ru_pu_t = DynArray::<T>::from_shape(ru.shape());
+        let mut ru_pu_t = DynArray::<T, _>::from_shape(ru.shape());
 
         // Iterate over pu_t matrix
         for (old_j, &new_j) in pu_vec.iter().enumerate() {
@@ -330,9 +369,9 @@ where
 
         // pv_rv_t = pv * rv^H
         let mut rv_t = rlst_dynamic_array!(T, [rv.shape()[1], rv.shape()[0]]);
-        rv_t.fill_from(rv.r().transpose().conj());
+        rv_t.fill_from(&rv.r().transpose().conj());
 
-        let mut pv_rv_t = DynArray::<T>::from_shape(rv_t.shape());
+        let mut pv_rv_t = DynArray::<T, _>::from_shape(rv_t.shape());
 
         for (old_i, &new_i) in pv_vec.iter().enumerate() {
             // Iterate over columns of output
@@ -358,20 +397,35 @@ where
             (s_c, ut_c, v_c) = pinv(&c, None, None).unwrap()
         } else {
             // Casting required
-            let mut c_64 = DynArray::<<T as Upcast>::Higher>::from_shape(c.shape());
-            for (dst, src) in c_64.data_mut().iter_mut().zip(c.data().iter()) {
+            let mut c_64 = DynArray::<<T as Upcast>::Higher, _>::from_shape(c.shape());
+            for (dst, src) in c_64
+                .data_mut()
+                .unwrap()
+                .iter_mut()
+                .zip(c.data().unwrap().iter())
+            {
                 *dst = src.cast();
             }
             let (s_c_v, ut_c_v, v_c_v) = pinv(&c_64, None, None).unwrap();
 
             // Downcast back to T
-            ut_c = DynArray::<T>::from_shape(ut_c_v.shape());
-            for (dst, src) in ut_c.data_mut().iter_mut().zip(ut_c_v.data().iter()) {
+            ut_c = DynArray::<T, _>::from_shape(ut_c_v.shape());
+            for (dst, src) in ut_c
+                .data_mut()
+                .unwrap()
+                .iter_mut()
+                .zip(ut_c_v.data().unwrap().iter())
+            {
                 *dst = src.cast();
             }
 
-            v_c = DynArray::<T>::from_shape(v_c_v.shape());
-            for (dst, src) in v_c.data_mut().iter_mut().zip(v_c_v.data().iter()) {
+            v_c = DynArray::<T, _>::from_shape(v_c_v.shape());
+            for (dst, src) in v_c
+                .data_mut()
+                .unwrap()
+                .iter_mut()
+                .zip(v_c_v.data().unwrap().iter())
+            {
                 *dst = src.cast();
             }
             s_c = vec![T::Real::zero(); s_c_v.len()];
@@ -387,7 +441,7 @@ where
         // qu_t := qu^H
         let [qu_m, qu_n] = qu.shape();
         let mut qu_t = rlst_dynamic_array!(T, [qu_n, qu_m]);
-        qu_t.r_mut().fill_from(qu.r().conj().transpose());
+        qu_t.r_mut().fill_from(&qu.r().conj().transpose());
 
         let mut right = rlst_dynamic_array!(T, [ut_c.shape()[0], qu_t.shape()[1]]);
         right.r_mut().simple_mult_into(ut_c.r(), qu_t.r());
@@ -396,7 +450,7 @@ where
             // qv_t := qv^H
             let [qv_m, qv_n] = qv.shape();
             let mut qv_t = rlst_dynamic_array!(T, [qv_n, qv_m]);
-            qv_t.fill_from(qv.r().conj().transpose());
+            qv_t.fill_from(&qv.r().conj().transpose());
 
             let mut mat_s = rlst_dynamic_array!(T, [s_c.len(), s_c.len()]);
             for i in 0..s_c.len() {
@@ -419,21 +473,25 @@ where
                 empty_array::<T, 2>().simple_mult_into_resize(aca.r(), aca_pinv.r()),
                 aca.r(),
             );
-            let e1 = (t1.r() - aca.r()).norm_fro() / aca.r().norm_fro();
+            let e1 = (t1.r() - aca.r()).norm_fro().unwrap() / aca.r().norm_fro().unwrap();
 
             let t2 = empty_array::<T, 2>().simple_mult_into_resize(
                 empty_array::<T, 2>().simple_mult_into_resize(aca_pinv.r(), aca.r()),
                 aca_pinv.r(),
             );
-            let e2 = (t2.r() - aca_pinv.r()).norm_fro() / aca_pinv.r().norm_fro();
+            let e2 = (t2.r() - aca_pinv.r()).norm_fro().unwrap() / aca_pinv.r().norm_fro().unwrap();
 
             let aca_aca_pinv = empty_array::<T, 2>().simple_mult_into_resize(aca.r(), aca_pinv.r());
             let aca_pinv_aca = empty_array::<T, 2>().simple_mult_into_resize(aca_pinv.r(), aca.r());
 
-            let e3 = (aca_aca_pinv.r() - aca_aca_pinv.r().conj().transpose()).norm_fro()
-                / aca_aca_pinv.r().norm_fro();
-            let e4 = (aca_pinv_aca.r() - aca_pinv_aca.r().conj().transpose()).norm_fro()
-                / aca_pinv_aca.r().norm_fro();
+            let e3 = (aca_aca_pinv.r() - aca_aca_pinv.r().conj().transpose())
+                .norm_fro()
+                .unwrap()
+                / aca_aca_pinv.r().norm_fro().unwrap();
+            let e4 = (aca_pinv_aca.r() - aca_pinv_aca.r().conj().transpose())
+                .norm_fro()
+                .unwrap()
+                / aca_pinv_aca.r().norm_fro().unwrap();
 
             assert!(e1 < eps);
             assert!(e2 < eps);
@@ -483,7 +541,7 @@ mod test {
         let actual = empty_array::<f64, 2>().simple_mult_into_resize(inv.r(), mat.r());
 
         // Expect the identity matrix
-        let mut expected = DynArray::<f64>::from_shape(actual.shape());
+        let mut expected = DynArray::<f64, _>::from_shape(actual.shape());
         for i in 0..dim {
             expected[[i, i]] = 1.0
         }
@@ -520,7 +578,7 @@ mod test {
         let actual = empty_array::<f64, 2>().simple_mult_into_resize(mat.r(), inv.r());
 
         // Expect the identity matrix
-        let mut expected = DynArray::<f64>::from_shape(actual.shape());
+        let mut expected = DynArray::<f64, _>::from_shape(actual.shape());
         for i in 0..dim {
             expected[[i, i]] = 1.0
         }
@@ -547,8 +605,8 @@ mod test {
         let eps = 1e-6;
 
         let (_s, _ut, _v) = pinv_aca_plus(
-            sources.data(),
-            targets.data(),
+            sources.data().unwrap(),
+            targets.data().unwrap(),
             kernel.clone(),
             Some(eps),
             None,
@@ -563,8 +621,8 @@ mod test {
         let kernel = Helmholtz3dKernel::<c64>::new(1.0);
         let eps = 1e-6;
         let (_s, _ut, _v) = pinv_aca_plus(
-            sources.data(),
-            targets.data(),
+            sources.data().unwrap(),
+            targets.data().unwrap(),
             kernel.clone(),
             Some(eps),
             None,
