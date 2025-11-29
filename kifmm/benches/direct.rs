@@ -8,7 +8,7 @@ use criterion::{
 
 use num::{Complex, Float, One, Zero};
 use rand_distr::uniform::SampleUniform;
-use rlst::{RawAccess, RlstScalar};
+use rlst::RlstScalar;
 use serde_yaml::Value;
 
 use green_kernels::{
@@ -41,16 +41,16 @@ fn benchmark_direct_laplace<
                 if mode == "multi_threaded" {
                     kernel.evaluate_mt(
                         GreenKernelEvalType::Value,
-                        sources.data(),
-                        sources.data(),
+                        sources.data().unwrap(),
+                        sources.data().unwrap(),
                         &charges,
                         &mut result,
                     )
                 } else if mode == "single_threaded" {
                     kernel.evaluate_st(
                         GreenKernelEvalType::Value,
-                        sources.data(),
-                        sources.data(),
+                        sources.data().unwrap(),
+                        sources.data().unwrap(),
                         &charges,
                         &mut result,
                     )
@@ -85,16 +85,16 @@ fn benchmark_direct_helmholtz<
                 if mode == "multi_threaded" {
                     kernel.evaluate_mt(
                         GreenKernelEvalType::Value,
-                        sources.data(),
-                        sources.data(),
+                        sources.data().unwrap(),
+                        sources.data().unwrap(),
                         &charges,
                         &mut result,
                     )
                 } else if mode == "single_threaded" {
                     kernel.evaluate_st(
                         GreenKernelEvalType::Value,
-                        sources.data(),
-                        sources.data(),
+                        sources.data().unwrap(),
+                        sources.data().unwrap(),
                         &charges,
                         &mut result,
                     )

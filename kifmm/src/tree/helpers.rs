@@ -3,7 +3,8 @@
 
 use itertools::Itertools;
 use num::Float;
-use rand::{distr::StandardUniform, prelude::*, rngs::StdRng, SeedableRng};
+use rand::{prelude::*, rngs::StdRng, SeedableRng};
+use rand_distr::Uniform;
 use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
 /// Alias for an rlst container for point data, expected with shape [n_points, 3];
@@ -28,9 +29,9 @@ pub fn points_fixture<T: Float + RlstScalar + rand::distr::uniform::SampleUnifor
 
     let between;
     if let (Some(min), Some(max)) = (min, max) {
-        between = rand::distr::StandardUniform::from(min..max);
+        between = rand::distr::Uniform::try_from(min..max).unwrap();
     } else {
-        between = rand::distr::StandardUniform::from(T::zero()..T::one());
+        between = rand::distr::Uniform::try_from(T::zero()..T::one()).unwrap();
     }
 
     let mut points = rlst_dynamic_array!(T, [3, n_points]);
@@ -59,8 +60,8 @@ pub fn points_fixture_sphere<T: RlstScalar + rand::distr::uniform::SampleUniform
     let two = T::from(2.0).unwrap();
 
     // Uniform distributions for phi and z = cos(theta)
-    let phi_dist = StandardUniform::from(T::zero()..(two * pi));
-    let z_dist = StandardUniform::from(T::from(-1.0).unwrap()..T::from(1.0).unwrap());
+    let phi_dist = Uniform::try_from(T::zero()..(two * pi)).unwrap();
+    let z_dist = Uniform::try_from(T::from(-1.0).unwrap()..T::from(1.0).unwrap()).unwrap();
 
     // Initialize points array
     let mut points = rlst_dynamic_array!(T, [3, n_points]);
@@ -100,8 +101,8 @@ pub fn points_fixture_oblate_spheroid<T: RlstScalar + rand::distr::uniform::Samp
     let two = T::from(2.0).unwrap();
     let one = T::one();
 
-    let phi_dist = StandardUniform::from(T::zero()..(two * pi)); // Azimuthal angle
-    let cos_theta_dist = StandardUniform::from(-one..one); // Cosine of polar angle
+    let phi_dist = Uniform::try_from(T::zero()..(two * pi)).unwrap(); // Azimuthal angle
+    let cos_theta_dist = Uniform::try_from(-one..one).unwrap(); // Cosine of polar angle
 
     let mut points = rlst_dynamic_array!(T, [3, n_points]);
 
@@ -130,8 +131,8 @@ pub fn points_fixture_col<T: Float + RlstScalar + rand::distr::uniform::SampleUn
     // Generate a set of randomly distributed points
     let mut range = StdRng::seed_from_u64(0);
 
-    let between1 = rand::distr::StandardUniform::from(T::zero()..T::from(0.1).unwrap());
-    let between2 = rand::distr::StandardUniform::from(T::zero()..T::from(500).unwrap());
+    let between1 = rand::distr::Uniform::try_from(T::zero()..T::from(0.1).unwrap()).unwrap();
+    let between2 = rand::distr::Uniform::try_from(T::zero()..T::from(500).unwrap()).unwrap();
 
     let mut points = rlst_dynamic_array!(T, [3, n_points]);
 

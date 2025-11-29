@@ -1303,7 +1303,7 @@ mod test {
         let n_points = 1000;
         let points = points_fixture(n_points, Some(-1.), Some(1.0), None);
 
-        let domain = Domain::<f64>::from_local_points(points.data());
+        let domain = Domain::<f64>::from_local_points(points.data().unwrap());
 
         let mut keys: Vec<MortonKey<_>> = Vec::new();
 

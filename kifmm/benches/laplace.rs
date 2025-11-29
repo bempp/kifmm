@@ -8,7 +8,7 @@ use criterion::{
 
 use num::Float;
 use rand_distr::uniform::SampleUniform;
-use rlst::{rlst_dynamic_array2, MatrixQr, MatrixSvd, RawAccess, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array, AbsSquare, Gemm, Lapack, RlstScalar};
 use serde_yaml::Value;
 
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
@@ -32,9 +32,10 @@ fn benchmark_fft_m2l<
         + SampleUniform
         + Float
         + Epsilon
-        + MatrixSvd
-        + MatrixQr
+        + Lapack
         + AsComplex
+        + AbsSquare<Output = T::Real>
+        + Gemm
         + Dft<InputType = T, OutputType = <T as AsComplex>::ComplexType>
         + Default
         + AlignedAllocable
@@ -55,8 +56,8 @@ fn benchmark_fft_m2l<
     <T as Dft>::Plan: Sync,
     <T as AsComplex>::ComplexType: AlignedAllocable,
     <T as AsComplex>::ComplexType: Hadamard8x8<Scalar = <T as AsComplex>::ComplexType>,
-    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
-    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
+    <T as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<T> + Gemm,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + Lapack + Cast<T::Real>,
 {
     // FFT based M2L for a vector of charges
     // FMM parameters
@@ -66,14 +67,20 @@ fn benchmark_fft_m2l<
     let sources = points_fixture::<T>(n_points, None, None, Some(0));
     let targets = points_fixture::<T>(n_points, None, None, Some(1));
     let tmp = vec![T::one(); n_points];
-    let mut charges = rlst_dynamic_array2!(T, [n_points, 1]);
-    charges.data_mut().copy_from_slice(&tmp);
+    let mut charges = rlst_dynamic_array!(T, [n_points, 1]);
+    charges.data_mut().unwrap().copy_from_slice(&tmp);
 
     let mut fmm_fft = SingleNodeBuilder::new(false)
-        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+        .tree(
+            sources.data().unwrap(),
+            targets.data().unwrap(),
+            n_crit,
+            depth,
+            prune_empty,
+        )
         .unwrap()
         .parameters(
-            charges.data(),
+            charges.data().unwrap(),
             &expansion_order,
             Laplace3dKernel::new(),
             GreenKernelEvalType::Value,
@@ -113,7 +120,9 @@ fn benchmark_blas_m2l<
         + MatrixRsvd
         + Float
         + SampleUniform
-        + MatrixQr
+        + Lapack
+        + Gemm
+        + AbsSquare<Output = T::Real>
         + Default
         + Upcast
         + ArgmaxValue<T>
@@ -132,15 +141,15 @@ fn benchmark_blas_m2l<
     svd_threshold: Option<T>,
 ) where
     <T as RlstScalar>::Real: Epsilon,
-    <T as Upcast>::Higher: RlstScalar + MatrixSvd + Epsilon + Cast<T>,
-    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + MatrixSvd + Cast<T::Real>,
+    <T as Upcast>::Higher: RlstScalar + Lapack + Epsilon + Cast<T> + Gemm,
+    <<T as Upcast>::Higher as RlstScalar>::Real: Epsilon + Lapack + Cast<T::Real>,
 {
     let sources = points_fixture::<T>(n_points, None, None, Some(0));
     let targets = points_fixture::<T>(n_points, None, None, Some(1));
 
     let tmp = vec![T::one(); n_points * n_vecs];
-    let mut charges = rlst_dynamic_array2!(T, [n_points, n_vecs]);
-    charges.data_mut().copy_from_slice(&tmp);
+    let mut charges = rlst_dynamic_array!(T, [n_points, n_vecs]);
+    charges.data_mut().unwrap().copy_from_slice(&tmp);
 
     // BLAS based M2L for a vector of charges
     // FMM parameters
@@ -149,10 +158,16 @@ fn benchmark_blas_m2l<
     let prune_empty = true;
 
     let mut fmm_blas = SingleNodeBuilder::new(false)
-        .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+        .tree(
+            sources.data().unwrap(),
+            targets.data().unwrap(),
+            n_crit,
+            depth,
+            prune_empty,
+        )
         .unwrap()
         .parameters(
-            charges.data(),
+            charges.data().unwrap(),
             &expansion_order,
             Laplace3dKernel::new(),
             GreenKernelEvalType::Value,

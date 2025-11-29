@@ -4,7 +4,7 @@ use kifmm::{Evaluate, FftFieldTranslation, FmmSvdMode, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};
-use rlst::{c32, rlst_dynamic_array2, RawAccess, RawAccessMut};
+use rlst::{c32, rlst_dynamic_array, RawAccess, RawAccessMut};
 
 fn main() {
     // Setup random sources and targets
@@ -26,14 +26,20 @@ fn main() {
     {
         let nvecs = 1;
         let tmp = vec![c32::one(); n_sources * nvecs];
-        let mut charges = rlst_dynamic_array2!(c32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c32, [n_sources, nvecs]);
         charges.data_mut().copy_from_slice(&tmp);
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
@@ -50,9 +56,10 @@ fn main() {
     {
         // Vector of charges
         let nvecs = 1;
-        let mut charges = rlst_dynamic_array2!(c32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c32, [n_sources, nvecs]);
         charges
             .data_mut()
+            .unwrap()
             .chunks_exact_mut(n_sources)
             .enumerate()
             .for_each(|(i, chunk)| {
@@ -64,10 +71,16 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let mut fmm_vec = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Helmholtz3dKernel::new(wavenumber),
                 GreenKernelEvalType::Value,
@@ -86,9 +99,10 @@ fn main() {
 
         // Matrix of charges
         let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(c32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(c32, [n_sources, nvecs]);
         charges
             .data_mut()
+            .unwrap()
             .chunks_exact_mut(n_sources)
             .enumerate()
             .for_each(|(i, chunk)| {

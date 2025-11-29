@@ -329,13 +329,12 @@ mod mpi_domain {
 mod test {
     use super::*;
     use crate::tree::helpers::{points_fixture, points_fixture_col, PointsMat};
-    use rlst::{RawAccess, Shape};
 
     fn test_compute_bounds<T>(points: PointsMat<T>)
     where
         T: RlstScalar + Float,
     {
-        let domain = Domain::<T>::from_local_points(points.data());
+        let domain = Domain::<T>::from_local_points(points.data().unwrap());
 
         // Test that the domain remains cubic
         assert!(domain

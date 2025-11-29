@@ -4,9 +4,12 @@ use rand::distr::StandardUniform;
 use rand_distr::StandardNormal;
 use rlst::{
     c32, c64,
-    dense::linalg::lapack::{qr::QrDecomposition, singular_value_decomposition::SvdMode},
-    empty_array, rlst_dynamic_array, DynArray, Lapack, MultIntoResize, RawAccess, RlstResult,
-    RlstScalar, Shape,
+    dense::linalg::lapack::{
+        qr::{EnablePivoting, QMode},
+        singular_value_decomposition::SvdMode,
+    },
+    empty_array, rlst_dynamic_array, DynArray, Lapack, MultIntoResize, Qr, RlstResult, RlstScalar,
+    SingularValueDecomposition,
 };
 
 /// Matrix type
@@ -98,7 +101,7 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             StandardUniform: rand_distr::Distribution<<$ty as RlstScalar>::Real>,
         {
             let mut mat_transpose = rlst_dynamic_array!($ty, [mat.shape()[1], mat.shape()[0]]);
-            mat_transpose.fill_from(mat.r().transpose());
+            mat_transpose.fill_from(&mat.r().transpose());
 
             // Input matrix of size [m, n]. Draw Gaussian matrix of size [n, size].
             let mut omega = rlst_dynamic_array!($ty, [mat.shape()[1], size]);
@@ -108,14 +111,16 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             if let Some(normaliser) = power_iteration_normaliser {
                 match normaliser {
                     Normaliser::Qr(n_iter) => {
-                        let mut q1 = rlst_dynamic_array!($ty, [mat.shape()[0], size]);
+                        //let mut q1 = rlst_dynamic_array!($ty, [mat.shape()[0], size]);
 
                         // Compute sample matrix of size [m, size]
                         let y = empty_array::<$ty, 2>().simple_mult_into_resize(mat.r(), omega.r());
 
                         // Ortho-normalise columns using QR
-                        let qr = QrDecomposition::<$ty>::new(y).expect("QR Decomposition failed");
-                        qr.get_q_alloc(q1.r_mut()).unwrap();
+                        let qr = y.qr(EnablePivoting::Yes).expect("QR Decomposition failed");
+                        // let qr = QrDecomposition::<$ty>::new(y).expect("QR Decomposition failed");
+                        let mut q1 = qr.q_mat(QMode::Compact).unwrap();
+                        // qr.get_q_alloc(q1.r_mut()).unwrap();
 
                         let mut q2 = rlst_dynamic_array!($ty, [mat.shape()[1], size]);
 
@@ -123,25 +128,34 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
                         for _ in 0..n_iter {
                             let atq = empty_array::<$ty, 2>()
                                 .simple_mult_into_resize(mat_transpose.r(), q1.r());
-                            let qr = QrDecomposition::<$ty, _>::new(atq).unwrap();
-                            qr.get_q_alloc(q2.r_mut()).unwrap();
+                            let qr = atq.qr(EnablePivoting::Yes).unwrap();
+                            // let qr = QrDecomposition::<$ty, _>::new(atq).unwrap();
+                            q2.fill_from(&qr.q_mat(QMode::Compact).unwrap());
+
+                            // qr.get_q_alloc(q2.r_mut()).unwrap();
 
                             let aq =
                                 empty_array::<$ty, 2>().simple_mult_into_resize(mat.r(), q2.r());
 
-                            let qr = QrDecomposition::<$ty, _>::new(aq).unwrap();
-                            qr.get_q_alloc(q1.r_mut()).unwrap();
+                            let qr = aq.qr(EnablePivoting::Yes).unwrap();
+                            // let qr = QrDecomposition::<$ty, _>::new(aq).unwrap();
+                            q1.fill_from(&qr.q_mat(QMode::Compact).unwrap());
+                            // qr.get_q_alloc(q1.r_mut()).unwrap();
                         }
 
                         let atq = empty_array::<$ty, 2>()
                             .simple_mult_into_resize(mat_transpose.r(), q1.r());
 
-                        let qr = QrDecomposition::<$ty, _>::new(atq).unwrap();
-                        qr.get_q_alloc(q2.r_mut()).unwrap();
+                        let qr = atq.qr(EnablePivoting::Yes).unwrap();
+                        q2.fill_from(&qr.q_mat(QMode::Compact).unwrap());
+                        // let qr = QrDecomposition::<$ty, _>::new(atq).unwrap();
+                        // qr.get_q_alloc(q2.r_mut()).unwrap();
                         let aq = empty_array::<$ty, 2>().simple_mult_into_resize(mat.r(), q2.r());
 
-                        let qr = QrDecomposition::<$ty, _>::new(aq).unwrap();
-                        qr.get_q_alloc(q1.r_mut()).unwrap();
+                        let qr = aq.qr(EnablePivoting::Yes).unwrap();
+                        q1.fill_from(&qr.q_mat(QMode::Compact).unwrap());
+                        // let qr = QrDecomposition::<$ty, _>::new(aq).unwrap();
+                        // qr.get_q_alloc(q1.r_mut()).unwrap();
 
                         return q1;
                     }
@@ -152,9 +166,11 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             let y = empty_array::<$ty, 2>().simple_mult_into_resize(mat.r(), omega.r());
 
             // Ortho-normalise columns using QR
-            let mut q = DynArray::<$ty>::from_shape(y.shape());
-            let qr = QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
-            qr.get_q_alloc(q.r_mut()).unwrap();
+            // let mut q = DynArray::<$ty, _>::from_shape(y.shape());
+            let qr = y.qr(EnablePivoting::Yes).expect("QR Decomposition failed");
+            // let qr = QrDecomposition::<$ty, _>::new(y).expect("QR Decomposition failed");
+            let q = qr.q_mat(QMode::Compact).unwrap();
+            // qr.get_q_alloc(q.r_mut()).unwrap();
 
             q
         }
@@ -185,20 +201,23 @@ macro_rules! generate_rsvd_fixed_rank {
             let q =
                 $randomised_range_finder(mat, n_random, power_iteration_normaliser, random_state);
             let mut q_transpose = rlst_dynamic_array!($ty, [q.shape()[1], q.shape()[0]]);
-            q_transpose.fill_from(q.r().conj().transpose());
+            q_transpose.fill_from(&q.r().conj().transpose());
             let b = empty_array::<$ty, 2>().simple_mult_into_resize(q_transpose.r(), mat.r());
 
             // Compute svd on thin matrix (k+p) wide
-            let k = std::cmp::min(b.shape()[0], b.shape()[1]);
-            let mut uhat = rlst_dynamic_array!($ty, [b.shape()[0], k]);
-            let mut s = vec![<$ty as RlstScalar>::Real::from(0.); k];
-            let mut vt = rlst_dynamic_array!($ty, [k, b.shape()[1]]);
+            // let k = std::cmp::min(b.shape()[0], b.shape()[1]);
+            // let mut uhat = rlst_dynamic_array!($ty, [b.shape()[0], k]);
+            // let mut s = vec![<$ty as RlstScalar>::Real::from(0.); k];
+            // let mut vt = rlst_dynamic_array!($ty, [k, b.shape()[1]]);
 
-            let mut b_copy = DynArray::<$ty>::from_shape(b.shape());
-            b_copy.fill_from(b.r());
-            b_copy
-                .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
-                .unwrap();
+            let (s, uhat, vt) = b.svd(SvdMode::Compact).unwrap();
+            let s = s.data().unwrap().to_vec();
+
+            // let mut b_copy = DynArray::<$ty, _>::from_shape(b.shape());
+            // b_copy.fill_from(b.r());
+            // b_copy
+            //     .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
+            //     .unwrap();
             let u = empty_array::<$ty, 2>().simple_mult_into_resize(q.r(), uhat.r());
 
             Ok((s, u, vt))
@@ -254,27 +273,30 @@ macro_rules! generate_randomised_range_finder_fixed_error {
             // Find random samples
             let y = empty_array::<$type, 2>().simple_mult_into_resize(mat.r(), omega.r());
             let y_shape = y.shape();
-            let mut y_copy = DynArray::<$type>::from_shape(y.shape());
-            y_copy.r_mut().fill_from(y.r());
+            let mut y_copy = DynArray::<$type, _>::from_shape(y.shape());
+            y_copy.r_mut().fill_from(&y.r());
 
-            let mut q_curr = DynArray::<$type>::from_shape(y_shape);
+            let mut q_curr = DynArray::<$type, _>::from_shape(y_shape);
 
             let mut done = false;
             while !done {
                 // Sketch Q
                 let y_shape = y_copy.shape();
-                let mut q = DynArray::<$type>::from_shape(y_shape);
-                let mut qt = DynArray::<$type>::from_shape([q.shape()[1], q.shape()[0]]);
+                let mut q = DynArray::<$type, _>::from_shape(y_shape);
+                let mut qt = DynArray::<$type, _>::from_shape([q.shape()[1], q.shape()[0]]);
 
                 // Copy local loop variable, as ownership passes to QR decomposition
-                let mut y_loop = DynArray::<$type>::from_shape(y_shape);
-                y_loop.r_mut().fill_from(y_copy.r());
+                let mut y_loop = DynArray::<$type, _>::from_shape(y_shape);
+                y_loop.r_mut().fill_from(&y_copy.r());
 
-                let qr = QrDecomposition::<$type, _>::new(y_loop).unwrap();
-                qr.get_q_alloc(q.r_mut()).unwrap();
-                qt.r_mut().fill_from(q.r().conj().transpose());
-                q_curr = DynArray::<$type>::from_shape(q.shape());
-                q_curr.r_mut().fill_from(q.r());
+                let qr = y_loop.qr(EnablePivoting::Yes).unwrap();
+
+                // let qr = QrDecomposition::<$type, _>::new(y_loop).unwrap();
+                q.fill_from(&qr.q_mat(QMode::Compact).unwrap());
+                // qr.get_q_alloc(q.r_mut()).unwrap();
+                qt.fill_from(&q.r().conj().transpose());
+                q_curr = DynArray::<$type, _>::from_shape(q.shape());
+                q_curr.fill_from(&q.r());
 
                 // Calculate QQ^TM
                 let qqtm = empty_array::<$type, 2>().simple_mult_into_resize(
@@ -283,16 +305,16 @@ macro_rules! generate_randomised_range_finder_fixed_error {
                 );
 
                 // Current approximation error
-                let norm_qqtm = qqtm.r().norm_fro();
-                let norm_qqtm_minus_mat = (qqtm.r() - mat.r()).norm_fro();
+                let norm_qqtm = qqtm.r().norm_fro().unwrap();
+                let norm_qqtm_minus_mat = (qqtm.r() - mat.r()).norm_fro().unwrap();
                 let error_norm = 0.01 * norm_qqtm_minus_mat / norm_qqtm;
 
                 if error_norm > tol {
                     let y_new =
                         empty_array::<$type, 2>().simple_mult_into_resize(mat.r(), omega.r());
                     let mut y_big_data = Vec::new();
-                    y_big_data.extend_from_slice(y_copy.data());
-                    y_big_data.extend_from_slice(y_new.data());
+                    y_big_data.extend_from_slice(y_copy.data().unwrap());
+                    y_big_data.extend_from_slice(y_new.data().unwrap());
                     let y_big = rlst_dynamic_array!(
                         $type,
                         [y_copy.shape()[0], y_copy.shape()[1] + y_new.shape()[1]]
@@ -328,22 +350,24 @@ macro_rules! generate_rsvd_fixed_error {
             let q = $randomised_range_finder(mat, tol, k_block, random_state);
 
             let mut q_transpose = rlst_dynamic_array!($type, [q.shape()[1], q.shape()[0]]);
-            q_transpose.fill_from(q.r().conj().transpose());
+            q_transpose.fill_from(&q.r().conj().transpose());
 
             // Project matrix to (k+p) dimensional space using orthonormal basis
             let b = empty_array::<$type, 2>().simple_mult_into_resize(q_transpose.r(), mat.r());
 
             // Compute svd on thin matrix (k+p) wide
-            let k = std::cmp::min(b.shape()[0], b.shape()[1]);
-            let mut uhat = rlst_dynamic_array!($type, [b.shape()[0], k]);
-            let mut s = vec![<$type as RlstScalar>::Real::from(0.); k];
-            let mut vt = DynArray::<$type>::from_shape([k, b.shape()[1]]);
+            // let k = std::cmp::min(b.shape()[0], b.shape()[1]);
+            // let mut uhat = rlst_dynamic_array!($type, [b.shape()[0], k]);
+            // let mut s = vec![<$type as RlstScalar>::Real::from(0.); k];
+            // let mut vt = DynArray::<$type, _>::from_shape([k, b.shape()[1]]);
 
-            let mut b_copy = DynArray::<$type>::from_shape(b.shape());
-            b_copy.fill_from(b.r());
-            b_copy
-                .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
-                .unwrap();
+            let (s, uhat, vt) = b.svd(SvdMode::Compact).unwrap();
+            let s = s.data().unwrap().to_vec();
+
+            // b_copy.fill_from(b.r());
+            // b_copy
+            //     .into_svd_alloc(uhat.r_mut(), vt.r_mut(), &mut s[..], SvdMode::Reduced)
+            //     .unwrap();
 
             let u = empty_array::<$type, 2>().simple_mult_into_resize(q.r(), uhat.r());
 
@@ -377,10 +401,7 @@ generate_rsvd_fixed_error!(
 
 #[cfg(test)]
 mod test {
-    use rlst::{
-        assert_array_abs_diff_eq, empty_array, rlst_dynamic_array, ArrayIteratorByValue,
-        MultIntoResize, RawAccessMut, Shape,
-    };
+    use rlst::{assert_array_abs_diff_eq, empty_array, rlst_dynamic_array, MultIntoResize, Shape};
 
     use super::MatrixRsvd;
     use crate::linalg::rsvd::Normaliser;
@@ -390,6 +411,7 @@ mod test {
         let mut mat = rlst_dynamic_array!(f32, [5, 6]);
 
         mat.data_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(i, v)| *v += (i + 1) as f32);
@@ -417,6 +439,7 @@ mod test {
         let mut mat = rlst_dynamic_array!(f32, [5, 6]);
 
         mat.data_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(i, v)| *v += (i + 1) as f32);
@@ -452,6 +475,7 @@ mod test {
         let mut mat = rlst_dynamic_array!(f64, [5, 6]);
 
         mat.data_mut()
+            .unwrap()
             .iter_mut()
             .enumerate()
             .for_each(|(i, v)| *v += (i + 1) as f64);
