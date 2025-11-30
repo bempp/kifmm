@@ -401,7 +401,7 @@ generate_rsvd_fixed_error!(
 
 #[cfg(test)]
 mod test {
-    use rlst::{assert_array_abs_diff_eq, empty_array, rlst_dynamic_array, MultIntoResize, Shape};
+    use rlst::{assert_array_abs_diff_eq, empty_array, rlst_dynamic_array, MultIntoResize};
 
     use super::MatrixRsvd;
     use crate::linalg::rsvd::Normaliser;

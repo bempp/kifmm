@@ -9,7 +9,7 @@ use mpi::{
     Count, Rank,
 };
 use num::Float;
-use rlst::{rlst_dynamic_array, DynArray, RawAccessMut, RlstScalar};
+use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
 use crate::{
     fmm::{

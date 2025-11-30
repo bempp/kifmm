@@ -670,9 +670,9 @@ where
             let mut vt = rlst_dynamic_array!(Scalar, [cutoff_rank, nvt]);
 
             // Store compressed M2L operators
-            let thin_nrows = se2tc_thin.shape()[0];
+            // let thin_nrows = se2tc_thin.shape()[0];
             let nst = se2tc_thin.shape()[1];
-            let k = std::cmp::min(thin_nrows, nst);
+            // let k = std::cmp::min(thin_nrows, nst);
             let mut st;
 
             if self.source_to_target.surface_diff() == 0 {

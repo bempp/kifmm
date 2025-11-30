@@ -5,8 +5,7 @@ use std::sync::Mutex;
 use itertools::Itertools;
 use rayon::prelude::*;
 use rlst::{
-    empty_array, rlst_dynamic_array, DynArray, Gemm, MultIntoResize, RawAccess, RawAccessMut,
-    RlstScalar, SliceArray,
+    empty_array, rlst_dynamic_array, DynArray, Gemm, MultIntoResize, RlstScalar, SliceArray,
 };
 
 use green_kernels::traits::Kernel as KernelTrait;

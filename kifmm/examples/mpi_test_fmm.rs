@@ -22,7 +22,7 @@ fn main() {
         traits::{Communicator, Equivalence, Root},
     };
     use num::{Float, One};
-    use rlst::{c32, RawAccess, RlstScalar};
+    use rlst::{c32, RlstScalar};
 
     fn test_multi_node_helmholtz_fmm_helper<
         T: RlstScalar<Complex = T> + Epsilon + MatrixRsvd + Default + Equivalence,
@@ -278,8 +278,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -313,8 +313,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -350,8 +350,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -385,8 +385,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -435,8 +435,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -470,8 +470,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -506,8 +506,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -541,8 +541,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,

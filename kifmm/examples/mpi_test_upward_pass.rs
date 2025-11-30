@@ -16,7 +16,7 @@ fn main() {
     use mpi::traits::{Communicator, Equivalence};
     use num::{Float, One};
     use num_complex::Complex32;
-    use rlst::{RawAccess, RlstScalar};
+    use rlst::RlstScalar;
 
     fn test_multi_node_helmholtz_upward_pass_helper<T>(
         name: String,
@@ -205,8 +205,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -240,8 +240,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -288,8 +288,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,
@@ -324,8 +324,8 @@ fn main() {
             let fmm = MultiNodeBuilder::new(false)
                 .tree(
                     &comm.duplicate(),
-                    sources.data(),
-                    sources.data(),
+                    sources.data().unwrap(),
+                    sources.data().unwrap(),
                     local_depth,
                     global_depth,
                     prune_empty,

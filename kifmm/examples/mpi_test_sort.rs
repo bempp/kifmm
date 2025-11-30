@@ -72,9 +72,9 @@ mod mpi {
             // Subcomm size must also be a power of two
             if power_of_two(comm.size()) && power_of_two(subcomm_size) {
                 // Select random integers, with duplicates
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
                 let n = 1000;
-                let mut arr: Vec<i32> = (0..n).map(|_| rng.gen_range(0..=10000)).collect();
+                let mut arr: Vec<i32> = (0..n).map(|_| rng.random_range(0..=10000)).collect();
 
                 // Sort
                 let _ = hyksort(&mut arr, subcomm_size, &comm);
@@ -87,9 +87,9 @@ mod mpi {
         // Test Sample Sort
         {
             // Select random integers, with duplicates
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let n = 1000;
-            let mut arr: Vec<i32> = (0..n).map(|_| rng.gen_range(0..=10000)).collect();
+            let mut arr: Vec<i32> = (0..n).map(|_| rng.random_range(0..=10000)).collect();
 
             let number_of_samples = 100;
 

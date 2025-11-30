@@ -49,7 +49,7 @@ where
     ///
     /// - `keys` -, A slice of Morton Keys subject to linearization, ensuring uniqueness and non-overlap in the resulting set.
     pub fn linearize_keys(keys: &[MortonKey<T>]) -> Vec<MortonKey<T>> {
-        let depth = keys.iter().map(|k| k.level()).max().unwrap();
+        let depth = Iterator::max(keys.iter().map(|k| k.level())).unwrap();
         let mut key_set: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
 
         for level in (0..=depth).rev() {
@@ -85,7 +85,7 @@ where
     /// contiguous space without gaps.
     pub fn balance_keys(keys: &[MortonKey<T>]) -> HashSet<MortonKey<T>> {
         let mut balanced: HashSet<MortonKey<_>> = keys.iter().cloned().collect();
-        let deepest_level = keys.iter().map(|key| key.level()).max().unwrap();
+        let deepest_level = Iterator::max(keys.iter().map(|key| key.level())).unwrap();
 
         for level in (0..=deepest_level).rev() {
             let work_list = balanced
@@ -157,8 +157,8 @@ where
     /// Complete the region between all elements in an vector of Morton keys that doesn't
     /// necessarily span the domain defined by its least and greatest nodes.
     pub fn complete(&mut self) {
-        let a = self.keys.iter().min().unwrap();
-        let b = self.keys.iter().max().unwrap();
+        let a = Iterator::min(self.keys.iter()).unwrap();
+        let b = Iterator::max(self.keys.iter()).unwrap();
         let completion = Self::complete_region(a, b);
         let start_val = vec![*a];
         let end_val = vec![*b];
@@ -598,10 +598,10 @@ where
     pub fn last_child(&self, level: u64) -> Self {
         if self.level() < level {
             let mut level_diff = level - self.level();
-            let mut flc = *self.children().iter().max().unwrap();
+            let mut flc = *Iterator::max(self.children().iter()).unwrap();
             while level_diff > 1 {
                 let tmp = flc;
-                flc = *tmp.children().iter().max().unwrap();
+                flc = *Iterator::max(tmp.children().iter()).unwrap();
                 level_diff -= 1;
             }
 
@@ -1129,7 +1129,6 @@ unsafe impl<T: RlstScalar + Float> Equivalence for MortonKey<T> {
 mod test {
     use super::*;
     use crate::tree::helpers::points_fixture;
-    use rlst::{RawAccess, Shape};
     use std::vec;
 
     /// Subroutine in less than function, equivalent to comparing floor of log_2(x). Adapted from [3].

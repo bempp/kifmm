@@ -121,7 +121,8 @@ mod test {
     };
     use num::{Complex, Float, Zero};
     use rand::{rngs::StdRng, Rng, SeedableRng};
-    use rlst::{c64, rlst_dynamic_array, DynArray, RlstScalar, Shape};
+    use rlst::c64;
+    use rlst::{rlst_dynamic_array, DynArray, RlstScalar};
 
     use crate::{
         fmm::{

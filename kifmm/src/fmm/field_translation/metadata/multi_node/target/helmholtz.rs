@@ -4,8 +4,7 @@ use green_kernels::{
 use itertools::Itertools;
 use mpi::traits::{Communicator, Equivalence};
 use rlst::{
-    empty_array, rlst_dynamic_array, AbsSquare, DynArray, Gemm, Lapack, MultIntoResize, RawAccess,
-    RlstScalar, Shape,
+    empty_array, rlst_dynamic_array, AbsSquare, DynArray, Gemm, Lapack, MultIntoResize, RlstScalar,
 };
 
 use crate::{

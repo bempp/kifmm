@@ -2,7 +2,7 @@ use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 use kifmm::{BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNodeBuilder};
 
 use kifmm::tree::helpers::points_fixture;
-use rlst::{rlst_dynamic_array2, RawAccess, RawAccessMut};
+use rlst::rlst_dynamic_array;
 
 fn main() {
     // Setup random sources and targets
@@ -21,14 +21,20 @@ fn main() {
     {
         let nvecs = 1;
         let tmp = vec![1.0; n_sources * nvecs];
-        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
-        charges.data_mut().copy_from_slice(&tmp);
+        let mut charges = rlst_dynamic_array!(f32, [n_sources, nvecs]);
+        charges.data_mut().unwrap().copy_from_slice(&tmp);
 
         let mut fmm_fft = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -45,9 +51,10 @@ fn main() {
     {
         // Vector of charges
         let nvecs = 1;
-        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f32, [n_sources, nvecs]);
         charges
             .data_mut()
+            .unwrap()
             .chunks_exact_mut(n_sources)
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
@@ -55,10 +62,16 @@ fn main() {
         let singular_value_threshold = Some(1e-5);
 
         let mut fmm_vec = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,
@@ -77,18 +90,25 @@ fn main() {
 
         // Matrix of charges
         let nvecs = 5;
-        let mut charges = rlst_dynamic_array2!(f32, [n_sources, nvecs]);
+        let mut charges = rlst_dynamic_array!(f32, [n_sources, nvecs]);
         charges
             .data_mut()
+            .unwrap()
             .chunks_exact_mut(n_sources)
             .enumerate()
             .for_each(|(i, chunk)| chunk.iter_mut().for_each(|elem| *elem += (1 + i) as f32));
 
         let mut fmm_mat = SingleNodeBuilder::new(false)
-            .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+            .tree(
+                sources.data().unwrap(),
+                targets.data().unwrap(),
+                n_crit,
+                depth,
+                prune_empty,
+            )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 Laplace3dKernel::new(),
                 GreenKernelEvalType::Value,

@@ -26,7 +26,7 @@ fn main() {
     // Call the tree constructor
     let _tree = MultiNodeTree::new(
         &comm,
-        points_per_process.data(),
+        points_per_process.data().unwrap(),
         local_depth,
         global_depth,
         domain,

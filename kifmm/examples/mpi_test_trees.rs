@@ -20,7 +20,6 @@ fn main() {
         datatype::PartitionMut,
         traits::{Communicator, Root},
     };
-    use rlst::RawAccess;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Single).unwrap();
     let world = universe.world();
@@ -50,8 +49,8 @@ fn main() {
     let mut fmm = MultiNodeBuilder::new(false)
         .tree(
             &comm,
-            points.data(),
-            points.data(),
+            points.data().unwrap(),
+            points.data().unwrap(),
             local_depth,
             global_depth,
             prune_empty,

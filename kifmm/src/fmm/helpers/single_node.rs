@@ -6,7 +6,7 @@ use std::{
 
 use itertools::{izip, Itertools};
 use num::traits::{Float, Zero};
-use rlst::{DynArray, RandomAccessByRef, RandomAccessMut, RlstScalar, Shape};
+use rlst::{DynArray, RlstScalar};
 
 use crate::{
     fmm::types::SendPtrMut,

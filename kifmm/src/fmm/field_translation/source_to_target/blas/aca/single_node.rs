@@ -20,10 +20,7 @@ use crate::{
 use green_kernels::traits::Kernel as KernelTrait;
 use itertools::Itertools;
 use rayon::prelude::*;
-use rlst::{
-    rlst_dynamic_array, DynArray, Gemm, Lapack, MultInto, RawAccess, RawAccessMut, RlstScalar,
-    Shape, SliceArray,
-};
+use rlst::{rlst_dynamic_array, DynArray, Gemm, Lapack, MultInto, RlstScalar, SliceArray};
 
 impl<Scalar, Kernel> SourceToTargetTranslation
     for KiFmm<Scalar, Kernel, BlasFieldTranslationAca<Scalar>>

@@ -121,7 +121,6 @@ mod test {
     use crate::tree::constants::DEEPEST_LEVEL;
     use crate::tree::helpers::points_fixture;
     use crate::tree::types::{Domain, MortonKey, Point};
-    use rlst::RawAccess;
 
     #[test]
     pub fn test_ordering() {
@@ -133,9 +132,9 @@ mod test {
 
         for i in 0..n_points {
             let p = [
-                coords.data()[i],
-                coords.data()[i + n_points],
-                coords.data()[i + 2 * n_points],
+                coords.data().unwrap()[i],
+                coords.data().unwrap()[i + n_points],
+                coords.data().unwrap()[i + 2 * n_points],
             ];
             points.push(Point {
                 coordinate: p,

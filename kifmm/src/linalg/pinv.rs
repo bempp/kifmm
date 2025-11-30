@@ -518,7 +518,7 @@ mod test {
     use super::*;
     use approx::assert_relative_eq;
     use green_kernels::{helmholtz_3d::Helmholtz3dKernel, laplace_3d::Laplace3dKernel};
-    use rlst::{empty_array, MultIntoResize, RandomAccessByRef, RawAccess};
+    use rlst::{empty_array, MultIntoResize};
 
     #[test]
     fn test_pinv_square() {

@@ -350,9 +350,13 @@ where
             let nvt = se2tc_fat.shape()[1];
             let k = std::cmp::min(mu, nvt);
 
-            let mut u_big = rlst_dynamic_array!(Scalar, [mu, k]);
-            let mut sigma = vec![Scalar::zero().re(); k];
-            let mut vt_big = rlst_dynamic_array!(Scalar, [k, nvt]);
+            // let mut u_big = rlst_dynamic_array!(Scalar, [mu, k]);
+            // let mut sigma = vec![Scalar::zero().re(); k];
+            // let mut vt_big = rlst_dynamic_array!(Scalar, [k, nvt]);
+
+            let mut u_big;
+            let mut vt_big;
+            let sigma;
 
             // Target rank defined by max dimension before cutoff
             let mut target_rank = k;
@@ -414,9 +418,9 @@ where
             let mut vt = rlst_dynamic_array!(Scalar, [cutoff_rank, nvt]);
 
             // Store compressed M2L operators
-            let thin_nrows = se2tc_thin.shape()[0];
+            // let thin_nrows = se2tc_thin.shape()[0];
             let nst = se2tc_thin.shape()[1];
-            let k = std::cmp::min(thin_nrows, nst);
+            // let k = std::cmp::min(thin_nrows, nst);
             let mut st;
 
             if self.source_to_target.surface_diff() == 0 {

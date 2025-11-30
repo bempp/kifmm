@@ -5,9 +5,7 @@ use itertools::Itertools;
 use num::{One, Zero};
 
 use rayon::prelude::*;
-use rlst::{
-    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RandomAccessMut, RawAccess, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RlstScalar};
 
 use green_kernels::traits::Kernel as KernelTrait;
 

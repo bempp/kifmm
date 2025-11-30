@@ -1033,9 +1033,9 @@ where
         let root = MortonKey::root();
 
         let ffc_root = root.finest_first_child();
-        let min = seeds.iter().min().unwrap();
+        let min = Iterator::min(seeds.iter()).unwrap();
         let fa = ffc_root.finest_ancestor(min);
-        let first_child = fa.children().into_iter().min().unwrap();
+        let first_child = Iterator::min(fa.children().into_iter()).unwrap();
 
         // Check for overlap
         if first_child < *min {
@@ -1043,9 +1043,9 @@ where
         }
 
         let flc_root = root.finest_last_child();
-        let max = seeds.iter().max().unwrap();
+        let max = Iterator::max(seeds.iter()).unwrap();
         let fa = flc_root.finest_ancestor(max);
-        let last_child = fa.children().into_iter().max().unwrap();
+        let last_child = Iterator::max(fa.children().into_iter()).unwrap();
 
         if last_child > *max
             && !max.ancestors().contains(&last_child)
@@ -1085,7 +1085,7 @@ where
     /// - `leaves` - A reference to a collection of Morton Keys, representing leaf nodes.
     #[allow(unused)]
     pub(crate) fn find_seeds(leaves: &MortonKeys<T>) -> MortonKeys<T> {
-        let coarsest_level = leaves.iter().map(|k| k.level()).min().unwrap();
+        let coarsest_level = Iterator::min(leaves.iter().map(|k| k.level())).unwrap();
 
         let mut seeds = MortonKeys::from(
             leaves
@@ -1320,7 +1320,6 @@ mod test {
 
     use super::*;
     use crate::tree::helpers::{points_fixture, points_fixture_col};
-    use rlst::RawAccess;
 
     #[test]
     pub fn test_uniform_tree() {
@@ -1329,7 +1328,8 @@ mod test {
 
         // Test uniformly distributed data
         let points = points_fixture(n_points, Some(-1.0), Some(1.0), None);
-        let tree = SingleNodeTree::<f64>::new(points.data(), depth, false, None, None, None);
+        let tree =
+            SingleNodeTree::<f64>::new(points.data().unwrap(), depth, false, None, None, None);
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -1348,7 +1348,8 @@ mod test {
         // Test a column distribution of data
         let points = points_fixture_col::<f64>(n_points);
         let tree =
-            SingleNodeTree::<f64>::new(points.data(), depth, false, None, None, None).unwrap();
+            SingleNodeTree::<f64>::new(points.data().unwrap(), depth, false, None, None, None)
+                .unwrap();
 
         // Test that the tree really is uniform
         let levels: Vec<u64> = tree
@@ -1387,9 +1388,15 @@ mod test {
         // Test data distributed over domain
         let points = points_fixture(n_points, Some(0.), Some(1.0), None);
         let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
-        let tree =
-            SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None)
-                .unwrap();
+        let tree = SingleNodeTree::<f64>::new(
+            points.data().unwrap(),
+            depth,
+            false,
+            Some(domain),
+            Some(root),
+            None,
+        )
+        .unwrap();
 
         // Test that only points contained within specified root node are mapped to this tree.
         assert!(tree.all_points().unwrap().len() < n_points);
@@ -1397,9 +1404,15 @@ mod test {
         // Test data contained in first child
         let points = points_fixture(n_points, Some(0.), Some(0.5), None);
         let domain = Domain::new(&[0., 0., 0.], &[1., 1., 1.]);
-        let tree =
-            SingleNodeTree::<f64>::new(points.data(), depth, false, Some(domain), Some(root), None)
-                .unwrap();
+        let tree = SingleNodeTree::<f64>::new(
+            points.data().unwrap(),
+            depth,
+            false,
+            Some(domain),
+            Some(root),
+            None,
+        )
+        .unwrap();
 
         // Test that only points contained within specified root node are mapped to this tree.
         assert_eq!(tree.all_points().unwrap().len(), n_points);
@@ -1580,7 +1593,8 @@ mod test {
         let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
         let tree =
-            SingleNodeTree::<f64>::new(points.data(), depth, false, None, None, None).unwrap();
+            SingleNodeTree::<f64>::new(points.data().unwrap(), depth, false, None, None, None)
+                .unwrap();
 
         let keys = tree.all_keys().unwrap();
 
@@ -1617,7 +1631,8 @@ mod test {
         let points = points_fixture::<f64>(n_points, None, None, None);
         let depth = 3;
         let tree =
-            SingleNodeTree::<f64>::new(points.data(), depth, false, None, None, None).unwrap();
+            SingleNodeTree::<f64>::new(points.data().unwrap(), depth, false, None, None, None)
+                .unwrap();
 
         let keys = tree.keys(3).unwrap();
 

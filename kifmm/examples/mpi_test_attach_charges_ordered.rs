@@ -17,7 +17,7 @@ fn main() {
         datatype::PartitionMut,
         traits::{Communicator, Root},
     };
-    use rlst::{rlst_dynamic_array1, RawAccess, RawAccessMut};
+    use rlst::rlst_dynamic_array;
 
     let (universe, _threading) = mpi::initialize_with_threading(mpi::Threading::Funneled).unwrap();
     let world = universe.world();
@@ -46,14 +46,18 @@ fn main() {
         // Generate some random test data local to each process
         let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
         let mut rng = StdRng::seed_from_u64(comm.rank() as u64);
-        let mut charges = rlst_dynamic_array1!(f32, [n_points]);
-        charges.data_mut().iter_mut().for_each(|c| *c = rng.gen());
+        let mut charges = rlst_dynamic_array!(f32, [n_points]);
+        charges
+            .data_mut()
+            .unwrap()
+            .iter_mut()
+            .for_each(|c| *c = rng.random());
 
         let mut multi_fmm = MultiNodeBuilder::new(false)
             .tree(
                 &comm,
-                points.data(),
-                points.data(),
+                points.data().unwrap(),
+                points.data().unwrap(),
                 local_depth,
                 global_depth,
                 prune_empty,
@@ -61,7 +65,7 @@ fn main() {
             )
             .unwrap()
             .parameters(
-                charges.data(),
+                charges.data().unwrap(),
                 &expansion_order,
                 kernel.clone(),
                 GreenKernelEvalType::Value,
