@@ -104,11 +104,11 @@ mod mpi {
         {
             // Select random integers, with duplicates
             let n_buckets = comm.size();
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let n = 10000;
             let step_size = 100;
             let max = n_buckets * step_size;
-            let mut arr: Vec<i32> = (0..n).map(|_| rng.gen_range(0..=max)).collect();
+            let mut arr: Vec<i32> = (0..n).map(|_| rng.random_range(0..=max)).collect();
 
             // Number of splitters must match the number of MPI processes
             let mut splitters = Vec::new();

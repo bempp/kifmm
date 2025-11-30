@@ -2,7 +2,6 @@
 
 fn main() {
     use kifmm::tree::{helpers::points_fixture, MultiNodeTree, SortKind};
-    use rlst::RawAccess;
 
     let universe = mpi::initialize().unwrap();
     let comm = universe.world();
