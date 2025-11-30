@@ -13,20 +13,20 @@ use crate::fftw::types::{BatchSize, FftError, Sign};
 /// use kifmm::traits::fftw::{RealToComplexFft3D, Dft};
 /// use num_complex::Complex;
 /// use num::Zero;
-/// use rlst::{rlst_dynamic_array3, RawAccessMut, c64};
+/// use rlst::{DynArray, RawAccessMut, c64};
 ///
 ///
 /// // Single R2C FFT
 /// {
 ///     let shape_in = [3, 3, 3];
 ///     let shape_out = [3, 3, 3/2 + 1];
-///     let mut in_ = rlst_dynamic_array3!(f64, shape_in);
+///     let mut in_ = DynArray::<f64, _>::from_shape(shape_in);
 ///     let mut rng = rand::thread_rng();
 ///     in_.fill_from_standard_normal(&mut rng); // fill with random data
-///     let mut out = rlst_dynamic_array3!(c64, shape_out);
+///     let mut out = DynArray::<c64, _>::from_shape(shape_out);
 ///
-///     let plan = f64::plan_forward(in_.data_mut(), out.data_mut(), &shape_in, None).unwrap();
-///     let _ = f64::r2c(in_.data_mut(), out.data_mut(), &shape_in, &plan).unwrap();
+///     let plan = f64::plan_forward(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape_in, None).unwrap();
+///     let _ = f64::r2c(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape_in, &plan).unwrap();
 /// }
 ///
 /// // (parallel) Batch operation
@@ -38,17 +38,17 @@ use crate::fftw::types::{BatchSize, FftError, Sign};
 ///     let shape_in_batch = [3, 3, 3 * n_batch];
 ///     let shape_out_batch = [3, 3, (3/2 + 1) * n_batch];
 ///
-///     let mut in_ = rlst_dynamic_array3!(f64, shape_in_batch);
+///     let mut in_ = DynArray::<f64, _>::from_shape(shape_in_batch);
 ///     let mut rng = rand::thread_rng();
 ///     in_.fill_from_standard_normal(&mut rng); // fill with random data
-///     let mut out = rlst_dynamic_array3!(c64, shape_out_batch);
+///     let mut out = DynArray::<c64, _>::from_shape(shape_out_batch);
 ///
-///     let plan = f64::plan_forward(in_.data_mut(), out.data_mut(), &shape_in, None).unwrap();
+///     let plan = f64::plan_forward(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape_in, None).unwrap();
 ///
-///     let _ = f64::r2c_batch(in_.data_mut(), out.data_mut(), &shape_in, &plan).unwrap();
+///     let _ = f64::r2c_batch(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape_in, &plan).unwrap();
 ///
 ///     // Optionally parallel
-///     let _ = f64::r2c_batch_par(in_.data_mut(), out.data_mut(), &shape_in, &plan).unwrap();
+///     let _ = f64::r2c_batch_par(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape_in, &plan).unwrap();
 /// }
 ///
 /// ```
@@ -152,19 +152,19 @@ where
 /// use kifmm::fftw::types::Sign;
 /// use num_complex::Complex;
 /// use num::Zero;
-/// use rlst::{rlst_dynamic_array3, RawAccessMut, c64};
+/// use rlst::{DynArray, RawAccessMut, c64};
 ///
 ///
 /// // Single forward C2C FFT
 /// {
 ///     let shape = [3, 3, 3];
-///     let mut in_ = rlst_dynamic_array3!(c64, shape);
-///     let mut rng = rand::thread_rng();
+///     let mut in_ = DynArray::<c64, _>::from_shape(shape);
+///     let mut rng = rand::rng();
 ///     in_.fill_from_standard_normal(&mut rng); // fill with random data
-///     let mut out = rlst_dynamic_array3!(c64, shape);
+///     let mut out = DynArray::<c64, _>::from_shape(shape);
 ///
-///     let plan = c64::plan_forward(in_.data_mut(), out.data_mut(), &shape, None).unwrap();
-///     let _ = c64::c2c(in_.data_mut(), out.data_mut(), &shape, Sign::Forward, &plan).unwrap();
+///     let plan = c64::plan_forward(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape, None).unwrap();
+///     let _ = c64::c2c(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape, Sign::Forward, &plan).unwrap();
 /// }
 ///
 /// // (parallel) Batch operation
@@ -174,16 +174,16 @@ where
 ///     let shape = [3, 3, 3];
 ///     let shape_batch = [3, 3, 3 * n_batch];
 ///
-///     let mut in_ = rlst_dynamic_array3!(c64, shape_batch);
-///     let mut rng = rand::thread_rng();
+///     let mut in_ = DynArray::<c64, _>::from_shape(shape_batch);
+///     let mut rng = rand::rng();
 ///     in_.fill_from_standard_normal(&mut rng); // fill with random data
-///     let mut out = rlst_dynamic_array3!(c64, shape_batch);
+///     let mut out = DynArray::<c64, _>::from_shape(shape_batch);
 ///
-///     let plan = c64::plan_forward(in_.data_mut(), out.data_mut(), &shape, None).unwrap();
-///     let _ = c64::c2c_batch(in_.data_mut(), out.data_mut(), &shape, Sign::Forward, &plan).unwrap();
+///     let plan = c64::plan_forward(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape, None).unwrap();
+///     let _ = c64::c2c_batch(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape, Sign::Forward, &plan).unwrap();
 ///
 ///     // Optionally parallel
-///     let _ = c64::c2c_batch_par(in_.data_mut(), out.data_mut(), &shape, Sign::Forward, &plan).unwrap();
+///     let _ = c64::c2c_batch_par(in_.data_mut().unwrap(), out.data_mut().unwrap(), &shape, Sign::Forward, &plan).unwrap();
 /// }
 ///
 /// ```

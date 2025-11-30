@@ -103,6 +103,10 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
             let mut mat_transpose = rlst_dynamic_array!($ty, [mat.shape()[1], mat.shape()[0]]);
             mat_transpose.fill_from(&mat.r().transpose());
 
+            // Restrict the overall size to the size of the matrix
+            let k = std::cmp::min(mat.shape()[0], mat.shape()[1]);
+            let size = std::cmp::min(size, k);
+
             // Input matrix of size [m, n]. Draw Gaussian matrix of size [n, size].
             let mut omega = rlst_dynamic_array!($ty, [mat.shape()[1], size]);
             let random_state = random_state.unwrap_or(0);
@@ -130,6 +134,7 @@ macro_rules! generate_randomised_range_finder_fixed_rank {
                                 .simple_mult_into_resize(mat_transpose.r(), q1.r());
                             let qr = atq.qr(EnablePivoting::Yes).unwrap();
                             // let qr = QrDecomposition::<$ty, _>::new(atq).unwrap();
+
                             q2.fill_from(&qr.q_mat(QMode::Compact).unwrap());
 
                             // qr.get_q_alloc(q2.r_mut()).unwrap();
@@ -258,10 +263,12 @@ macro_rules! generate_randomised_range_finder_fixed_error {
         where
             $type: RlstScalar + Lapack,
         {
-            let [_m, n] = mat.shape();
+            let [m, n] = mat.shape();
 
             // Number of samples in block
+            let k = std::cmp::min(m, n);
             let kblock = k_block.unwrap_or(10);
+            let kblock = std::cmp::min(kblock, k);
 
             let tol = tol / (10. * (2. / <<$type as RlstScalar>::Real>::PI()).sqrt());
 
@@ -309,7 +316,10 @@ macro_rules! generate_randomised_range_finder_fixed_error {
                 let norm_qqtm_minus_mat = (qqtm.r() - mat.r()).norm_fro().unwrap();
                 let error_norm = 0.01 * norm_qqtm_minus_mat / norm_qqtm;
 
-                if error_norm > tol {
+                // Only proceed if the next kblock vectors still fit in the dimension
+                // and tolerance is too large.
+                if error_norm > tol && y_copy.shape()[1] + kblock < mat.shape()[1] {
+                    // The following seems wrong. We should take a new random matrix.
                     let y_new =
                         empty_array::<$type, 2>().simple_mult_into_resize(mat.r(), omega.r());
                     let mut y_big_data = Vec::new();

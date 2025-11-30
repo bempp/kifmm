@@ -20,7 +20,7 @@
 //!
 //! // Create a single node tree
 //! let single_node = SingleNodeTree::new(
-//!     points.data(),
+//!     points.data().unwrap(),
 //!     depth,
 //!     prune_empty,
 //!     domain,

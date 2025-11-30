@@ -303,11 +303,13 @@ pub enum FmmEvalType {
 /// manner
 /// # Example
 /// ```
+/// extern crate blas_src;
+/// extern crate lapack_src;
 /// use kifmm::{SingleNodeBuilder, BlasFieldTranslationSaRcmp, FftFieldTranslation};
 /// use kifmm::traits::fmm::{Evaluate, ChargeHandler};
 /// use kifmm::traits::tree::SingleFmmTree;
 /// use kifmm::tree::helpers::points_fixture;
-/// use rlst::{rlst_dynamic_array2, RawAccessMut, RawAccess};
+/// use rlst::{rlst_dynamic_array, RawAccessMut, RawAccess};
 /// use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
 ///
 /// /// Particle data
@@ -325,18 +327,18 @@ pub enum FmmEvalType {
 /// /// Charge data
 /// let nvecs = 1;
 /// let tmp = vec![1.0; n_sources * nvecs];
-/// let mut charges = rlst_dynamic_array2!(f64, [n_sources, nvecs]);
-/// charges.data_mut().copy_from_slice(&tmp);
+/// let mut charges = rlst_dynamic_array!(f64, [n_sources, nvecs]);
+/// charges.data_mut().unwrap().copy_from_slice(&tmp);
 ///
 /// /// Create a new builder, and attach a tree
 /// let fmm = SingleNodeBuilder::new(false) // optionally time operators
-///     .tree(sources.data(), targets.data(), n_crit, depth, prune_empty)
+///     .tree(sources.data().unwrap(), targets.data().unwrap(), n_crit, depth, prune_empty)
 ///     .unwrap();
 ///
 /// /// Specify the FMM parameters, such as the kernel , the kernel evaluation mode, expansion order and charge data
 /// let mut fmm = fmm
 ///     .parameters(
-///         charges.data(),
+///         charges.data().unwrap(),
 ///         &expansion_order,
 ///         Laplace3dKernel::new(),
 ///         GreenKernelEvalType::Value,
