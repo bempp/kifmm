@@ -1,5 +1,7 @@
 #[allow(dead_code)]
 mod mpi {
+    extern crate blas_src;
+    extern crate lapack_src;
 
     use kifmm::sorting::{hyksort, samplesort, simplesort};
     use mpi::{

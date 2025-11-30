@@ -1,3 +1,6 @@
+extern crate blas_src;
+extern crate lapack_src;
+
 use std::collections::HashMap;
 
 use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};

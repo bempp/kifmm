@@ -6,6 +6,9 @@ use kifmm::tree::helpers::points_fixture;
 use num::{FromPrimitive, One};
 use rlst::{c32, rlst_dynamic_array};
 
+extern crate blas_src;
+extern crate lapack_src;
+
 fn main() {
     // Setup random sources and targets
     let n_sources = 1000;

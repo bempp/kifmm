@@ -1,5 +1,8 @@
 //! Create a multi-node tree, distributed with MPI
 
+extern crate blas_src;
+extern crate lapack_src;
+
 fn main() {
     use kifmm::tree::{helpers::points_fixture, MultiNodeTree, SortKind};
 

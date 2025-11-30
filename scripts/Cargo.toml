@@ -15,6 +15,14 @@ mpi = { git = "https://github.com/rsmpi/rsmpi.git", optional = true}
 rayon = "1.11"
 clap = { version = "4.5.53", features = ["derive"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+blas-src = { version = "0.14", features = ["accelerate"]}
+lapack-src = { version = "0.13", features = ["accelerate"]}
+
+[target.'cfg(target_os = "linux")'.dependencies]
+lapack-src = { version = "0.13", features = ["netlib"]}
+blas-src = { version = "0.14", features = ["blis"] }
+
 [features]
 mpi = ["kifmm/mpi", "dep:mpi", "rlst/mpi"]
 

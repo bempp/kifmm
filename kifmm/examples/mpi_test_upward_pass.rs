@@ -1,3 +1,6 @@
+extern crate blas_src;
+extern crate lapack_src;
+
 fn main() {
     use green_kernels::helmholtz_3d::Helmholtz3dKernel;
     use green_kernels::{laplace_3d::Laplace3dKernel, traits::Kernel, types::GreenKernelEvalType};

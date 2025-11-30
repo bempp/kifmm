@@ -145,4 +145,7 @@ use pulp as _;
 #[cfg(test)]
 mod test {
     use criterion as _;
+
+    extern crate blas_src;
+    extern crate lapack_src;
 }

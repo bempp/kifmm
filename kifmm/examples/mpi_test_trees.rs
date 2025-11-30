@@ -1,4 +1,7 @@
 fn main() {
+    extern crate blas_src;
+    extern crate lapack_src;
+
     use green_kernels::{laplace_3d::Laplace3dKernel, types::GreenKernelEvalType};
     use kifmm::{
         fmm::types::MultiNodeBuilder,

@@ -4,6 +4,9 @@ use kifmm::{BlasFieldTranslationSaRcmp, Evaluate, FftFieldTranslation, SingleNod
 use kifmm::tree::helpers::points_fixture;
 use rlst::rlst_dynamic_array;
 
+extern crate blas_src;
+extern crate lapack_src;
+
 fn main() {
     // Setup random sources and targets
     let n_sources = 1000;

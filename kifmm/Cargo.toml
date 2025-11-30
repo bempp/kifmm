@@ -18,7 +18,7 @@ categories = ["mathematics", "science"]
 
 [lib]
 name = "kifmm"
-crate-type = ["cdylib", "lib"]
+crate-type = ["lib"]
 
 [dependencies]
 itertools = "0.14.*"
@@ -41,9 +41,20 @@ rlst = { git = "https://github.com/linalg-rs/rlst.git" }
 serde_yaml = "0.9.34"
 coe-rs = "0.1.2"
 
+
+
 [dev-dependencies]
 approx = "0.5"
 criterion = { version = "0.7.*", features = ["html_reports"]}
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+blas-src = { version = "0.14", features = ["accelerate"]}
+lapack-src = { version = "0.13", features = ["accelerate"]}
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+lapack-src = { version = "0.13", features = ["netlib"]}
+blas-src = { version = "0.14", features = ["blis"] }
+
 
 [build-dependencies]
 cbindgen = "0.29"
