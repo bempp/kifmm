@@ -6,10 +6,7 @@ use itertools::Itertools;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
 use rayon::prelude::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use rlst::{
-    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
-    SliceArray,
-};
+use rlst::{empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RlstScalar, SliceArray};
 
 use green_kernels::traits::Kernel as KernelTrait;
 

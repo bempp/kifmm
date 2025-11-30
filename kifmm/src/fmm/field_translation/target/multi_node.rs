@@ -21,9 +21,7 @@ use crate::{
 use green_kernels::traits::Kernel as KernelTrait;
 use mpi::{topology::SimpleCommunicator, traits::Equivalence};
 use num::Float;
-use rlst::{
-    empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RawAccess, RawAccessMut, RlstScalar,
-};
+use rlst::{empty_array, rlst_dynamic_array, Gemm, MultIntoResize, RlstScalar};
 
 impl<Scalar, Kernel, FieldTranslation> TargetTranslation
     for KiFmmMulti<Scalar, Kernel, FieldTranslation>

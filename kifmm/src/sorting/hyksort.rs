@@ -57,13 +57,13 @@ where
         split_count = arr_len as Count;
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Randomly sample splitters from local section of array
     let mut splitters: Vec<T> = vec![T::default(); split_count as usize];
 
     for i in 0..split_count {
-        let mut idx: u64 = rng.gen::<u64>();
+        let mut idx: u64 = rng.random::<u64>();
         idx %= arr_len;
         splitters[i as usize] = array[idx as usize];
     }
