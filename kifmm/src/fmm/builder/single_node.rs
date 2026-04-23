@@ -193,28 +193,11 @@ where
         source_to_target: FieldTranslation,
         pinv_mode: Option<PinvMode<Scalar>>,
     ) -> Result<Self, std::io::Error> {
-        if self.tree.is_none() {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Must build tree before specifying FMM parameters",
-            ))
-        } else {
+        if let Some(tree) = &self.tree {
             // Set FMM parameters
-            let global_indices = self
-                .tree
-                .as_ref()
-                .unwrap()
-                .source_tree
-                .all_global_indices()
-                .unwrap();
+            let global_indices = tree.source_tree.all_global_indices().unwrap();
 
-            let n_charges = &self
-                .tree
-                .as_ref()
-                .unwrap()
-                .source_tree()
-                .n_coordinates_tot()
-                .unwrap();
+            let n_charges = tree.source_tree().n_coordinates_tot().unwrap();
             let n_matvecs = charges.len() / n_charges;
 
             self.charges = Some(map_charges(global_indices, charges, n_matvecs));
@@ -225,7 +208,7 @@ where
                 self.fmm_eval_type = Some(FmmEvalType::Vector)
             }
 
-            let depth = self.tree.as_ref().unwrap().source_tree().depth();
+            let depth = tree.source_tree().depth();
 
             let equivalent_surface_order;
 
@@ -279,17 +262,17 @@ where
             self.pinv_mode = pinv_mode;
 
             Ok(self)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must build tree before specifying FMM parameters",
+            ))
         }
     }
 
     /// Finalize and build the single node FMM
     pub fn build(self) -> Result<KiFmm<Scalar, Kernel, FieldTranslation>, std::io::Error> {
-        if self.tree.is_none() {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Must create a tree, and FMM metadata before building",
-            ))
-        } else {
+        if let Some(tree) = self.tree {
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();
             let dim = kernel.space_dimension();
@@ -305,7 +288,7 @@ where
             let mut result = KiFmm {
                 timed,
                 isa: self.isa.unwrap(),
-                tree: self.tree.unwrap(),
+                tree,
                 equivalent_surface_order: self.equivalent_surface_order.unwrap(),
                 check_surface_order: self.check_surface_order.unwrap(),
                 variable_expansion_order: self.variable_expansion_order.unwrap(),
@@ -368,6 +351,11 @@ where
             }
 
             Ok(result)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must create a tree, and FMM metadata before building",
+            ))
         }
     }
 }
