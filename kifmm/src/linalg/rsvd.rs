@@ -190,7 +190,7 @@ macro_rules! generate_rsvd_fixed_rank {
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
             let mut uhat = rlst_dynamic_array2!($ty, [b.shape()[0], k]);
-            let mut s = vec![<$ty as RlstScalar>::Real::from(0._f32); k];
+            let mut s = vec![<$ty as RlstScalar>::Real::from(0.); k];
             let mut vt = rlst_dynamic_array2!($ty, [k, b.shape()[1]]);
 
             let mut b_copy = rlst_dynamic_array2!($ty, b.shape());
@@ -335,7 +335,7 @@ macro_rules! generate_rsvd_fixed_error {
             // Compute svd on thin matrix (k+p) wide
             let k = std::cmp::min(b.shape()[0], b.shape()[1]);
             let mut uhat = rlst_dynamic_array2!($type, [b.shape()[0], k]);
-            let mut s = vec![<$type as RlstScalar>::Real::from(0._f32); k];
+            let mut s = vec![<$type as RlstScalar>::Real::from(0.); k];
             let mut vt = rlst_dynamic_array2!($type, [k, b.shape()[1]]);
 
             let mut b_copy = rlst_dynamic_array2!($type, b.shape());
