@@ -34,20 +34,35 @@ kernel:
                   3:
                     order: 3
                     depth: 5
-                    eps: 0.0000001
+                    eps: 0.001
                     surface_diff: null
                   4:
                     order: 3
                     depth: 5
-                    eps: null
+                    eps: 1e-7
                     surface_diff: 1
+                  5:
+                    order: 5
+                    depth: 5
+                    eps: 0.00001
+                    surface_diff: 0
               8000000:
                 digits:
                   3:
                     order: 3
                     depth: 6
-                    eps: 1e-7
+                    eps: 0.001
                     surface_diff: null
+                  4:
+                    order: 3
+                    depth: 6
+                    eps: 0.00001
+                    surface_diff: 1
+                  5:
+                    order: 5
+                    depth: 5
+                    eps: 0.00001
+                    surface_diff: 1
 
           fft:
             n_points:
@@ -162,40 +177,35 @@ kernel:
                     order: 5
                     depth: 5
                     surface_diff: 1
-                    eps: 0.001
+                    eps: 1e-7
                   8:
                     order: 8
                     depth: 5
-                    surface_diff: 2
-                    eps: 0.001
+                    surface_diff: 1
+                    eps: 1e-7
                   10:
                     order: 9
-                    depth: 4
-                    surface_diff: 2
-                    eps: 1e-7
+                    depth: 5
+                    surface_diff: 1
+                    eps:
 
               8000000:
                 digits:
-                  4:
-                    order: 3
-                    depth: 6
-                    surface_diff: 2
-                    eps: 0.001
                   6:
                     order: 5
                     depth: 5
                     surface_diff: 1
-                    eps: 0.001
+                    eps: 1e-7
                   8:
-                    order: 7
+                    order: 9
                     depth: 5
-                    surface_diff: 1
-                    eps: 0.00001
+                    surface_diff: null
+                    eps: 1e-7
                   10:
                     order: 9
                     depth: 5
-                    surface_diff: 2
-                    eps: 1e-7
+                    surface_diff: 1
+                    eps: 0
       AMD_3790X:
         fp32:
           blas_rsvd:
@@ -258,7 +268,7 @@ kernel:
                   3:
                     order: 3
                     depth: 4
-                    eps: null
+                    surface_diff: null
                     eps: 0.001
                   4:
                     order: 3
