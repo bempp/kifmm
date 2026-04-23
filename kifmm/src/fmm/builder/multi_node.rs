@@ -217,13 +217,8 @@ where
         eval_type: GreenKernelEvalType,
         source_to_target: FieldTranslation,
     ) -> Result<Self, std::io::Error> {
-        if self.tree.is_none() {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Must build tree before specifying FMM parameters",
-            ))
-        } else {
-            let total_depth = self.tree.as_ref().unwrap().source_tree.total_depth;
+        if let Some(tree) = &self.tree {
+            let total_depth = tree.source_tree.total_depth;
 
             let equivalent_surface_order;
 
@@ -276,17 +271,17 @@ where
             self.source_to_target = Some(source_to_target);
             self.charges = Some(charges.to_vec()); // un-ordered charges
             Ok(self)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must build tree before specifying FMM parameters",
+            ))
         }
     }
 
     /// Initialise
     pub fn build(self) -> Result<KiFmmMulti<Scalar, Kernel, FieldTranslation>, std::io::Error> {
-        if self.tree.is_none() {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidInput,
-                "Must create a tree, and FMM metadata before building",
-            ))
-        } else {
+        if let Some(tree) = self.tree {
             let kernel = self.kernel.unwrap();
             let communicator = self.communicator.unwrap();
             let neighbourhood_communicator_v = NeighbourhoodCommunicator::from_comm(&communicator);
@@ -362,7 +357,7 @@ where
                 neighbourhood_communicator_charge,
                 rank,
                 kernel,
-                tree: self.tree.unwrap(),
+                tree,
                 equivalent_surface_order,
                 check_surface_order,
                 n_coeffs_equivalent_surface,
@@ -487,6 +482,11 @@ where
             }
 
             Ok(result)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "Must create a tree, and FMM metadata before building",
+            ))
         }
     }
 }
