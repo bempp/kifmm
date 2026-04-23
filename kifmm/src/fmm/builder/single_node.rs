@@ -193,18 +193,11 @@ where
         source_to_target: FieldTranslation,
         pinv_mode: Option<PinvMode<Scalar>>,
     ) -> Result<Self, std::io::Error> {
-
         if let Some(tree) = &self.tree {
             // Set FMM parameters
-            let global_indices = tree
-                .source_tree
-                .all_global_indices()
-                .unwrap();
+            let global_indices = tree.source_tree.all_global_indices().unwrap();
 
-            let n_charges = tree
-                .source_tree()
-                .n_coordinates_tot()
-                .unwrap();
+            let n_charges = tree.source_tree().n_coordinates_tot().unwrap();
             let n_matvecs = charges.len() / n_charges;
 
             self.charges = Some(map_charges(global_indices, charges, n_matvecs));
@@ -279,7 +272,6 @@ where
 
     /// Finalize and build the single node FMM
     pub fn build(self) -> Result<KiFmm<Scalar, Kernel, FieldTranslation>, std::io::Error> {
-
         if let Some(tree) = self.tree {
             // Configure with tree, expansion parameters and source to target field translation operators
             let kernel = self.kernel.unwrap();
