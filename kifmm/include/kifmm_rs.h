@@ -101,7 +101,7 @@ typedef enum MetadataType {
    */
   MetadataType_GhostFmmU,
   /**
-   * Pointer and Buffer Creation
+   * Pointer and Buffer Creationmp
    */
   MetadataType_MetadataCreation,
   /**

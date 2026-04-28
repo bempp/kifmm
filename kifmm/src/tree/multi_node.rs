@@ -1,5 +1,6 @@
 //! Implementation of constructors for MPI distributed multi node trees, from distributed point data.
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use itertools::Itertools;
 use mpi::{datatype::PartitionMut, topology::SimpleCommunicator, traits::Root};
@@ -10,6 +11,7 @@ use mpi::{
 use num::Float;
 use rlst::RlstScalar;
 
+use crate::traits::types::{MPICollectiveType, OperatorTime};
 use crate::{
     sorting::{hyksort, samplesort, simplesort},
     traits::tree::{MultiTree, SingleTree},
@@ -48,6 +50,7 @@ where
     ) -> Result<MultiNodeTree<T, SimpleCommunicator>, std::io::Error> {
         let dim = 3;
         let n_coords = coordinates_row_major.len() / dim;
+        let mut mpi_times: HashMap<MPICollectiveType, OperatorTime> = HashMap::default();
 
         let mut points = Points::default();
         for i in 0..n_coords {
@@ -68,7 +71,16 @@ where
         // Perform parallel Morton sort over encoded points
         match sort_kind {
             SortKind::Hyksort { subcomm_size } => hyksort(&mut points, subcomm_size, communicator)?,
-            SortKind::Samplesort { n_samples } => samplesort(&mut points, communicator, n_samples)?,
+            SortKind::Samplesort { n_samples } => {
+                let st = Instant::now();
+                samplesort(&mut points, communicator, n_samples)?;
+                mpi_times
+                    .entry(MPICollectiveType::Sort)
+                    .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                    .or_insert(OperatorTime {
+                        time: st.elapsed().as_millis() as u64,
+                    });
+            }
             SortKind::Simplesort => {
                 let splitters = MortonKey::root().descendants(global_depth).unwrap();
                 let mut splitters = splitters
@@ -227,7 +239,15 @@ where
             }
 
             let mut counts = vec![0 as Count; size as usize];
+            // TODO: sort times
+            let st = Instant::now();
             root_process.gather_into_root(&n_roots, &mut counts);
+            mpi_times
+                .entry(MPICollectiveType::Gather)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             // Calculate associated displacements from the counts
             let mut displacements = Vec::new();
@@ -244,7 +264,14 @@ where
             let mut partition =
                 PartitionMut::new(&mut global_roots, &counts[..], &displacements[..]);
 
+            let st = Instant::now();
             root_process.gather_varcount_into_root(&roots, &mut partition);
+            mpi_times
+                .entry(MPICollectiveType::GatherV)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             let mut global_roots_ranks = Vec::new();
             for (rank, &count) in counts.iter().enumerate() {
@@ -264,8 +291,22 @@ where
                 roots.push(tree.root())
             }
 
+            let st = Instant::now();
             root_process.gather_into(&n_roots);
+            mpi_times
+                .entry(MPICollectiveType::Gather)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
+            let st = Instant::now();
             root_process.gather_varcount_into(&roots);
+            mpi_times
+                .entry(MPICollectiveType::GatherV)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             all_roots = Vec::default();
             all_roots_counts = Vec::default();
@@ -276,6 +317,7 @@ where
         Ok(MultiNodeTree {
             domain,
             communicator: communicator.duplicate(),
+            mpi_times,
             rank,
             global_depth,
             local_depth,

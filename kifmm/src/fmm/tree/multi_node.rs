@@ -11,8 +11,14 @@ use num::Float;
 use rlst::RlstScalar;
 
 use crate::{
-    fmm::types::{Layout, Query},
-    traits::tree::{MultiFmmTree, MultiTree, SingleTree},
+    fmm::{
+        helpers::single_node::optionally_time,
+        types::{Layout, Query},
+    },
+    traits::{
+        tree::{MultiFmmTree, MultiTree, SingleTree},
+        types::{MPICollectiveType, OperatorTime},
+    },
     tree::{MortonKey, MultiNodeTree},
     MultiNodeFmmTree,
 };
@@ -144,9 +150,22 @@ where
         let mut receive_counts = vec![0i32; self.source_tree().communicator.size() as usize];
         let mut receive_marker = vec![0i32; self.source_tree().communicator.size() as usize];
 
-        self.source_tree
-            .communicator
-            .all_to_all_into(&send_counts, &mut receive_counts);
+        let (_, duration) = optionally_time(true, {
+            || {
+                self.source_tree
+                    .communicator
+                    .all_to_all_into(&send_counts, &mut receive_counts);
+            }
+        });
+
+        if let Some(d) = duration {
+            self.mpi_times
+                .entry(MPICollectiveType::AlltoAll)
+                .and_modify(|t| t.time += d.as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: d.as_millis() as u64,
+                });
+        };
 
         for (rank, &receive_count) in receive_counts.iter().enumerate() {
             if receive_count > 0 {
@@ -184,9 +203,22 @@ where
         let mut counts_ = vec![0i32; size as usize];
 
         // All gather to calculate the counts of roots on each processor
-        self.source_tree
-            .communicator
-            .all_gather_into(&n_roots, &mut counts_);
+
+        // TODO cleanup timing
+        let (_, duration) = optionally_time(true, || {
+            self.source_tree
+                .communicator
+                .all_gather_into(&n_roots, &mut counts_)
+        });
+
+        if let Some(d) = duration {
+            self.mpi_times
+                .entry(MPICollectiveType::AllGather)
+                .and_modify(|t| t.time += d.as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: d.as_millis() as u64,
+                });
+        };
 
         // Calculate displacements from the counts on each processor
         let mut displacements_ = Vec::new();
@@ -202,16 +234,31 @@ where
         let mut raw = vec![MortonKey::<T>::default(); n_roots_global as usize];
 
         // Store a copy of counts and displacements
+
+        // TODO: tidy timing
         let counts;
         let displacements;
-        {
-            let mut partition = PartitionMut::new(&mut raw, counts_, &displacements_[..]);
-            self.source_tree
-                .communicator
-                .all_gather_varcount_into(&roots, &mut partition);
-            counts = partition.counts().to_vec();
-            displacements = partition.displs().to_vec();
-        }
+        let mut partition = PartitionMut::new(&mut raw, counts_, &displacements_[..]);
+
+        let (_, duration) = optionally_time(true, {
+            || {
+                self.source_tree
+                    .communicator
+                    .all_gather_varcount_into(&roots, &mut partition);
+            }
+        });
+
+        counts = partition.counts().to_vec();
+        displacements = partition.displs().to_vec();
+
+        if let Some(d) = duration {
+            self.mpi_times
+                .entry(MPICollectiveType::AllGatherV)
+                .and_modify(|t| t.time += d.as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: d.as_millis() as u64,
+                });
+        };
 
         // Store as a set for easy lookup
         let raw_set = raw.iter().cloned().collect();

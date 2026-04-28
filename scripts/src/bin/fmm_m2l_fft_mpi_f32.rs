@@ -2,8 +2,14 @@
 use clap::Parser;
 use green_kernels::laplace_3d::Laplace3dKernel;
 use kifmm::{
-    traits::types::{CommunicationType, FmmOperatorType, MetadataType},
-    tree::{helpers::points_fixture, types::SortKind},
+    traits::{
+        tree::MultiFmmTree,
+        types::{CommunicationType, FmmOperatorType, MPICollectiveType, MetadataType},
+    },
+    tree::{
+        helpers::{points_fixture, points_fixture_sphere},
+        types::SortKind,
+    },
     DataAccessMulti, EvaluateMulti, FftFieldTranslation, MultiNodeBuilder,
 };
 use mpi::traits::*;
@@ -48,6 +54,10 @@ struct Args {
     /// less than the number of samples and greater than 0
     #[arg(long, default_value_t = 10)]
     n_samples: usize,
+
+    /// Particle distribution (0 - uniform, 1 - sphere)
+    #[arg(long, default_value_t = 0)]
+    distribution: u64,
 }
 
 fn main() {
@@ -66,6 +76,7 @@ fn main() {
     let block_size = args.block_size;
     let n_threads = args.n_threads;
     let n_samples = args.n_samples;
+    let distribution = args.distribution;
     let id = args.id;
 
     assert!(n_samples > 0 && n_samples < n_points);
@@ -83,7 +94,16 @@ fn main() {
     let source_to_target = FftFieldTranslation::<f32>::new(Some(block_size));
 
     // Generate some random test data local to each process
-    let points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+
+    let points;
+    if distribution == 0 {
+        points = points_fixture::<f32>(n_points, None, None, Some(world.rank() as u64));
+    } else if distribution == 1 {
+        points = points_fixture_sphere::<f32>(n_points, Some(world.rank() as u64))
+    } else {
+        panic!("Unknown distribution")
+    }
+
     let charges = vec![1f32; n_points];
 
     let mut multi_fmm = MultiNodeBuilder::new(true)
@@ -112,8 +132,158 @@ fn main() {
     multi_fmm.evaluate().unwrap();
     let runtime = start.elapsed().as_millis();
 
+    let mut mean_roots_per_rank_source_tree = 0.;
+    if multi_fmm.rank() == 0 {
+        let mut m: HashMap<i32, f64> = HashMap::new();
+        for x in multi_fmm.tree().source_tree().all_roots_ranks.iter() {
+            *m.entry(*x).or_default() += 1.0;
+        }
+
+        let n_ranks = m.len();
+        let mut tmp = 0.0;
+        for (_rank, n_keys) in m.iter() {
+            tmp += n_keys;
+        }
+
+        mean_roots_per_rank_source_tree = tmp / (n_ranks as f64);
+    }
+
+    let mut mean_roots_per_rank_target_tree = 0.;
+    if multi_fmm.rank() == 0 {
+        let mut m: HashMap<i32, f64> = HashMap::new();
+        for x in multi_fmm.tree().target_tree().all_roots_ranks.iter() {
+            *m.entry(*x).or_default() += 1.0;
+        }
+
+        let n_ranks = m.len();
+        let mut tmp = 0.0;
+        for (_rank, n_keys) in m.iter() {
+            tmp += n_keys;
+        }
+
+        mean_roots_per_rank_target_tree = tmp / (n_ranks as f64);
+    }
+
     // Destructure operator times
     let mut operator_times = HashMap::new();
+
+    // Destructure FMM MPI times
+    let mut mpi_times = HashMap::new();
+
+    for (&op_type, op_time) in multi_fmm.mpi_times.iter() {
+        match op_type {
+            MPICollectiveType::AlltoAll => {
+                mpi_times.insert("all_to_all", op_time.time);
+            }
+            MPICollectiveType::AlltoAllV => {
+                mpi_times.insert("all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::NeighbourAlltoAll => {
+                mpi_times.insert("neighbour_all_to_all", op_time.time);
+            }
+            MPICollectiveType::NeighbourAlltoAllv => {
+                mpi_times.insert("neighbour_all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::NeighbourAlltoAllvRuntime => {
+                mpi_times.insert("neighbour_all_to_all_v_runtime", op_time.time);
+            }
+
+            MPICollectiveType::Gather => {
+                mpi_times.insert("gather", op_time.time);
+            }
+            MPICollectiveType::Scatter => {
+                mpi_times.insert("scatter", op_time.time);
+            }
+
+            MPICollectiveType::GatherV => {
+                mpi_times.insert("gather_v", op_time.time);
+            }
+            MPICollectiveType::ScatterV => {
+                mpi_times.insert("scatter_v", op_time.time);
+            }
+
+            MPICollectiveType::GatherVRuntime => {
+                mpi_times.insert("gather_v_runtime", op_time.time);
+            }
+            MPICollectiveType::ScatterVRuntime => {
+                mpi_times.insert("scatter_v_runtime", op_time.time);
+            }
+
+            MPICollectiveType::AllGather => {
+                mpi_times.insert("all_gather", op_time.time);
+            }
+            MPICollectiveType::AllGatherV => {
+                mpi_times.insert("all_gather_v", op_time.time);
+            }
+
+            MPICollectiveType::DistGraphCreate => {
+                mpi_times.insert("dist_graph_create", op_time.time);
+            }
+
+            MPICollectiveType::Sort => {
+                mpi_times.insert("sort", op_time.time);
+            }
+        }
+    }
+
+    for (&op_type, op_time) in multi_fmm.tree.mpi_times.iter() {
+        match op_type {
+            MPICollectiveType::AlltoAll => {
+                mpi_times.insert("tree_all_to_all", op_time.time);
+            }
+            MPICollectiveType::AlltoAllV => {
+                mpi_times.insert("tree_all_to_all_v", op_time.time);
+            }
+
+            MPICollectiveType::NeighbourAlltoAll => {
+                mpi_times.insert("tree_neighbour_all_to_all", op_time.time);
+            }
+            MPICollectiveType::NeighbourAlltoAllv => {
+                mpi_times.insert("tree_neighbour_all_to_all_v", op_time.time);
+            }
+            MPICollectiveType::NeighbourAlltoAllvRuntime => {
+                mpi_times.insert("tree_neighbour_all_to_all_v_runtime", op_time.time);
+            }
+
+            MPICollectiveType::GatherVRuntime => {
+                mpi_times.insert("tree_gather_v_runtime", op_time.time);
+            }
+            MPICollectiveType::ScatterVRuntime => {
+                mpi_times.insert("tree_scatter_v_runtime", op_time.time);
+            }
+
+            MPICollectiveType::Gather => {
+                mpi_times.insert("tree_gather", op_time.time);
+            }
+            MPICollectiveType::Scatter => {
+                mpi_times.insert("tree_scatter", op_time.time);
+            }
+
+            MPICollectiveType::GatherV => {
+                mpi_times.insert("tree_gather_v", op_time.time);
+            }
+            MPICollectiveType::ScatterV => {
+                mpi_times.insert("tree_scatter_v", op_time.time);
+            }
+
+            MPICollectiveType::AllGather => {
+                mpi_times.insert("tree_all_gather", op_time.time);
+            }
+            MPICollectiveType::AllGatherV => {
+                mpi_times.insert("tree_all_gather_v", op_time.time);
+            }
+
+            MPICollectiveType::DistGraphCreate => {
+                mpi_times.insert("tree_dist_graph_create", op_time.time);
+            }
+
+            MPICollectiveType::Sort => {
+                mpi_times.insert("tree_sort", op_time.time);
+            }
+        }
+    }
 
     for (&op_type, op_time) in multi_fmm.operator_times.iter() {
         match op_type {
@@ -224,8 +394,10 @@ fn main() {
     println!(
         "{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},\
          {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
-         {:?},{:?},{:?},{:?},{:?},{:?}, {:?}, {:?} \
-         {:?},{:?},{:?},{:?},{:?},{:?},{:?}",
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}, \
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},\
+         {:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?},{:?}",
         id,
         multi_fmm.rank(),
         runtime,
@@ -260,6 +432,42 @@ fn main() {
         args.global_depth,
         args.block_size,
         args.n_threads,
-        args.n_samples
+        args.n_samples,
+        mean_roots_per_rank_source_tree,
+        mean_roots_per_rank_target_tree,
+        mpi_times.get("all_to_all").unwrap_or(&0),
+        mpi_times.get("all_to_all_v").unwrap_or(&0),
+        mpi_times.get("neighbour_all_to_all").unwrap_or(&0),
+        mpi_times.get("neighbour_all_to_all_v").unwrap_or(&0),
+        mpi_times
+            .get("neighbour_all_to_all_v_runtime")
+            .unwrap_or(&0),
+        mpi_times.get("gather").unwrap_or(&0),
+        mpi_times.get("scatter").unwrap_or(&0),
+        mpi_times.get("gather_v").unwrap_or(&0),
+        mpi_times.get("scatter_v").unwrap_or(&0),
+        mpi_times.get("gather_v_runtime").unwrap_or(&0),
+        mpi_times.get("scatter_v_runtime").unwrap_or(&0),
+        mpi_times.get("all_gather").unwrap_or(&0),
+        mpi_times.get("all_gather_v").unwrap_or(&0),
+        mpi_times.get("dist_graph_create").unwrap_or(&0),
+        mpi_times.get("sort").unwrap_or(&0),
+        mpi_times.get("tree_all_to_all").unwrap_or(&0),
+        mpi_times.get("tree_all_to_all_v").unwrap_or(&0),
+        mpi_times.get("tree_neighbour_all_to_all").unwrap_or(&0),
+        mpi_times.get("tree_neighbour_all_to_all_v").unwrap_or(&0),
+        mpi_times
+            .get("tree_neighbour_all_to_all_v_runtime")
+            .unwrap_or(&0),
+        mpi_times.get("tree_gather").unwrap_or(&0),
+        mpi_times.get("tree_scatter").unwrap_or(&0),
+        mpi_times.get("tree_gather_v").unwrap_or(&0),
+        mpi_times.get("tree_scatter_v").unwrap_or(&0),
+        mpi_times.get("tree_gather_v_runtime").unwrap_or(&0),
+        mpi_times.get("tree_scatter_v_runtime").unwrap_or(&0),
+        mpi_times.get("tree_all_gather").unwrap_or(&0),
+        mpi_times.get("tree_all_gather_v").unwrap_or(&0),
+        mpi_times.get("tree_dist_graph_create").unwrap_or(&0),
+        mpi_times.get("tree_sort").unwrap_or(&0),
     );
 }

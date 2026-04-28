@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    time::Instant,
+};
 
 use green_kernels::traits::Kernel as KernelTrait;
 use itertools::{izip, Itertools};
@@ -21,6 +24,7 @@ use crate::{
         fmm::{DataAccess, DataAccessMulti, HomogenousKernel},
         general::multi_node::{GhostExchange, GlobalFmmMetadata},
         tree::{MultiFmmTree, MultiTree, SingleFmmTree, SingleTree},
+        types::{MPICollectiveType, OperatorTime},
     },
     tree::{
         types::{Domain, MortonKey},
@@ -92,7 +96,14 @@ where
                 &displacements_buffers[..],
             );
 
+            let st = Instant::now();
             root_process.gather_varcount_into_root(&multipoles, &mut partition);
+            self.mpi_times
+                .entry(MPICollectiveType::GatherVRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             self.global_fmm.global_fmm_multipole_metadata(
                 self.tree.source_tree.all_roots.clone(),
@@ -110,7 +121,14 @@ where
                     .copy_from_slice(tmp);
             }
 
+            let st = Instant::now();
             root_process.gather_varcount_into(&multipoles);
+            self.mpi_times
+                .entry(MPICollectiveType::GatherVRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
     }
 
@@ -165,7 +183,14 @@ where
 
             // Send back coefficient data
             let partition = Partition::new(&send_buffer, counts, &displacements[..]);
+            let st = Instant::now();
             root_process.scatter_varcount_into_root(&partition, &mut receive_buffer);
+            self.mpi_times
+                .entry(MPICollectiveType::ScatterVRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             // Send back associated keys
             let partition = Partition::new(
@@ -173,10 +198,31 @@ where
                 &self.tree.target_tree.all_roots_counts[..],
                 &self.tree.target_tree.all_roots_displacements[..],
             );
+            let st = Instant::now();
             root_process.scatter_varcount_into_root(&partition, &mut expected_roots);
+            self.mpi_times
+                .entry(MPICollectiveType::ScatterVRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         } else {
+            let st = Instant::now();
             root_process.scatter_varcount_into(&mut receive_buffer);
+            self.mpi_times
+                .entry(MPICollectiveType::ScatterVRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
+            let st = Instant::now();
             root_process.scatter_varcount_into(&mut expected_roots);
+            self.mpi_times
+                .entry(MPICollectiveType::ScatterVRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // TODO might be broken if level locals is incorrectly set
@@ -253,8 +299,15 @@ where
                 neighbourhood_receive_displacements,
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             // Filter for locally available queries to send back
             let receive_counts_ = partition_receive.counts().iter().cloned().collect_vec();
@@ -364,8 +417,15 @@ where
             );
 
             // TODO: Investigate why all to all failing, and require all to all v
+            let st = Instant::now();
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Communicate expected query sizes
@@ -402,8 +462,15 @@ where
             );
 
             // TODO: Investigate why all to all failing, and require all to all v
+            let st = Instant::now();
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Create buffers to receive charge and coordinate data
@@ -457,8 +524,15 @@ where
                 &requested_queries_displacements[..],
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Communicate ghost coordinate data
@@ -475,8 +549,15 @@ where
                 &requested_coordinates_displacements[..],
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Communicate ghost charge data
@@ -493,8 +574,15 @@ where
                 requested_charges_displacements,
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_u
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Set metadata for Ghost FMM object
@@ -568,8 +656,15 @@ where
                 neighbourhood_receive_displacements,
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_v
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
 
             // Then, filter for queries that actually exist at this rank and send back this information
             let receive_counts = partition_receive.counts().iter().cloned().collect_vec();
@@ -645,8 +740,15 @@ where
                 recv_displacements_,
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_v
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Create buffers to receive queries which have been requested from neighbours
@@ -677,8 +779,15 @@ where
                 &requested_queries_displacements[..],
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_v
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllv)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Store original ordering of received data temporarily
@@ -879,8 +988,15 @@ where
                 &requested_multipoles_displacements[..],
             );
 
+            let st = Instant::now();
             self.neighbourhood_communicator_v
                 .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+            self.mpi_times
+                .entry(MPICollectiveType::NeighbourAlltoAllvRuntime)
+                .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                .or_insert(OperatorTime {
+                    time: st.elapsed().as_millis() as u64,
+                });
         }
 
         // Allocate ghost multipoles including sibling data, ordering dictated by tree construction

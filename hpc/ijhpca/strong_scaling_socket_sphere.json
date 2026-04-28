@@ -1,0 +1,11 @@
+{
+    "_comment": "Strong scaling",
+    "min_nodes": 1,
+    "max_nodes": 128,
+    "min_points_per_rank": 1000000,
+    "min_local_depth": 4,
+    "output": "strong_scaling_socket_sphere.slurm",
+    "method": "socket",
+    "scaling_func": 8,
+    "distribution": "sphere"
+}

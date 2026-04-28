@@ -1,4 +1,6 @@
 //! Charge handling in multi-node setting
+use std::time::Instant;
+
 use green_kernels::traits::Kernel as KernelTrait;
 use itertools::izip;
 use mpi::{
@@ -14,7 +16,7 @@ use crate::{
         fmm::{ChargeHandler, HomogenousKernel},
         general::multi_node::GhostExchange,
         tree::{MultiFmmTree, MultiTree},
-        types::FmmError,
+        types::{FmmError, MPICollectiveType, OperatorTime},
     },
     KiFmmMulti,
 };
@@ -171,8 +173,15 @@ where
                     &self.charge_receive_queries_displacements[..],
                 );
 
+                let st = Instant::now();
                 self.neighbourhood_communicator_charge
                     .all_to_all_varcount_into(&partition_send, &mut partition_receive);
+                self.mpi_times
+                    .entry(MPICollectiveType::NeighbourAlltoAllv)
+                    .and_modify(|t| t.time += st.elapsed().as_millis() as u64)
+                    .or_insert(OperatorTime {
+                        time: st.elapsed().as_millis() as u64,
+                    });
             }
 
             self.charges = requested_queries;
